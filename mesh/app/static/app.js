@@ -60,9 +60,13 @@
     let askAbort=null, searchAbort=null, searchSeq=0;
     const idx=[];const clean=t=>t.replace(/\s+/g,' ').trim();
     const secName=el=>{const h=el.closest('section')?.querySelector('h2');return h?clean(h.textContent):'本期';};
-    document.querySelectorAll('.card').forEach(c=>{const t=c.querySelector('.t');if(!t)return;idx.push({el:c,type:secName(c),title:clean(t.textContent),text:clean(c.textContent)});});
-    document.querySelectorAll('.ent').forEach(e=>{idx.push({el:e,type:secName(e),title:chipName(e),text:chipName(e)+' '+(e.dataset.tip||'').replace(/<[^>]+>/g,' ').replace(/\|\|/g,' ').replace(/::/g,' ')});});
-    document.querySelectorAll('.row').forEach(r=>{const l=r.querySelector('.l');if(!l)return;idx.push({el:r,type:secName(r),title:clean(l.textContent),text:clean(r.textContent)});});
+    const SEC_HASH={'可同步的关系':'rel','接触过的人和公司':'who','关注了什么':'what','日程与计划':'next','沟通中提到的看法':'views'};
+    function pushIdx(entry){entry.i=idx.length;idx.push(entry);}
+    document.querySelectorAll('.card').forEach(c=>{const t=c.querySelector('.t');if(!t)return;pushIdx({el:c,type:secName(c),title:clean(t.textContent),text:clean(c.textContent)});});
+    document.querySelectorAll('.ent').forEach(e=>{pushIdx({el:e,type:secName(e),title:chipName(e),text:chipName(e)+' '+(e.dataset.tip||'').replace(/<[^>]+>/g,' ').replace(/\|\|/g,' ').replace(/::/g,' ')});});
+    document.querySelectorAll('.row').forEach(r=>{const l=r.querySelector('.l');if(!l)return;pushIdx({el:r,type:secName(r),title:clean(l.textContent),text:clean(r.textContent)});});
+    function jumpToHit(x){if(!x||!x.el)return;closeModal();x.el.scrollIntoView({behavior:'smooth',block:'center'});x.el.classList.remove('hit');void x.el.offsetWidth;x.el.classList.add('hit');}
+    function issuePeekUrl(slug,q,section,title){const hash=SEC_HASH[section]||'';let u='/'+encodeURIComponent(slug)+'?peek='+encodeURIComponent(q);if(title)u+='&at='+encodeURIComponent(title);return hash?u+'#'+hash:u;}
     const AI_EX=['过去一个月里有哪些硬件公司是编辑部接触过、但 Founder Park 团队还没接触过的？','商业化团队在跟进的客户里，哪些同时也是编辑部的采访对象？','最近哪些海外接触是国内还没有部门跟进的？','关于 AI 助听器，公司内部各团队分别知道什么？'];
     function esc(t){return String(t||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
     function hl(t,q){const i=t.toLowerCase().indexOf(q.toLowerCase());if(i<0)return esc(t.slice(0,110));const a=Math.max(0,i-36);return esc(t.slice(a,i))+'<mark>'+esc(t.slice(i,i+q.length))+'</mark>'+esc(t.slice(i+q.length,i+q.length+70));}
@@ -85,10 +89,10 @@
       }
       if(!q){mbody.innerHTML='<div class="grp2">输入即搜。本期结果可直接跳转；往期结果跳到对应期。</div>';return;}
       const hits=idx.filter(x=>x.text.toLowerCase().includes(q.toLowerCase())).slice(0,12);
-      let h='<div class="grp2">本期 · '+hits.length+' 条</div><div class="res">'+(hits.map(x=>'<a class="it" data-i="'+idx.indexOf(x)+'"><span class="k">'+esc(x.type)+'</span><span class="t">'+esc(x.title)+'</span><div class="sn">'+hl(x.text,q)+'</div></a>').join('')||'<div class="empty">本期无匹配</div>')+'</div>';
+      let h='<div class="grp2">本期 · '+hits.length+' 条</div><div class="res">'+(hits.map(x=>'<a class="it" href="#" data-i="'+x.i+'"><span class="k">'+esc(x.type)+'</span><span class="t">'+esc(x.title)+'</span><div class="sn">'+hl(x.text,q)+'</div></a>').join('')||'<div class="empty">本期无匹配</div>')+'</div>';
       h+='<div class="grp2" id="oldHead">往期 · 检索中…</div><div class="res" id="oldRes"></div>';
       mbody.innerHTML=h;
-      mbody.querySelectorAll('.it[data-i]').forEach(a=>a.addEventListener('click',()=>{const x=idx[+a.dataset.i];closeModal();x.el.scrollIntoView({behavior:'smooth',block:'center'});x.el.classList.remove('hit');void x.el.offsetWidth;x.el.classList.add('hit');}));
+      mbody.querySelectorAll('.it[data-i]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();jumpToHit(idx[+a.dataset.i]);}));
       if(searchAbort){try{searchAbort.abort();}catch(_){ }}
       searchAbort=new AbortController();
       const seq=++searchSeq;
@@ -98,23 +102,28 @@
         const old=(j.hits||[]).filter(x=>x.issue_slug!==CFG.slug);
         const oh=document.getElementById('oldHead'),orr=document.getElementById('oldRes');if(!oh)return;
         oh.textContent='往期 · '+old.length+' 条';
-        orr.innerHTML=old.map(x=>'<a class="it" href="/'+esc(x.issue_slug)+'?q='+encodeURIComponent(q)+'"><span class="k old">'+esc(x.issue_slug)+' · '+esc(x.section)+'</span><span class="t">'+esc(x.title)+'</span><div class="sn">'+(x.sn||'')+'</div></a>').join('')||'<div class="empty">往期无匹配</div>';
+        orr.innerHTML=old.map(x=>'<a class="it" href="'+issuePeekUrl(x.issue_slug,q,x.section,x.title)+'"><span class="k old">'+esc(x.issue_slug)+' · '+esc(x.section)+'</span><span class="t">'+esc(x.title)+'</span><div class="sn">'+(x.sn||'')+'</div></a>').join('')||'<div class="empty">往期无匹配</div>';
       }catch(e){if(e&&e.name==='AbortError')return;const oh=document.getElementById('oldHead');if(oh)oh.textContent='往期 · 检索失败';}
     }
+    function meshAskStore(){
+      try{return sessionStorage;}catch(_){return localStorage;}
+    }
     function meshAskPayload(q){
-      let sid=localStorage.getItem('mesh_ask_session');
-      if(!sid){ sid=(crypto.randomUUID&&crypto.randomUUID())||String(Date.now()); localStorage.setItem('mesh_ask_session',sid); }
+      const store=meshAskStore();
+      let sid=store.getItem('mesh_ask_session');
+      if(!sid){ sid=(crypto.randomUUID&&crypto.randomUUID())||String(Date.now()); store.setItem('mesh_ask_session',sid); }
       const p={q, session_id:sid};
       if(window.MESH&&window.MESH.slug) p.slug=window.MESH.slug;
       return p;
     }
     async function meshAskNewSession(){
+      const store=meshAskStore();
       try{
         const r=await fetch('/api/ask/new_session',{method:'POST',headers:{'Content-Type':'application/json'}});
-        if(r.ok){ const j=await r.json(); if(j.session_id){ localStorage.setItem('mesh_ask_session',j.session_id); return j.session_id; } }
+        if(r.ok){ const j=await r.json(); if(j.session_id){ store.setItem('mesh_ask_session',j.session_id); return j.session_id; } }
       }catch(_){}
       const sid=(crypto.randomUUID&&crypto.randomUUID())||String(Date.now());
-      localStorage.setItem('mesh_ask_session',sid);
+      store.setItem('mesh_ask_session',sid);
       return sid;
     }
     async function ask(){
@@ -372,8 +381,25 @@
     document.getElementById('mx').addEventListener('click',closeModal);
     modal.addEventListener('click',e=>{if(e.target===modal)closeModal();});
     document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();document.querySelectorAll('.pop').forEach(p=>p.classList.remove('show'));} if(e.key==='/'&&document.activeElement.tagName!=='INPUT'&&document.activeElement.contentEditable!=='true'){e.preventDefault();openModal('','kw');}});
-    // URL ?q= 直接打开搜索
-    const qp=new URLSearchParams(location.search).get('q'); if(qp!==null){openModal(qp,'kw');}
+    // URL ?q= 打开搜索；?ask=1 则进 AI 问答并自动提问（EDM 预搜索链接）
+    const urlParams=new URLSearchParams(location.search);
+    const qp=urlParams.get('q');
+    const askAuto=urlParams.get('ask')==='1';
+    const peek=urlParams.get('peek');
+    const peekAt=urlParams.get('at')||'';
+    if(peek){
+      let target=null;
+      if(peekAt) target=idx.find(x=>x.title===peekAt)||idx.find(x=>x.title.includes(peekAt));
+      if(!target) target=idx.find(x=>x.text.toLowerCase().includes(peek.toLowerCase()));
+      if(target) setTimeout(()=>jumpToHit(target),150);
+    }else if(qp!==null){
+      if(askAuto){
+        openModal(qp,'ai');
+        setTimeout(()=>ask(),40);
+      }else{
+        openModal(qp,'kw');
+      }
+    }
     // 往期弹层
     document.querySelectorAll('.calbtn[data-pop]').forEach(b=>{const pop=b.parentElement.querySelector('.pop');b.addEventListener('click',e=>{e.stopPropagation();const on=pop.classList.contains('show');document.querySelectorAll('.pop').forEach(p=>p.classList.remove('show'));document.querySelectorAll('.calbtn').forEach(x=>x.classList.remove('on'));if(!on){pop.classList.add('show');b.classList.add('on');}});});
     document.addEventListener('click',e=>{if(!e.target.closest('.search')){document.querySelectorAll('.pop').forEach(p=>p.classList.remove('show'));document.querySelectorAll('.calbtn').forEach(x=>x.classList.remove('on'));}});

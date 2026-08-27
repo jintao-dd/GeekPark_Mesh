@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import json
 import secrets
-import sqlite3
 import datetime
 from typing import Any
 
+from . import db
 from .ask_scope import AskScope
 
 
@@ -37,7 +37,7 @@ def ensure_session(con, scope: AskScope, user: dict | None = None) -> dict:
                 now, now, now,
             ),
         )
-    except sqlite3.IntegrityError:
+    except db.IntegrityError:
         row = con.execute("SELECT * FROM ask_sessions WHERE scope_key=?", (key,)).fetchone()
         if row:
             return dict(row)

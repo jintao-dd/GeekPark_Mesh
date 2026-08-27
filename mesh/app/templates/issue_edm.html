@@ -6,6 +6,6 @@
 {% endblock %}
 {% block body %}
 {% set email_mode = false %}
-{% set edm_banner = '邮件预览 · ' ~ issue.period_label ~ ' · slug ' ~ issue.slug ~ (' · 已上线稿（与正式发送一致）' if issue.status == 'published' else ' · 草稿（尚未上线）') ~ ' · 关系节只列前 ' ~ ([d.relations|length, 4]|min)|string ~ (' 组，共 ' ~ n_rel|string ~ ' 组' if n_rel > 4 else ' 组') %}
+{% set edm_banner = '旧版浏览器预览（已弃用） · ' ~ issue.period_label ~ ' · slug ' ~ issue.slug ~ (' · 已上线稿' if issue.status == 'published' else ' · 草稿') ~ ' · 请关闭本页，从 EDM 管理打开「预览」查看与发送一致的邮件' %}
 {% include "_issue_edm_inner.html" %}
 {% endblock %}

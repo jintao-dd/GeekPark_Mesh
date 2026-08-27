@@ -18,8 +18,11 @@ def _starttls(env):
 
 
 updates = {
-    "SMTP_USER": "blog@geekpark.net",
-    "SMTP_FROM": "GeekPark Mesh <blog@geekpark.net>",
+    "SMTP_HOST": "smtp.feishu.cn",
+    "SMTP_PORT": "465",
+    "SMTP_SSL": "1",
+    "SMTP_USER": "mesh@geekpark.net",
+    "SMTP_FROM": "GeekPark Mesh <mesh@geekpark.net>",
 }
 if len(sys.argv) > 1:
     updates["SMTP_PASSWORD"] = sys.argv[1]

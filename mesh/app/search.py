@@ -52,30 +52,47 @@ def fts_search(
         return sql
 
     if match_q:
-        params: list = [match_q]
-        sql = """
-            SELECT issue_slug, section, title, body, date_end,
-                   bm25(search_fts) AS score
-            FROM search_fts
-            WHERE search_fts MATCH ?
-        """
-        sql += _date_sql(params)
-        sql += " ORDER BY bm25(search_fts) LIMIT ?"
-        params.append(max(limit * 3, limit))
-        try:
-            for r in con.execute(sql, params):
-                body = r["body"] or ""
-                hits.append({
-                    "issue_slug": r["issue_slug"],
-                    "section": r["section"],
-                    "title": r["title"],
-                    "sn": _highlight(body, q),
-                    "body": body,
-                    "date_end": r["date_end"] or "",
-                    "score": float(r["score"] or 0),
-                })
-        except Exception:
-            hits = []
+        if getattr(con, "dialect", "sqlite") == "postgresql":
+            from . import fts_pg
+            try:
+                for r in fts_pg.search_fts(con, q, slug=slug, date_from=date_from, date_to=date_to, limit=limit):
+                    body = r.get("body") or ""
+                    hits.append({
+                        "issue_slug": r["issue_slug"],
+                        "section": r["section"],
+                        "title": r["title"],
+                        "sn": _highlight(body, q),
+                        "body": body,
+                        "date_end": r.get("date_end") or "",
+                        "score": float(r.get("score") or 0),
+                    })
+            except Exception:
+                hits = []
+        else:
+            params: list = [match_q]
+            sql = """
+                SELECT issue_slug, section, title, body, date_end,
+                       bm25(search_fts) AS score
+                FROM search_fts
+                WHERE search_fts MATCH ?
+            """
+            sql += _date_sql(params)
+            sql += " ORDER BY bm25(search_fts) LIMIT ?"
+            params.append(max(limit * 3, limit))
+            try:
+                for r in con.execute(sql, params):
+                    body = r["body"] or ""
+                    hits.append({
+                        "issue_slug": r["issue_slug"],
+                        "section": r["section"],
+                        "title": r["title"],
+                        "sn": _highlight(body, q),
+                        "body": body,
+                        "date_end": r["date_end"] or "",
+                        "score": float(r["score"] or 0),
+                    })
+            except Exception:
+                hits = []
 
     if len(hits) < min(3, limit):
         terms = tok.query_terms(q, limit=3)

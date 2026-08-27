@@ -1,10 +1,38 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: geekpark-mesh-pg
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mesh}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mesh}
+      POSTGRES_DB: ${POSTGRES_DB:-mesh}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - mesh_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mesh} -d ${POSTGRES_DB:-mesh}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   mesh:
     build: .
     container_name: geekpark-mesh
     restart: unless-stopped
     env_file: .env
+    environment:
+      MESH_DB_URL: postgresql://${POSTGRES_USER:-mesh}:${POSTGRES_PASSWORD:-mesh}@postgres:5432/${POSTGRES_DB:-mesh}
+      MESH_UVICORN_WORKERS: ${MESH_UVICORN_WORKERS:-2}
     ports: ["8090:8080"]
     volumes:
-      - ./data:/srv/mesh/data          # 数据库、原始文件持久化
-      - ./app/prompts:/srv/mesh/app/prompts   # 规则提示词可在线编辑并持久化
+      - ./data:/srv/mesh/data
+      - ./app/prompts:/srv/mesh/app/prompts
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  mesh_pg_data:

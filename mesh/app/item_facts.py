@@ -300,30 +300,61 @@ def search(
     hits: list[dict] = []
 
     if match_q:
-        params.append(match_q)
-        sql = """
-            SELECT issue_slug, date_end, item_id, source_id, owner_team, stype,
-                   primary_name, text_snippet, source_label, level, kind, zone,
-                   bm25(item_facts_fts) AS score
-            FROM item_facts_fts WHERE item_facts_fts MATCH ?
-        """
-        if slug:
-            sql += " AND issue_slug = ?"
-            params.append(slug)
-        if team:
-            sql += " AND owner_team = ?"
-            params.append(ingest.canonical_team(team) or team)
-        if stype:
-            sql += " AND stype = ?"
-            params.append(stype)
-        sql += _date_clause(date_from, date_to, params)
-        sql += " ORDER BY bm25(item_facts_fts) LIMIT ?"
-        params.append(max(limit * 2, limit))
-        try:
-            for r in con.execute(sql, params):
-                hits.append(_row_to_hit(dict(r), q))
-        except Exception:
-            hits = []
+        if getattr(con, "dialect", "sqlite") == "postgresql":
+            from . import fts_pg
+            filt, fp, score_expr = fts_pg.build_toks_filter(
+                match_q, ["toks", "primary_name", "text_snippet"]
+            )
+            if filt:
+                sql = f"""
+                    SELECT issue_slug, date_end, item_id, source_id, owner_team, stype,
+                           primary_name, text_snippet, source_label, level, kind, zone,
+                           -({score_expr}) AS score
+                    FROM item_facts_fts WHERE {filt}
+                """
+                params = list(fp)
+                if slug:
+                    sql += " AND issue_slug = %s"
+                    params.append(slug)
+                if team:
+                    sql += " AND owner_team = %s"
+                    params.append(ingest.canonical_team(team) or team)
+                if stype:
+                    sql += " AND stype = %s"
+                    params.append(stype)
+                sql += _date_clause(date_from, date_to, params)
+                sql += f" ORDER BY score DESC LIMIT %s"
+                params.append(max(limit * 2, limit))
+                try:
+                    for r in con.execute(sql, params):
+                        hits.append(_row_to_hit(dict(r), q))
+                except Exception:
+                    hits = []
+        else:
+            params.append(match_q)
+            sql = """
+                SELECT issue_slug, date_end, item_id, source_id, owner_team, stype,
+                       primary_name, text_snippet, source_label, level, kind, zone,
+                       bm25(item_facts_fts) AS score
+                FROM item_facts_fts WHERE item_facts_fts MATCH ?
+            """
+            if slug:
+                sql += " AND issue_slug = ?"
+                params.append(slug)
+            if team:
+                sql += " AND owner_team = ?"
+                params.append(ingest.canonical_team(team) or team)
+            if stype:
+                sql += " AND stype = ?"
+                params.append(stype)
+            sql += _date_clause(date_from, date_to, params)
+            sql += " ORDER BY bm25(item_facts_fts) LIMIT ?"
+            params.append(max(limit * 2, limit))
+            try:
+                for r in con.execute(sql, params):
+                    hits.append(_row_to_hit(dict(r), q))
+            except Exception:
+                hits = []
 
     if len(hits) < min(3, limit):
         terms = tok.query_terms(q, limit=4)

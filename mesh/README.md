@@ -83,11 +83,15 @@
 | ANTHROPIC_API_KEY | 必填。主 LLM。 |
 | MESH_SECRET | 必填。会话签名，≥16 字符随机串。 |
 | MESH_ADMIN_PASSWORD | 首次 admin 密码。 |
-| MESH_BASE_URL | 站点 URL（EDM、飞书回调）。 |
+| MESH_DB | SQLite 路径（未设 MESH_DB_URL 时默认 `data/mesh.db`）。 |
+| MESH_DB_URL | PostgreSQL 连接串；设置后启用 PG（推荐生产）。 |
+| MESH_UVICORN_WORKERS | PG 模式下 worker 数（默认 1；compose 默认 2）。 |
 | MESH_LLM_PROVIDER / MESH_LLM_* | 换模型（Anthropic / OpenAI 兼容）。 |
 | MESH_EMBED_ENABLED | 默认 1；无 Key 时向量检索自动降级。 |
 | MESH_EMBED_API_KEY / MESH_EMBED_BASE_URL / MESH_EMBED_MODEL | 向量嵌入（可与 LLM 同厂商）。 |
 | MESH_ASK_RATE_PER_MIN | Ask 速率限制（默认 40/分钟/用户）。 |
+| MESH_ASK_LLM_CONCURRENCY | 同时进行 LLM 问答数（默认 4，超出排队）。 |
+| MESH_ASK_QUEUE_TIMEOUT | 排队等 LLM 槽最长秒数（默认 120）。 |
 | SMTP_* | EDM |
 | FEISHU_APP_ID / FEISHU_APP_SECRET | 飞书登录 |
 
@@ -137,6 +141,7 @@ mesh/
 
 ## 九、常见问题
 
+- **迁 PostgreSQL**：`MESH_DB_URL=postgresql://... python deploy/migrate_to_postgres.py`，然后 `.env` 固定 `MESH_DB_URL` 并 `docker compose up -d --build`。
 - **chunk_embeddings=0**：配置 `MESH_EMBED_*` 后重启，或调 `POST /admin/embed_backfill`。
 - **Ask 429**：调低频率或增大 `MESH_ASK_RATE_PER_MIN`。
 - **重抽后 Ask 与页面不一致**：Ask 跟条目快照；页面跟 `published_json`，需 owner 重新上线更新页面。

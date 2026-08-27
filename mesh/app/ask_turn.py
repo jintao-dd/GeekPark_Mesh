@@ -4,7 +4,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from . import ask_engine, conversation, llm
+from . import ask_engine, conversation, llm, db
 from .ask_scope import AskScope
 
 
@@ -49,7 +49,8 @@ def begin_turn(
                 {**resp, "latency_ms": 0, "n_hits": resp.get("n_context", 0)},
                 session_id=sess["id"],
             )
-            con.commit()
+            with db.write_lock():
+                db.commit_retry(con)
             resp["session_id"] = sess["id"]
             resp["cached"] = True
             return {"cached": True, "resp": resp}
@@ -83,7 +84,8 @@ def complete_turn(
         mode=prepared.get("mode", ""), n_context=prepared.get("n_context", 0),
     )
     ask_engine.log_ask(con, scope, user, q, prepared, session_id=sess["id"])
-    con.commit()
+    with db.write_lock():
+        db.commit_retry(con)
     resp = _resp_from_prepared(prepared, ans, sess["id"])
     if use_cache:
         cache_put(cache_key, resp)

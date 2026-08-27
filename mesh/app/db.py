@@ -1,12 +1,20 @@
-"""GeekPark Mesh · 数据库层（SQLite，标准库，无需编译）"""
-import sqlite3, json, os, hashlib, secrets, datetime, re, threading, logging
+"""GeekPark Mesh · 数据库层（SQLite 或 PostgreSQL via MESH_DB_URL）"""
+import sqlite3, json, os, hashlib, secrets, datetime, re, threading, logging, time
 from contextlib import contextmanager
 from pathlib import Path
 
+from . import db_conn
+
 _log = logging.getLogger("mesh.db")
-DB_PATH = os.environ.get("MESH_DB", str(Path(__file__).resolve().parent.parent / "data" / "mesh.db"))
-SCHEMA_VERSION = "1.6.3"
+DB_PATH = db_conn.DB_PATH
+SCHEMA_VERSION = "1.7.0"
 _DB_WRITE_LOCK = threading.RLock()
+
+IntegrityError = db_conn.IntegrityError
+is_postgres = db_conn.is_postgres
+connect = db_conn.connect
+try_maintenance_lock = db_conn.try_maintenance_lock
+release_maintenance_lock = db_conn.release_maintenance_lock
 
 SCHEMA = """
 PRAGMA journal_mode=WAL;
@@ -269,20 +277,29 @@ CREATE TABLE IF NOT EXISTS preset_push_log(
 
 @contextmanager
 def write_lock():
-    """跨 pipeline / preview / 后台维护 的 SQLite 写锁。"""
+    """跨 pipeline / preview / 后台维护 的写锁（PG 下协调长事务）。"""
     with _DB_WRITE_LOCK:
         yield
 
 
-def connect():
-    Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(DB_PATH, check_same_thread=False)
-    con.row_factory = sqlite3.Row
-    try:
-        con.execute("PRAGMA busy_timeout=30000")
-    except Exception:
-        pass
-    return con
+def commit_retry(con, *, max_attempts: int = 5) -> None:
+    """写冲突时指数退避重试（SQLite locked / PG serialization）。"""
+    if getattr(con, "dialect", "sqlite") == "postgresql":
+        con.commit()
+        return
+    delay = 0.05
+    for attempt in range(max_attempts):
+        try:
+            con.commit()
+            return
+        except sqlite3.OperationalError as e:
+            msg = str(e).lower()
+            if "locked" not in msg and "busy" not in msg:
+                raise
+            if attempt >= max_attempts - 1:
+                raise
+            time.sleep(delay)
+            delay = min(delay * 2, 1.0)
 
 def hash_pw(pw: str, salt: str | None = None) -> str:
     salt = salt or secrets.token_hex(8)
@@ -297,11 +314,24 @@ def check_pw(pw: str, stored: str) -> bool:
         return False
 
 def _cols(con, table):
+    if getattr(con, "dialect", "sqlite") == "postgresql":
+        rows = con.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=%s",
+            (table,),
+        ).fetchall()
+        return {r["column_name"] for r in rows}
     return {r["name"] for r in con.execute(f"PRAGMA table_info({table})")}
 
 
 def migrate(con):
     """就地升级旧库：老部署直接覆盖代码后启动即可，不丢数据。"""
+    if is_postgres():
+        try:
+            set_setting(con, "schema_version", SCHEMA_VERSION)
+        except Exception:
+            pass
+        ensure_search_fts_schema(con)
+        return
     add = [
         ("sources", "channel", "TEXT DEFAULT 'manual'"),
         ("items", "owner_team", "TEXT"),
@@ -446,20 +476,29 @@ def migrate(con):
 
 
 def _fts_columns(con) -> set[str]:
+    if getattr(con, "dialect", "sqlite") == "postgresql":
+        return _cols(con, "search_fts")
     try:
         return {r[1] for r in con.execute("PRAGMA table_info(search_fts)")}
     except Exception:
         return set()
 
 
+def _init_pg_schema(con) -> None:
+    schema_path = Path(__file__).resolve().parent / "schema_pg.sql"
+    con.executescript(schema_path.read_text(encoding="utf-8"))
+
+
 def ensure_search_fts_schema(con) -> bool:
     """
     确保 search_fts 含 toks/date_end（中文 MATCH 用）。
-    旧四列结构只建空表并打标，全量重索引放到后台，避免启动卡住导致网关 502。
+    SQLite：旧四列结构重建 FTS5；PostgreSQL：普通表 + pg_trgm。
     """
-    cols = _fts_columns(con)
     need = {"issue_slug", "section", "title", "body", "date_end", "toks"}
+    cols = _fts_columns(con)
     if cols >= need:
+        return False
+    if getattr(con, "dialect", "sqlite") == "postgresql":
         return False
     con.execute("DROP TABLE IF EXISTS search_fts")
     con.execute("""CREATE VIRTUAL TABLE search_fts USING fts5(
@@ -471,7 +510,6 @@ def ensure_search_fts_schema(con) -> bool:
       toks,
       tokenize='unicode61'
     )""")
-    # 直接写 settings，避免依赖函数定义顺序
     try:
         con.execute(
             "INSERT INTO settings(key,value) VALUES('search_fts_needs_reindex','1') "
@@ -495,7 +533,10 @@ def clear_search_reindex_flag(con):
 
 def init_db(seed: bool = True):
     con = connect()
-    con.executescript(SCHEMA)
+    if is_postgres():
+        _init_pg_schema(con)
+    else:
+        con.executescript(SCHEMA)
     migrate(con)
     # 默认管理员：必须用环境变量设密码；演示弱口令仅允许显式打开 MESH_ALLOW_DEMO_PASSWORDS=1
     import secrets as _secrets
@@ -969,32 +1010,33 @@ def iter_index_items(con, issue_id: int):
 
 
 def prune_old_logs(con, *, ask_days: int = 180, push_days: int = 90) -> dict:
-    """裁剪问答/推送日志，避免无限增长。"""
+    """裁剪问答/推送日志，避免无限增长（SQLite / PostgreSQL 通用）。"""
+    import datetime as _dt
+
+    def _cutoff(days: int) -> str:
+        return (_dt.datetime.now() - _dt.timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+
+    ask_cut = _cutoff(ask_days)
+    push_cut = _cutoff(push_days)
     out = {"ask_log": 0, "ask_messages": 0, "preset_push_log": 0}
-    for table, col, days, key in (
-        ("ask_log", "created_at", ask_days, "ask_log"),
-        ("preset_push_log", "pushed_at", push_days, "preset_push_log"),
+    for table, col, cutoff, key in (
+        ("ask_log", "created_at", ask_cut, "ask_log"),
+        ("preset_push_log", "pushed_at", push_cut, "preset_push_log"),
     ):
         try:
-            cur = con.execute(
-                f"DELETE FROM {table} WHERE {col} < datetime('now', ?)",
-                (f"-{days} days",),
-            )
-            out[key] = cur.rowcount
+            cur = con.execute(f"DELETE FROM {table} WHERE {col} < ?", (cutoff,))
+            out[key] = int(getattr(cur, "rowcount", 0) or 0)
         except Exception:
             pass
     try:
         cur = con.execute(
             """DELETE FROM ask_messages WHERE session_id IN (
-               SELECT id FROM ask_sessions WHERE last_active_at < datetime('now', ?)
+               SELECT id FROM ask_sessions WHERE last_active_at < ?
             )""",
-            (f"-{ask_days} days",),
+            (ask_cut,),
         )
-        out["ask_messages"] = cur.rowcount
-        con.execute(
-            "DELETE FROM ask_sessions WHERE last_active_at < datetime('now', ?)",
-            (f"-{ask_days} days",),
-        )
+        out["ask_messages"] = int(getattr(cur, "rowcount", 0) or 0)
+        con.execute("DELETE FROM ask_sessions WHERE last_active_at < ?", (ask_cut,))
     except Exception:
         pass
     return out

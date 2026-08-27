@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 BASE = Path(__file__).resolve().parent
 load_dotenv(BASE.parent / ".env")
 from . import db, ingest, llm, auth, edm, edm_job, merge, pipeline, preview_job, qa_structured, search, tokenize
-from . import ask_engine, ask_scope, conversation, presets, chunk_index, embeddings, retriever, ask_turn, ask_query
+from . import ask_engine, ask_scope, conversation, presets, chunk_index, embeddings, retriever, ask_turn, ask_query, ask_concurrency
 import time
 
 _ASK_CACHE: dict[str, tuple[float, dict]] = {}
@@ -182,10 +182,12 @@ def _startup():
         print(f"[mesh] init_db failed: {e}", flush=True)
 
     def _bg_maintenance():
+        con = db.connect()
         try:
+            if not db.try_maintenance_lock(con):
+                print("[mesh] maintenance skipped (another worker holds lock)", flush=True)
+                return
             with db.write_lock():
-                con = db.connect()
-                try:
                     n_facts = con.execute("SELECT COUNT(*) c FROM entity_team_facts").fetchone()["c"]
                     n_pub = con.execute("SELECT COUNT(*) c FROM issues WHERE status='published'").fetchone()["c"]
                     fact_slugs = con.execute("SELECT COUNT(DISTINCT issue_slug) c FROM entity_team_facts").fetchone()["c"]
@@ -265,10 +267,14 @@ def _startup():
                             con.commit()
                     except Exception:
                         pass
-                finally:
-                    con.close()
         except Exception as e:
             print(f"[mesh] background maintenance failed: {e}", flush=True)
+        finally:
+            try:
+                db.release_maintenance_lock(con)
+            except Exception:
+                pass
+            con.close()
 
     import threading
     threading.Thread(target=_bg_maintenance, daemon=True, name="mesh-maint").start()
@@ -562,17 +568,37 @@ def _run_ask(request: Request, payload: dict):
         )
         if turn.get("cached"):
             return turn["resp"]
-        try:
-            ans = ask_turn.generate_answer(q, turn["prepared"], turn["history"])
-        except Exception:
-            return {k: v for k, v in turn["prepared"].items() if k not in ("contexts", "direct_answer", "preview")} | {
-                "answer": "AI 问答暂不可用，请稍后重试。",
-                "session_id": turn["sess"]["id"],
-            }
+        prepared = turn["prepared"]
+        sess = turn["sess"]
+        history = turn["history"]
+        cache_key = turn["cache_key"]
+        use_cache = turn["use_cache"]
+    finally:
+        con.close()
+
+    try:
+        if prepared.get("direct_answer") is not None:
+            ans = prepared["direct_answer"]
+        else:
+            with ask_concurrency.llm_slot():
+                ans = ask_turn.generate_answer(q, prepared, history)
+    except ask_concurrency.AskBusyError as e:
+        return {k: v for k, v in prepared.items() if k not in ("contexts", "direct_answer", "preview")} | {
+            "answer": str(e),
+            "session_id": sess["id"],
+        }
+    except Exception:
+        return {k: v for k, v in prepared.items() if k not in ("contexts", "direct_answer", "preview")} | {
+            "answer": "AI 问答暂不可用，请稍后重试。",
+            "session_id": sess["id"],
+        }
+
+    con = db.connect()
+    try:
         return ask_turn.complete_turn(
             con, user=user, scope=scope, q=q,
-            sess=turn["sess"], prepared=turn["prepared"], ans=ans,
-            cache_key=turn["cache_key"], use_cache=turn["use_cache"],
+            sess=sess, prepared=prepared, ans=ans,
+            cache_key=cache_key, use_cache=use_cache,
             cache_put=_ask_cache_put,
         )
     finally:
@@ -761,11 +787,13 @@ def api_ask_stream(request: Request, payload: dict):
             return
 
         con = db.connect()
+        user = scope = prepared = sess = history = None
+        cache_key = ""
+        use_cache = False
         try:
             user = auth.ask_user(con, cookie)
             if not user:
                 yield sse({"type": "error", "message": "未登录"})
-                con.close()
                 return
             scope = ask_scope.resolve(con, user, payload)
             turn = ask_turn.begin_turn(
@@ -784,16 +812,18 @@ def api_ask_stream(request: Request, payload: dict):
                 if ans:
                     yield sse({"type": "token", "text": ans})
                 yield sse({"type": "done", "answer": ans})
-                con.close()
                 return
 
             prepared = turn["prepared"]
             sess = turn["sess"]
             history = turn["history"]
+            cache_key = turn["cache_key"]
+            use_cache = turn["use_cache"]
         except Exception as e:
             yield sse({"type": "error", "message": str(e)})
-            con.close()
             return
+        finally:
+            con.close()
 
         meta = {k: v for k, v in prepared.items() if k not in ("contexts", "direct_answer", "preview")}
         meta["type"] = "meta"
@@ -802,24 +832,36 @@ def api_ask_stream(request: Request, payload: dict):
 
         parts: list[str] = []
         try:
-            for chunk in ask_turn.generate_answer_stream(q, prepared, history):
-                if not chunk:
-                    continue
-                parts.append(chunk)
-                yield sse({"type": "token", "text": chunk})
+            if prepared.get("direct_answer") is not None:
+                ans = prepared["direct_answer"]
+                if ans:
+                    parts.append(ans)
+                    yield sse({"type": "token", "text": ans})
+            else:
+                with ask_concurrency.llm_slot():
+                    for chunk in ask_turn.generate_answer_stream(q, prepared, history):
+                        if not chunk:
+                            continue
+                        parts.append(chunk)
+                        yield sse({"type": "token", "text": chunk})
+        except ask_concurrency.AskBusyError as e:
+            yield sse({"type": "error", "message": str(e)})
+            return
         except Exception:
-            con.close()
             yield sse({"type": "error", "message": "AI 问答暂不可用，请稍后重试。"})
             return
 
         ans = "".join(parts) if parts else (prepared.get("direct_answer") or "")
-        ask_turn.complete_turn(
-            con, user=user, scope=scope, q=q,
-            sess=sess, prepared=prepared, ans=ans,
-            cache_key=turn["cache_key"], use_cache=turn["use_cache"],
-            cache_put=_ask_cache_put,
-        )
-        con.close()
+        con = db.connect()
+        try:
+            ask_turn.complete_turn(
+                con, user=user, scope=scope, q=q,
+                sess=sess, prepared=prepared, ans=ans,
+                cache_key=cache_key, use_cache=use_cache,
+                cache_put=_ask_cache_put,
+            )
+        finally:
+            con.close()
         yield sse({"type": "done", "answer": ans})
 
     return StreamingResponse(
@@ -1850,20 +1892,36 @@ def unpublish(request: Request, slug: str):
         return JSONResponse({"ok": True, "slug": slug, "status": "draft"})
     return RedirectResponse("/admin/issues", status_code=302)
 
+def _edm_json_from_row(row: dict) -> dict:
+    """从 issues 行解析 EDM 用 JSON，避免重复查库。"""
+    if row.get("status") == "published":
+        raw = row.get("published_json") or "{}"
+    else:
+        raw = row.get("draft_json") or row.get("published_json") or "{}"
+    try:
+        return json.loads(raw or "{}")
+    except json.JSONDecodeError:
+        return {}
+
+
 @app.get("/admin/edm", response_class=HTMLResponse)
 def edm_admin(request: Request, saved: int = 0, err: str = ""):
     auth.require(request, "editor")
     con = db.connect()
     issues = []
     for row in con.execute(
-        "SELECT id, slug, period_label, status, published_at, updated_at, version, draft_json, published_json FROM issues ORDER BY date_end DESC"
+        "SELECT id, slug, period_label, status, published_at, updated_at, version, draft_json, published_json, date_end FROM issues ORDER BY date_end DESC"
     ):
-        i = dict(row)
+        row_d = dict(row)
+        data = _edm_json_from_row(row_d)
+        i = dict(row_d)
         i.pop("draft_json", None)
         i.pop("published_json", None)
+        i.pop("date_end", None)
+        i["edm_subject"] = edm.build_edm_subject(row_d, data, use_llm=False)
         i["mail"] = edm.mail_status_label(con, i["id"])
         i["auto_send"] = edm.issue_auto_send_enabled(con, i["id"])
-        i["draft_sync"] = not edm_draft_out_of_sync(dict(row))
+        i["draft_sync"] = not edm_draft_out_of_sync(row_d)
         issues.append(i)
     default_to = edm.default_to(con)
     auto_default = (db.get_setting(con, "edm_auto_send_default") or "1") == "1"
@@ -1943,41 +2001,55 @@ def edm_admin_send(request: Request, slug: str, to: str = Form(""), test: int = 
 
 
 @app.get("/admin/issue/{slug}/edm", response_class=HTMLResponse)
-def edm_preview(request: Request, slug: str, raw: int = 0):
+def edm_preview(request: Request, slug: str, legacy: int = 0):
     auth.require(request, "editor")
+    import html as html_mod
+
     con = db.connect()
     r, data, source = load_issue_for_edm(con, slug)
     if not r:
         con.close()
         raise HTTPException(404)
-    if raw:
+    if legacy:
+        data = data or {}
+        data.setdefault("kpis", [])
+        data.setdefault("relations", [])
+        n_rel = len(data.get("relations", []))
+        draft_sync = not edm_draft_out_of_sync(r)
         con.close()
-        h, _ = edm.render_edm(dict(r), data or {}, BASE_URL, os.environ.get("MESH_LOGO_URL", ""))
-        return HTMLResponse(h)
-    data = data or {}
-    data.setdefault("kpis", [])
-    data.setdefault("relations", [])
-    n_rel = len(data.get("relations", []))
-    draft_sync = not edm_draft_out_of_sync(r)
-    arch = [
-        dict(x)
-        for x in con.execute(
-            "SELECT slug, period_label, date_end FROM issues WHERE status='published' ORDER BY date_end DESC LIMIT 12"
+        return templates.TemplateResponse(
+            "issue_edm.html",
+            ctx(
+                request,
+                issue=dict(r),
+                d=data,
+                n_rel=n_rel,
+                edm_source=source,
+                draft_sync=draft_sync,
+            ),
         )
-    ]
+    subject = edm.build_edm_subject(dict(r), data or {}, use_llm=False)
+    h, _ = edm.render_edm(dict(r), data or {}, BASE_URL, os.environ.get("MESH_LOGO_URL", ""))
     con.close()
-    return templates.TemplateResponse(
-        "issue_edm.html",
-        ctx(
-            request,
-            issue=dict(r),
-            d=data,
-            n_rel=n_rel,
-            edm_source=source,
-            draft_sync=draft_sync,
-            archive_list=arch,
-        ),
+    src_label = "已上线稿" if source == "published" else "草稿"
+    slug_e = html_mod.escape(slug)
+    period_e = html_mod.escape(r.get("period_label") or slug)
+    subject_e = html_mod.escape(subject)
+    chrome = (
+        '<div style="position:sticky;top:0;z-index:9999;background:#14382F;color:#fff;'
+        'padding:10px 14px;font:13px/1.5 -apple-system,\'PingFang SC\',sans-serif;">'
+        '<div style="max-width:480px;margin:0 auto;display:flex;flex-wrap:wrap;gap:8px 12px;'
+        'align-items:center;justify-content:space-between;">'
+        f'<span><b>EDM 预览</b> · {period_e} · {src_label}</span>'
+        f'<a href="/admin/edm#{slug_e}" style="color:#C6FF3F;font-weight:700;text-decoration:none">← EDM 管理</a>'
+        f'</div><div style="max-width:480px;margin:6px auto 0;font-size:12px;opacity:.92;word-break:break-word;">'
+        f'发送标题（规则预览，正式发送时由模型生成）：{subject_e}</div></div>'
     )
+    if re.search(r"<body[^>]*>", h, re.I):
+        h = re.sub(r"(<body[^>]*>)", r"\1" + chrome, h, count=1, flags=re.I)
+    else:
+        h = chrome + h
+    return HTMLResponse(h)
 
 @app.post("/admin/issue/{slug}/edm/send")
 def edm_send(request: Request, slug: str, to: str = Form(...), test: int = Form(1)):

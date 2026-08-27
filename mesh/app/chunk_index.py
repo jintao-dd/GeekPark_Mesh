@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 from . import embeddings, tokenize as tok
+from . import db_conn
 
 
 def _cid(*parts: str) -> str:
@@ -15,11 +16,9 @@ def _cid(*parts: str) -> str:
 
 def _insert_chunk(con, rec: dict) -> str:
     cid = rec["chunk_id"]
+    dialect = getattr(con, "dialect", "sqlite")
     con.execute(
-        """INSERT OR REPLACE INTO chunk_index(
-           chunk_id, issue_slug, issue_id, date_end, layer, section, stype, owner_team,
-           entity_name, title, body, source_label, item_id, source_id, toks, meta_json)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        db_conn.chunk_index_upsert_sql(dialect),
         (
             cid, rec["issue_slug"], rec.get("issue_id"), rec.get("date_end") or "",
             rec["layer"], rec.get("section") or "", rec.get("stype") or "",
@@ -130,8 +129,7 @@ def embed_missing_chunks(con, batch: int = 32) -> int:
         if not vec:
             continue
         con.execute(
-            """INSERT OR REPLACE INTO chunk_embeddings(chunk_id, model, dim, vector_json, updated_at)
-               VALUES (?,?,?,?,datetime('now'))""",
+            db_conn.chunk_embedding_upsert_sql(getattr(con, "dialect", "sqlite")),
             (r["chunk_id"], model, len(vec), json.dumps(vec)),
         )
         n += 1
