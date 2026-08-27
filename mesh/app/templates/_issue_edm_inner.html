@@ -1,0 +1,75 @@
+{% macro flagstyle(label) -%}style="background:{{ flag_colors.get(label, '#344054') }}"{%- endmacro %}
+{% macro sp() -%}{% if email_mode %}{{ base_url }}/static{% else %}/static{% endif %}{%- endmacro %}
+{% macro open_url(anchor) -%}{% if email_mode %}{{ base_url }}/{{ issue.slug }}{{ anchor }}{% else %}/{{ issue.slug }}{{ anchor }}{% endif %}{%- endmacro %}
+
+{% if not email_mode %}
+<nav class="nav show"><div class="wrap">
+  <a class="brand" href="#top"><img src="{{ sp() }}/assets/mesh_logo.png" alt="GeekPark Mesh" class="logo"><small>周报 · {{ issue.period_label }}</small></a>
+  <div class="menu">
+    <a href="#rel">可同步的关系</a><a href="#more">其余四节</a>
+    <span class="sep"></span><a href="/admin/edm#{{ issue.slug }}">EDM 管理</a><a href="/{{ issue.slug }}">读者页</a>
+  </div>
+  <div class="tools">
+    <div class="search"><a class="calbtn" href="/admin/edm#{{ issue.slug }}">EDM 管理</a></div>
+    <div class="search"><a class="calbtn" href="/{{ issue.slug }}">读者页</a></div>
+  </div>
+</div></nav>
+{% endif %}
+
+{% if not email_mode and edm_banner %}
+<div class="wrap edm-banner">{{ edm_banner }}</div>
+{% endif %}
+
+<div class="herowrap"><main class="wrap" style="padding-bottom:0">
+  <div class="hero" id="top">
+    <div class="hero-top">
+      <div class="logo-wrap"><img src="{{ sp() }}/assets/mesh_logo.png" alt="GeekPark Mesh" class="hero-logo"><span class="ver">{{ issue.version }}</span></div>
+      <div class="headrow"><div class="headline"><div class="hq">{{ d.question }}</div><p class="hl">{{ d.lead }}</p></div><div class="bigdate">{{ issue.period_label }}</div></div>
+    </div>
+    <div class="kpis">{% for k in d.kpis %}<div class="kpi"><b>{{ k.n }}</b><span>{{ k.label }}</span></div>{% endfor %}</div>
+  </div>
+</main></div>
+<main class="wrap">
+
+  <section id="rel">
+    <div class="sec-h"><div class="hrow"><img class="num" src="{{ sp() }}/assets/num_1.png" alt="1"><h2>可同步的关系</h2><span class="k">权重最高</span></div><p>被不止一个团队碰到，或一个团队碰到、另一个明显用得上。只列各团队各自的事实，不给建议。实线标签是指各方都有具体记录的关系；虚线标签是指内容可能值得相关团队关注。</p></div>
+    {% if n_rel > 4 %}<p class="note" style="margin:-8px 0 18px;font-family:var(--mono);font-size:13px">邮件只列前 4 组，共 {{ n_rel }} 组</p>{% endif %}
+    <div class="cards">
+    {% for r in d.relations[:4] %}
+      <div class="card{% if r.weak %} weak{% endif %}">
+        <span class="flag" {{ flagstyle(r.label) }}>{{ r.label }}</span>
+        <p class="t">{{ r.title }}</p>
+        <p class="b">{{ r.body }}</p>
+        {% if r.details %}<div class="detail"><ul>{% for li in r.details %}<li>{{ li }}</li>{% endfor %}</ul></div>{% endif %}
+        <div class="srcs">{% for s in r.sources %}<p><span class="lab">来源</span><span>{{ s }}</span></p>{% endfor %}</div>
+        <div class="deps">{% for t in r.teams %}<span class="dep{% if t.startswith('→') or t.startswith('->') %} dep-sug{% endif %}">{{ t }}</span>{% endfor %}</div>
+      </div>
+    {% endfor %}
+    </div>
+    {% if n_rel > 4 %}<p style="margin:8px 0 0"><a class="calbtn" href="{{ open_url('#rel') }}">查看全部 {{ n_rel }} 组关系</a></p>{% endif %}
+  </section>
+
+  <section id="more">
+    <div class="sec-h"><div class="hrow"><img class="num" src="{{ sp() }}/assets/num_2.png" alt="2"><h2>其余四节，在 Mesh 里看</h2></div><p>邮件为摘要；完整内容与搜索问答请打开读者页。</p></div>
+    <div class="list">
+      <div class="row"><div class="l">接触过的人和公司</div><div class="r">这段时间接触的人和公司。人名实名、公司实名；融资条款、金额、谈判立场不在此处。 <a href="{{ open_url('#who') }}">打开</a></div></div>
+      <div class="row"><div class="l">关注了什么</div><div class="r">关注的领域、公司与人、技术、类型。 <a href="{{ open_url('#what') }}">打开</a></div></div>
+      <div class="row"><div class="l">日程与计划</div><div class="r">各团队日程或会议里出现过的、还没发生的事；不代表承诺，也不构成任务。 <a href="{{ open_url('#next') }}">打开</a></div></div>
+      <div class="row"><div class="l">沟通中提到的看法</div><div class="r">各团队例会和对话里顺口说到的判断，非结论、不追溯发言人。 <a href="{{ open_url('#views') }}">打开</a></div></div>
+    </div>
+  </section>
+
+  <section class="tail">
+    <div class="card">
+      <p class="t edm-search-title">在 Mesh 里搜人、搜公司、搜关键词，或直接问一句话</p>
+      <div class="edm-cta">
+        <div class="search"><a class="calbtn pri" href="{{ open_url('?q=') }}">打开 Mesh 搜索</a></div>
+        <div class="search"><a class="calbtn" href="{% if email_mode %}{{ base_url }}/archive{% else %}/archive{% endif %}">往期周报</a></div>
+      </div>
+    </div>
+  </section>
+</main>
+<footer><div class="wrap"><div class="internal"><b>仅限极客公园内部使用</b><span> · 请勿转发、截图或对外引用；页内人名与公司为内部沟通记录，非公开信息。</span></div><span class="eyebrow">内部 · {{ issue.version }}</span><span class="upd">数据最近更新：{{ issue.updated_at }}</span>此邮件由 GeekPark Mesh 在管理员确认后发出 · 脱敏在分发层执行 · <a href="{{ open_url('') }}" style="color:#0AA79F">在浏览器中查看本期</a>
+<div class="site-url">{{ base_url.replace('https://','').replace('http://','') if email_mode else (base_url or '').replace('https://','').replace('http://','') or 'mesh.geekpark.ai' }}</div>
+<div class="endmark"><div class="cp">© GEEKPARK</div></div>
+</div></footer>

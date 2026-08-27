@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>GeekPark Mesh · 周报 · {{ issue.period_label }}</title>
+<!--[if mso]>
+<style type="text/css">
+  table, td { font-family: Arial, "Microsoft YaHei", sans-serif !important; }
+  .edm-list-label { width: 200px !important; }
+</style>
+<![endif]-->
+</head>
+<body style="margin:0;padding:0;background-color:#ffffff;font-family:Inter,-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',Helvetica,Arial,sans-serif;font-size:16px;line-height:1.7;color:#0B0B0C;-webkit-text-size-adjust:100%;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;">
+<tr><td align="center" style="padding:24px 12px 48px;">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="max-width:640px;width:100%;">
+
+{# —— Hero —— #}
+<tr><td style="padding:32px 20px 36px;font-family:Inter,-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr><td style="padding-bottom:28px;">
+    <img src="{{ base_url }}/static/assets/mesh_logo.png" alt="GeekPark Mesh" height="92" border="0" style="display:block;height:92px;width:auto;max-width:220px;">
+    <span style="font-family:'SF Mono',Menlo,Consolas,monospace;font-size:14px;color:#9CA3AF;margin-left:8px;">{{ issue.version }}</span>
+  </td></tr>
+  <tr><td>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+      <td valign="top" style="padding-right:20px;font-family:Inter,-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',Helvetica,Arial,sans-serif;">
+        <div style="font-size:16.5px;line-height:1.8;font-weight:700;color:#0B0B0C;margin:0 0 4px;">{{ d.question }}</div>
+        <div style="font-size:16.5px;line-height:1.8;color:#3F4650;margin:0;">{{ d.lead }}</div>
+      </td>
+      <td align="right" valign="top" style="font-family:Inter,-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',Helvetica,Arial,sans-serif;font-size:44px;line-height:1;font-weight:700;color:#CBD0D6;white-space:nowrap;padding-top:2px;">{{ issue.period_label }}</td>
+    </tr>
+    </table>
+  </td></tr>
+  <tr><td style="padding-top:28px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+    {% for k in d.kpis %}
+    <td style="padding:0 32px 12px 0;font-family:Inter,-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',Helvetica,Arial,sans-serif;vertical-align:top;">
+      <div style="font-size:40px;line-height:1;font-weight:800;color:#14382F;padding-bottom:8px;border-bottom:3px solid #C6FF3F;">{{ k.n }}</div>
+      <div style="font-size:14px;line-height:1.5;color:#6B7280;margin-top:8px;">{{ k.label }}</div>
+    </td>
+    {% endfor %}
+    </tr></table>
+  </td></tr>
+  </table>
+</td></tr>
+
+{# —— 可同步的关系 —— #}
+<tr><td style="padding:48px 20px 0;font-family:Inter,-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
+  <tr>
+    <td valign="top" style="padding-right:16px;">
+      <div style="font-size:36px;line-height:1.2;font-weight:800;color:#0B0B0C;margin:0 0 6px;">可同步的关系<span style="font-family:'SF Mono',Menlo,Consolas,monospace;font-size:13px;font-weight:700;color:#0AA79F;letter-spacing:0.06em;margin-left:8px;">权重最高</span></div>
+      <div style="font-size:17px;line-height:1.65;color:#6B7280;margin:0;">被不止一个团队碰到，或一个团队碰到、另一个明显用得上。只列各团队各自的事实，不给建议。实线标签是指各方都有具体记录的关系；虚线标签是指内容可能值得相关团队关注。</div>
+    </td>
+    <td align="right" valign="top" width="100" style="line-height:0;width:100px;">
+      <img src="{{ base_url }}/static/assets/num_1.png" width="72" height="72" alt="" border="0" style="display:block;width:72px;height:72px;">
+    </td>
+  </tr>
+  </table>
+  {% if n_rel > 4 %}<div style="font-family:'SF Mono',Menlo,Consolas,monospace;font-size:13px;color:#6B7280;margin:-8px 0 16px;">邮件只列前 4 组，共 {{ n_rel }} 组</div>{% endif %}
+
+  {% for r in d.relations[:4] %}
+  {% if loop.index0 % 2 == 0 %}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px;"><tr>{% endif %}
+    <td width="50%" valign="top" style="width:50%;padding:{% if loop.index0 % 2 == 0 %}0 10px 0 0{% else %}0 0 0 10px{% endif %};font-family:Inter,-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',Helvetica,Arial,sans-serif;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;border:{% if r.weak %}1px dashed{% else %}1px solid{% endif %} #E6EDE0;">
+      <tr><td style="padding:26px 28px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="{{ flag_colors.get(r.label, '#344054') }}" style="background-color:{{ flag_colors.get(r.label, '#344054') }};border-radius:999px;padding:4px 12px;">
+          <span style="font-size:12.5px;font-weight:700;color:#ffffff;line-height:1.4;">{{ r.label }}</span>
+        </td></tr></table>
+        <div style="font-size:{% if r.weak %}21.5{% else %}24{% endif %}px;line-height:1.25;font-weight:700;color:#0B0B0C;margin:14px 0 8px;">{{ r.title }}</div>
+        <div style="font-size:{% if r.weak %}15{% else %}15.5{% endif %}px;line-height:1.65;color:#3F4650;margin:0;">{{ r.body }}</div>
+        {% if r.details %}
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;"><tr><td style="padding-top:14px;border-top:1px dashed #EAECF0;">
+          <ul style="margin:0;padding-left:18px;font-size:14.5px;line-height:1.6;color:#3F4650;">
+          {% for li in r.details %}<li style="margin:4px 0;">{{ li }}</li>{% endfor %}
+          </ul>
+        </td></tr></table>
+        {% endif %}
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F4FAEC" style="margin-top:14px;background-color:#F4FAEC;"><tr><td style="padding:10px 14px;font-size:13.5px;line-height:1.55;color:#3F4650;">
+          <p style="margin:0 0 6px;"><span style="font-family:'SF Mono',Menlo,Consolas,monospace;font-size:11.5px;font-weight:700;color:#14382F;letter-spacing:0.06em;">来源</span></p>
+          {% for s in r.sources %}<p style="margin:3px 0;">{{ s }}</p>{% endfor %}
+        </td></tr></table>
+        {% if r.teams %}
+        <div style="margin-top:14px;line-height:1.5;">
+          {% for t in r.teams %}
+          {% set sug = t.startswith('→') or t.startswith('->') %}
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-table;margin:0 6px 6px 0;"><tr><td style="font-size:12.5px;font-weight:{% if sug %}500{% else %}600{% endif %};color:{% if sug %}#6B8F4E{% else %}#3F6E14{% endif %};background-color:{% if sug %}#F9FCF5{% else %}#F4FAEC{% endif %};border:{% if sug %}1px dashed #8FB06E{% else %}1px solid #CFE6B3{% endif %};padding:2px 9px;">{{ t }}</td></tr></table>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </td></tr>
+      </table>
+    </td>
+  {% if loop.index0 % 2 == 1 or loop.last %}</tr></table>{% endif %}
+  {% endfor %}
+
+  {% if n_rel > 4 %}
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px;"><tr><td>
+    <a href="{{ base_url }}/{{ issue.slug }}#rel" style="display:inline-block;padding:9px 16px;font-size:14px;font-weight:600;color:#14382F;text-decoration:none;border:1px solid #EAECF0;background-color:#ffffff;">查看全部 {{ n_rel }} 组关系</a>
+  </td></tr></table>
+  {% endif %}
+</td></tr>
+
+{# —— 其余四节 —— #}
+<tr><td style="padding:48px 20px 0;font-family:Inter,-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
+  <tr>
+    <td valign="top" style="padding-right:16px;">
+      <div style="font-size:36px;line-height:1.2;font-weight:800;color:#0B0B0C;margin:0 0 6px;">其余四节，在 Mesh 里看</div>
+      <div style="font-size:17px;line-height:1.65;color:#6B7280;margin:0;">邮件为摘要；完整内容与搜索问答请打开读者页。</div>
+    </td>
+    <td align="right" valign="top" width="100" style="line-height:0;width:100px;">
+      <img src="{{ base_url }}/static/assets/num_2.png" width="72" height="72" alt="" border="0" style="display:block;width:72px;height:72px;">
+    </td>
+  </tr>
+  </table>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="1" bordercolor="#E6EDE0" bgcolor="#ffffff" style="background-color:#ffffff;border:1px solid #E6EDE0;">
+  {% set sections = [
+    ('接触过的人和公司', '这段时间接触的人和公司。人名实名、公司实名；融资条款、金额、谈判立场不在此处。', '#who'),
+    ('关注了什么', '关注的领域、公司与人、技术、类型。', '#what'),
+    ('日程与计划', '各团队日程或会议里出现过的、还没发生的事；不代表承诺，也不构成任务。', '#next'),
+    ('沟通中提到的看法', '各团队例会和对话里顺口说到的判断，非结论、不追溯发言人。', '#views'),
+  ] %}
+  {% for title, desc, anchor in sections %}
+  <tr>
+    <td colspan="2" style="padding:0;{% if not loop.first %}border-top:1px solid #EEF2EA;{% endif %}">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        <td class="edm-list-label" width="200" valign="top" style="width:200px;padding:18px 16px 18px 24px;font-size:15.5px;font-weight:700;color:#0B0B0C;">{{ title }}</td>
+        <td valign="top" style="padding:18px 24px 18px 0;font-size:15.5px;line-height:1.65;color:#3F4650;">{{ desc }} <a href="{{ base_url }}/{{ issue.slug }}{{ anchor }}" style="color:#0AA79F;font-weight:600;text-decoration:underline;">打开</a></td>
+      </tr>
+      </table>
+    </td>
+  </tr>
+  {% endfor %}
+  </table>
+</td></tr>
+
+{# —— 搜索 CTA —— #}
+<tr><td style="padding:48px 20px 0;font-family:Inter,-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="1" bordercolor="#E6EDE0" bgcolor="#ffffff" style="background-color:#ffffff;border:1px solid #E6EDE0;">
+  <tr><td style="padding:26px 28px;">
+    <div style="font-size:18px;line-height:1.4;font-weight:700;color:#0B0B0C;margin:0 0 14px;">在 Mesh 里搜人、搜公司、搜关键词，或直接问一句话</div>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td style="padding:0 10px 8px 0;">
+        <!--[if mso]>
+        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ base_url }}/{{ issue.slug }}?q=" style="height:38px;v-text-anchor:middle;width:140px;" arcsize="50%" strokecolor="#14382F" fillcolor="#14382F">
+        <w:anchorlock/><center style="color:#ffffff;font-family:sans-serif;font-size:14px;font-weight:600;">打开 Mesh 搜索</center>
+        </v:roundrect>
+        <![endif]-->
+        <!--[if !mso]><!-->
+        <a href="{{ base_url }}/{{ issue.slug }}?q=" style="display:inline-block;padding:9px 16px;font-size:14px;line-height:18px;font-weight:600;color:#ffffff;text-decoration:none;background-color:#14382F;border:1px solid #14382F;">打开 Mesh 搜索</a>
+        <!--<![endif]-->
+      </td>
+      <td style="padding:0 0 8px 0;">
+        <a href="{{ base_url }}/archive" style="display:inline-block;padding:9px 16px;font-size:14px;line-height:18px;font-weight:600;color:#3F4650;text-decoration:none;background-color:#ffffff;border:1px solid #EAECF0;">往期周报</a>
+      </td>
+    </tr></table>
+  </td></tr>
+  </table>
+</td></tr>
+
+{# —— Footer —— #}
+<tr><td style="padding:40px 20px 0;font-family:Inter,-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#14382F" style="background-color:#14382F;">
+  <tr><td bgcolor="#14382F" style="padding:14px 18px;font-size:14px;line-height:1.65;color:#ffffff;background-color:#14382F;">
+    <span style="font-weight:700;color:#ffffff;">仅限极客公园内部使用</span>
+    <span style="color:#C7D6CF;"> · 请勿转发、截图或对外引用；邮件内人名与公司为内部沟通记录，非公开信息。</span>
+  </td></tr>
+  </table>
+  <div style="margin-top:14px;font-size:13px;line-height:1.6;color:#9CA3AF;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-table;margin-right:12px;"><tr><td bgcolor="#14382F" style="background-color:#14382F;padding:4px 12px;"><span style="font-size:13px;font-weight:700;color:#ffffff;">内部 · {{ issue.version }}</span></td></tr></table>
+    <span style="font-family:'SF Mono',Menlo,Consolas,monospace;font-size:12px;">数据最近更新：{{ issue.updated_at }}</span>
+  </div>
+  <div style="margin-top:6px;font-size:13px;line-height:1.6;color:#9CA3AF;">
+    此邮件由 GeekPark Mesh 在管理员确认后发出 · 脱敏在分发层执行 · <a href="{{ base_url }}/{{ issue.slug }}" style="color:#0AA79F;text-decoration:underline;">在浏览器中查看本期</a>
+  </div>
+  <div style="margin-top:20px;text-align:center;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:11.5px;letter-spacing:0.14em;color:#9CA3AF;">© GEEKPARK</div>
+</td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>

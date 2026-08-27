@@ -281,13 +281,7 @@
       {% endif %}
       {% endif %}
       {% if perms.write %}
-      <details class="more" style="margin-top:16px"><summary>EDM 发送</summary>
-        <form method="post" action="/admin/issue/{{ issue.slug }}/edm/send" style="margin-top:8px">
-          <textarea name="to" placeholder="收件人，逗号或换行分隔" style="width:100%;min-height:60px;border:1px solid var(--line);border-radius:12px;padding:10px;font:inherit"></textarea>
-          <div style="margin-top:8px;font-size:13px"><label><input type="radio" name="test" value="1" checked> 测试</label> &nbsp;<label><input type="radio" name="test" value="0"> 正式发送</label></div>
-          <div style="margin-top:8px"><button class="ghost js-confirm-click" type="submit" data-title="发送 EDM" data-body="确认发送这封邮件？">发送</button> <a class="ghost" href="/admin/issue/{{ issue.slug }}/edm" target="_blank" style="text-decoration:none">预览 EDM</a></div>
-        </form>
-      </details>
+      <p class="hint" style="margin-top:16px"><a href="/admin/edm#{{ issue.slug }}" style="color:var(--deep);font-weight:600">EDM 管理 →</a> 预览邮件、测试/正式发送、上线自动推送与发送记录。</p>
       {% endif %}
     </div>
   </div>

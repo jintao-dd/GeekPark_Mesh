@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 BASE = Path(__file__).resolve().parent
 load_dotenv(BASE.parent / ".env")
-from . import db, ingest, llm, auth, edm, merge, pipeline, preview_job, qa_structured, search, tokenize
+from . import db, ingest, llm, auth, edm, edm_job, merge, pipeline, preview_job, qa_structured, search, tokenize
 from . import ask_engine, ask_scope, conversation, presets, chunk_index, embeddings, retriever, ask_turn, ask_query
 import time
 
@@ -394,6 +394,36 @@ def load_issue(con, slug: str, published_only=True):
     if published_only and r["status"] != "published": return r, None
     data = json.loads((r["published_json"] if published_only else (r["draft_json"] or r["published_json"])) or "{}")
     return r, data
+
+
+def load_issue_for_edm(con, slug: str):
+    """EDM 预览/发信用：已上线期一律读 published_json，与读者页和正式邮件一致。"""
+    r = con.execute("SELECT * FROM issues WHERE slug=?", (slug,)).fetchone()
+    if not r:
+        return None, None, "missing"
+    row = dict(r)
+    if row["status"] == "published":
+        raw = row.get("published_json") or "{}"
+        source = "published"
+    else:
+        raw = row.get("draft_json") or row.get("published_json") or "{}"
+        source = "draft" if row.get("draft_json") else ("published" if row.get("published_json") else "empty")
+    try:
+        data = json.loads(raw or "{}")
+    except json.JSONDecodeError:
+        data = {}
+        source = "invalid"
+    return row, data, source
+
+
+def edm_draft_out_of_sync(row: dict) -> bool:
+    """已上线期：草稿与上线稿不一致（预览/测试若读草稿会与正式邮件不同）。"""
+    if not row or row.get("status") != "published":
+        return False
+    d, p = row.get("draft_json"), row.get("published_json")
+    if not d or not p:
+        return False
+    return d != p
 
 def publish_blockers(con, issue_id: int, draft_json: str) -> list[str]:
     """与后台第四步检查清单一致的服务端拦截项。"""
@@ -1797,6 +1827,7 @@ def publish(request: Request, slug: str, confirm: str = Form("")):
                  f"{os.environ.get('MESH_BASE_URL','').rstrip('/')}/{slug}", json.dumps(data, ensure_ascii=False)))
     con.execute("INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)", (r["id"], u["u"], "publish", "", f"v{seq}"))
     con.commit(); con.close()
+    edm_job.enqueue_auto_send(slug, by=u.get("u") or "publish")
     if wants_json:
         return JSONResponse({"ok": True, "slug": slug, "status": "published", "published_at": now})
     return RedirectResponse(f"/{slug}?published=1", status_code=302)
@@ -1819,30 +1850,168 @@ def unpublish(request: Request, slug: str):
         return JSONResponse({"ok": True, "slug": slug, "status": "draft"})
     return RedirectResponse("/admin/issues", status_code=302)
 
-@app.get("/admin/issue/{slug}/edm", response_class=HTMLResponse)
-def edm_preview(request: Request, slug: str):
+@app.get("/admin/edm", response_class=HTMLResponse)
+def edm_admin(request: Request, saved: int = 0, err: str = ""):
     auth.require(request, "editor")
-    con = db.connect(); r, data = load_issue(con, slug, published_only=False); con.close()
-    h, _ = edm.render_edm(dict(r), data or {}, BASE_URL, os.environ.get("MESH_LOGO_URL", ""))
-    return HTMLResponse(h)
+    con = db.connect()
+    issues = []
+    for row in con.execute(
+        "SELECT id, slug, period_label, status, published_at, updated_at, version, draft_json, published_json FROM issues ORDER BY date_end DESC"
+    ):
+        i = dict(row)
+        i.pop("draft_json", None)
+        i.pop("published_json", None)
+        i["mail"] = edm.mail_status_label(con, i["id"])
+        i["auto_send"] = edm.issue_auto_send_enabled(con, i["id"])
+        i["draft_sync"] = not edm_draft_out_of_sync(dict(row))
+        issues.append(i)
+    default_to = edm.default_to(con)
+    auto_default = (db.get_setting(con, "edm_auto_send_default") or "1") == "1"
+    con.close()
+    return templates.TemplateResponse(
+        "edm_admin.html",
+        ctx(
+            request,
+            nav="edm",
+            issues=issues,
+            default_to=default_to,
+            auto_default=auto_default,
+            smtp_ok=edm.smtp_configured(),
+            flash_ok="已保存" if saved else None,
+            flash_err=err or None,
+        ),
+    )
 
-@app.post("/admin/issue/{slug}/edm/send")
-def edm_send(request: Request, slug: str, to: str = Form(...), test: int = Form(1)):
+
+@app.post("/admin/edm/settings")
+def edm_settings_save(request: Request, default_to: str = Form(""), auto_default: str = Form("")):
     auth.require(request, "editor")
-    con = db.connect(); r, data = load_issue(con, slug, published_only=False)
+    con = db.connect()
+    db.set_setting(con, "edm_default_to", default_to.strip())
+    db.set_setting(con, "edm_auto_send_default", "1" if auto_default == "1" else "0")
+    con.commit()
+    con.close()
+    return RedirectResponse("/admin/edm?saved=1", status_code=302)
+
+
+@app.post("/admin/edm/issue/{slug}/auto")
+def edm_issue_auto(request: Request, slug: str, enabled: str = Form("")):
+    auth.require(request, "editor")
+    con = db.connect()
+    r = con.execute("SELECT id FROM issues WHERE slug=?", (slug,)).fetchone()
+    if not r:
+        con.close()
+        raise HTTPException(404)
+    db.set_setting(con, f"edm_auto_send:{r['id']}", "1" if enabled == "1" else "0")
+    con.commit()
+    con.close()
+    return RedirectResponse(f"/admin/edm#{slug}", status_code=302)
+
+
+@app.post("/admin/edm/issue/{slug}/send")
+def edm_admin_send(request: Request, slug: str, to: str = Form(""), test: int = Form(1)):
+    auth.require(request, "editor")
+    from urllib.parse import quote
+    con = db.connect()
+    r, data, source = load_issue_for_edm(con, slug)
     if not r:
         con.close()
         raise HTTPException(404)
     if not int(test) and r["status"] != "published":
         con.close()
-        return _flash_redirect(f"/admin/issue/{slug}", "正式发送仅限已上线的期；未上线请用「测试」或先确认上线。")
-    h, t = edm.render_edm(dict(r), data or {}, BASE_URL, os.environ.get("MESH_LOGO_URL", ""))
-    addrs = [a.strip() for a in re.split(r"[,\s;]+", to) if a.strip()]
-    subject = ("【测试】" if test else "") + f"GeekPark Mesh · 周报 · {r['period_label']}（内部 · {r['version']}）"
-    ok, err = edm.send_mail(addrs, subject, h, t)
-    con.execute("INSERT INTO mail_log(issue_id,to_addr,subject,ok,error) VALUES(?,?,?,?,?)", (r["id"], ",".join(addrs), subject, 1 if ok else 0, err))
-    con.commit(); con.close()
-    return RedirectResponse(f"/admin/issue/{slug}", status_code=302)
+        return _flash_redirect("/admin/edm", "正式发送仅限已上线期")
+    if not int(test) and source != "published":
+        con.close()
+        return _flash_redirect("/admin/edm", "该期尚无上线稿，请先确认上线")
+    addrs = edm.parse_addrs(to) or edm.parse_addrs(edm.default_to(con))
+    if not addrs:
+        con.close()
+        return _flash_redirect("/admin/edm", "请填写收件人或配置默认名单")
+    ok, err, _ = edm.send_for_issue(
+        con,
+        dict(r),
+        data or {},
+        to_addrs=addrs,
+        test=bool(int(test)),
+        base_url=BASE_URL,
+        logo_url=os.environ.get("MESH_LOGO_URL", ""),
+    )
+    con.close()
+    if not ok:
+        return RedirectResponse("/admin/edm?err=" + quote(err[:200]), status_code=302)
+    return RedirectResponse(f"/admin/edm?saved=1#{slug}", status_code=302)
+
+
+@app.get("/admin/issue/{slug}/edm", response_class=HTMLResponse)
+def edm_preview(request: Request, slug: str, raw: int = 0):
+    auth.require(request, "editor")
+    con = db.connect()
+    r, data, source = load_issue_for_edm(con, slug)
+    if not r:
+        con.close()
+        raise HTTPException(404)
+    if raw:
+        con.close()
+        h, _ = edm.render_edm(dict(r), data or {}, BASE_URL, os.environ.get("MESH_LOGO_URL", ""))
+        return HTMLResponse(h)
+    data = data or {}
+    data.setdefault("kpis", [])
+    data.setdefault("relations", [])
+    n_rel = len(data.get("relations", []))
+    draft_sync = not edm_draft_out_of_sync(r)
+    arch = [
+        dict(x)
+        for x in con.execute(
+            "SELECT slug, period_label, date_end FROM issues WHERE status='published' ORDER BY date_end DESC LIMIT 12"
+        )
+    ]
+    con.close()
+    return templates.TemplateResponse(
+        "issue_edm.html",
+        ctx(
+            request,
+            issue=dict(r),
+            d=data,
+            n_rel=n_rel,
+            edm_source=source,
+            draft_sync=draft_sync,
+            archive_list=arch,
+        ),
+    )
+
+@app.post("/admin/issue/{slug}/edm/send")
+def edm_send(request: Request, slug: str, to: str = Form(...), test: int = Form(1)):
+    """兼容旧入口：转发到 EDM 管理页逻辑。"""
+    auth.require(request, "editor")
+    from urllib.parse import quote
+    con = db.connect()
+    r, data, source = load_issue_for_edm(con, slug)
+    if not r:
+        con.close()
+        raise HTTPException(404)
+    if not int(test) and r["status"] != "published":
+        con.close()
+        return _flash_redirect("/admin/edm", "正式发送仅限已上线期")
+    if not int(test) and source != "published":
+        con.close()
+        return _flash_redirect("/admin/edm", "该期尚无上线稿，请先确认上线")
+    addrs = edm.parse_addrs(to)
+    if not addrs:
+        con.close()
+        return _flash_redirect("/admin/edm", "请填写收件人")
+    ok, err, _ = edm.send_for_issue(
+        con,
+        dict(r),
+        data or {},
+        to_addrs=addrs,
+        test=bool(int(test)),
+        base_url=BASE_URL,
+        logo_url=os.environ.get("MESH_LOGO_URL", ""),
+    )
+    con.close()
+    if not ok:
+        return RedirectResponse("/admin/edm?err=" + quote(err[:200]), status_code=302)
+    return RedirectResponse(f"/admin/edm?saved=1#{slug}", status_code=302)
 
 @app.get("/admin/users", response_class=HTMLResponse)
 def users_page(request: Request, page: int = 1, saved: int = 0):

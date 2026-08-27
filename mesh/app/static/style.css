@@ -48,6 +48,9 @@ body::before{content:"";position:fixed;inset:-20%;z-index:-1;pointer-events:none
 .search input:focus{border-color:var(--tif);box-shadow:0 0 0 3px var(--tif-bg)}
 .search .ico{position:absolute;right:12px;top:9px;width:20px;height:20px;color:var(--ink3);pointer-events:none}
 .calbtn{height:38px;border:1px solid var(--line);border-radius:var(--r-pill);background:#fff;padding:0 14px;font:inherit;font-size:14px;font-weight:600;color:var(--ink2);cursor:pointer;display:flex;align-items:center;gap:6px}
+a.calbtn{display:inline-flex;text-decoration:none;align-items:center;justify-content:center;white-space:nowrap}
+.calbtn.pri{background:var(--deep);color:#fff;border-color:var(--deep)}
+.calbtn.pri:hover,.calbtn.pri.on{background:var(--deep);color:#fff;filter:brightness(.95)}
 .calbtn:hover,.calbtn.on{border-color:var(--deep);color:var(--deep);background:var(--deep-bg)}
 .pop{position:absolute;right:0;top:46px;z-index:70;width:360px;max-width:92vw;background:#fff;border:1px solid var(--line);border-radius:var(--r-box);box-shadow:0 18px 44px rgba(16,24,40,.16);padding:12px 12px 8px;display:none}
 .pop.show{display:block}
@@ -431,7 +434,15 @@ body[data-num="a"] .hrow .ds{height:52px}
 .row .l{font-weight:700;color:var(--ink)}
 .row .r{color:var(--ink2)}
 .row .r b{color:var(--ink);font-weight:600}
+.row .r a{color:var(--tif);font-weight:600;text-decoration:underline;text-decoration-color:rgba(10,167,159,.45)}
 @media (max-width:640px){.row{grid-template-columns:1fr;gap:6px}}
+.edm-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;align-items:center}
+.edm-search-title{font-size:18px!important;font-weight:700!important;margin:0 0 4px!important;letter-spacing:-.01em}
+@media (max-width:640px){
+  .edm-cta{flex-direction:column;align-items:stretch}
+  .edm-cta .search{width:100%}
+  .edm-cta .calbtn{width:100%;justify-content:center;box-sizing:border-box}
+}
 .j{position:relative;padding-left:14px}
 .j::before{content:"";position:absolute;left:0;top:.55em;width:6px;height:6px;border-radius:50%;background:var(--amber)}
 .legend{font-size:13.5px;color:var(--ink3);margin-top:14px}

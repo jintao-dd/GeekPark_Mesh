@@ -1,0 +1,118 @@
+{% extends "base.html" %}{% block title %}EDM · GeekPark Mesh{% endblock %}
+{% block head %}
+<style>
+.adm.edm-page{max-width:1080px}
+.edm-lead{margin:0 0 18px;max-width:760px;color:var(--ink3);font-size:14px;line-height:1.65}
+.edm-settings{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin-bottom:22px}
+.edm-settings h2{margin:0 0 8px;font-size:16px}
+.edm-settings .hint{margin:0 0 12px;font-size:13px;color:var(--ink3);line-height:1.55}
+.edm-settings textarea{width:100%;min-height:72px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font:inherit;font-size:13.5px}
+.edm-settings .row{margin-top:12px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.edm-settings label{font-size:13px;color:var(--ink2);display:flex;align-items:center;gap:6px}
+.edm-warn{display:inline-block;margin:0 0 14px;padding:8px 12px;border-radius:10px;background:#FEF3F2;color:#B42318;font-size:13px}
+.edm-ok{display:inline-block;margin:0 0 14px;padding:8px 12px;border-radius:10px;background:#F4FAEC;color:#3F6E14;font-size:13px}
+.edm-table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:#fff}
+.edm-table{width:100%;border-collapse:collapse;font-size:13.5px}
+.edm-table th,.edm-table td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.edm-table th{font-size:12px;color:var(--ink3);font-weight:700;background:#FAFCF7;white-space:nowrap}
+.edm-table tr:last-child td{border-bottom:0}
+.edm-table tr:target{background:#F7FBF0}
+.edm-table .slug{font-family:var(--mono);font-size:12px;color:var(--ink3)}
+.edm-mail.ok{color:#166534;font-weight:600}
+.edm-mail.test{color:#0369A1;font-weight:600}
+.edm-mail.fail{color:#B42318;font-weight:600}
+.edm-mail.none{color:var(--ink3)}
+.edm-acts{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.edm-acts .btn{padding:5px 11px;font-size:12.5px}
+.edm-acts form{display:inline;margin:0}
+.edm-acts .auto{font-size:12px;color:var(--ink3);display:flex;align-items:center;gap:4px}
+.edm-log{margin:6px 0 0;padding:0;list-style:none;font-size:11.5px;color:var(--ink3);line-height:1.5}
+.edm-log li{margin:0}
+</style>
+{% endblock %}
+{% block body %}
+<div class="adm edm-page">
+{% with nav='edm' %}{% include "adm_top.html" %}{% endwith %}
+<h1>EDM</h1>
+<p class="edm-lead">内部周报邮件：预览、测试发送、上线自动推送与发送记录。邮件内容为摘要（关系卡前 4 组 + 链回 Mesh 全文）。<b>确认上线</b>后若开启「上线自动发」，将异步投递，失败可在此重发。</p>
+{% if flash_ok %}<p class="edm-ok">{{ flash_ok }}</p>{% endif %}
+{% if flash_err %}<p class="edm-warn">{{ flash_err }}</p>{% endif %}
+{% if not smtp_ok %}<p class="edm-warn">SMTP 未配置完整（SMTP_HOST / SMTP_USER / SMTP_PASSWORD），无法发信。</p>{% endif %}
+
+<section class="edm-settings">
+  <h2>默认设置</h2>
+  <p class="hint">默认收件人用于测试发送、正式发送和上线自动推送。多个地址用逗号、空格或换行分隔。可在 .env 用 <code>EDM_DEFAULT_TO</code> 设初始值。</p>
+  <form method="post" action="/admin/edm/settings">
+    <textarea name="default_to" placeholder="name@geekpark.net, team@geekpark.net">{{ default_to }}</textarea>
+    <div class="row">
+      <label><input type="checkbox" name="auto_default" value="1"{% if auto_default %} checked{% endif %}> 新期默认「上线自动发送」</label>
+      <button class="btn pri" type="submit">保存设置</button>
+    </div>
+  </form>
+</section>
+
+<h2 style="font-size:16px;margin:0 0 10px">各期邮件</h2>
+<div class="edm-table-wrap">
+<table class="edm-table">
+  <tr><th>期</th><th>状态</th><th>邮件</th><th>上线自动发</th><th>操作</th></tr>
+  {% for i in issues %}
+  <tr id="{{ i.slug }}">
+    <td><b>{{ i.period_label }}</b><div class="slug">{{ i.slug }}</div>{% if i.status=='published' and not i.draft_sync %}<div class="slug" style="color:#B45309">草稿已改，EDM 仍发上线稿</div>{% endif %}</td>
+    <td>{% if i.status=='published' %}<span class="tag ok">已上线</span>{% else %}<span class="tag pend">草稿</span>{% endif %}</td>
+    <td><span class="edm-mail {{ i.mail.kind }}">{{ i.mail.label }}</span>
+      {% if i.mail.recent %}
+      <ul class="edm-log">{% for m in i.mail.recent[:3] %}<li>{{ m.at }} · {{ '成功' if m.ok else '失败' }}{% if m.error and not m.ok %} · {{ m.error[:60] }}{% endif %}</li>{% endfor %}</ul>
+      {% endif %}
+    </td>
+    <td>
+      <form method="post" action="/admin/edm/issue/{{ i.slug }}/auto">
+        <label class="auto"><input type="checkbox" name="enabled" value="1"{% if i.auto_send %} checked{% endif %} onchange="this.form.submit()"> 开启</label>
+      </form>
+    </td>
+    <td>
+      <div class="edm-acts">
+        <a class="btn" href="/admin/issue/{{ i.slug }}/edm" target="_blank" rel="noopener">预览</a>
+        <form method="post" action="/admin/edm/issue/{{ i.slug }}/send" class="js-confirm" data-title="发送测试 EDM" data-body="将按默认收件人（或下方覆盖）发送测试邮件。" data-ok="发送">
+          <input type="hidden" name="test" value="1">
+          <input type="hidden" name="to" value="">
+          <button class="btn" type="submit">测试发送</button>
+        </form>
+        {% if i.status=='published' %}
+        <form method="post" action="/admin/edm/issue/{{ i.slug }}/send" class="js-confirm" data-title="正式发送 EDM" data-body="确认向默认收件人发送正式内部邮件？" data-ok="发送">
+          <input type="hidden" name="test" value="0">
+          <input type="hidden" name="to" value="">
+          <button class="btn pri" type="submit">正式发送</button>
+        </form>
+        {% else %}
+        <span class="btn is-disabled" title="请先确认上线">正式发送</span>
+        {% endif %}
+      </div>
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="5" style="color:var(--ink3);padding:24px">尚无各期，请先在「各期」新建。</td></tr>
+  {% endfor %}
+</table>
+</div>
+</div>
+<script>
+(function(){
+  var id = location.hash.replace(/^#/, '');
+  if (id) {
+    var row = document.getElementById(id);
+    if (row) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+  document.querySelectorAll('form.js-confirm').forEach(function (form) {
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var ok = await MeshDialog.confirm({
+        title: form.dataset.title || '请确认',
+        body: form.dataset.body || '',
+        okText: form.dataset.ok || '确定',
+      });
+      if (ok) form.submit();
+    });
+  });
+})();
+</script>
+{% endblock %}
