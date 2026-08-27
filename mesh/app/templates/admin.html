@@ -1,0 +1,255 @@
+{% extends "base.html" %}{% block title %}期管理 · GeekPark Mesh{% endblock %}
+{% block body %}
+<div class="adm">
+{% with nav='issues' %}{% include "adm_top.html" %}{% endwith %}
+<h1>各期</h1>
+<p class="muted" style="max-width:720px;line-height:1.6">管理后台从这里开始。点「修改源数据」进入某一期制作；读者页「往期」只显示<strong>已上线</strong>的期。
+{% if perms.write %}流程：新建 → 放素材 → 生成预览 → 所有者确认上线。{% endif %}</p>
+{% if flash_err %}<p class="tag pend" style="display:inline-block;margin:0 0 14px">{{ flash_err }}</p>{% endif %}
+
+<h2>已有各期</h2>
+<table><tr><th>期</th><th>状态</th><th>更新时间</th><th>发布时间</th><th></th></tr>
+{% for i in issues %}<tr data-slug="{{ i.slug }}" data-label="{{ i.period_label }}" data-can-delete-draft="{{ '1' if perms.delete_draft else '0' }}">
+  <td>{% if perms.console %}<a href="/admin/issue/{{ i.slug }}{% if not perms.write %}?step=2{% endif %}"><b>{{ i.period_label }}</b></a>{% else %}<b>{{ i.period_label }}</b>{% endif %} <span class="muted">{{ i.slug }}</span></td>
+  <td class="col-status">{% if i.status=='published' %}<span class="tag ok">已上线</span>{% else %}<span class="tag pend">草稿</span>{% endif %}</td>
+  <td class="col-updated">{{ i.updated_at }}</td>
+  <td class="col-published">{{ i.published_at or '—' }}</td>
+  <td class="acts">
+    <div class="issue-acts">
+      {% if perms.write %}
+      <a class="btn" href="/admin/issue/{{ i.slug }}">修改源数据</a>
+      {% elif perms.console %}
+      <a class="btn" href="/admin/issue/{{ i.slug }}?step=2">进入审校</a>
+      {% else %}
+      <span class="act-ph" aria-hidden="true"></span>
+      {% endif %}
+      {% if i.status=='published' %}
+      <a class="btn btn-view" href="/{{ i.slug }}">查看</a>
+      {% elif perms.write and i.has_preview %}
+      <a class="btn btn-view" href="/{{ i.slug }}?preview=1">查看</a>
+      {% elif perms.write %}
+      <span class="btn is-disabled btn-view" title="请先生成预览">暂无预览</span>
+      {% else %}
+      <span class="act-ph btn-view" aria-hidden="true"></span>
+      {% endif %}
+      {% if perms.publish %}
+        {% if i.status=='published' %}
+        <form method="post" action="/admin/issue/{{ i.slug }}/unpublish" class="js-unpublish" data-slug="{{ i.slug }}" data-label="{{ i.period_label }}" data-can-delete-draft="{{ '1' if perms.delete_draft else '0' }}"><button class="btn" type="submit">撤回上线</button></form>
+        {% elif i.can_go_live %}
+        <form method="post" action="/admin/issue/{{ i.slug }}/publish" class="js-publish" data-slug="{{ i.slug }}" data-label="{{ i.period_label }}" data-can-delete-draft="{{ '1' if perms.delete_draft else '0' }}"><input type="hidden" name="confirm" value=""><button class="btn pri-live" type="submit">上线</button></form>
+        {% else %}
+        <span class="btn is-disabled pub-slot" title="{{ i.publish_hint or '请先生成预览并完成检查' }}">上线</span>
+        {% endif %}
+      {% else %}
+      <span class="act-ph" aria-hidden="true"></span>
+      {% endif %}
+      {% if (i.status=='published' and perms.delete_published) or (i.status!='published' and perms.delete_draft) %}
+      <form method="post" action="/admin/issue/{{ i.slug }}/delete" class="js-delete-issue" data-label="{{ i.period_label }}" data-slug="{{ i.slug }}" data-published="{{ '1' if i.status=='published' else '0' }}"><input type="hidden" name="confirm_slug" value=""><button class="btn danger" type="submit">删除本期</button></form>
+      {% else %}
+      <span class="act-ph" aria-hidden="true"></span>
+      {% endif %}
+    </div>
+  </td>
+</tr>{% endfor %}
+</table>
+
+{% if perms.write %}
+<h2>新建下一期</h2>
+<p class="muted">下面已按上一期自动填好建议区间，可改。创建后会进入该期的后台，从头放材料。</p>
+<form class="box grid2" method="post" action="/admin/issue/new">
+<div><label class="muted">期号（URL，建议用结束日，如 {{ suggest.slug }}）</label><input type="text" name="slug" required value="{{ suggest.slug }}" placeholder="2026-08-21"></div>
+<div><label class="muted">显示标题（读者页大日期）</label><input type="text" name="period_label" required value="{{ suggest.period_label }}" placeholder="2026.8.15 - 8.21"></div>
+<div><label class="muted">开始日期</label><input type="date" name="date_start" required value="{{ suggest.date_start }}"></div>
+<div><label class="muted">结束日期</label><input type="date" name="date_end" required value="{{ suggest.date_end }}"></div>
+<div><label class="muted">版本号</label><input type="text" name="version" value="{{ suggest.version }}"></div>
+<div style="align-self:end"><button class="btn pri" type="submit">创建并进入这一期</button></div>
+</form>
+{% endif %}
+</div>
+<script>
+(function () {
+  function esc(t) {
+    return String(t || '').replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+
+  function replacePubForm(tr, status, publishedAt) {
+    var acts = tr.querySelector('.issue-acts');
+    if (!acts) return;
+    var slug = tr.dataset.slug || '';
+    var label = tr.dataset.label || slug;
+    var canDraft = tr.dataset.canDeleteDraft === '1';
+    var old = acts.querySelector('.js-publish, .js-unpublish, .pub-slot');
+    if (!old) return;
+    var form = document.createElement('form');
+    form.method = 'post';
+    if (status === 'published') {
+      form.action = '/admin/issue/' + encodeURIComponent(slug) + '/unpublish';
+      form.className = 'js-unpublish';
+      form.innerHTML = '<button class="btn" type="submit">撤回上线</button>';
+      bindUnpublish(form);
+    } else {
+      form.action = '/admin/issue/' + encodeURIComponent(slug) + '/publish';
+      form.className = 'js-publish';
+      form.innerHTML = '<input type="hidden" name="confirm" value=""><button class="btn pri-live" type="submit">上线</button>';
+      bindPublish(form);
+    }
+    form.dataset.slug = slug;
+    form.dataset.label = label;
+    form.dataset.canDeleteDraft = canDraft ? '1' : '0';
+    old.replaceWith(form);
+
+    var st = tr.querySelector('.col-status');
+    if (st) st.innerHTML = status === 'published'
+      ? '<span class="tag ok">已上线</span>'
+      : '<span class="tag pend">草稿</span>';
+    var pub = tr.querySelector('.col-published');
+    if (pub) pub.textContent = status === 'published' ? (publishedAt || '—') : '—';
+
+    var view = acts.querySelector('.btn-view');
+    if (view && view.tagName === 'A') {
+      view.href = status === 'published' ? '/' + slug : '/' + slug + '?preview=1';
+      view.textContent = '查看';
+      view.classList.remove('is-disabled');
+    }
+
+    var del = acts.querySelector('.js-delete-issue');
+    if (del) del.dataset.published = status === 'published' ? '1' : '0';
+  }
+
+  function bindDelete(form) {
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var slug = form.dataset.slug || '';
+      var label = form.dataset.label || slug;
+      var tip = form.dataset.published === '1'
+        ? '已上线内容、索引与素材都会永久删除。'
+        : '草稿与素材都会永久删除。';
+      var btn = form.querySelector('button[type="submit"]');
+      if (btn) btn.classList.add('is-busy');
+      var ok = await MeshDialog.confirm({
+        title: '删除本期',
+        body: '确定删除「' + esc(label) + '」？\n' + tip,
+        okText: '确认删除',
+        cancelText: '取消',
+        danger: true,
+      });
+      if (btn) btn.classList.remove('is-busy');
+      if (!ok) return;
+      if (btn) { btn.disabled = true; btn.classList.add('is-busy'); }
+      try {
+        var body = new URLSearchParams();
+        var r = await fetch(form.action, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          credentials: 'same-origin',
+          body: body.toString(),
+        });
+        var data = {};
+        try { data = await r.json(); } catch (_) {}
+        if (!r.ok || data.ok === false) {
+          throw new Error((data && data.error) || ('HTTP ' + r.status));
+        }
+        var tr = form.closest('tr');
+        if (tr) tr.remove();
+      } catch (err) {
+        if (btn) { btn.disabled = false; btn.classList.remove('is-busy'); }
+        await MeshDialog.alert({ title: '删除失败', body: String(err.message || err) });
+      }
+    });
+  }
+
+  function bindPublish(form) {
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var slug = form.dataset.slug || '';
+      var label = form.dataset.label || slug;
+      var ok = await MeshDialog.confirm({
+        title: '确认上线',
+        body: '上线后读者可见「' + esc(label) + '」。此操作不可撤回。',
+        okText: '确认上线',
+        cancelText: '取消',
+      });
+      if (!ok) return;
+      var btn = form.querySelector('button[type="submit"]');
+      if (btn) { btn.disabled = true; btn.classList.add('is-busy'); }
+      try {
+        var body = new URLSearchParams();
+        var r = await fetch(form.action, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          credentials: 'same-origin',
+          body: body.toString(),
+        });
+        var data = {};
+        try { data = await r.json(); } catch (_) {}
+        if (!r.ok || data.ok === false) {
+          throw new Error((data && data.error) || ('HTTP ' + r.status));
+        }
+        var tr = form.closest('tr');
+        if (tr) replacePubForm(tr, 'published', data.published_at || '');
+      } catch (err) {
+        if (btn) { btn.disabled = false; btn.classList.remove('is-busy'); }
+        await MeshDialog.alert({ title: '上线失败', body: String(err.message || err) });
+      }
+    });
+  }
+
+  function bindUnpublish(form) {
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var slug = form.dataset.slug || '';
+      var label = form.dataset.label || slug;
+      var ok = await MeshDialog.confirm({
+        title: '撤回上线',
+        body: '确认将「' + esc(label) + '」撤回为草稿？读者将无法再打开本期。',
+        okText: '撤回上线',
+        cancelText: '取消',
+      });
+      if (!ok) return;
+      var btn = form.querySelector('button[type="submit"]');
+      if (btn) { btn.disabled = true; btn.classList.add('is-busy'); }
+      try {
+        var r = await fetch(form.action, {
+          method: 'POST',
+          headers: { Accept: 'application/json' },
+          credentials: 'same-origin',
+        });
+        var data = {};
+        try { data = await r.json(); } catch (_) {}
+        if (!r.ok || data.ok === false) throw new Error((data && data.error) || ('HTTP ' + r.status));
+        var tr = form.closest('tr');
+        if (tr) replacePubForm(tr, 'draft', '');
+      } catch (err) {
+        if (btn) { btn.disabled = false; btn.classList.remove('is-busy'); }
+        await MeshDialog.alert({ title: '撤回失败', body: String(err.message || err) });
+      }
+    });
+  }
+
+  document.querySelectorAll('form.js-confirm').forEach(function (form) {
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var ok = await MeshDialog.confirm({
+        title: form.dataset.title || '请确认',
+        body: form.dataset.body || '',
+        okText: form.dataset.ok || '确定',
+        cancelText: '取消',
+      });
+      if (ok) form.submit();
+    });
+  });
+
+  document.querySelectorAll('form.js-publish').forEach(bindPublish);
+  document.querySelectorAll('form.js-unpublish').forEach(bindUnpublish);
+  document.querySelectorAll('form.js-delete-issue').forEach(bindDelete);
+})();
+</script>
+{% endblock %}

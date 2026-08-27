@@ -1,0 +1,230 @@
+{% extends "base.html" %}{% block title %}提示词 · GeekPark Mesh{% endblock %}
+{% block head %}
+<style>
+.adm.prompts-page{max-width:1180px}
+.prompts-lead{margin:0 0 18px;max-width:720px;color:var(--ink3);font-size:14px;line-height:1.65}
+.prompts-layout{display:grid;grid-template-columns:260px 1fr;gap:14px;margin-top:8px;align-items:start}
+.prompts-side,.prompts-main{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px}
+.prompts-side h2{margin:0 0 10px;font-size:14px;color:var(--ink2)}
+.prompts-side ul{list-style:none;margin:0;padding:0;max-height:min(62vh,560px);overflow:auto}
+.prompts-side li{margin:0}
+.prompts-side a{display:block;padding:8px 10px;border-radius:10px;font-size:13px;color:var(--ink2);text-decoration:none;word-break:break-all}
+.prompts-side a:hover{background:#F4FAEC;color:var(--deep)}
+.prompts-side a.on{background:var(--deep);color:#fff;font-weight:600}
+.prompts-drop{margin-top:14px;padding:14px 12px;border:1.5px dashed #CBD6CC;border-radius:12px;background:#FAFCF7;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.prompts-drop:hover,.prompts-drop.over{border-color:var(--deep);background:#F4FAEC}
+.prompts-drop .t{font-size:13px;font-weight:600;color:var(--ink2)}
+.prompts-drop .s{margin-top:4px;font-size:12px;color:var(--ink3);line-height:1.45}
+.prompts-drop input{display:none}
+.prompts-add{margin-top:10px}
+.prompts-add .or{display:flex;align-items:center;gap:8px;margin:0 0 8px;color:var(--ink3);font-size:11.5px}
+.prompts-add .or::before,.prompts-add .or::after{content:"";flex:1;height:1px;background:#E8EEE6}
+.prompts-add .row{display:flex;align-items:stretch;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff;transition:border-color .12s,box-shadow .12s}
+.prompts-add .row:focus-within{border-color:var(--deep);box-shadow:0 0 0 3px rgba(20,56,47,.12)}
+.prompts-add input[type=text]{flex:1;min-width:0;border:0!important;outline:none!important;box-shadow:none!important;border-radius:0;padding:8px 10px;font-size:13px;background:transparent}
+.prompts-add input[type=text]:focus{outline:none!important;border:0!important;box-shadow:none!important}
+.prompts-add .suf{display:flex;align-items:center;padding:0 8px;font-size:12px;color:var(--ink3);background:#F7F9F5;border-left:1px solid var(--line);font-family:var(--mono)}
+.prompts-add button{border:0;border-left:1px solid var(--line);border-radius:0;background:#fff;color:var(--deep);font-size:13px;font-weight:600;padding:0 12px;cursor:pointer}
+.prompts-add button:hover{background:#F4FAEC}
+.prompts-add button:focus{outline:none;background:#F4FAEC}
+.prompts-main .title{margin-bottom:12px}
+.prompts-main .title h2{margin:0;font-size:16px;word-break:break-all}
+.prompts-main textarea{min-height:560px;font-family:var(--mono);font-size:12.5px;line-height:1.55}
+.prompts-main .foot{margin-top:12px;display:flex;justify-content:flex-end;align-items:center;gap:8px}
+.prompts-main .empty{padding:40px 16px;text-align:center;color:var(--ink3);font-size:14px;line-height:1.6}
+.prompts-main .empty-drop{margin:18px auto 0;max-width:360px;padding:28px 18px;border:1.5px dashed #CBD6CC;border-radius:14px;background:#FAFCF7;cursor:pointer}
+.prompts-main .empty-drop:hover,.prompts-main .empty-drop.over{border-color:var(--deep);background:#F4FAEC}
+.prompts-main .empty-drop .t{font-weight:600;color:var(--ink2)}
+.prompts-main .btn.ghost-del{border-color:transparent;color:var(--ink3);background:transparent}
+.prompts-main .btn.ghost-del:hover{color:#B42318;background:#FEF3F2}
+body.prompts-dragging .prompts-drop,body.prompts-dragging .empty-drop{border-color:var(--deep)}
+@media (max-width:860px){.prompts-layout{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+{% block body %}
+{% set protected = [
+  '00_base_rules.md','05_owner_attrib.md','90_output_items.md','91_output_issue.md',
+  'card_team.md','issue_draft.md','qa.md',
+  'extract_T1.md','extract_T2.md','extract_T3.md','extract_T4.md','extract_T5.md',
+  'extract_T6.md','extract_T7.md','extract_T8.md','extract_T9.md',
+  'extract_T10.md','extract_T11.md','extract_T12.md',
+  'team_gp.md','team_svbd.md','team_podcast.md','team_video.md'
+] %}
+<div class="adm prompts-page">
+{% with nav='prompts' %}{% include "adm_top.html" %}{% endwith %}
+<h1>提示词</h1>
+<p class="prompts-lead">这些 Markdown 是抽取与生成用的规则。改完保存后，后续任务立即生效。可直接把 <code>.md</code> 拖进下方区域上传；管线会读取固定文件名（如 <code>00_base_rules</code>、<code>extract_T1</code>）。</p>
+{% if flash_err %}<p class="tag pend" style="display:inline-block;margin:0 0 14px">{{ flash_err }}</p>{% endif %}
+
+<div class="prompts-layout">
+  <aside class="prompts-side">
+    <h2>文件列表</h2>
+    <ul>
+      {% for f in files %}
+      <li><a href="/admin/prompts/{{ f }}" {% if f==current %}class="on"{% endif %}>{{ f }}</a></li>
+      {% endfor %}
+    </ul>
+    <div class="prompts-drop" id="promptDrop" tabindex="0" role="button" aria-label="拖拽上传提示词">
+      <div class="t">拖入 .md 上传</div>
+      <div class="s">也可点击选择，支持多选</div>
+      <input type="file" id="promptFile" accept=".md,text/markdown,text/plain" multiple>
+    </div>
+    <form class="prompts-add" method="post" action="/admin/prompts/new">
+      <div class="or">或命名新建</div>
+      <div class="row">
+        <input id="new-prompt-name" type="text" name="name" required placeholder="文件名" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,63}" title="字母数字开头，可含 _ -" autocomplete="off" aria-label="新文件名">
+        <span class="suf">.md</span>
+        <button type="submit">创建</button>
+      </div>
+    </form>
+  </aside>
+
+  <section class="prompts-main">
+    {% if current %}
+    <div class="title"><h2>{{ current }}</h2></div>
+    <form id="prompt-save" method="post" action="/admin/prompts/{{ current }}">
+      <textarea name="content" spellcheck="false">{{ content }}</textarea>
+    </form>
+    <div class="foot">
+      {% if current not in protected %}
+      <form class="inline js-confirm" method="post" action="/admin/prompts/{{ current }}/delete" data-title="删除提示词" data-body="确定删除「{{ current }}」？此操作不可恢复。" data-ok="删除">
+        <button class="btn ghost-del" type="submit">删除此文件</button>
+      </form>
+      {% endif %}
+      <button class="btn pri" type="submit" form="prompt-save">保存</button>
+    </div>
+    {% else %}
+    <div class="empty">
+      从左侧选择一个文件编辑，或把规则 md 拖到这里。
+      <div class="empty-drop" id="promptDropMain">
+        <div class="t">拖入 .md 文件</div>
+        <div class="s" style="margin-top:6px;font-size:12.5px">支持一次多个</div>
+      </div>
+    </div>
+    {% endif %}
+  </section>
+</div>
+</div>
+<script>
+document.querySelectorAll('form.js-confirm').forEach(function (form) {
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var ok = await MeshDialog.confirm({
+      title: form.dataset.title || '请确认',
+      body: form.dataset.body || '',
+      okText: form.dataset.ok || '确定',
+      danger: true,
+    });
+    if (ok) form.submit();
+  });
+});
+
+(function () {
+  var fileInput = document.getElementById('promptFile');
+  var dropA = document.getElementById('promptDrop');
+  var dropB = document.getElementById('promptDropMain');
+
+  async function uploadFiles(fileList, overwrite) {
+    var files = Array.prototype.slice.call(fileList || []).filter(function (f) {
+      return /\.md$/i.test(f.name);
+    });
+    if (!files.length) {
+      await MeshDialog.alert({ title: '无法上传', body: '请拖入或选择 .md 文件。' });
+      return;
+    }
+    var fd = new FormData();
+    files.forEach(function (f) { fd.append('files', f, f.name); });
+    fd.append('overwrite', overwrite ? '1' : '0');
+    var r = await fetch('/admin/prompts/upload', {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+      credentials: 'same-origin',
+      body: fd,
+    });
+    var data = {};
+    try { data = await r.json(); } catch (_) {}
+    if (!r.ok && !data.saved) {
+      await MeshDialog.alert({ title: '上传失败', body: (data && data.error) || ('HTTP ' + r.status) });
+      return;
+    }
+    if (data.skipped && data.skipped.length) {
+      var ok = await MeshDialog.confirm({
+        title: '文件已存在',
+        body: '以下文件已存在，是否覆盖？\n' + data.skipped.join('\n'),
+        okText: '覆盖上传',
+        cancelText: '取消',
+        danger: true,
+      });
+      if (ok) {
+        await uploadFiles(files.filter(function (f) {
+          return data.skipped.indexOf(f.name) >= 0 || data.skipped.indexOf(f.name.replace(/^.*[\\/]/, '')) >= 0;
+        }).length ? files.filter(function (f) {
+          var n = f.name.replace(/^.*[\\/]/, '');
+          return data.skipped.indexOf(n) >= 0;
+        }) : files, true);
+        return;
+      }
+    }
+    if (data.errors && data.errors.length) {
+      await MeshDialog.alert({ title: '部分失败', body: data.errors.join('\n') });
+    }
+    if (data.open) {
+      location.href = '/admin/prompts/' + encodeURIComponent(data.open);
+      return;
+    }
+    if (data.saved && data.saved.length) {
+      var ul = document.querySelector('.prompts-side ul');
+      (data.saved || []).forEach(function (name) {
+        if (!ul) return;
+        var exists = Array.prototype.some.call(ul.querySelectorAll('a'), function (a) {
+          return a.textContent === name;
+        });
+        if (exists) return;
+        var li = document.createElement('li');
+        var a = document.createElement('a');
+        a.href = '/admin/prompts/' + encodeURIComponent(name);
+        a.textContent = name;
+        li.appendChild(a);
+        ul.appendChild(li);
+      });
+    }
+  }
+
+  function bindDrop(el) {
+    if (!el) return;
+    el.addEventListener('click', function () { fileInput && fileInput.click(); });
+    el.addEventListener('dragenter', function (e) { e.preventDefault(); el.classList.add('over'); });
+    el.addEventListener('dragover', function (e) { e.preventDefault(); el.classList.add('over'); });
+    el.addEventListener('dragleave', function () { el.classList.remove('over'); });
+    el.addEventListener('drop', function (e) {
+      e.preventDefault();
+      el.classList.remove('over');
+      if (e.dataTransfer && e.dataTransfer.files) uploadFiles(e.dataTransfer.files, false);
+    });
+  }
+  bindDrop(dropA);
+  bindDrop(dropB);
+  if (fileInput) {
+    fileInput.addEventListener('change', function () {
+      if (fileInput.files && fileInput.files.length) uploadFiles(fileInput.files, false);
+      fileInput.value = '';
+    });
+  }
+  // 整页拖入时高亮投放区
+  var dragDepth = 0;
+  window.addEventListener('dragenter', function (e) {
+    if (!e.dataTransfer || !Array.prototype.some.call(e.dataTransfer.types || [], function (t) { return t === 'Files'; })) return;
+    dragDepth++;
+    document.body.classList.add('prompts-dragging');
+  });
+  window.addEventListener('dragleave', function () {
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (!dragDepth) document.body.classList.remove('prompts-dragging');
+  });
+  window.addEventListener('drop', function () {
+    dragDepth = 0;
+    document.body.classList.remove('prompts-dragging');
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,207 @@
+{% extends "base.html" %}{% block title %}账号 · GeekPark Mesh{% endblock %}
+{% block head %}
+<style>
+.adm.users-page{max-width:980px}
+.users-lead{margin:0 0 6px;font-size:14px;color:var(--ink2)}
+.users-ladder{margin:0 0 18px;font-size:13px;color:var(--ink3);line-height:1.55;max-width:760px}
+.users-ladder b{color:var(--ink2);font-weight:600}
+.users-table-wrap{overflow-x:auto;margin:0 0 16px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.users-table{width:100%;border-collapse:collapse;font-size:13.5px;margin:0}
+.users-table th,.users-table td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+.users-table th{font-size:12px;color:var(--ink3);font-weight:700;background:#FAFCF7;white-space:nowrap}
+.users-table tr:last-child td{border-bottom:0}
+.users-table .acct{font-family:var(--mono);font-size:12px;color:var(--ink3);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.users-table .feishu{font-size:11.5px;color:#166534;font-weight:600}
+.users-table .feishu.off{color:var(--ink3);font-weight:500}
+.users-table input,.users-table select{font-size:13px;padding:6px 8px;width:100%;min-width:0}
+.users-table .col-display{min-width:140px}
+.users-table .col-role{width:120px}
+.users-table .col-acts{width:120px;white-space:nowrap}
+.users-table .acts{display:flex;gap:6px;align-items:center;justify-content:flex-end}
+.users-table .btn{padding:5px 12px;font-size:12.5px}
+.users-table .btn.ghost-del{border-color:transparent;color:var(--ink3);background:transparent;padding:5px 8px}
+.users-table .btn.pri[disabled]{opacity:.45;cursor:not-allowed}
+.users-table tr.is-dirty{background:#F7FBF0}
+.users-pager{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 28px;font-size:13px;color:var(--ink3)}
+.users-pager .links{display:flex;gap:6px;align-items:center}
+.users-pager a,.users-pager span.pg{display:inline-block;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink2);text-decoration:none;font-weight:600}
+.users-pager a:hover{border-color:var(--deep);color:var(--deep)}
+.users-pager span.pg.on{background:var(--deep);color:#fff;border-color:var(--deep)}
+.users-pager span.pg.dis{opacity:.45;pointer-events:none}
+.users-add{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.users-add h2{margin:0 0 4px;font-size:16px}
+.users-add .hint{margin:0 0 12px;font-size:12.5px;color:var(--ink3)}
+.users-add .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;align-items:end}
+.users-add .fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.users-add .fld label{font-size:11.5px;font-weight:700;color:var(--ink3)}
+.users-add .fld.act{justify-content:flex-end}
+@media (max-width:900px){.users-add .grid{grid-template-columns:1fr 1fr}}
+</style>
+{% endblock %}
+{% block body %}
+{% set role_choices = [
+  ('viewer', '查看者'),
+  ('editor', '编辑'),
+  ('admin', '管理员'),
+  ('owner', '所有者')
+] %}
+<div class="adm users-page">
+{% with nav='users' %}{% include "adm_top.html" %}{% endwith %}
+<h1>账号</h1>
+<p class="users-lead">权限四档</p>
+<p class="users-ladder"><b>查看者</b> 看已上线周报 · <b>编辑</b> 制作预览与草稿 · <b>管理员</b> 再加管账号/提示词 · <b>所有者</b> 再加确认上线/撤回</p>
+{% if flash_ok %}<p class="tag ok" id="usersFlash" style="display:inline-block;margin:0 0 14px">{{ flash_ok }}</p>{% endif %}
+<p class="muted" style="margin:0 0 12px;font-size:12.5px">改显示名或权限后，请点右侧「保存」。</p>
+
+<div class="users-table-wrap">
+<table class="users-table">
+  <thead>
+    <tr>
+      <th>账号</th>
+      <th class="col-display">显示名</th>
+      <th class="col-role">权限</th>
+      <th>飞书</th>
+      <th class="col-acts"></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for u in users %}
+    {% set show_role = 'viewer' if u.role == 'dept' else u.role %}
+    <tr>
+      <td>
+        <form id="user-save-{{ u.id }}" method="post" action="/admin/users/save">
+          <input type="hidden" name="uid" value="{{ u.id }}">
+          <input type="hidden" name="team" value="{{ u.team or '' }}">
+        </form>
+        <div class="acct" title="{{ u.username }}">{{ u.username }}</div>
+      </td>
+      <td class="col-display">
+        <input form="user-save-{{ u.id }}" type="text" name="display" value="{{ u.display or '' }}" autocomplete="off" class="js-dirty">
+      </td>
+      <td class="col-role">
+        <select form="user-save-{{ u.id }}" name="role" class="js-dirty">
+          {% for val, lab in role_choices %}
+          {% if val != 'owner' or perms.publish %}
+          <option value="{{ val }}" {% if show_role == val %}selected{% endif %}>{{ lab }}</option>
+          {% endif %}
+          {% endfor %}
+        </select>
+      </td>
+      <td>{% if u.feishu_open_id %}<span class="feishu">已绑</span>{% else %}<span class="feishu off">本地</span>{% endif %}</td>
+      <td class="col-acts">
+        <div class="acts">
+          <form class="inline js-confirm" method="post" action="/admin/users/{{ u.id }}/delete" data-title="删除账号" data-body="确定删除「{{ u.display or u.username }}」？" data-ok="删除">
+            <button class="btn ghost-del" type="submit">删</button>
+          </form>
+          <button class="btn pri js-save-btn" type="submit" form="user-save-{{ u.id }}" disabled title="有修改后再点保存">保存</button>
+        </div>
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5" class="muted" style="padding:20px">还没有账号。</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if pages > 1 or total > page_size %}
+<nav class="users-pager" aria-label="分页">
+  <div>共 {{ total }} 人 · 第 {{ page }}/{{ pages }} 页</div>
+  <div class="links">
+    {% if page > 1 %}
+    <a href="/admin/users?page={{ page - 1 }}">上一页</a>
+    {% else %}
+    <span class="pg dis">上一页</span>
+    {% endif %}
+    {% for p in range(1, pages + 1) %}
+      {% if p == page %}<span class="pg on">{{ p }}</span>
+      {% elif pages <= 9 or p == 1 or p == pages or (p >= page - 2 and p <= page + 2) %}
+      <a href="/admin/users?page={{ p }}">{{ p }}</a>
+      {% elif p == page - 3 or p == page + 3 %}<span class="pg dis">…</span>
+      {% endif %}
+    {% endfor %}
+    {% if page < pages %}
+    <a href="/admin/users?page={{ page + 1 }}">下一页</a>
+    {% else %}
+    <span class="pg dis">下一页</span>
+    {% endif %}
+  </div>
+</nav>
+{% else %}
+<p class="muted" style="margin:0 0 24px;font-size:13px">共 {{ total }} 人</p>
+{% endif %}
+
+<section class="users-add">
+  <h2>新建本地账号</h2>
+  <p class="hint">仅给不用飞书、用账号密码登录的人。同事一般走飞书登录即可，登录后会出现在上表。</p>
+  <form method="post" action="/admin/users/save">
+    <div class="grid">
+      <div class="fld"><label>账号</label><input type="text" name="username" required autocomplete="off"></div>
+      <div class="fld"><label>显示名</label><input type="text" name="display" autocomplete="off"></div>
+      <div class="fld"><label>密码</label><input type="password" name="password" required autocomplete="new-password"></div>
+      <div class="fld">
+        <label>权限</label>
+        <select name="role">
+          <option value="viewer">查看者</option>
+          <option value="editor">编辑</option>
+          <option value="admin">管理员</option>
+          {% if perms.publish %}<option value="owner">所有者</option>{% endif %}
+        </select>
+      </div>
+      <div class="fld act"><button class="btn pri" type="submit">创建</button></div>
+    </div>
+  </form>
+</section>
+</div>
+<script>
+document.querySelectorAll('form.js-confirm').forEach(function (form) {
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var ok = await MeshDialog.confirm({
+      title: form.dataset.title || '请确认',
+      body: form.dataset.body || '',
+      okText: form.dataset.ok || '确定',
+      danger: true,
+    });
+    if (ok) form.submit();
+  });
+});
+document.querySelectorAll('tr').forEach(function (tr) {
+  var fields = tr.querySelectorAll('.js-dirty');
+  var btn = tr.querySelector('.js-save-btn');
+  if (!fields.length || !btn) return;
+  function mark() {
+    tr.classList.add('is-dirty');
+    btn.disabled = false;
+    btn.title = '保存修改';
+  }
+  fields.forEach(function (el) {
+    el.addEventListener('input', mark);
+    el.addEventListener('change', mark);
+    if (el.tagName === 'INPUT') {
+      el.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (!btn.disabled) btn.click();
+        }
+      });
+    }
+  });
+});
+(function () {
+  var flash = document.getElementById('usersFlash');
+  if (!flash) return;
+  setTimeout(function () {
+    flash.style.opacity = '0';
+    flash.style.transition = 'opacity .4s';
+  }, 2200);
+  if (window.history && history.replaceState) {
+    var u = new URL(location.href);
+    if (u.searchParams.has('saved')) {
+      u.searchParams.delete('saved');
+      history.replaceState({}, '', u.pathname + (u.search ? u.search : ''));
+    }
+  }
+})();
+</script>
+{% endblock %}

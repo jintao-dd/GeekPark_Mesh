@@ -1,0 +1,31 @@
+#!/bin/sh
+# Mesh 前端轻量 pre-commit：仅当暂存了 JS/CSS/相关模板时跑本地检查。
+# 安装：powershell -File .githooks/install.ps1   或  bash .githooks/install.sh
+set -e
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+# Windows：优先走 PowerShell 版（不依赖系统 PATH 里的 bash）
+if command -v powershell.exe >/dev/null 2>&1 && [ -f "$ROOT/.githooks/pre-commit.ps1" ]; then
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$ROOT/.githooks/pre-commit.ps1"
+  exit $?
+fi
+
+if ! git diff --cached --name-only --diff-filter=ACMR | grep -Eq \
+  '(^|/)mesh/app/static/(app|console|dialog)\.js$|(^|/)mesh/app/static/style\.css$|(^|/)mesh/app/templates/(base|issue_console)\.html$'; then
+  exit 0
+fi
+
+echo "==> pre-commit: 前端检查（本地）"
+if command -v python >/dev/null 2>&1; then
+  PY=python
+elif command -v python3 >/dev/null 2>&1; then
+  PY=python3
+else
+  echo "pre-commit: 未找到 python，跳过前端检查" >&2
+  exit 0
+fi
+
+"$PY" mesh/scripts/check_frontend.py
+echo "==> pre-commit: FRONTEND_OK"

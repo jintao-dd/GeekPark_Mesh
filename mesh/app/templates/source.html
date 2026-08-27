@@ -1,0 +1,68 @@
+{% extends "base.html" %}{% block title %}来源 #{{ s.id }}{% endblock %}
+{% block body %}
+<div class="adm"><a href="/admin/issue/{{ slug }}">← 返回本期</a>
+<h1>{{ s.title }} <span class="muted">{{ s.stype }} · {{ s.team }}</span></h1>
+{% if flash_err %}<p class="tag pend" style="display:inline-block;margin:0 0 14px">{{ flash_err }}</p>{% endif %}
+{% if split_hint %}<p class="hint" style="margin:0 0 14px">{{ split_hint }}</p>{% endif %}
+{% if split_info.warnings %}
+<p class="tag pend" style="display:inline-block;margin:0 0 14px;max-width:720px;line-height:1.5">{% for w in split_info.warnings %}{{ w }}{% if not loop.last %}<br>{% endif %}{% endfor %}</p>
+{% endif %}
+{% if perms.write %}<form class="inline" method="post" action="/admin/source/{{ s.id }}/extract"><button class="btn pri">{{ '重新抽取' if s.extracted else '抽取' }}</button></form>{% endif %}
+<h2>抽取条目 <span class="muted">{{ items|length }} 条；标红为 ⑤区/L3 硬拦；「归属」为 owner_team，用于要点卡与交叉分析</span></h2>
+<table><tr><th>区</th><th>级</th><th>类</th><th>T</th><th>归属</th><th>内容</th><th>主体</th><th>来源写法</th></tr>
+{% for it in items %}
+<tr style="{% if it.blocked %}background:#FEF3F2{% endif %}" data-item-id="{{ it.id }}">
+  <td>{{ it.zone }}</td><td>{{ it.level }}</td><td>{{ '判断' if it.kind=='judgment' else '事实' }}</td>
+  <td class="muted">{{ it.stype }}</td>
+  <td>
+    {% if not it.owner_team %}<span class="tag bad">待指定</span>{% else %}{{ it.owner_team }}{% endif %}
+    {% if perms.write %}
+    <div class="owner-edit" style="margin-top:4px">
+      <select class="owner-sel" data-item-id="{{ it.id }}" style="max-width:160px;font-size:12px">
+        <option value="">改归属…</option>
+        {% for t in owner_teams %}<option value="{{ t }}" {% if it.owner_team==t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+      </select>
+    </div>
+    {% endif %}
+  </td>
+  <td>{{ it.text }}</td><td class="muted">{{ it.entities }}</td><td class="muted">{{ it.source_label }}</td>
+</tr>
+{% endfor %}
+</table>
+{% if perms.write %}
+<script>
+document.querySelectorAll('.owner-sel').forEach(sel => {
+  sel.addEventListener('change', async () => {
+    const v = sel.value;
+    if (!v) return;
+    const id = +sel.dataset.itemId;
+    sel.disabled = true;
+    try {
+      const r = await fetch('/api/item_owner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ id, owner_team: v }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.detail || j.error || ('HTTP ' + r.status));
+      location.reload();
+    } catch (e) {
+      alert('保存失败：' + (e.message || e));
+    } finally {
+      sel.disabled = false;
+    }
+  });
+});
+</script>
+{% endif %}
+<h2>原文</h2>
+{% if perms.raw_view %}
+<pre style="max-height:600px;overflow:auto">{{ s.text }}</pre>
+{% else %}
+<p class="muted" style="background:#F7F8F6;border:1px solid var(--line);border-radius:12px;padding:14px 16px;line-height:1.55">
+  原文全文仅 <b>管理员 / 所有者</b> 可查看（与「脱敏与数据安全说明」一致）。<br>
+  你仍可上传、跑挖掘与审校条目；{% if s.raw_chars %}本条约 {{ s.raw_chars }} 字已入库，{% endif %}读者页不会出现原文。
+</p>
+{% endif %}
+</div>
+{% endblock %}

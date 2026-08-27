@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ issue.period_label }} · 周报后台</title>
+<link rel="icon" href="/static/assets/mesh_logo.png">
+<link rel="stylesheet" href="/static/console.css?v=qa-fix-8">
+</head>
+<body>
+
+<header class="chrome" id="chrome">
+  <a class="brand" href="/" title="返回前台首页"><span class="mk"><img src="/static/assets/mesh_logo.png" alt="GEEKPARK Mesh"></span><span class="pmeta"><span class="ptag">周报后台</span><span class="pmot">让极客公园的关系与判断，跨部门看得见</span></span></a>
+  <div class="spacer"></div>
+  <span class="state" id="state">还没开始</span>
+  {% if perms.write %}
+  <a class="state" href="/admin/issues" style="text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:12.5px;color:var(--ink2)">各期 / 新建下一期</a>
+  {% elif perms.console %}
+  <a class="state" href="/admin/issues" style="text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:12.5px;color:var(--ink2)">各期</a>
+  {% endif %}
+  <div class="who">身份 <b style="margin-left:6px">{{ role_cn }}</b><span style="margin-left:8px;color:var(--ink3)">{{ user.d }}</span>&nbsp;<a href="/logout" style="color:var(--ink3)">退出</a></div>
+</header>
+
+<!-- ============ 1 放入素材 ============ -->
+<section class="screen" id="s1">
+  <p class="eyebrow">放入素材</p>
+  <h1>归集本周<br><span class="thin">各部门材料</span></h1>
+  <p class="lede">录音、录屏、文字稿一并放入。<b>在线文档请先下载为文件</b>再拖进来。</p>
+
+  <div class="safewrap" id="safewrap">
+    <button class="safebar" id="safebar" aria-expanded="false">
+      <span class="lk"><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg></span>
+      <span class="tx"><span class="tt">脱敏与数据安全说明</span><span class="sb">原始文件怎么存 · 敏感信息怎么拦 · 谁能看到 · 你之后还有几道关</span></span>
+      <span class="cv">›</span>
+    </button>
+    <div class="pop" id="safepop" role="dialog" aria-label="脱敏与数据安全说明">
+      <button class="x" id="safex" aria-label="关闭">✕</button>
+      <h3>你交进来的东西，会怎么被对待</h3>
+      <p class="plede">你交的是<b>原始录音和记录</b>。你不是最后一道关——脱敏、审校、所有者确认都在后面，<b>压力不在你这</b>。</p>
+
+      <div class="whoseesbar">
+        <div class="row"><svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/></svg>原文全文只有 <b>管理员 / 所有者</b> 能在后台打开；编辑可上传与跑管线，看不到全文</div>
+        <div class="row"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V8a5 5 0 0110 0v3"/></svg>存进服务器 <b>隔离目录 + 数据库</b>，不挂公网、不进读者页与 EDM</div>
+        <div class="row"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 109-9"/><path d="M3 4v4h4"/></svg>每一步都能 <b>看到、撤回、改</b>（条目与要点卡；原文按角色）</div>
+      </div>
+
+      <div class="pledge">
+        <div class="pcol will">
+          <h4><span class="ic">✓</span>Mesh 会做的</h4>
+          <ul>
+            <li>原文<b>只存隔离区</b>，全文仅管理员/所有者可打开；读者页只出现脱敏结论</li>
+            <li>钱与条款<b>自动拦下</b>，命中即整条不入库</li>
+            <li>只写<b>事实</b>，不加评价与建议</li>
+            <li>每条都带<b>来源</b>，内部只到会议级</li>
+          </ul>
+        </div>
+        <div class="pcol wont">
+          <h4><span class="ic">—</span>Mesh 不会做的</h4>
+          <ul>
+            <li><b>不</b>外传原始文件，不进网站与 EDM</li>
+            <li><b>不</b>变成任务或 KPI</li>
+            <li><b>不</b>对观点追责</li>
+            <li><b>不</b>靠你手删——<b>系统兜底</b>，漏筛不怪你</li>
+            <li><b>不</b>自动上线，所有者确认前读者看不到</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="flowmap">
+        <h4>你松手之后，还要经过这些关</h4>
+        <div class="chain">
+          <div class="link here"><div class="st">01 现在</div><div class="nm">你放入素材</div><div class="by you">你</div><div class="ds">拖进来即可，不用整理、不用预先删减</div></div>
+          <div class="link"><div class="st">02</div><div class="nm">转写 · 抽帧 · 清洗</div><div class="by sys">系统自动</div><div class="ds">录音转文字、录屏拼接，去掉寒暄与重复</div></div>
+          <div class="link"><div class="st">03</div><div class="nm">脱敏 · ⑤区硬拦截</div><div class="by sys">系统自动</div><div class="ds">融资 / 薪酬 / 谈判立场，代码强制拦下</div></div>
+          <div class="link"><div class="st">04</div><div class="nm">编辑 · 核对要点卡</div><div class="by">编辑</div><div class="ds">AI 已生成各团队要点卡，可逐张查看或改 JSON</div></div>
+          <div class="link"><div class="st">05</div><div class="nm">所有者确认</div><div class="by">所有者</div><div class="ds">逐张过目，点确认即可上线</div></div>
+          <div class="link"><div class="st">06</div><div class="nm">归档上线</div><div class="by sys">系统</div><div class="ds">生成不可改版本，留痕可追溯</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if perms.write %}
+  <form id="upform" method="post" action="/admin/issue/{{ issue.slug }}/upload" enctype="multipart/form-data">
+  <div class="drop" id="drop">
+    <input type="file" id="fi" name="files" multiple accept=".txt,.md,.docx,.pdf,.csv,.ics,.json,.html">
+    <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 16V4M12 4l-5 5M12 4l5 5"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg></div>
+    <h3>拖到这里，或点击选择</h3>
+    <p>放入后自动识别类型与团队（如 T11 · 视频号团队、T10 · GP 周报、T12 · 音频播客）</p>
+    <div class="kinds"><span>文档 docx / pdf / txt / csv / ics</span><span>视频号周数据 csv → T11；脚本库 docx → T5</span><span>录音录屏请先转写后再放入</span></div>
+    <div class="rej" id="rej"></div>
+  </div>
+  </form>
+
+  <details class="more" style="margin-top:18px">
+    <summary>+ 粘贴文本 / 抓取 RSS</summary>
+    <form method="post" action="/admin/issue/{{ issue.slug }}/paste" style="margin-top:10px">
+      <textarea name="text" required placeholder="粘贴正文；类型与团队会按内容自动识别" style="width:100%;min-height:120px;margin-top:8px;font:inherit;border:1px solid var(--line);border-radius:12px;padding:10px"></textarea>
+      <div style="margin-top:8px"><button class="ghost" type="submit">保存为来源</button></div>
+    </form>
+    <form method="post" action="/admin/issue/{{ issue.slug }}/fetch" class="linkrow" style="margin-top:14px">
+      <select name="which" style="flex:0 0 auto"><option value="all">全部源</option><option value="cn">仅中文站</option><option value="en">仅英文站</option><option value="ext">仅外部媒体</option></select>
+      <label style="font-size:13px;color:var(--ink3)"><input type="checkbox" name="allow_stale" value="1"> 允许过期</label>
+      <button type="submit">抓取 RSS</button>
+    </form>
+  </details>
+  {% else %}
+  <p class="note" style="margin-top:8px">当前身份无法编辑后台，请联系管理员提权为编辑。</p>
+  {% endif %}
+
+  <div class="files" id="files" style="margin-top:20px">
+    <div class="fh"><h4>已放入 <span id="fcount">{{ sources|length }}</span> 个来源</h4><span class="meta" id="fmeta">条目 {{ n_items }} · 其中硬拦 {{ n_blocked }}</span></div>
+    <div id="frows">
+      {% for s in sources %}
+      <div class="frow" data-source-id="{{ s.id }}">
+        <div class="nm">
+          <b>{{ s.title }}</b>
+          {% if perms.write %}
+          <div class="meta-edits">
+            <select class="meta-sel" data-field="stype" title="数据类型（T13=内容中心混合包，将按段分别抽取）">
+              {% for k,v in stypes.items() %}<option value="{{ k }}" {% if s.stype==k %}selected{% endif %}>{{ k }} · {{ v.split('（')[0] }}</option>{% endfor %}
+            </select>
+            <select class="meta-sel" data-field="team" title="提交部门 / 默认归属">
+              {% for t in teams %}<option value="{{ t }}" {% if s.team==t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+            </select>
+          </div>
+          {% else %}
+          <div class="hint" style="margin-top:4px">{{ s.stype }} · {{ s.team }}</div>
+          {% endif %}
+        </div>
+        <div class="dept"><div class="hint">{{ s.n or 0 }} 字 · {% if s.extracted %}已抽取{% else %}未抽取{% endif %}{% if s.split_hint %} · {{ s.split_hint }}{% endif %}</div></div>
+        <div class="frow-acts">
+          {% if perms.raw_view %}
+          <a class="src-link" href="/admin/source/{{ s.id }}">查看原文</a>
+          {% elif perms.write %}
+          <a class="src-link" href="/admin/source/{{ s.id }}">查看条目</a>
+          {% endif %}
+          {% if perms.write %}
+          <form method="post" action="/admin/source/{{ s.id }}/delete" class="js-confirm js-ajax" data-title="移除来源" data-body="删除该来源及其条目？" data-ok="移除"><button class="x" type="submit">移除</button></form>
+          {% endif %}
+        </div>
+      </div>
+      {% else %}<div class="note">还没有放入任何材料。</div>{% endfor %}
+    </div>
+  </div>
+
+  <div class="actions pushed">
+    {% if perms.write %}
+    <button class="cta" id="to2" {% if not sources %}disabled{% endif %}>生成预览 <span class="arw">→</span></button>
+    <span class="hint" style="font-size:13px;color:var(--ink3);margin-left:12px">将自动生成要点卡与草稿，并进入预览编辑页</span>
+    {% else %}
+    <button class="cta" data-go="2" disabled title="需要编辑权限">生成预览 <span class="arw">→</span></button>
+    {% endif %}
+  </div>
+</section>
+
+{% if perms.write %}
+<form method="post" action="/admin/issue/{{ issue.slug }}/prepare_preview" id="prepPreview" class="ai-job" data-busy="正在生成各团队要点卡与周报草稿，完成后进入预览…" hidden></form>
+{% endif %}
+
+<!-- ============ 2 挖掘 & 脱敏 ============ -->
+<section class="screen" id="s3">
+  <p class="eyebrow">挖掘 &amp; 脱敏</p>
+  <h1>Mesh 定制化<br><span class="thin">深度挖掘 &amp; 脱敏</span></h1>
+  <p class="lede">不是交给大模型自己写。Mesh 按<b>规则库</b>逐条处理，每条都显示在下面。产出是<b>草稿</b>，仍需审校与所有者确认。</p>
+
+  <div class="rulewrap">
+    <div class="progline"><div class="f" id="pf"></div></div>
+    <div class="progmeta"><span id="pnow">准备就绪</span><span class="pct" id="ppct">0%</span></div>
+    <ul class="rules" id="rules"></ul>
+    <div class="result" id="result"><div class="grid" id="resGrid"></div></div>
+  </div>
+
+  <div class="actions pushed">
+    <button class="ghost" data-go="0">← 返回</button>
+    <button class="cta" id="gen" style="display:none">重新执行 <span class="arw">→</span></button>
+    <button class="ghost" id="to3" style="display:none">进入审校 →</button>
+  </div>
+</section>
+
+<!-- ============ 3 审校 ============ -->
+<section class="screen" id="s4">
+  <div class="review">
+    <p class="eyebrow">可选 · 要点卡核对</p>
+    <h1 style="font-size:clamp(28px,4vw,44px)">核对</h1>
+    <div class="verdict" id="verdict"></div>
+    <div class="attn" id="attn"></div>
+
+    <details class="bench" id="bench" open>
+      <summary>逐张查看与编辑 <span class="tag">要点卡 · 改 JSON · 审计记录</span></summary>
+      <div class="inner">
+        <p class="hint">要点卡由 AI 自动生成，供逐张核对；草稿已包含全部有效条目。⑤区硬拦条目可在此对照。</p>
+        <div class="rvgrid">
+          <div id="cards">
+            {% for c in cards %}
+            <div class="rc">
+              <div class="hd">
+                <div class="who">{{ c.team }}</div>
+                <span class="lab cert">已生成</span>
+              </div>
+              {% for sec in c.card.sections %}{% if sec.lines %}
+              <details>
+                <summary>{{ sec.title }}</summary>
+                <p>{% for l in sec.lines %}{{ l }}{% if not loop.last %}<br>{% endif %}{% endfor %}</p>
+              </details>
+              {% endif %}{% endfor %}
+              {% if c.card.dropped_summary %}<div class="src"><span>按规则未抽 · {{ c.card.dropped_summary }}</span></div>{% endif %}
+              {% if perms.write %}
+              <form method="post" action="/admin/card/{{ c.id }}/save" class="ops">
+                <details class="more"><summary>编辑要点卡 JSON</summary><textarea name="card_json" style="width:100%;min-height:160px;font-family:var(--mono);font-size:12.5px;border:1px solid var(--line);border-radius:12px;padding:10px">{{ c.card_json }}</textarea>
+                <button type="submit" style="margin-top:8px">保存</button></details>
+              </form>{% endif %}
+            </div>
+            {% else %}<div class="note">尚未生成要点卡。回到第二步执行挖掘，或在下方点「生成各团队要点卡」。</div>{% endfor %}
+          </div>
+          <aside class="aside">
+            <div><h4>敏感检查</h4><div class="kv">
+              <div><span>⑤区 / L3 硬拦</span><b>{{ n_blocked }}</b></div>
+              <div><span>跨通道已合并</span><b>{{ n_merged }}</b></div>
+              <div><span>归属待指定</span><b>{{ n_noowner }}</b></div>
+            </div></div>
+            <div><h4>操作记录 · 内部审计线</h4><div class="alog">{% for e in edits[:12] %}<div>{{ e.at }} {{ e.user }} · {{ e.target }}</div>{% else %}<div>尚无操作</div>{% endfor %}</div></div>
+          </aside>
+        </div>
+      </div>
+    </details>
+
+    <div class="actions" style="margin-top:32px">
+      <button class="ghost" data-go="1">← 返回</button>
+      {% if perms.write %}
+      <form method="post" action="/admin/issue/{{ issue.slug }}/cards" class="ai-job" data-busy="正在用 AI 生成各团队要点卡…" data-need-items="1" style="display:inline"><button class="ghost" type="submit"{% if not n_items %} disabled title="请先完成挖掘"{% endif %}>生成各团队要点卡</button></form>
+      <form method="post" action="/admin/issue/{{ issue.slug }}/draft" class="ai-job" data-busy="正在用 AI 生成周报草稿…" data-confirm="将根据全部有效条目重新生成草稿，覆盖当前草稿。继续？" style="display:inline"><button class="ghost" type="submit">生成周报草稿</button></form>
+      <a class="ghost" href="/{{ issue.slug }}?preview=1" target="_blank" style="text-decoration:none">预览读者页</a>
+      <button class="cta" id="to4" {% if not has_draft or draft_stale or n_noowner or not cards or not n_items %}disabled{% endif %}>全部无误，下一步 <span class="arw">→</span></button>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4 确认上线 ============ -->
+<section class="screen" id="s5">
+  <p class="eyebrow">可选 · 上线前检查</p>
+  <h1>确认 · 上线</h1>
+  <p class="lede"><b>只有所有者能上线</b>。上线即生成不可改版本、归档、出 EDM 预览。改动另发新版，不覆盖旧的。</p>
+
+  <div class="pub">
+    <div>
+      <h4 style="font-size:11px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin:0 0 14px">上线前检查</h4>
+      <ul class="chk" id="chk">
+        <li class="{% if sources %}ok{% else %}bad{% endif %}"><span class="m"></span><span>已放入材料<small>{{ sources|length }} 个来源</small></span></li>
+        <li class="{% if n_items %}ok{% else %}bad{% endif %}"><span class="m"></span><span>已完成挖掘与脱敏<small>条目 {{ n_items }} · 硬拦 {{ n_blocked }}</small></span></li>
+        <li class="{% if cards %}ok{% else %}bad{% endif %}"><span class="m"></span><span>已生成团队要点卡<small>{% if not cards %}请点「生成预览」{% else %}{{ cards|length }} 张{% endif %}</small></span></li>
+        <li class="{% if has_draft and not draft_stale %}ok{% else %}bad{% endif %}"><span class="m"></span><span>已生成周报草稿<small>{% if draft_stale %}挖掘/卡片已变更，请重新生成{% elif has_draft %}可预览{% else %}尚未生成{% endif %}</small></span></li>
+        <li class="{% if n_noowner==0 %}ok{% else %}bad{% endif %}"><span class="m"></span><span>条目归属团队均已判定<small>{% if n_noowner %}{{ n_noowner }} 条待指定{% else %}无遗留{% endif %}</small></span></li>
+      </ul>
+    </div>
+    <div>
+      <div class="gate" id="gate">
+        <div class="role">当前身份：{{ role_cn }}</div>
+        <h3>确认上线 · {{ issue.date_start }} → {{ issue.date_end }}</h3>
+        {% if perms.publish %}
+        <p>确认后：生成新版本、写入归档、开放读者访问、生成 EDM 预览稿（EDM 仍需手动发送）。</p>
+        <button class="go" id="publish" {% if not has_draft or draft_stale or n_noowner or not cards or not n_items or not sources %}disabled{% endif %}>确认上线</button>
+        {% elif perms.write %}
+        <p>你可以完成放入、挖掘与审校，并把本期提交给所有者。<b>上线按钮只对所有者显示。</b></p>
+        <form method="post" action="/admin/issue/{{ issue.slug }}/request_publish"><button class="req" type="submit">提交给所有者确认</button></form>
+        {% else %}
+        <p>当前身份无法编辑后台。上线由编辑准备、所有者确认。</p>
+        {% endif %}
+      </div>
+      <div class="vers"><h4>版本记录 · 不可改</h4>
+        <ul>{% for v in versions %}<li><span class="v">{{ v.version }}</span><span>{{ v.at }}</span><span>由 {{ v.by_user }} 确认</span><span>{{ v.cards_out }} 张卡对外</span><span>人工修订 {{ v.edited_count }}</span></li>{% else %}<li>本期尚未上线</li>{% endfor %}</ul>
+        <div class="hint" style="margin-top:8px">上线后要改动，请在审校页修改后另发新版本，旧版本保留在归档。</div>
+      </div>
+      {% if perms.write and issue.status == 'published' %}
+      <form method="post" action="/admin/issue/{{ issue.slug }}/reindex_published" style="margin-top:16px">
+        <button class="ghost js-confirm-click" type="submit" data-title="重建搜索索引" data-body="从当前条目快照与已上线 JSON 重建搜索/问答索引。">重建搜索索引</button>
+      </form>
+      {% if embeddings_configured is defined and not embeddings_configured %}
+      <p class="hint" style="margin-top:8px">向量语义检索未配置：请在 .env 设置 MESH_EMBED_* 后重启。</p>
+      {% endif %}
+      {% endif %}
+      {% if perms.write %}
+      <details class="more" style="margin-top:16px"><summary>EDM 发送</summary>
+        <form method="post" action="/admin/issue/{{ issue.slug }}/edm/send" style="margin-top:8px">
+          <textarea name="to" placeholder="收件人，逗号或换行分隔" style="width:100%;min-height:60px;border:1px solid var(--line);border-radius:12px;padding:10px;font:inherit"></textarea>
+          <div style="margin-top:8px;font-size:13px"><label><input type="radio" name="test" value="1" checked> 测试</label> &nbsp;<label><input type="radio" name="test" value="0"> 正式发送</label></div>
+          <div style="margin-top:8px"><button class="ghost js-confirm-click" type="submit" data-title="发送 EDM" data-body="确认发送这封邮件？">发送</button> <a class="ghost" href="/admin/issue/{{ issue.slug }}/edm" target="_blank" style="text-decoration:none">预览 EDM</a></div>
+        </form>
+      </details>
+      {% endif %}
+    </div>
+  </div>
+  <div class="actions" style="margin-top:44px"><button class="ghost" data-go="2">← 返回核对</button></div>
+</section>
+
+{% if perms.publish %}
+<!-- 上线确认改由 console.js MeshDialog，不再使用输入框 -->
+{% endif %}
+<div class="toast" id="toast"></div>
+<div class="mask" id="busy" aria-live="polite" aria-busy="true">
+  <div class="modal busy-modal" role="dialog" aria-modal="true">
+    <div class="busy-row">
+      <div class="busy-spin" aria-hidden="true"></div>
+      <div class="busy-tx">
+        <h3 id="busyTitle">处理中…</h3>
+        <p id="busyHint">模型生成通常需要几十秒到几分钟，请勿关闭或刷新页面。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+window.MESHADMIN = {
+  slug: {{ issue.slug|tojson }},
+  role: {{ user.r|tojson }},
+  canWrite: {{ 'true' if perms.write else 'false' }},
+  canRawView: {{ 'true' if perms.raw_view else 'false' }},
+  canPublish: {{ 'true' if perms.publish else 'false' }},
+  steps: {{ steps|tojson }},
+  hasItems: {{ 'true' if n_items else 'false' }},
+  startStep: {{ start_step }},
+  nItems: {{ n_items }},
+  nBlocked: {{ n_blocked }},
+  nMerged: {{ n_merged }},
+  nNoOwner: {{ n_noowner }},
+  cardCount: {{ cards|length }},
+  hasDraft: {{ 'true' if has_draft else 'false' }},
+  draftStale: {{ 'true' if draft_stale else 'false' }},
+  issueStatus: {{ issue.status|tojson }},
+  periodLabel: {{ issue.period_label|tojson }},
+  flashErr: {{ flash_err|tojson }},
+  stypes: {{ stypes|tojson }},
+  teams: {{ teams|tojson }},
+  sourcesDirty: {{ 'true' if sources_need_mine else 'false' }}
+};
+</script>
+<script src="/static/dialog.js?v=mesh-dlg-2"></script>
+<script src="/static/console.js?v=qa-fix-18"></script>
+</body>
+</html>

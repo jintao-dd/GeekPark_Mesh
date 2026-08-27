@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}GeekPark Mesh{% endblock %}</title>
+<link rel="icon" href="/static/assets/mesh_logo.png">
+<link rel="stylesheet" href="/static/style.css?v=qa-fix-13">
+<style>
+/* 后台通用小样式（不影响周报页） */
+.adm{max-width:1040px;margin:0 auto;padding:36px 28px 80px}
+.adm h1{font-size:28px;margin:0 0 6px}.adm h2{font-size:20px;margin:36px 0 12px}
+.adm table{width:100%;border-collapse:collapse;font-size:14px;background:#fff;border:1px solid var(--line);border-radius:var(--r-box);overflow:hidden}
+.adm th,.adm td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+.adm th{font-size:12px;color:var(--ink3);font-weight:700}
+.adm form.inline{display:inline}
+.adm .btn{font:inherit;font-size:13.5px;font-weight:600;border-radius:var(--r-pill);border:1px solid var(--line);background:#fff;padding:7px 14px;cursor:pointer;color:var(--ink2);text-decoration:none;display:inline-block;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.adm .btn:active{transform:scale(.97);opacity:.92}
+.adm .btn.pri{background:var(--deep);color:#fff;border-color:var(--deep)}
+.adm .btn.pri:active{opacity:1;filter:brightness(.95)}
+.adm .btn.warn{border-color:#EA580C;color:#EA580C}
+.adm .btn.danger{color:#B42318;border-color:#FDA29B}
+.adm .btn.danger:active{background:#FEF3F2}
+.adm .btn.is-busy{opacity:.7;pointer-events:none}
+.adm .btn.is-disabled{opacity:.55;cursor:default;pointer-events:none}
+.adm td.acts{white-space:nowrap}
+.adm .issue-acts{display:grid;grid-template-columns:120px 72px 88px 88px;gap:8px;align-items:center;justify-content:start}
+.adm .issue-acts > .btn,.adm .issue-acts > form > .btn{width:100%;box-sizing:border-box;text-align:center;padding-left:8px;padding-right:8px}
+.adm .issue-acts > form{margin:0;display:block}
+.adm .issue-acts .act-ph{display:block;min-height:1px}
+.adm .btn.pri-live{background:var(--deep);color:#fff;border-color:var(--deep)}
+.adm .btn.pri-live:active{filter:brightness(.95)}
+.adm input[type=text],.adm input[type=password],.adm input[type=date],.adm select,.adm textarea{font:inherit;font-size:14px;border:1px solid var(--line);border-radius:var(--r-in);padding:8px 10px;width:100%;box-sizing:border-box;background:#fff}
+.adm textarea{min-height:140px;font-family:var(--mono);font-size:12.5px}
+.adm .box{background:#fff;border:1px solid var(--line);border-radius:var(--r-box);padding:18px 20px;margin:12px 0}
+.adm .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.adm .muted{color:var(--ink3);font-size:13px}
+.adm .tag{display:inline-block;font-size:11.5px;font-weight:700;border-radius:var(--r-pill);padding:2px 9px;color:#fff;background:#64748B}
+.adm .tag.ok{background:#166534}.adm .tag.bad{background:#B91C1C}.adm .tag.pend{background:#EA580C}
+.adm .steps{counter-reset:s;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:10px 0 20px}
+.adm .steps div{background:#F4FAEC;border-radius:var(--r-in);padding:10px 12px;font-size:13px}
+.adm .steps div::before{counter-increment:s;content:counter(s) ". ";font-weight:800;color:var(--deep)}
+.adm pre{white-space:pre-wrap;font-size:12.5px;background:#F7F8F6;border-radius:var(--r-in);padding:10px}
+.adm-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:8px}
+.adm-top .adm-who{text-align:right;font-size:13px;color:var(--ink3);line-height:1.35}
+.adm-top .adm-who b{display:block;font-size:14px;color:var(--ink);font-weight:700}
+.adm-nav{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;margin-top:8px}
+.adm-nav a{font-size:13px;font-weight:600;color:var(--ink2);text-decoration:none;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:#fff}
+.adm-nav a:hover{border-color:var(--deep);color:var(--deep)}
+.adm-nav a.on{background:var(--deep);color:#fff;border-color:var(--deep)}
+.adm-nav a.quiet{border-color:transparent;background:transparent;color:var(--ink3);font-weight:500}
+.adm-nav a.quiet:hover{color:var(--ink);background:#F4FAEC}
+</style>
+{% block head %}{% endblock %}
+</head>
+<body{% block bodyattrs %}{% endblock %}>
+{% block body %}{% endblock %}
+
+<div class="modal" id="modal" role="dialog" aria-modal="true">
+  <div class="mbox">
+    <div class="mhead"><input id="mq" type="search" placeholder="搜人、搜公司、搜关键词；或切到「AI 问答」用一句话提问" autocomplete="off"><button class="x" id="mx" aria-label="关闭">×</button></div>
+    <div class="mtabs"><button class="on" data-tab="kw">关键词搜索</button><button data-tab="ai">AI 问答</button><span class="wip">回答逐句带来源 · ⑤区与暂扣内容不进语料</span></div>
+    <div class="mbody" id="mbody"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+{% if perms.write %}
+<div class="editbar">
+  <span>编辑模式 · 改动写入草稿，读者页需重新上线后才会更新</span>
+  <button id="edExit" type="button">退出编辑</button>
+  <button class="pri" id="edSave" type="button">已写入草稿</button>
+  {% if preview and perms.publish and issue %}
+  <button class="go" id="edPublish" type="button">{{ '重新上线' if issue.status == 'published' else '确认上线' }}</button>
+  {% elif preview %}
+  <span class="edithint">上线需所有者确认</span>
+  {% endif %}
+</div>
+{% endif %}
+{% if preview and perms.publish and issue %}
+<div class="pubmask" id="pubMask" hidden>
+  <form class="pubmodal" method="post" action="/admin/issue/{{ issue.slug }}/publish" role="dialog" aria-modal="true">
+    <h3>{% if issue.status == 'published' %}重新上线后，读者页会换成这份草稿{% else %}上线后所有收件人可见{% endif %}</h3>
+    <p>这一步不可撤回。确认后将立即对读者可见。</p>
+    <div class="row">
+      <button class="c" type="button" id="pubCancel">再看看</button>
+      <button class="k" type="submit" id="pubOk">{{ '重新上线' if issue.status == 'published' else '确认上线' }}</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+<script src="/static/dialog.js?v=mesh-dlg-2"></script>
+<script>window.MESH={slug:"{{ issue.slug if issue else '' }}",target:"draft",canEdit:{{ 'true' if perms.write else 'false' }},canPublish:{{ 'true' if preview and perms.publish else 'false' }},isPreview:{{ 'true' if preview else 'false' }},askStream:true,flagColors:{{ flag_colors|tojson }},teamOrder:{{ team_order|tojson }}};</script>
+<script src="/static/app.js?v=qa-fix-13"></script>
+</body>
+</html>

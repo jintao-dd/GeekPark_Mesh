@@ -1,0 +1,10 @@
+services:
+  mesh:
+    build: .
+    container_name: geekpark-mesh
+    restart: unless-stopped
+    env_file: .env
+    ports: ["8090:8080"]
+    volumes:
+      - ./data:/srv/mesh/data          # 数据库、原始文件持久化
+      - ./app/prompts:/srv/mesh/app/prompts   # 规则提示词可在线编辑并持久化

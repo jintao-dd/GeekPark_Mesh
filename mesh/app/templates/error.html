@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% block title %}{{ title }} · GeekPark Mesh{% endblock %}
+{% block body %}
+<div class="adm" style="max-width:520px;padding-top:80px;text-align:center">
+  <a href="/"><img src="/static/assets/mesh_logo.png" alt="GeekPark Mesh" style="height:56px;margin-bottom:28px"></a>
+  <p class="tag {% if code >= 500 %}bad{% elif code == 403 %}pend{% else %}pend{% endif %}" style="display:inline-block;margin:0 0 14px">{{ code }}</p>
+  <h1 style="font-size:26px;margin:0 0 10px">{{ title }}</h1>
+  <p class="muted" style="margin:0 0 28px;line-height:1.6">{{ message }}</p>
+  <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+    {% if code == 401 %}
+    <a class="btn pri" href="/login?next={{ next|urlencode }}">去登录</a>
+    {% endif %}
+    {% if perms and perms.console %}
+    <a class="btn" href="/admin/issues">回各期</a>
+    {% endif %}
+    <a class="btn" href="/">回首页</a>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,17 @@
+{# 后台顶栏：身份一行 + 少量导航，不堆「继续制作」这类含糊入口 #}
+<div class="adm-top">
+  <a href="/"><img src="/static/assets/mesh_logo.png" style="height:60px" alt="GeekPark Mesh"></a>
+  <div>
+    <div class="adm-who"><b>{{ user.d }}</b>{{ perms.role_cn }}</div>
+    <nav class="adm-nav" aria-label="后台导航">
+      {% if perms.console %}
+      <a href="/admin/issues"{% if nav == 'issues' %} class="on"{% endif %}>各期</a>
+      {% endif %}
+      {% if perms.sysadmin %}
+      <a href="/admin/users"{% if nav == 'users' %} class="on"{% endif %}>账号</a>
+      <a href="/admin/prompts"{% if nav == 'prompts' %} class="on"{% endif %}>提示词</a>
+      {% endif %}
+      <a href="/logout" class="quiet">退出</a>
+    </nav>
+  </div>
+</div>
