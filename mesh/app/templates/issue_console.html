@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{{ issue.period_label }} · 周报后台</title>
+<title>{{ issue.display_date }} · 周报后台</title>
 <link rel="icon" href="/static/assets/mesh_logo.png">
-<link rel="stylesheet" href="/static/console.css?v=qa-fix-8">
+<link rel="stylesheet" href="/static/console.css?v=team-stype-3">
 </head>
 <body>
 
@@ -86,8 +86,8 @@
     <input type="file" id="fi" name="files" multiple accept=".txt,.md,.docx,.pdf,.csv,.ics,.json,.html">
     <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 16V4M12 4l-5 5M12 4l5 5"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg></div>
     <h3>拖到这里，或点击选择</h3>
-    <p>放入后自动识别类型与团队（如 T11 · 视频号团队、T10 · GP 周报、T12 · 音频播客）</p>
-    <div class="kinds"><span>文档 docx / pdf / txt / csv / ics</span><span>视频号周数据 csv → T11；脚本库 docx → T5</span><span>录音录屏请先转写后再放入</span></div>
+    <p>放入后按<strong>文件名</strong>自动识别团队；<code>内容聚合报告</code> / <code>数据聚合</code> 等混合包归「内容中心·数据聚合」。命名不准时在下方列表里改选即可</p>
+    <div class="kinds"><span>文档 docx / pdf / txt / csv / ics</span><span>编辑部请选：沟通记录 / 选题表 / 周例会</span><span>录音录屏请先转写后再放入</span></div>
     <div class="rej" id="rej"></div>
   </div>
   </form>
@@ -95,7 +95,7 @@
   <details class="more" style="margin-top:18px">
     <summary>+ 粘贴文本 / 抓取 RSS</summary>
     <form method="post" action="/admin/issue/{{ issue.slug }}/paste" style="margin-top:10px">
-      <textarea name="text" required placeholder="粘贴正文；类型与团队会按内容自动识别" style="width:100%;min-height:120px;margin-top:8px;font:inherit;border:1px solid var(--line);border-radius:12px;padding:10px"></textarea>
+      <textarea name="text" required placeholder="粘贴正文；团队会按内容自动识别，也可放入后在列表里改选" style="width:100%;min-height:120px;margin-top:8px;font:inherit;border:1px solid var(--line);border-radius:12px;padding:10px"></textarea>
       <div style="margin-top:8px"><button class="ghost" type="submit">保存为来源</button></div>
     </form>
     <form method="post" action="/admin/issue/{{ issue.slug }}/fetch" class="linkrow" style="margin-top:14px">
@@ -117,15 +117,13 @@
           <b>{{ s.title }}</b>
           {% if perms.write %}
           <div class="meta-edits">
-            <select class="meta-sel" data-field="stype" title="数据类型（T13=内容中心混合包，将按段分别抽取）">
-              {% for k,v in stypes.items() %}<option value="{{ k }}" {% if s.stype==k %}selected{% endif %}>{{ k }} · {{ v.split('（')[0] }}</option>{% endfor %}
-            </select>
-            <select class="meta-sel" data-field="team" title="提交部门 / 默认归属">
-              {% for t in teams %}<option value="{{ t }}" {% if s.team==t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+            <label class="meta-lbl">团队</label>
+            <select class="meta-sel" data-field="team" title="选择提交团队或编辑部材料类型">
+              {% for t in source_picks %}<option value="{{ t }}" {% if s.team==t %}selected{% endif %}>{{ t }}</option>{% endfor %}
             </select>
           </div>
           {% else %}
-          <div class="hint" style="margin-top:4px">{{ s.stype }} · {{ s.team }}</div>
+          <div class="hint" style="margin-top:4px">{{ s.team }}</div>
           {% endif %}
         </div>
         <div class="dept"><div class="hint">{{ s.n or 0 }} 字 · {% if s.extracted %}已抽取{% else %}未抽取{% endif %}{% if s.split_hint %} · {{ s.split_hint }}{% endif %}</div></div>
@@ -241,7 +239,7 @@
 <section class="screen" id="s5">
   <p class="eyebrow">可选 · 上线前检查</p>
   <h1>确认 · 上线</h1>
-  <p class="lede"><b>只有所有者能上线</b>。上线即生成不可改版本、归档、出 EDM 预览。改动另发新版，不覆盖旧的。</p>
+  <p class="lede"><b>管理员或所有者</b>可确认上线。上线即生成不可改版本、归档{% if perms.edm %}、出 EDM 预览{% endif %}。改动另发新版，不覆盖旧的。</p>
 
   <div class="pub">
     <div>
@@ -252,18 +250,60 @@
         <li class="{% if cards %}ok{% else %}bad{% endif %}"><span class="m"></span><span>已生成团队要点卡<small>{% if not cards %}请点「生成预览」{% else %}{{ cards|length }} 张{% endif %}</small></span></li>
         <li class="{% if has_draft and not draft_stale %}ok{% else %}bad{% endif %}"><span class="m"></span><span>已生成周报草稿<small>{% if draft_stale %}挖掘/卡片已变更，请重新生成{% elif has_draft %}可预览{% else %}尚未生成{% endif %}</small></span></li>
         <li class="{% if n_noowner==0 %}ok{% else %}bad{% endif %}"><span class="m"></span><span>条目归属团队均已判定<small>{% if n_noowner %}{{ n_noowner }} 条待指定{% else %}无遗留{% endif %}</small></span></li>
+        <li class="{% if not sources_need_review %}ok{% else %}bad{% endif %}"><span class="m"></span><span>拆段归属已确认<small>{% if sources_need_review %}{{ sources_need_review|length }} 条待确认{% else %}无待确认{% endif %}</small></span></li>
+        <li class="{% if not weak_relations %}ok{% else %}bad{% endif %}"><span class="m"></span><span>弱关系已处理<small>{% if weak_relations %}{{ weak_relations|length }} 条待确认/删除{% else %}无弱关系{% endif %}</small></span></li>
       </ul>
+      {% if sources_need_review %}
+      <div class="hint" style="margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:10px">
+        <b>待确认拆段</b>
+        <ul style="margin:8px 0 0;padding-left:18px">{% for s in sources_need_review %}<li><a href="/admin/source/{{ s.id }}">{{ s.title }}</a></li>{% endfor %}</ul>
+      </div>
+      {% endif %}
+      {% if weak_relations and perms.write %}
+      <div class="hint" style="margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:10px" id="weakBox">
+        <b>弱关系待处理</b>
+        <ul style="margin:8px 0;padding-left:18px" id="weakList">
+          {% for w in weak_relations %}
+          <li data-idx="{{ w.index }}"><label><input type="checkbox" class="weak-cb" value="{{ w.index }}"> {{ w.title or '（无标题）' }} <span class="muted">{{ w.label }}</span></label></li>
+          {% endfor %}
+        </ul>
+        <button type="button" class="ghost" id="weakConfirm">确认选中（取消 weak）</button>
+        <button type="button" class="ghost" id="weakDelete" style="margin-left:8px">删除选中</button>
+      </div>
+      <script>
+      (function(){
+        async function resolve(action){
+          const idxs=[...document.querySelectorAll('.weak-cb:checked')].map(x=>+x.value);
+          if(!idxs.length){alert('请先勾选');return;}
+          const r=await fetch('/admin/issue/'+encodeURIComponent(window.MESHADMIN.slug)+'/weak_relations/resolve',{
+            method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},
+            body:JSON.stringify({action,indexes:idxs})
+          });
+          const j=await r.json().catch(()=>({}));
+          if(!r.ok){alert(j.detail||j.error||'失败');return;}
+          location.reload();
+        }
+        const c=document.getElementById('weakConfirm');
+        const d=document.getElementById('weakDelete');
+        if(c) c.onclick=()=>resolve('confirm');
+        if(d) d.onclick=()=>{if(confirm('确定删除选中的弱关系卡？')) resolve('delete');};
+      })();
+      </script>
+      {% endif %}
+      {% if publish_blockers %}
+      <div class="tag pend" style="display:block;margin-top:12px;line-height:1.5">上线仍被拦截：{% for b in publish_blockers %}{{ b }}{% if not loop.last %}；{% endif %}{% endfor %}</div>
+      {% endif %}
     </div>
     <div>
       <div class="gate" id="gate">
         <div class="role">当前身份：{{ role_cn }}</div>
-        <h3>确认上线 · {{ issue.date_start }} → {{ issue.date_end }}</h3>
+        <h3>确认上线 · {{ issue.display_date }}</h3>
         {% if perms.publish %}
         <p>确认后：生成新版本、写入归档、开放读者访问、生成 EDM 预览稿（EDM 仍需手动发送）。</p>
-        <button class="go" id="publish" {% if not has_draft or draft_stale or n_noowner or not cards or not n_items or not sources %}disabled{% endif %}>确认上线</button>
+        <button class="go" id="publish" {% if not has_draft or draft_stale or n_noowner or not cards or not n_items or not sources or sources_need_review or weak_relations or publish_blockers %}disabled{% endif %}>确认上线</button>
         {% elif perms.write %}
-        <p>你可以完成放入、挖掘与审校，并把本期提交给所有者。<b>上线按钮只对所有者显示。</b></p>
-        <form method="post" action="/admin/issue/{{ issue.slug }}/request_publish"><button class="req" type="submit">提交给所有者确认</button></form>
+        <p>你可以完成放入、挖掘与审校，并把本期提交给有上线权限的同事。<b>上线按钮仅对管理员 / 所有者显示。</b></p>
+        <form method="post" action="/admin/issue/{{ issue.slug }}/request_publish"><button class="req" type="submit">提交确认上线</button></form>
         {% else %}
         <p>当前身份无法编辑后台。上线由编辑准备、所有者确认。</p>
         {% endif %}
@@ -280,7 +320,7 @@
       <p class="hint" style="margin-top:8px">向量语义检索未配置：请在 .env 设置 MESH_EMBED_* 后重启。</p>
       {% endif %}
       {% endif %}
-      {% if perms.write %}
+      {% if perms.write and perms.edm %}
       <p class="hint" style="margin-top:16px"><a href="/admin/edm#{{ issue.slug }}" style="color:var(--deep);font-weight:600">EDM 管理 →</a> 预览邮件、测试/正式发送、上线自动推送与发送记录。</p>
       {% endif %}
     </div>
@@ -322,14 +362,16 @@ window.MESHADMIN = {
   hasDraft: {{ 'true' if has_draft else 'false' }},
   draftStale: {{ 'true' if draft_stale else 'false' }},
   issueStatus: {{ issue.status|tojson }},
-  periodLabel: {{ issue.period_label|tojson }},
+  periodLabel: {{ issue.display_date|tojson }},
   flashErr: {{ flash_err|tojson }},
   stypes: {{ stypes|tojson }},
   teams: {{ teams|tojson }},
+  sourcePicks: {{ source_picks|tojson }},
+  teamDefaultStype: {{ team_default_stype|tojson }},
   sourcesDirty: {{ 'true' if sources_need_mine else 'false' }}
 };
 </script>
 <script src="/static/dialog.js?v=mesh-dlg-2"></script>
-<script src="/static/console.js?v=qa-fix-18"></script>
+<script src="/static/console.js?v=team-stype-3"></script>
 </body>
 </html>

@@ -504,7 +504,11 @@ def _is_video_team(name: str) -> bool:
 
 
 def _subject_date(issue: dict) -> str:
-    for key in ("date_end", "slug"):
+    disp = (issue.get("display_date") or "").strip()
+    m = re.search(r"(\d+)\.(\d+)\.(\d+)", disp)
+    if m:
+        return f"{int(m.group(2)):02d}.{int(m.group(3)):02d}"
+    for key in ("published_at", "date_end", "slug"):
         raw = str(issue.get(key) or "")[:10]
         m = re.match(r"(\d{4})-(\d{1,2})-(\d{1,2})", raw)
         if m:

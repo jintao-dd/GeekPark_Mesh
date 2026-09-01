@@ -6,7 +6,7 @@ import json
 import re
 from typing import Any
 
-from . import ask_engine, llm
+from . import ask_engine, db, llm
 from .ask_scope import AskScope
 
 
@@ -39,7 +39,8 @@ def create_preset(
     created_by: int | None = None,
 ) -> int:
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cur = con.execute(
+    return db.insert_id(
+        con,
         """INSERT INTO user_ask_presets(
            scope, user_id, target_team, title, question_template, schedule,
            schedule_time, schedule_dow, team_scope, enabled, created_by, created_at, updated_at)
@@ -49,7 +50,6 @@ def create_preset(
             schedule_time, schedule_dow, team_scope or None, created_by, now, now,
         ),
     )
-    return int(cur.lastrowid)
 
 
 def update_preset(con, preset_id: int, **fields) -> bool:

@@ -4,7 +4,7 @@
 
 {% if not email_mode %}
 <nav class="nav show"><div class="wrap">
-  <a class="brand" href="#top"><img src="{{ sp() }}/assets/mesh_logo.png" alt="GeekPark Mesh" class="logo"><small>周报 · {{ issue.period_label }}</small></a>
+  <a class="brand" href="#top"><img src="{{ sp() }}/assets/mesh_logo.png" alt="GeekPark Mesh" class="logo"><small>周报 · {{ issue.display_date }}</small></a>
   <div class="menu">
     <a href="#rel">可同步的关系</a><a href="#more">其余四节</a>
     <span class="sep"></span><a href="/admin/edm#{{ issue.slug }}">EDM 管理</a><a href="/{{ issue.slug }}">读者页</a>
@@ -36,7 +36,7 @@
     {% if n_rel > 4 %}<p class="note" style="margin:-8px 0 18px;font-family:var(--mono);font-size:13px">邮件只列前 4 组，共 {{ n_rel }} 组</p>{% endif %}
     <div class="cards">
     {% for r in d.relations[:4] %}
-      <div class="card{% if r.weak %} weak{% endif %}">
+      <div class="card">
         <span class="flag" {{ flagstyle(r.label) }}>{{ r.label }}</span>
         <p class="t">{{ r.title }}</p>
         <p class="b">{{ r.body }}</p>

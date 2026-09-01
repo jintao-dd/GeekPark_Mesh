@@ -76,6 +76,9 @@ def fts_search(
                 FROM search_fts
                 WHERE search_fts MATCH ?
             """
+            if slug:
+                sql += " AND issue_slug = ?"
+                params.append(slug)
             sql += _date_sql(params)
             sql += " ORDER BY bm25(search_fts) LIMIT ?"
             params.append(max(limit * 3, limit))
@@ -102,6 +105,9 @@ def fts_search(
             for t in terms:
                 params += [f"%{t}%", f"%{t}%"]
             sql = f"SELECT issue_slug, section, title, body, date_end FROM search_fts WHERE ({where})"
+            if slug:
+                sql += " AND issue_slug = ?"
+                params.append(slug)
             sql += _date_sql(params)
             sql += " LIMIT ?"
             params.append(limit)
@@ -142,14 +148,18 @@ def fts_search(
     hits.sort(key=_rank_key)
     out = []
     for h in hits[:limit]:
-        out.append({
+        row = {
             "issue_slug": h["issue_slug"],
             "section": h["section"],
             "title": h["title"],
             "sn": h["sn"],
             "body": h.get("body") or "",
             "date_end": h.get("date_end") or "",
-        })
+            "source": "fts",
+        }
+        if h.get("score") is not None:
+            row["score"] = float(h["score"])
+        out.append(row)
     return out
 
 
@@ -186,25 +196,40 @@ def ask_contexts_from_hits(hits: list[dict], limit: int = 40) -> list[dict]:
             "标题": h.get("title") or "",
             "内容": (h.get("body") or "")[:600],
         }
+        if h.get("owner_team"):
+            ctx["归属团队"] = h["owner_team"]
         if h.get("source") == "item_facts":
             ctx["来源层"] = "条目索引"
             if h.get("item_id"):
                 ctx["条目ID"] = h["item_id"]
-            if h.get("owner_team"):
-                ctx["归属团队"] = h["owner_team"]
+        elif h.get("source") == "vector":
+                ctx["来源层"] = "向量"
+        if h.get("chunk_id"):
+            ctx["chunk_id"] = h["chunk_id"]
+        if h.get("item_id") is not None and "条目ID" not in ctx:
+            ctx["条目ID"] = h["item_id"]
         ctxs.append(ctx)
     return ctxs
 
 
+def _body_fingerprint(body: str, width: int = 160) -> str:
+    """跨 FTS/向量/条目去重：归一化正文前缀。"""
+    b = _DEDUP_WS.sub("", (body or "")[:width]).lower()
+    return b[:120]
+
+
 def hit_dedup_key(h: dict) -> tuple:
     """重复检测：同一 item / chunk / 正文片段只保留得分最优的一条。"""
+    fp = _body_fingerprint(h.get("body") or "")
+    if fp and len(fp) >= 16:
+        return ("body", h.get("issue_slug"), fp)
     if h.get("item_id"):
         return ("item", h.get("issue_slug"), int(h["item_id"]))
-    if h.get("chunk_id"):
-        return ("chunk", h.get("chunk_id"))
-    body = _DEDUP_WS.sub("", (h.get("body") or "")[:160])
-    title = _DEDUP_WS.sub("", (h.get("title") or "")[:80])
-    return ("text", h.get("issue_slug"), h.get("section"), title, body)
+    cid = h.get("chunk_id")
+    if cid:
+        return ("chunk", cid)
+    title = _DEDUP_WS.sub("", (h.get("title") or "")[:80]).lower()
+    return ("text", h.get("issue_slug"), h.get("section"), title, fp)
 
 
 def merge_hits(*groups: list[dict], limit: int = 48) -> list[dict]:
@@ -215,7 +240,8 @@ def merge_hits(*groups: list[dict], limit: int = 48) -> list[dict]:
             key = hit_dedup_key(h)
             w = _SECTION_WEIGHT.get(h.get("section") or "", 1)
             cand = dict(h)
-            cand["score"] = float(cand.get("score") or 0) + w * 0.15
+            # 分数越小越好（BM25 为负）；高权重章节减分以提升排序
+            cand["score"] = float(cand.get("score") or 0) - w * 0.15
             prev = best.get(key)
             if prev is None or float(cand["score"]) < float(prev.get("score") or 0):
                 best[key] = cand

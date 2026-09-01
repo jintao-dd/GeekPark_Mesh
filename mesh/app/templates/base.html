@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}GeekPark Mesh{% endblock %}</title>
 <link rel="icon" href="/static/assets/mesh_logo.png">
-<link rel="stylesheet" href="/static/style.css?v=ask-concurrency-1">
+<link rel="stylesheet" href="/static/style.css?v=ask-think-1">
 <style>
 /* 后台通用小样式（不影响周报页） */
 .adm{max-width:1040px;margin:0 auto;padding:36px 28px 80px}
@@ -50,6 +50,10 @@
 .adm-nav a.on{background:var(--deep);color:#fff;border-color:var(--deep)}
 .adm-nav a.quiet{border-color:transparent;background:transparent;color:var(--ink3);font-weight:500}
 .adm-nav a.quiet:hover{color:var(--ink);background:#F4FAEC}
+.debugbar{position:fixed;left:12px;right:12px;bottom:12px;z-index:9998;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;background:#14382F;color:#fff;border-radius:12px;font-size:12px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.debugbar b{color:#C6FF3F}
+.debugbar select{font:inherit;font-size:12px;border-radius:8px;border:0;padding:4px 8px}
+.debugbar button{font:inherit;font-size:12px;border:0;border-radius:8px;padding:4px 10px;background:#C6FF3F;color:#14382F;font-weight:700;cursor:pointer}
 </style>
 {% block head %}{% endblock %}
 </head>
@@ -64,6 +68,40 @@
   </div>
 </div>
 <div class="toast" id="toast"></div>
+{% if perms.debug %}
+<div class="debugbar" id="debugBar">
+  <span>调试 · 真实 <b>{{ perms.real_role }}</b> · 当前 <b>{{ perms.role_cn }}</b></span>
+  <select id="debugRoleSel" aria-label="切换调试视角">
+    <option value="">真实权限</option>
+    <option value="viewer">查看者</option>
+    <option value="editor">编辑</option>
+    <option value="admin">管理员</option>
+    <option value="owner">所有者</option>
+  </select>
+  <button type="button" id="debugRoleApply">切换并刷新</button>
+</div>
+<script>
+(function(){
+  const sel=document.getElementById('debugRoleSel');
+  const btn=document.getElementById('debugRoleApply');
+  if(!sel||!btn) return;
+  const cur={{ perms.role|tojson }};
+  const dr={{ (user.debug_r or '')|tojson }};
+  sel.value=dr||'';
+  btn.addEventListener('click', async ()=>{
+    btn.disabled=true;
+    try{
+      const r=await fetch('/api/debug/role',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({role:sel.value||''})});
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error(j.detail||j.error||('HTTP '+r.status));
+      location.reload();
+    }catch(e){
+      alert('切换失败：'+(e.message||e));
+    }finally{btn.disabled=false;}
+  });
+})();
+</script>
+{% endif %}
 {% if perms.write %}
 <div class="editbar">
   <span>编辑模式 · 改动写入草稿，读者页需重新上线后才会更新</span>
@@ -72,7 +110,7 @@
   {% if preview and perms.publish and issue %}
   <button class="go" id="edPublish" type="button">{{ '重新上线' if issue.status == 'published' else '确认上线' }}</button>
   {% elif preview %}
-  <span class="edithint">上线需所有者确认</span>
+  <span class="edithint">上线需管理员确认</span>
   {% endif %}
 </div>
 {% endif %}
@@ -90,6 +128,6 @@
 {% endif %}
 <script src="/static/dialog.js?v=mesh-dlg-2"></script>
 <script>window.MESH={slug:"{{ issue.slug if issue else '' }}",target:"draft",canEdit:{{ 'true' if perms.write else 'false' }},canPublish:{{ 'true' if preview and perms.publish else 'false' }},isPreview:{{ 'true' if preview else 'false' }},askStream:true,flagColors:{{ flag_colors|tojson }},teamOrder:{{ team_order|tojson }}};</script>
-<script src="/static/app.js?v=ask-concurrency-1"></script>
+<script src="/static/app.js?v=ask-think-1"></script>
 </body>
 </html>

@@ -41,7 +41,89 @@ _SKIP_PREFIXES = (
     "🏢 内部飞书内容",
     "🗂 内部飞书文件夹",
     "本节内容来自指定飞书文件夹",
+    "📊 飞书多维表格",
 )
+
+_AI_SECTION = re.compile(r"^##\s*🤖")
+_RAW_DATA_SECTION = re.compile(r"^##\s*(🏢|🌐)")
+
+# 与导出 MD「内容统计」目录一致的正文章节（### 级；单条记录如「### 英伟达播客」不算）
+_EXTERNAL_FEED_NAMES = (
+    "TechCrunch", "Wired", "The Verge", "Stratechery", "Platformer",
+    "Lex Fridman", "How I Built This", "Ars Technica", "VentureBeat",
+    "MIT Technology Review", "ZDNet", "TechRadar", "Digital Trends",
+    "极客公园",
+)
+
+_TOC_BULLET = re.compile(
+    r"^\s*-\s+\*\*(?P<name>[^*]+)\*\*:\s*(?P<count>\d+)\s*(?:条记录|条|篇)?",
+    re.M,
+)
+_TOC_SUB = re.compile(
+    r"^\s*-\s+(?P<name>编辑部\s*·\s*(?:选题|沟通记录)|视频号数据):\s*(?P<count>\d+)\s*条",
+    re.M,
+)
+
+
+def parse_content_stats_toc(text: str) -> list[dict]:
+    """解析 ## 📊 内容统计 下的目录项（用于校验 / 元数据）。"""
+    m = re.search(r"^##\s*📊\s*内容统计\s*$", text, re.M)
+    if not m:
+        return []
+    rest = text[m.end():]
+    end = re.search(r"^##\s+", rest, re.M)
+    block = rest[: end.start()] if end else rest[:2000]
+    out: list[dict] = []
+    for line in block.splitlines():
+        sub = _TOC_SUB.match(line)
+        if sub:
+            out.append({"name": re.sub(r"\s+", " ", sub.group("name")).strip(), "count": int(sub.group("count"))})
+            continue
+        bul = _TOC_BULLET.match(line)
+        if bul:
+            out.append({"name": bul.group("name").strip(), "count": int(bul.group("count"))})
+    return out
+
+
+def _raw_data_start_line(lines: list[str]) -> int:
+    """跳过 🤖 AI智能分析，从 🏢/🌐 原始数据区开始拆。"""
+    for i, line in enumerate(lines):
+        if _RAW_DATA_SECTION.match(line.strip()):
+            return i
+    for i, line in enumerate(lines):
+        if _AI_SECTION.match(line.strip()):
+            for j in range(i + 1, len(lines)):
+                if _RAW_DATA_SECTION.match(lines[j].strip()):
+                    return j
+            break
+    return 0
+
+
+def _is_md_section_boundary(line: str) -> bool:
+    s = line.strip()
+    if not s.startswith("### "):
+        return False
+    body = s[4:].strip()
+    if re.match(r"📆\s*会议日程", body):
+        return True
+    if body.startswith("📊 飞书多维表格") or body == "飞书多维表格":
+        return True
+    if re.match(r"编辑部\s*·\s*(选题|沟通记录)", body):
+        return True
+    if body == "视频号数据":
+        return True
+    if "Notion CRM" in body:
+        return True
+    if body.startswith("🗂"):
+        return False
+    if "行业观察" in body or "匹配建联" in body:
+        return False
+    if body.startswith("记录 "):
+        return False
+    for name in _EXTERNAL_FEED_NAMES:
+        if name in body and len(body) <= len(name) + 8:
+            return True
+    return False
 
 
 @dataclass
@@ -50,6 +132,7 @@ class Segment:
     text: str
     stype: str
     team: str
+    owner_hint: str = ""
 
 
 @dataclass
@@ -95,13 +178,12 @@ def sanitize_owner_team(name: str | None) -> str | None:
     return n
 
 
-def resolve_item_owner(it: dict, *, source_team: str) -> str | None:
-    """入库前解析条目 owner_team，禁止内容中心·数据聚合 / 其他。"""
-    for key in ("owner_team", "team"):
-        owner = sanitize_owner_team(it.get(key))
-        if owner:
-            return owner
-    return sanitize_owner_team(source_team)
+def resolve_item_owner(it: dict, *, source_team: str, segment_team: str | None = None) -> str | None:
+    """入库前解析条目 owner_team（见 app.attribution）。"""
+    from .attribution import resolve_item_owner as _resolve
+
+    hint = sanitize_owner_team(segment_team) or sanitize_owner_team(it.get("_segment_team"))
+    return _resolve(it, source_team=source_team, segment_team=hint)
 
 
 def merge_source_meta(existing: str | dict | None, split_meta: dict | None) -> str:
@@ -129,6 +211,12 @@ def split_hint(meta: str | dict | None) -> str:
         return ""
     n = sp.get("segments", 0)
     mode = sp.get("mode", "")
+    if mode == "pre_split":
+        idx = sp.get("segment_index")
+        parent = sp.get("parent_filename") or sp.get("parent_title") or ""
+        if idx is not None and n:
+            return f"上传已预拆 {idx + 1}/{n}" + (f"（来自 {parent}）" if parent else "")
+        return "上传已预拆"
     if mode == "multi" and n > 1:
         types = sp.get("types") or {}
         brief = "、".join(f"{k}×{v}" for k, v in sorted(types.items()))
@@ -140,6 +228,56 @@ def split_hint(meta: str | dict | None) -> str:
     if n == 1:
         return "整包 1 段"
     return f"已拆 {n} 段"
+
+
+def sources_from_split(
+    split: SplitResult,
+    *,
+    parent_title: str,
+    parent_filename: str,
+    raw_path: str = "",
+    base_meta: dict | None = None,
+    upload_team: str = "",
+) -> list[dict]:
+    """把拆段结果物化为多条 sources 插入参数（上传时预拆，降低错归属）。
+
+    若 upload_team 为非占位人工选项，各段 sources.team 沿用用户选择（不被段推断覆盖）；
+    段推断团队仅写入 meta.split.segment_inferred_team 供审计。
+    """
+    from .attribution import is_placeholder_pick
+
+    base = dict(base_meta or {})
+    upload_pick = ingest.source_pick_for(upload_team) if upload_team else ""
+    manual_upload = upload_pick and not is_placeholder_pick(upload_pick)
+    out: list[dict] = []
+    for i, seg in enumerate(split.segments):
+        seg_inferred = sanitize_owner_team(seg.owner_hint or seg.team) or seg.team
+        split_meta = {
+            "mode": "pre_split",
+            "parent_filename": parent_filename,
+            "parent_title": parent_title,
+            "segment_index": i,
+            "segments": len(split.segments),
+            "boundaries": split.boundaries,
+            "warnings": split.warnings,
+        }
+        if manual_upload:
+            split_meta["segment_inferred_team"] = seg_inferred
+            split_meta["upload_team_override"] = upload_pick
+        meta = {**base, "split": split_meta}
+        title = f"{parent_title} · {seg.title}" if parent_title else seg.title
+        team_for_source = upload_pick if manual_upload else seg_inferred
+        out.append({
+            "stype": seg.stype,
+            "team": team_for_source,
+            "title": title[:200],
+            "filename": parent_filename,
+            "raw_path": raw_path,
+            "text": seg.text,
+            "meta": meta,
+            "channel": "aggregator" if split.mode in ("multi", "fallback") else "manual",
+        })
+    return out
 
 
 def _stype_counts(segments: list[Segment]) -> dict[str, int]:
@@ -157,6 +295,8 @@ def _is_boundary(line: str) -> bool:
     s = line.strip()
     if not s:
         return False
+    if _is_md_section_boundary(s):
+        return True
     if _MAJOR.match(s):
         return True
     if _DATA_SUB.match(s):
@@ -183,14 +323,19 @@ def _is_internal_boundary(line: str) -> bool:
 
 def _classify(title: str, body: str) -> tuple[str, str]:
     h = f"{title}\n{body[:6000]}"
+    t = title.strip()
+    if re.search(r"编辑部\s*·\s*选题", t):
+        return "T2", "编辑部 · 选题表"
+    if re.search(r"编辑部\s*·\s*沟通记录", t):
+        return "T1", "编辑部 · 沟通记录"
     if "视频号数据" in title or ("完播率" in h and "视频标题" in h):
         return "T11", "视频号团队"
-    if "编辑部数据" in title or ("选题状态" in h and "选题:" in h):
-        return "T2", "编辑部"
     if "会议日程" in title or "ICS" in title or "grip.events" in h[:800]:
         return "T3", "硅谷 BD 团队"
     if "Notion CRM" in title or "Interactions / Takes" in h or "People / Companies" in h:
         return "T3", "硅谷 BD 团队"
+    if "极客公园" in title and "外部" not in title:
+        return "T5", "编辑部"
     if "外部信息" in title or _FEED_SUB.match(title.strip()):
         return "T7", "外部媒体"
     if any(
@@ -220,7 +365,9 @@ def _classify(title: str, body: str) -> tuple[str, str]:
     return st, tm
 
 
-def _chunk_to_segment(chunk_lines: list[str]) -> Segment | None:
+def _chunk_to_segment(chunk_lines: list[str], *, owner_hint: str = "") -> Segment | None:
+    from .owner_guard import owner_hint_for_lines
+
     while chunk_lines and not chunk_lines[0].strip():
         chunk_lines.pop(0)
     while chunk_lines and not chunk_lines[-1].strip():
@@ -230,7 +377,8 @@ def _chunk_to_segment(chunk_lines: list[str]) -> Segment | None:
         return None
     title = chunk_lines[0].strip()[:120] if chunk_lines else "未命名段落"
     stype, team = _classify(title, chunk)
-    return Segment(title=title, text=chunk, stype=stype, team=team)
+    hint = owner_hint_for_lines(chunk_lines, fallback=owner_hint or team)
+    return Segment(title=title, text=chunk, stype=stype, team=team, owner_hint=hint or team)
 
 
 def _split_lines(lines: list[str], start: int) -> tuple[list[tuple[int, int]], int]:
@@ -246,10 +394,13 @@ def _split_lines(lines: list[str], start: int) -> tuple[list[tuple[int, int]], i
     return pairs, boundary_count
 
 
-def _segments_from_range(lines: list[str], a: int, b: int, *, skipped: list[int]) -> list[Segment]:
+def _segments_from_range(
+    lines: list[str], a: int, b: int, *, skipped: list[int], section_at: list[str | None],
+) -> list[Segment]:
     chunk_lines = lines[a:b]
     if not chunk_lines:
         return []
+    hint = section_at[a] if a < len(section_at) else ""
     title = chunk_lines[0].strip()[:120] if chunk_lines[0].strip() else ""
     if _is_skip_title(title):
         inner_bounds = [i for i in range(1, len(chunk_lines)) if _is_boundary(chunk_lines[i])]
@@ -258,15 +409,29 @@ def _segments_from_range(lines: list[str], a: int, b: int, *, skipped: list[int]
             segs: list[Segment] = []
             inner_bounds.append(len(chunk_lines))
             for x, y in zip(inner_bounds, inner_bounds[1:]):
-                seg = _chunk_to_segment(chunk_lines[x:y])
+                local_hint = hint or (section_at[a + x] if a + x < len(section_at) else "")
+                seg = _chunk_to_segment(chunk_lines[x:y], owner_hint=local_hint or "")
                 if seg:
                     segs.append(seg)
             return segs
         if len("\n".join(chunk_lines).strip()) >= _MIN_SEGMENT:
             skipped.append(1)
         return []
-    seg = _chunk_to_segment(chunk_lines)
+    seg = _chunk_to_segment(chunk_lines, owner_hint=hint or "")
     return [seg] if seg else []
+
+
+def _build_section_map(lines: list[str]) -> list[str]:
+    from .owner_guard import parse_section_team
+
+    out: list[str] = []
+    cur = ""
+    for line in lines:
+        t = parse_section_team(line)
+        if t:
+            cur = t
+        out.append(cur)
+    return out
 
 
 def _fallback_segment(source_title: str, text: str) -> Segment:
@@ -283,7 +448,7 @@ def _fallback_segment(source_title: str, text: str) -> Segment:
             "T9": "品牌创意团队", "T10": "Global Partnership 团队", "T11": "视频号团队",
             "T12": "音频播客团队",
         }.get(st, "编辑部")
-    return Segment(title=title[:120], text=text.strip(), stype=st, team=tm)
+    return Segment(title=title[:120], text=text.strip(), stype=st, team=tm, owner_hint=tm)
 
 
 def split_bundle_ex(text: str, *, source_title: str = "") -> SplitResult:
@@ -293,9 +458,10 @@ def split_bundle_ex(text: str, *, source_title: str = "") -> SplitResult:
         return SplitResult(segments=[], mode="empty", warnings=["正文为空"])
 
     lines = raw.split("\n")
-    start = 0
-    for i, line in enumerate(lines):
-        if _is_boundary(line):
+    section_at = _build_section_map(lines)
+    start = _raw_data_start_line(lines)
+    for i in range(start, len(lines)):
+        if _is_boundary(lines[i]):
             start = i
             break
 
@@ -304,10 +470,13 @@ def split_bundle_ex(text: str, *, source_title: str = "") -> SplitResult:
     segments: list[Segment] = []
     skipped: list[int] = []
     for a, b in pairs:
-        segments.extend(_segments_from_range(lines, a, b, skipped=skipped))
+        segments.extend(_segments_from_range(lines, a, b, skipped=skipped, section_at=section_at))
     skipped_n = sum(skipped)
 
+    toc = parse_content_stats_toc(raw)
     warnings: list[str] = []
+    if toc and segments:
+        warnings.append(f"内容统计目录 {len(toc)} 项；正文拆出 {len(segments)} 段")
     if not segments and len(raw) >= _MIN_SEGMENT:
         seg = _fallback_segment(source_title, raw)
         warnings.append(

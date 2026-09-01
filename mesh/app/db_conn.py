@@ -23,9 +23,41 @@ IntegrityError: tuple[type[BaseException], ...] = (sqlite3.IntegrityError,)
 if _HAS_PSYCOPG2:
     IntegrityError = (sqlite3.IntegrityError, psycopg2.IntegrityError)  # type: ignore
 
+_PG_POOL = None
+_pg_pool_lock = threading.Lock()
+
 
 def is_postgres() -> bool:
     return bool(MESH_DB_URL) and MESH_DB_URL.lower().startswith("postgres")
+
+
+def get_pg_pool():
+    """进程内 ThreadedConnectionPool，多请求复用连接。"""
+    global _PG_POOL
+    if not is_postgres():
+        return None
+    if not _HAS_PSYCOPG2:
+        raise RuntimeError("MESH_DB_URL 已设置但未安装 psycopg2-binary")
+    with _pg_pool_lock:
+        if _PG_POOL is None:
+            from psycopg2 import pool as pg_pool
+
+            mn = max(1, int(os.environ.get("MESH_DB_POOL_MIN", "2") or "2"))
+            mx = max(mn, int(os.environ.get("MESH_DB_POOL_MAX", "20") or "20"))
+            _PG_POOL = pg_pool.ThreadedConnectionPool(mn, mx, MESH_DB_URL)
+            print(f"[mesh] pg pool min={mn} max={mx}", flush=True)
+        return _PG_POOL
+
+
+def close_pool() -> None:
+    global _PG_POOL
+    with _pg_pool_lock:
+        if _PG_POOL is not None:
+            try:
+                _PG_POOL.closeall()
+            except Exception:
+                pass
+            _PG_POOL = None
 
 
 def sql_now(dialect: str = "sqlite") -> str:
@@ -70,15 +102,22 @@ class _PgCursor:
     def __iter__(self):
         return iter(self._cur)
 
+    @property
+    def lastrowid(self) -> int | None:
+        """兼容 SQLite；PG 仅在 INSERT … RETURNING 后由 insert_id 设置。"""
+        return getattr(self, "_lastrowid", None)
+
 
 class MeshConnection:
     """统一连接包装：? 占位符、Row/dict 行、execute().fetchone() 与 SQLite 一致。"""
 
     dialect: str
 
-    def __init__(self, raw, dialect: str):
+    def __init__(self, raw, dialect: str, *, pooled: bool = False):
         self._raw = raw
         self.dialect = dialect
+        self._pooled = pooled
+        self._closed = False
 
     def execute(self, sql: str, params=()):
         sql = adapt_sql(sql, self.dialect)
@@ -95,7 +134,26 @@ class MeshConnection:
         self._raw.rollback()
 
     def close(self):
-        self._raw.close()
+        if self._closed:
+            return
+        self._closed = True
+        if self._pooled and self.dialect == "postgresql":
+            try:
+                self._raw.rollback()
+            except Exception:
+                pass
+            try:
+                get_pg_pool().putconn(self._raw)
+            except Exception:
+                try:
+                    self._raw.close()
+                except Exception:
+                    pass
+            return
+        try:
+            self._raw.close()
+        except Exception:
+            pass
 
     def executescript(self, script: str):
         if self.dialect == "sqlite":
@@ -127,13 +185,29 @@ def _split_sql(script: str) -> list[str]:
     return parts
 
 
+def insert_id(con: MeshConnection, sql: str, params=()) -> int:
+    """INSERT 并返回自增 id（SQLite lastrowid / PostgreSQL RETURNING id）。"""
+    if con.dialect == "postgresql":
+        s = adapt_sql(sql, "postgresql").rstrip().rstrip(";")
+        if "returning" not in s.lower():
+            s += " RETURNING id"
+        cur = con.execute(s, params)
+        row = cur.fetchone()
+        if not row or row.get("id") is None:
+            raise RuntimeError("INSERT RETURNING id 未返回行")
+        return int(row["id"])
+    cur = con.execute(sql, params)
+    rid = getattr(cur, "lastrowid", None)
+    if not rid:
+        raise RuntimeError("INSERT lastrowid 不可用")
+    return int(rid)
+
+
 def connect() -> MeshConnection:
     if is_postgres():
-        if not _HAS_PSYCOPG2:
-            raise RuntimeError("MESH_DB_URL 已设置但未安装 psycopg2-binary")
-        raw = psycopg2.connect(MESH_DB_URL)
+        raw = get_pg_pool().getconn()
         raw.autocommit = False
-        return MeshConnection(raw, "postgresql")
+        return MeshConnection(raw, "postgresql", pooled=True)
 
     Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     raw = sqlite3.connect(DB_PATH, check_same_thread=False)
@@ -147,7 +221,7 @@ def connect() -> MeshConnection:
             raw.execute(pragma)
         except Exception:
             pass
-    return MeshConnection(raw, "sqlite")
+    return MeshConnection(raw, "sqlite", pooled=False)
 
 
 def chunk_index_upsert_sql(dialect: str) -> str:
@@ -181,21 +255,27 @@ def chunk_embedding_upsert_sql(dialect: str) -> str:
 
 _MAINT_ADVISORY_KEY = 0x4D455348  # 'MESH'
 _maint_lock_file = None
+_maint_advisory_held = False
 _maint_lock_path = Path(DB_PATH).parent / ".maintenance.lock"
 
 
 def try_maintenance_lock(con) -> bool:
     """多 worker 时仅一个进程跑后台维护（PG advisory lock / 文件锁）。"""
-    global _maint_lock_file
+    global _maint_lock_file, _maint_advisory_held
+    _maint_advisory_held = False
     if con.dialect == "postgresql":
         row = con.execute("SELECT pg_try_advisory_lock(%s)", (_MAINT_ADVISORY_KEY,)).fetchone()
-        return bool(row and row.get("pg_try_advisory_lock"))
+        ok = bool(row and row.get("pg_try_advisory_lock"))
+        if ok:
+            _maint_advisory_held = True
+        return ok
     try:
         import fcntl
 
         _maint_lock_path.parent.mkdir(parents=True, exist_ok=True)
         _maint_lock_file = open(_maint_lock_path, "w")
         fcntl.flock(_maint_lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        _maint_advisory_held = True
         return True
     except OSError:
         if _maint_lock_file:
@@ -205,12 +285,17 @@ def try_maintenance_lock(con) -> bool:
 
 
 def release_maintenance_lock(con) -> None:
-    global _maint_lock_file
+    global _maint_lock_file, _maint_advisory_held
     if con.dialect == "postgresql":
+        if not _maint_advisory_held:
+            return
         try:
             con.execute("SELECT pg_advisory_unlock(%s)", (_MAINT_ADVISORY_KEY,))
         except Exception:
             pass
+        _maint_advisory_held = False
+        return
+    if not _maint_advisory_held:
         return
     if _maint_lock_file:
         try:
@@ -221,3 +306,4 @@ def release_maintenance_lock(con) -> None:
         except Exception:
             pass
         _maint_lock_file = None
+    _maint_advisory_held = False

@@ -61,6 +61,8 @@ CREATE TABLE IF NOT EXISTS items(
   pointer TEXT,
   blocked INTEGER DEFAULT 0,
   owner_team TEXT,
+  owner_provenance TEXT,
+  llm_owner_team_hint TEXT,
   channel TEXT DEFAULT 'manual',
   merged_into INTEGER,
   source_labels TEXT,
@@ -347,4 +349,28 @@ CREATE TABLE IF NOT EXISTS preset_push_log(
   ok INTEGER DEFAULT 1,
   error TEXT,
   pushed_at TEXT DEFAULT to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')
+);
+
+CREATE TABLE IF NOT EXISTS mesh_jobs(
+  job_kind TEXT NOT NULL,
+  job_key TEXT NOT NULL,
+  token INTEGER NOT NULL DEFAULT 0,
+  running INTEGER NOT NULL DEFAULT 0,
+  done INTEGER NOT NULL DEFAULT 0,
+  error TEXT,
+  payload_json TEXT,
+  updated_at TEXT DEFAULT to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'),
+  PRIMARY KEY (job_kind, job_key)
+);
+
+CREATE TABLE IF NOT EXISTS ask_rate_hits(
+  rate_key TEXT NOT NULL,
+  hit_at DOUBLE PRECISION NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ask_rate_key ON ask_rate_hits(rate_key, hit_at);
+
+CREATE TABLE IF NOT EXISTS mesh_llm_slots(
+  slot_id INTEGER PRIMARY KEY,
+  holder TEXT,
+  taken_at DOUBLE PRECISION
 );

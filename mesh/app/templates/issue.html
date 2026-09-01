@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}GeekPark Mesh · 周报 · {{ issue.period_label }}{% endblock %}
+{% block title %}GeekPark Mesh · 周报 · {{ issue.display_date }}{% endblock %}
 {% block bodyattrs %} data-num="a"{% endblock %}
 {% macro flagstyle(label) -%}style="background:{{ flag_colors.get(label, '#344054') }}"{%- endmacro %}
 {% macro tipattr(rows) -%}data-tip="{% for r in rows %}{{ r.k|e }}::{{ r.v|e }}{% if not loop.last %}||{% endif %}{% endfor %}"{%- endmacro %}
@@ -8,7 +8,7 @@
   {% if not big %}<button class="sbtn" type="button" aria-label="搜索" id="navSbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>{% endif %}
   <div class="search{% if big %} big{% endif %}">{% if big %}<svg class="spark" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8zM19 14l.9 2.6L22.5 17.5l-2.6.9L19 21l-.9-2.6-2.6-.9 2.6-.9zM4.5 15l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7z"/></svg>{% endif %}<input type="search" placeholder="{{ '搜人、搜公司、搜关键词，或直接问一句话…' if big else '搜索…' }}" aria-label="搜索" autocomplete="off">{% if big %}<span class="kbd">/</span>{% endif %}<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></div>
   <div class="search"><button class="calbtn" type="button" data-pop="cal"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>往期</button>
-    <div class="pop" data-pop="cal"><div class="ph"><b>往期周报</b><a href="/archive" style="font-size:12px;color:var(--tif)">全部</a></div>{% for it in archive_list %}<a class="iss{% if it.slug==issue.slug %} cur{% endif %}" href="/{{ it.slug }}">{{ it.period_label }} <small>{{ '本期' if it.slug==issue.slug else it.date_end }}</small></a>{% endfor %}</div></div>
+    <div class="pop" data-pop="cal"><div class="ph"><b>往期周报</b><a href="/archive" style="font-size:12px;color:var(--tif)">全部</a></div>{% for it in archive_list %}<a class="iss{% if it.slug==issue.slug %} cur{% endif %}" href="/{{ it.slug }}">{{ it.display_date }} <small>{{ '本期' if it.slug==issue.slug else '' }}</small></a>{% endfor %}</div></div>
   {% if user %}
     {% if perms.write %}<div class="search"><button class="calbtn" type="button" id="{{ 'editToggle' if big else 'editToggleNav' }}"{% if not big %} onclick="document.getElementById('editToggle').click()"{% endif %}>编辑</button></div>{% endif %}
     {% if perms.console %}
@@ -20,7 +20,7 @@
 {% endmacro %}
 {% block body %}
 <nav class="nav"><div class="wrap">
-  <a class="brand" href="#top"><img src="/static/assets/mesh_logo.png" alt="GeekPark Mesh" class="logo"><small>周报 · {{ issue.period_label }}</small></a>
+  <a class="brand" href="#top"><img src="/static/assets/mesh_logo.png" alt="GeekPark Mesh" class="logo"><small>周报 · {{ issue.display_date }}</small></a>
   <div class="menu" id="menu">
     <a href="#rel">可同步的关系</a><a href="#who">接触过的人和公司</a><a href="#what">关注了什么</a><a href="#next">日程与计划</a><a href="#views">沟通中的看法</a>
     <span class="sep"></span><a href="#gap">本期未汇入</a><a href="#src">原始来源</a>
@@ -33,19 +33,19 @@
     <div class="hero-meta">{{ tools(True) }}</div>
     <div class="hero-top">
       <div class="logo-wrap"><img src="/static/assets/mesh_logo.png" alt="GeekPark Mesh" class="hero-logo"><span class="ver">{{ issue.version }}</span></div>
-      <div class="headrow"><div class="headline"><div class="hq" data-path="question">{{ d.question }}</div><p class="hl" data-path="lead">{{ d.lead }}</p></div><div class="bigdate">{{ issue.period_label }}</div></div>
+      <div class="headrow"><div class="headline"><div class="hq" data-path="question">{{ d.question }}</div><p class="hl" data-path="lead">{{ d.lead }}</p></div><div class="bigdate">{{ issue.display_date }}</div></div>
     </div>
     <div class="kpis">{% for k in d.kpis %}<div class="kpi"><b data-path="kpis.{{ loop.index0 }}.n">{{ k.n }}</b><span data-path="kpis.{{ loop.index0 }}.label">{{ k.label }}</span></div>{% endfor %}</div>
-    {% if preview %}<p class="note" style="color:#B45309">预览模式：显示的是草稿，读者仍看到上一版上线内容。{% if perms.publish %} 改完后点下方「{% if issue.status == 'published' %}重新上线{% else %}确认上线{% endif %}」。{% else %} 上线需所有者确认。{% endif %}</p>{% endif %}
+    {% if preview %}<p class="note preview-note" id="previewNote" style="color:#B45309" hidden>预览模式：显示的是草稿，读者仍看到上一版上线内容。{% if perms.publish %} 改完后点下方「{% if issue.status == 'published' %}重新上线{% else %}确认上线{% endif %}」。{% else %} 上线需管理员确认。{% endif %}</p>{% endif %}
   </div>
 </main></div>
 <main class="wrap">
 
   <section id="rel">
-    <div class="sec-h"><div class="hrow"><img class="num" src="/static/assets/num_1.png" alt="1"><h2>可同步的关系</h2><span class="k">权重最高</span></div><p>被不止一个团队碰到，或一个团队碰到、另一个明显用得上。只列各团队各自的事实，不给建议。实线标签是指各方都有具体记录的关系；虚线标签是指内容可能值得相关团队关注。</p></div>
+    <div class="sec-h"><div class="hrow"><img class="num" src="/static/assets/num_1.png" alt="1"><h2>可同步的关系</h2><span class="k">权重最高</span></div><p>被不止一个团队碰到，或一个团队碰到、另一个明显用得上。只列各团队各自的事实，不给建议。<strong>实线团队标签</strong>表示该团队本期有具体记录；<strong>虚线「→ 团队」</strong>表示建议该团队关注、内容可能与其相关。</p></div>
     <div class="cards" data-addable="relations">
     {% for r in d.relations %}
-      <div class="card{% if r.weak %} weak{% endif %}" data-path="relations.{{ loop.index0 }}">
+      <div class="card" data-path="relations.{{ loop.index0 }}">
         <span class="flag" {{ flagstyle(r.label) }} data-path="relations.{{ loop.index0 }}.label" title="单击换标签，双击改文字">{{ r.label }}</span>
         <p class="t" data-path="relations.{{ loop.index0 }}.title">{{ r.title }}</p>
         <p class="b" data-path="relations.{{ loop.index0 }}.body">{{ r.body }}</p>

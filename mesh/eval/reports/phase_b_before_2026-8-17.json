@@ -1,0 +1,157 @@
+{
+  "generated_at": "2026-09-01T05:33:56.968028+00:00",
+  "phase": "B",
+  "slug": "2026-8-17",
+  "issue_id": 6,
+  "status": "published",
+  "draft_published_synced": false,
+  "published": {
+    "kpi_relations": 14,
+    "card_count": 11,
+    "kpi_matches_cards": false,
+    "integrity": {
+      "n_relations": 11,
+      "n_weak": 10,
+      "n_needs_review": 0,
+      "n_strong": 1,
+      "strong_no_evidence": 0,
+      "team_mismatch": 5,
+      "orphan_sources": 8,
+      "duplicate_titles": 0,
+      "blocked_leaks": 0,
+      "bad_cards": 5
+    },
+    "samples": [
+      {
+        "title": "豆包 · 字节跳动",
+        "label": "同一件事，两个部门各知一半",
+        "weak": true,
+        "needs_review": false,
+        "teams": [
+          "编辑部",
+          "视频号团队",
+          "商业化团队"
+        ],
+        "n_evidence": 7,
+        "body_preview": "豆包收费与向豆包集结的巨头动作，在编辑部、视频号、商业化三处各有一角。"
+      },
+      {
+        "title": "千问 · 智能体身份管理体系",
+        "label": "采访对象也是客户",
+        "weak": true,
+        "needs_review": false,
+        "teams": [
+          "商业化团队",
+          "编辑部"
+        ],
+        "n_evidence": 3,
+        "body_preview": "阿里千问既是商业化团队签约执行中的稿件项目，也是编辑部就智能体下线与合规做交流的采访对象。"
+      },
+      {
+        "title": "刘靖康 · Insta360",
+        "label": "同一件事，两个部门各知一半",
+        "weak": true,
+        "needs_review": false,
+        "teams": [
+          "编辑部",
+          "视频号团队"
+        ],
+        "n_evidence": 3,
+        "body_preview": "影石创始人刘靖康在编辑部建联与英文站稿中，也在视频号的对谈素材里出现。"
+      },
+      {
+        "title": "张鹏 · AGI Playground Singapore",
+        "label": "同一件事，两个部门各知一半",
+        "weak": true,
+        "needs_review": false,
+        "teams": [
+          "编辑部",
+          "视频号团队"
+        ],
+        "n_evidence": 10,
+        "body_preview": "新加坡 AGI Playground 现场对谈，英文站已成稿、视频号在把现场访谈转视频稿。"
+      },
+      {
+        "title": "视频号 · 小红书",
+        "label": "同一件事，两个部门各知一半",
+        "weak": true,
+        "needs_review": false,
+        "teams": [
+          "品牌创意团队",
+          "视频号团队"
+        ],
+        "n_evidence": 8,
+        "body_preview": "小红书内容试点与视频号栏目分类调整，品牌创意团队与视频号团队各自在推进同一套 AI-native 工作流。"
+      },
+      {
+        "title": "具身智能 · 世界机器人大会",
+        "label": "同一件事，两个部门各知一半",
+        "weak": false,
+        "needs_review": false,
+        "teams": [
+          "社群",
+          "编辑部",
+          "视频号团队"
+        ],
+        "n_evidence": 7,
+        "body_preview": "WRC2026 与具身智能话题在社群、编辑部、视频号各有触点。"
+      },
+      {
+        "title": "字节视频/音频模型 · 豆包",
+        "label": "同一件事，两个部门各知一半",
+        "weak": true,
+        "needs_review": false,
+        "teams": [
+          "编辑部",
+          "视频号团队"
+        ],
+        "n_evidence": 6,
+        "body_preview": "字节的模型能力在编辑部报道与视频号工具试用两处出现。"
+      },
+      {
+        "title": "Agent 上下文与自进化",
+        "label": "两个部门各有判断",
+        "weak": true,
+        "needs_review": false,
+        "teams": [
+          "商业化团队",
+          "社群"
+        ],
+        "n_evidence": 0,
+        "body_preview": "Agent 的核心生态位，商业化团队与社群各有一条判断。"
+      }
+    ]
+  },
+  "draft": {
+    "kpi_relations": 12,
+    "card_count": 6,
+    "kpi_matches_cards": false
+  },
+  "publish_blockers": [
+    "keywords 已删减 17 处 unsupported 行",
+    "plans 已删减 4 处 unsupported 行",
+    "contacts 已删减 9 处 unsupported 行",
+    "views 已删减 1 处 unsupported 行",
+    "关系「具身智能 · 世界机器人大会」body 无法由 evidence 证明"
+  ],
+  "n_candidates": 19,
+  "likely_llm_skipped_candidates": [
+    "Founder Park · AGI 2026",
+    "AI硬件 · OpenAI",
+    "小红书 · AGI 2026",
+    "Agent · Evolvent AI",
+    "MiniMax · AGI Playground 2026",
+    "OpenAI · Chrome",
+    "宇树 · 物理AI机器人自进化1.0",
+    "支付宝 · HarmonyOS 7",
+    "英特尔 · Mercury Research",
+    "阿里巴巴 · 蔡崇信"
+  ],
+  "label_distribution": {
+    "同一件事，两个部门各知一半": 6,
+    "采访对象也是客户": 1,
+    "两个部门各有判断": 1,
+    "一方报道了，另一方在接触": 2,
+    "已联动": 1
+  }
+}

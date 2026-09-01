@@ -92,6 +92,9 @@ def search_fts(
                 WHERE {filt}
             """
             params = fp + params
+            if slug:
+                sql += " AND issue_slug = %s"
+                params.append(slug)
             sql += _date_sql()
             sql += f" ORDER BY score DESC, date_end DESC NULLS LAST LIMIT %s"
             params.append(max(limit * 3, limit))

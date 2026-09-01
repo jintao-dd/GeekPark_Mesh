@@ -60,7 +60,7 @@
   <tr><th>期</th><th>邮件标题（预览）</th><th>状态</th><th>邮件</th><th>上线自动发</th><th>操作</th></tr>
   {% for i in issues %}
   <tr id="{{ i.slug }}">
-    <td><b>{{ i.period_label }}</b><div class="slug">{{ i.slug }}</div>{% if i.status=='published' and not i.draft_sync %}<div class="slug" style="color:#B45309">草稿已改，EDM 仍发上线稿</div>{% endif %}</td>
+    <td><b>{{ i.display_date }}</b><div class="slug">{{ i.slug }}</div>{% if i.status=='published' and not i.draft_sync %}<div class="slug" style="color:#B45309">草稿已改，EDM 仍发上线稿</div>{% endif %}</td>
     <td><div class="edm-subj">{{ i.edm_subject }}</div><div class="edm-subj-hint">规则预览 · 发送时由模型定稿</div></td>
     <td>{% if i.status=='published' %}<span class="tag ok">已上线</span>{% else %}<span class="tag pend">草稿</span>{% endif %}</td>
     <td><span class="edm-mail {{ i.mail.kind }}">{{ i.mail.label }}</span>

@@ -25,6 +25,83 @@ TEAMS = [
     "CEO / 总裁办", "外部媒体", "内容中心·数据聚合", "其他",
 ]
 
+# 编辑部在 UI 拆成三种材料（owner 仍归「编辑部」）
+EDITORIAL_PICKS = {
+    "编辑部 · 沟通记录": "T1",
+    "编辑部 · 选题表": "T2",
+    "编辑部 · 周例会": "T6",
+}
+
+# 上传页选项 → 默认 stype（含编辑部子类）
+TEAM_DEFAULT_STYPE = {
+    **EDITORIAL_PICKS,
+    "商业化团队": "T6",
+    "硅谷 BD 团队": "T3",
+    "Global Partnership 团队": "T10",
+    "英文站": "T5",
+    "品牌创意团队": "T6",
+    "社群": "T4",
+    "投资团队": "T8",
+    "音频播客团队": "T12",
+    "视频号团队": "T11",
+    "CEO / 总裁办": "T6",
+    "外部媒体": "T7",
+    "内容中心·数据聚合": "T13",
+    "其他": "T6",
+}
+
+SOURCE_PICKS = list(EDITORIAL_PICKS.keys()) + [
+    t for t in TEAMS if t not in ("编辑部", "内容中心·数据聚合", "其他")
+] + ["内容中心·数据聚合", "其他"]
+
+# stype → 团队（仅在上传推断不出团队时用）
+STYPE_DEFAULT_TEAM = {
+    "T1": "编辑部", "T2": "编辑部", "T3": "硅谷 BD 团队", "T4": "社群",
+    "T5": "英文站", "T6": "编辑部", "T7": "外部媒体", "T8": "投资团队",
+    "T9": "品牌创意团队", "T10": "Global Partnership 团队", "T11": "视频号团队",
+    "T12": "音频播客团队", "T13": "内容中心·数据聚合",
+}
+
+
+def editorial_pick_for_stype(stype: str) -> str:
+    return {
+        "T1": "编辑部 · 沟通记录",
+        "T2": "编辑部 · 选题表",
+        "T6": "编辑部 · 周例会",
+    }.get((stype or "").strip(), "编辑部 · 沟通记录")
+
+
+def source_pick_for(team: str, stype: str = "") -> str:
+    """归一上传页选项（sources.team 存此值）。"""
+    t = (team or "").strip()
+    if t in TEAM_DEFAULT_STYPE:
+        return t
+    if t == "编辑部" or (t.startswith("编辑部") and t not in TEAM_DEFAULT_STYPE):
+        code = (stype or "").strip()
+        if code not in EDITORIAL_PICKS.values():
+            code = "T1"
+        return editorial_pick_for_stype(code)
+    c = canonical_team(t)
+    if c in TEAM_DEFAULT_STYPE:
+        return c
+    return t or "其他"
+
+
+def owner_team_for_pick(pick: str) -> str:
+    """上传选项 → 条目 owner_team（要点卡 / 上线归属）。"""
+    p = (pick or "").strip()
+    if p.startswith("编辑部"):
+        return "编辑部"
+    return canonical_team(p) or p
+
+
+def default_stype_for_team(team: str) -> str:
+    return TEAM_DEFAULT_STYPE.get(source_pick_for(team), "T6")
+
+
+def canonical_source_pick(name: str) -> str:
+    return source_pick_for(name)
+
 
 def canonical_team(name: str) -> str:
     """规范团队名（含旧称「播客」→「音频播客团队」）。"""
@@ -38,10 +115,19 @@ def canonical_team(name: str) -> str:
     return n
 
 
-def _is_aggregation_bundle(name: str, text: str = "") -> bool:
+_AGG_BUNDLE_KEYS = (
+    "数据聚合",
+    "内容聚合",
+    "内容中心",
+    "内容中心·数据聚合",
+    "聚合器",
+)
+
+
+def _is_aggregation_bundle(name: str, text: str = "", *, filename_only: bool = False) -> bool:
     """内容中心·数据聚合 等混合导出包（整份多来源，不能按正文目录行判单一 T 类型）。"""
-    probe = f"{name}\n{(text or '')[:1200]}"
-    return any(k in probe for k in ("数据聚合", "内容中心", "内容中心·数据聚合", "聚合器"))
+    probe = name if filename_only else f"{name}\n{(text or '')[:1200]}"
+    return any(k in probe for k in _AGG_BUNDLE_KEYS)
 
 
 def _match_stype(name: str, text: str, *, filename_only: bool = False) -> str:
@@ -85,7 +171,7 @@ def _match_team(name: str, text: str, *, filename_only: bool = False) -> str:
     team_rules = [
         ("硅谷 BD 团队", ("硅谷", "BD团队", "bd 团队")),
         ("Global Partnership 团队", ("Global Partnership", "全球合作")),
-        ("英文站", ("英文站", "geekpark.media", "english")),
+        ("英文站", ("英文站", "geekpark.media", "geekpark english", "about.geekpark", "极客公园英文站")),
         ("商业化团队", ("商业化", "广告销售")),
         ("品牌创意团队", ("品牌创意", "品牌部")),
         ("社群", ("社群", "私域运营")),
@@ -102,36 +188,39 @@ def _match_team(name: str, text: str, *, filename_only: bool = False) -> str:
     return ""
 
 
-def infer_source_meta(filename: str, text: str = "", default_team: str = "") -> dict:
-    """根据文件名与正文前缀推断数据类型、团队、通道。拖入即可，无需手选。"""
+def infer_source_meta(filename: str, text: str = "", default_team: str = "", *, filename_only: bool = False) -> dict:
+    """推断数据类型、团队、通道。
+
+    filename_only=True（文件上传）：只看文件名，不看正文，避免内容误触发。
+    粘贴文本等无可靠文件名时仍可用正文辅助推断。
+    """
     name = (filename or "").strip()
-    ext = Path(name).suffix.lower()
-    head = f"{name}\n{(text or '')[:5000]}"
+    head = name if filename_only else f"{name}\n{(text or '')[:5000]}"
 
-    # 通道：明显聚合/外部源才标 aggregator（内容中心·数据聚合 等）
-    channel = "aggregator" if any(
-        k in head for k in ("聚合器", "数据聚合", "内容中心", "内容中心·数据聚合", "RSS", "外部媒体抓取")
-    ) else "manual"
+    # 通道：明显聚合/外部源才标 aggregator
+    channel = "aggregator" if any(k in head for k in _AGG_BUNDLE_KEYS + ("RSS", "外部媒体抓取")) else "manual"
 
-    bundle = _is_aggregation_bundle(name, text)
+    bundle = _is_aggregation_bundle(name, text, filename_only=filename_only)
 
     if bundle:
         stype = AGG_STYPE
         team = "内容中心·数据聚合"
     else:
-        stype = _match_stype(name, text)
-        team = _match_team(name, text, filename_only=True) or _match_team(name, text)
-        if not team:
-            team = (default_team or "").strip()
-        if not team:
-            team = {
-                "T1": "编辑部", "T2": "编辑部", "T3": "硅谷 BD 团队", "T4": "社群",
-                "T5": "编辑部", "T6": "编辑部", "T7": "外部媒体", "T8": "商业化团队", "T9": "品牌创意团队",
-                "T10": "Global Partnership 团队", "T11": "视频号团队", "T12": "音频播客团队",
-            }.get(stype, "编辑部")
-    team = canonical_team(team)
-    if team not in TEAMS:
-        team = "其他"
+        stype_guess = _match_stype(name, text, filename_only=filename_only)
+        team_guess = _match_team(name, text, filename_only=filename_only)
+        if not team_guess:
+            team_guess = (default_team or "").strip()
+        if not team_guess:
+            team_guess = STYPE_DEFAULT_TEAM.get(stype_guess, "编辑部")
+        team_guess = canonical_team(team_guess)
+        if team_guess not in TEAMS:
+            team_guess = "其他"
+        if team_guess == "编辑部":
+            stype = stype_guess if stype_guess in EDITORIAL_PICKS.values() else "T1"
+            team = editorial_pick_for_stype(stype)
+        else:
+            team = source_pick_for(team_guess)
+            stype = default_stype_for_team(team)
 
     title = Path(name).stem if name else ""
     return {"stype": stype, "team": team, "channel": channel, "title": title}

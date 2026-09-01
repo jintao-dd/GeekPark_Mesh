@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.aggregator import split_bundle_ex
+from app.aggregator import parse_content_stats_toc, split_bundle_ex
 
 
 PAD = "详细内容补充行。\n" * 12
@@ -68,6 +68,72 @@ def test_gp_internal_boundary():
     text = "GP 工作进展周报\n" + ("进展条目。\n" * 20)
     r = split_bundle_ex(text)
     assert r.segments[0].stype == "T10"
+
+
+MD_REPORT_SNIPPET = """## 📊 内容统计
+
+- **飞书多维表格**: 31 条记录
+  - 编辑部 · 选题: 15 条
+  - 编辑部 · 沟通记录: 8 条
+  - 视频号数据: 8 条
+- **TechCrunch**: 11 篇
+- **会议日程 (ICS)**: 1 条
+
+## 🤖 AI智能分析
+
+长篇 AI 解读不应进入抽取段落。""" + ("分析填充。\n" * 30) + """
+
+## 🏢 内部飞书内容
+
+### 📆 会议日程 (ICS)
+
+**grip.events 会议日程**
+""" + PAD + """
+
+### 📊 飞书多维表格
+
+### 编辑部 · 选题
+
+*表格 ID: tbl*
+""" + PAD + """
+
+### 编辑部 · 沟通记录
+
+*表格 ID: tbl2*
+""" + PAD + """
+
+### 视频号数据
+
+视频标题 | 完播率
+某视频 | 12%
+""" + PAD + """
+
+## 🌐 外部信息源
+
+### 📰 TechCrunch
+
+**TechCrunch-综合 - 综合**
+
+作者: 张三
+链接: https://example.com
+发布时间: 2026-01-01
+""" + PAD
+
+
+def test_md_report_skips_ai_and_splits_by_toc_sections():
+    r = split_bundle_ex(MD_REPORT_SNIPPET, source_title="内容聚合报告")
+    assert r.mode == "multi"
+    assert len(r.segments) >= 5
+    stypes = {s.stype for s in r.segments}
+    assert "T2" in stypes or "T1" in stypes
+    assert "T11" in stypes
+    assert "T7" in stypes
+    assert all("AI智能分析" not in s.text for s in r.segments)
+    toc = parse_content_stats_toc(MD_REPORT_SNIPPET)
+    names = {x["name"] for x in toc}
+    assert "飞书多维表格" in names
+    assert "编辑部 · 选题" in names
+    assert "视频号数据" in names
 
 
 if __name__ == "__main__":

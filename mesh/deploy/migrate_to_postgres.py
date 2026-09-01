@@ -107,7 +107,25 @@ def _reset_serial(dst, table: str) -> None:
         pass
 
 
+def _pg_has_data(dst) -> bool:
+    try:
+        row = dst.execute("SELECT COUNT(*) c FROM issues").fetchone()
+        return bool(row and row["c"] > 0)
+    except Exception:
+        return False
+
+
 def main() -> None:
+    import argparse
+
+    ap = argparse.ArgumentParser(description="SQLite → PostgreSQL 全量迁移")
+    ap.add_argument(
+        "--force",
+        action="store_true",
+        help="目标 PG 已有数据时仍 TRUNCATE 后覆盖（危险，仅首次或明确恢复时用）",
+    )
+    args = ap.parse_args()
+
     if not db_conn.MESH_DB_URL:
         print("错误：请设置 MESH_DB_URL=postgresql://...", file=sys.stderr)
         sys.exit(1)
@@ -125,6 +143,16 @@ def main() -> None:
     dst = db.connect()
     assert dst.dialect == "postgresql"
     db._init_pg_schema(dst)
+    if _pg_has_data(dst) and not args.force:
+        print(
+            "错误：目标 PostgreSQL 已有期号数据。若确需全量覆盖请加 --force",
+            file=sys.stderr,
+        )
+        dst.close()
+        src.close()
+        sys.exit(2)
+    if args.force and _pg_has_data(dst):
+        print("==> --force：清空目标 PG 表…")
     for table, _ in reversed(_TABLES):
         try:
             dst.execute(f"TRUNCATE TABLE {table} RESTART IDENTITY CASCADE")

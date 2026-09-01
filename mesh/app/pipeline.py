@@ -10,10 +10,11 @@ UI 会把两者区分显示。**不许给 model 步伪造独立进度条。**
 """
 from __future__ import annotations
 import json
-import threading
 import traceback
 
-from . import db, llm, merge
+from . import db, llm, merge, job_store, ask_concurrency
+
+KIND = "pipeline"
 
 # ---------------------------------------------------------------- 步骤表
 PROC = [
@@ -38,38 +39,39 @@ DESIGN = [
          h="对照信息池近 12 期，识别谁首次进入记录、谁与往期同名。没有这一步，周报只是一次性摘要"),
     dict(sk="cross-channel-merge", k="跨通道合并 · 同一件事只算一次", by="code",
          h="同一场会可能同时出现在日历、录音和聚合文档里。按实体加事件合并，合并后保留全部来源行。不做这一步，同团队的数据到达两次会被误判成跨部门关系"),
-    dict(sk="relation-link", k="关系匹配", by="model",
-         h="同一公司或同一人，判定谁接触了、谁在关注、谁已联动，用平实标签标状态，不做对抗性描述"),
-    dict(sk="sync-pick", k="可同步性判断", by="model",
-         h="只看归属团队是否不同，不看来源记录条数。只有不同团队各自碰到，才进「可同步的关系」"),
-    dict(sk="compose", k="五块合成", by="model",
-         h="可同步的关系 · 接触过的人和公司 · 关注了什么 · 日程与计划 · 沟通中提到的看法"),
-    dict(sk="cite", k="来源行生成", by="model",
-         h="内部来源写到会议级不带时间戳，公开来源写标题日期作者链接，每卡至少一行"),
+    # 以下随「生成预览/草稿」执行，挖掘阶段只占位说明，避免 UI 假完成
+    dict(sk="relation-link", k="关系匹配", by="defer",
+         h="在生成周报草稿时由关系候选 + 模型完成，挖掘阶段不单独跑"),
+    dict(sk="sync-pick", k="可同步性判断", by="defer",
+         h="在生成周报草稿时执行（跨团队 provenance 校验）"),
+    dict(sk="compose", k="五块合成", by="defer",
+         h="在生成周报草稿时合成五块结构"),
+    dict(sk="cite", k="来源行生成", by="defer",
+         h="在生成周报草稿时写入来源行"),
     dict(sk="lint", k="术语与标签检查", by="code",
          h="禁用词、日程确定度、「不代表承诺」提示、只列本期提交团队"),
-    dict(sk="name-verify", k="姓名与职级核对", by="model",
-         h="对话主体保留真名。只有金额、条款、谈判立场、薪酬这四类才锁"),
-    dict(sk="zone-sort", k="六区分拣", by="model",
-         h="把每段内容归到六个区：可公开、需脱敏、仅内部、待核对、⑤区人与钱、无关噪声"),
-    dict(sk="decision-split", k="决定与想法分离", by="model",
-         h="例会里「定了要做」和「随口一提」必须分开。拿不准的一律降级为想法"),
-    dict(sk="speaker-doubt", k="说话人存疑标记", by="model",
-         h="转写的说话人归属可能错。不确定是谁说的，就不写进带姓名的卡"),
-    dict(sk="value-extract", k="价值提取 · 有没有下一步", by="model",
-         h="一段接触值不值得留档，看它有没有可展开的下一步——不是热闹就留"),
-    dict(sk="certainty-tag", k="确定度标注", by="model",
-         h="日程与计划每条打确定度：已排期 / 在做 / 计划中 / 在谈 / 初步想法 / 日历订阅 / 外部事件"),
+    dict(sk="name-verify", k="姓名与职级核对", by="defer",
+         h="随抽取提示词约束；挖掘阶段不做二次模型核对"),
+    dict(sk="zone-sort", k="六区分拣", by="defer",
+         h="随抽取写入 zone；代码硬拦⑤区/L3"),
+    dict(sk="decision-split", k="决定与想法分离", by="defer",
+         h="随 T6 等抽取提示词执行"),
+    dict(sk="speaker-doubt", k="说话人存疑标记", by="defer",
+         h="随转写类抽取提示词执行"),
+    dict(sk="value-extract", k="价值提取 · 有没有下一步", by="defer",
+         h="随抽取提示词执行"),
+    dict(sk="certainty-tag", k="确定度标注", by="defer",
+         h="随抽取提示词执行"),
     dict(sk="first-seen", k="首次进入判定", by="code",
          h="对照信息池，确认哪些人和公司是本期第一次进入记录。本周导语从这里取角度"),
-    dict(sk="invest-guard", k="投资侧合规二次过滤", by="model",
-         h="上市与临近上市公司只留「已接触」，隐去对方表述与进展"),
+    dict(sk="invest-guard", k="投资侧合规二次过滤", by="defer",
+         h="随 listed / zone 规则与草稿生成"),
     dict(sk="contrib-list", k="贡献团队清点", by="code",
          h="按归属团队计，不按采集通道计。只列本期有材料进来的团队，不写谁没交"),
     dict(sk="trace-keep", k="可追溯留痕", by="code",
          h="被暂扣和被脱敏的原文全量留在隔离区，附来源与时间。脱敏只发生在对外这一层，底库不动"),
     dict(sk="draft-save", k="落盘为草稿", by="code",
-         h="生成 draft-1 进入审校台，对读者不可见"),
+         h="挖掘结束后旧草稿失效，须重新「生成周报草稿」才能上线"),
 ]
 
 ALL_STEPS = PROC + DESIGN
@@ -84,59 +86,53 @@ def steps_for_ui() -> list[dict]:
     return out
 
 
-# ---------------------------------------------------------------- 运行状态
-JOBS: dict[str, dict] = {}
-_LOCK = threading.Lock()
+def _defaults(slug: str) -> dict:
+    return {
+        "slug": slug, "running": False, "done": False, "error": None,
+        "cur": -1, "results": {}, "log": [], "token": 0,
+    }
 
 
 def _new_state(slug: str) -> dict:
-    return {"slug": slug, "running": True, "done": False, "error": None,
-            "cur": -1, "results": {}, "log": [], "token": 0}
+    st = _defaults(slug)
+    st["running"] = True
+    return st
 
 
 def get_state(slug: str) -> dict:
-    with _LOCK:
-        return dict(JOBS.get(slug) or {"slug": slug, "running": False, "done": False,
-                                       "error": None, "cur": -1, "results": {}, "log": [], "token": 0})
+    return job_store.get(KIND, slug, _defaults(slug))
 
 
 def _set(slug, **kw):
-    with _LOCK:
-        st = JOBS.setdefault(slug, _new_state(slug))
-        st.update(kw)
+    st = job_store.get(KIND, slug, _new_state(slug))
+    st.update(kw)
+    job_store.put(KIND, slug, st)
 
 
 def _mark(slug, sk, result=""):
-    with _LOCK:
-        st = JOBS.setdefault(slug, _new_state(slug))
-        idx = next((i for i, s in enumerate(ALL_STEPS) if s["sk"] == sk), -1)
-        st["cur"] = max(st["cur"], idx)
-        if result:
-            st["results"][sk] = result
+    st = job_store.get(KIND, slug, _new_state(slug))
+    idx = next((i for i, s in enumerate(ALL_STEPS) if s["sk"] == sk), -1)
+    st["cur"] = max(int(st.get("cur") or -1), idx)
+    if result:
+        results = dict(st.get("results") or {})
+        results[sk] = result
+        st["results"] = results
+    job_store.put(KIND, slug, st)
 
 
 def _is_current(slug: str, token: int) -> bool:
-    with _LOCK:
-        st = JOBS.get(slug) or {}
-        return st.get("token") == token and st.get("running")
+    return job_store.is_current(KIND, slug, token, _defaults(slug))
 
 
 def start(slug: str, force: bool = False) -> None:
     """启动一次完整管线。force=True 时取消卡住/旧任务并重新开跑。"""
-    with _LOCK:
-        cur = JOBS.get(slug)
-        if cur and cur.get("running"):
-            if not force:
-                return
-            # 作废旧线程：抬 token；旧 _run 写库前会自检退出
-            cur["running"] = False
-            cur["done"] = False
-            cur["error"] = "已被强制重新启动"
-        token = int((cur or {}).get("token") or 0) + 1
-        st = _new_state(slug)
-        st["token"] = token
-        JOBS[slug] = st
-    threading.Thread(target=_run, args=(slug, token), daemon=True).start()
+    from . import job_runtime
+
+    claimed = job_store.try_claim(KIND, slug, _defaults(slug), _new_state(slug), force=force)
+    if not claimed:
+        return
+    token = int(claimed.get("token") or 0)
+    job_runtime.spawn_after_claim(KIND, slug, _defaults(slug), _run, (slug, token))
 
 
 def _run(slug: str, token: int = 0) -> None:
@@ -147,7 +143,7 @@ def _run(slug: str, token: int = 0) -> None:
         r = con.execute("SELECT * FROM issues WHERE slug=?", (slug,)).fetchone()
         iid = r["id"]
         srcs = [dict(x) for x in con.execute(
-            "SELECT id, stype, team, title, text, channel FROM sources WHERE issue_id=? AND length(text)>0", (iid,))]
+            "SELECT id, stype, team, title, text, channel, meta FROM sources WHERE issue_id=? AND length(text)>0", (iid,))]
 
         _mark(slug, "intake", f"{len(srcs)} 文件")
         n_aud = sum(1 for s in srcs if (s["stype"] or "") in ("T6",) and "录音" in (s["title"] or ""))
@@ -162,35 +158,65 @@ def _run(slug: str, token: int = 0) -> None:
                 return
             title = (s["title"] or f"来源 {s['id']}")[:36]
             _mark(slug, "extract", f"抽取中 {i}/{total} · {title}")
-            items, split_meta = llm.extract_source(
-                s["stype"], s["team"], s["title"], s["text"] or "",
-                period_start=r["date_start"] or "",
-                period_end=r["date_end"] or "",
-                period_label=r["period_label"] or "",
-                channel=s.get("channel") or "manual",
-            )
+            skip_split = False
+            try:
+                meta_obj = json.loads(s["meta"] or "{}") if isinstance(s.get("meta"), str) else (s.get("meta") or {})
+                skip_split = (meta_obj.get("split") or {}).get("mode") == "pre_split"
+            except (json.JSONDecodeError, TypeError, AttributeError):
+                skip_split = False
+            items, split_meta = None, None
+            try:
+                with ask_concurrency.llm_slot(pool="job"):
+                    items, split_meta = llm.extract_source(
+                        s["stype"], s["team"], s["title"], s["text"] or "",
+                        period_start=r["date_start"] or "",
+                        period_end=r["date_end"] or "",
+                        period_label=r["period_label"] or "",
+                        channel=s.get("channel") or "manual",
+                        skip_split=skip_split,
+                        source_id=s["id"],
+                    )
+            except ask_concurrency.AskBusyError as e:
+                raise RuntimeError(f"抽取排队超时：{e}") from e
+            except ask_concurrency.JobBusyError as e:
+                raise RuntimeError(f"抽取排队超时：{e}") from e
             if not _is_current(slug, token):
                 return
             con.execute("DELETE FROM items WHERE source_id=?", (s["id"],))
-            from .aggregator import merge_source_meta, resolve_item_owner
+            from .aggregator import merge_source_meta
+            from .attribution import apply_attribution_to_item
             for it in items:
                 item_stype = it.get("item_stype") or s["stype"]
-                owner = resolve_item_owner(it, source_team=s["team"] or "")
+                attr = apply_attribution_to_item(
+                    it, source_team=s["team"] or "", segment_team=it.get("_segment_team"),
+                )
+                owner = attr.owner_team
+                blocked = int(it.get("blocked") or 0)
                 con.execute(
                     """INSERT INTO items(issue_id,source_id,team,stype,zone,level,kind,text,entities,roles,signals,
-                       source_label,pointer,blocked,owner_team,channel,source_labels)
-                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (iid, s["id"], it["team"], item_stype, it["zone"], it["level"], it["kind"], it["text"],
+                       source_label,pointer,blocked,owner_team,channel,source_labels,owner_provenance,llm_owner_team_hint)
+                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (iid, s["id"], owner or it.get("team"), item_stype, it["zone"], it["level"], it["kind"], it["text"],
                      json.dumps(it["entities"], ensure_ascii=False), json.dumps(it["roles"], ensure_ascii=False),
-                     json.dumps(it["signals"], ensure_ascii=False), it["source_label"], it["pointer"], it["blocked"],
+                     json.dumps(it["signals"], ensure_ascii=False), it["source_label"], it["pointer"], blocked,
                      owner, s["channel"] or "manual",
-                     json.dumps([it["source_label"]] if it.get("source_label") else [], ensure_ascii=False)))
+                     json.dumps([it["source_label"]] if it.get("source_label") else [], ensure_ascii=False),
+                     attr.provenance, attr.llm_owner_team_hint or it.get("llm_owner_team_hint")))
                 for name in it["entities"]:
                     if name:
                         con.execute("INSERT INTO entities(name,kind,first_issue) VALUES(?,?,?) ON CONFLICT(name) DO NOTHING",
                                     (name, "auto", slug))
                 got += 1
             meta = merge_source_meta(s.get("meta"), split_meta)
+            try:
+                meta_obj = json.loads(meta) if isinstance(meta, str) else dict(meta or {})
+            except (json.JSONDecodeError, TypeError):
+                meta_obj = {}
+            if llm.split_needs_review(split_meta):
+                sp = dict(meta_obj.get("split") or {})
+                sp["needs_review"] = True
+                meta_obj["split"] = sp
+                meta = json.dumps(meta_obj, ensure_ascii=False)
             con.execute("UPDATE sources SET extracted=1, meta=? WHERE id=?", (meta, s["id"]))
             con.commit()
             _mark(slug, "extract", f"已完成 {i}/{total} · 候选 {got}")
@@ -220,7 +246,7 @@ def _run(slug: str, token: int = 0) -> None:
         _mark(slug, "cross-channel-merge", f"合并 {st['groups']} 组 · 来源 {st['source_lines']} 行")
 
         for sk in ("relation-link", "sync-pick", "compose", "cite"):
-            _mark(slug, sk, "已完成")
+            _mark(slug, sk, "待预览/草稿阶段")
 
         hits = llm.forbidden_hits(" ".join(
             (x["text"] or "") for x in con.execute("SELECT text FROM items WHERE issue_id=? AND blocked=0 AND merged_into IS NULL", (iid,))))
@@ -228,10 +254,10 @@ def _run(slug: str, token: int = 0) -> None:
 
         for sk in ("name-verify", "zone-sort", "decision-split", "speaker-doubt",
                    "value-extract", "certainty-tag"):
-            _mark(slug, sk, "已完成")
+            _mark(slug, sk, "随抽取提示词")
 
         _mark(slug, "first-seen", f"首次 {len(first)}")
-        _mark(slug, "invest-guard", "已过滤")
+        _mark(slug, "invest-guard", "随草稿/规则")
 
         teams = [x["owner_team"] for x in con.execute(
             "SELECT DISTINCT owner_team FROM items WHERE issue_id=? AND blocked=0 AND merged_into IS NULL AND owner_team IS NOT NULL AND owner_team<>''", (iid,))]

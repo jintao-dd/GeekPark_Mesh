@@ -6,25 +6,33 @@ from . import db
 
 SECRET = os.environ.get("MESH_SECRET", "").strip()
 _WEAK_SECRETS = {"", "change-me-please", "local-dev-secret-change-me-1234567890", "secret", "mesh"}
+_BASE = (os.environ.get("MESH_BASE_URL") or "").strip().lower()
+_IS_PROD = (
+    (os.environ.get("MESH_ENV") or "").strip().lower() in ("prod", "production")
+    or _BASE.startswith("https://")
+)
 if SECRET in _WEAK_SECRETS or len(SECRET) < 16:
+    msg = "MESH_SECRET 未设置或过弱：会话可被伪造。生产环境必须设置强随机串。"
+    if _IS_PROD:
+        raise RuntimeError(msg + "（已拒绝启动）")
     import warnings
-    warnings.warn(
-        "MESH_SECRET 未设置或过弱：会话可被伪造。生产环境必须设置强随机串。",
-        RuntimeWarning,
-        stacklevel=1,
-    )
+    warnings.warn(msg, RuntimeWarning, stacklevel=1)
     if not SECRET:
         SECRET = "change-me-please"
 _ser = URLSafeSerializer(SECRET, salt="mesh-session")
 _state_ser = URLSafeSerializer(SECRET, salt="mesh-feishu-state")
 COOKIE = "mesh_session"
+DEBUG_PRESET_COOKIE = "mesh_debug_preset"
 SESSION_MAX_AGE = 60 * 60 * 24 * 14
 FEISHU_STATE_TTL = 60 * 10
 _log = logging.getLogger("mesh.auth")
-# owner 是唯一有权确认上线的角色，排在 admin 之上
+# owner 最高；admin 可确认上线/撤回；EDM/账号/提示词仅 owner
 ROLE_RANK = {"viewer": 1, "dept": 2, "editor": 3, "admin": 4, "owner": 5}
 ROLE_CN = {"owner": "所有者", "admin": "管理员", "editor": "编辑", "dept": "编辑（已迁移）", "viewer": "查看者"}
 
+
+def _csv_set(env_key: str) -> set[str]:
+    return {x.strip() for x in os.environ.get(env_key, "").split(",") if x.strip()}
 
 def role_of(user) -> str:
     if not user:
@@ -44,18 +52,23 @@ def perms(user) -> dict:
     """前端/模板能力开关；后端仍须 require() 再验一次。"""
     r = role_of(user)
     write = at_least(user, "editor")
-    sysadmin = at_least(user, "admin")
+    is_owner = r == "owner"
+    can_publish = r in ("admin", "owner")
+    debug = bool(user and is_debug_user(user.get("d") or "", user.get("u") or ""))
     return {
         "role": r,
         "role_cn": ROLE_CN.get(r, r),
+        "real_role": (user or {}).get("real_r") or r,
+        "debug": debug,
         "read": at_least(user, "viewer"),
-        "console": at_least(user, "editor"),      # 进后台（上传、挖掘、审校、上线）
-        "write": write,                           # 素材、挖掘、草稿、页面编辑
-        "publish": r == "owner",                  # 仅所有者上线
-        "sysadmin": sysadmin,                     # 用户与提示词（含 owner）
-        "raw_view": sysadmin,                     # 来源原文全文（与安全说明一致）
+        "console": at_least(user, "editor"),
+        "write": write,
+        "publish": can_publish,
+        "edm": is_owner,
+        "sysadmin": is_owner,
+        "raw_view": at_least(user, "admin"),
         "delete_draft": write,
-        "delete_published": r == "owner",
+        "delete_published": is_owner,
     }
 
 
@@ -65,8 +78,26 @@ def can_delete_issue(user, status: str) -> bool:
     return at_least(user, "editor")
 
 
-def make_session(user: dict) -> str:
-    return _ser.dumps({"u": user["username"], "r": user["role"], "t": user.get("team"), "d": user.get("display"), "a": user.get("avatar_url"), "ts": int(time.time())})
+def is_debug_user(display: str = "", username: str = "") -> bool:
+    """调试模式白名单（默认杜锦涛；可用 MESH_DEBUG_USERS 追加）。"""
+    names = _csv_set("MESH_DEBUG_USERS") or {"杜锦涛"}
+    blob = f"{display or ''}{username or ''}"
+    return any(n and n in blob for n in names)
+
+
+def make_session(user: dict, debug_role: str = "") -> str:
+    payload = {
+        "u": user["username"],
+        "r": user["role"],
+        "t": user.get("team"),
+        "d": user.get("display"),
+        "a": user.get("avatar_url"),
+        "ts": int(time.time()),
+    }
+    dr = (debug_role or "").strip()
+    if dr and dr in ROLE_RANK:
+        payload["dr"] = dr
+    return _ser.dumps(payload)
 
 def read_session(request: Request):
     tok = request.cookies.get(COOKIE)
@@ -103,11 +134,19 @@ def current_user(request: Request):
         return None
     if not row:
         return None
+    display = row["display"] or s.get("d") or ""
+    real_role = row["role"]
+    effective = real_role
+    dr = (s.get("dr") or "").strip()
+    if dr and dr in ROLE_RANK and is_debug_user(display, row["username"]):
+        effective = dr
     return {
         "u": row["username"],
-        "r": row["role"],
+        "r": effective,
+        "real_r": real_role,
+        "debug_r": dr or None,
         "t": row["team"],
-        "d": row["display"] or s.get("d"),
+        "d": display,
         "a": (row["avatar_url"] if "avatar_url" in row.keys() else None) or s.get("a"),
         "ts": s.get("ts"),
     }
@@ -134,15 +173,16 @@ def ask_user(con, session: dict | None) -> dict | None:
         return None
     display = row["display"] or row["username"]
     team = row["team"] or ""
+    role = (session.get("r") if session else None) or row["role"]
     return {
         "id": row["id"],
         "username": row["username"],
         "display": display,
-        "role": row["role"],
+        "role": role,
         "team": team,
         "feishu_open_id": row["feishu_open_id"] or "",
         "u": row["username"],
-        "r": row["role"],
+        "r": role,
         "t": team,
         "d": display,
     }
@@ -257,9 +297,6 @@ def feishu_exchange(code: str) -> dict:
         "email": d.get("enterprise_email") or d.get("email") or "",
         "avatar_url": d.get("avatar_url") or d.get("avatar_thumb") or d.get("avatar_middle") or d.get("avatar_big") or ""
     }
-
-def _csv_set(env_key: str) -> set[str]:
-    return {x.strip() for x in os.environ.get(env_key, "").split(",") if x.strip()}
 
 def feishu_auto_role(info: dict) -> str | None:
     """仅按 open_id 自动授予角色（禁止靠显示名升权）。未命中返回 None。"""

@@ -133,9 +133,47 @@
       if(askAbort){try{askAbort.abort();}catch(_){ }}
       askAbort=new AbortController();
       const signal=askAbort.signal;
+      let askOnce=null;
       try{
       const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const modeLabel=m=>m==='structured'?'结构化交叉':(m==='hybrid'?'混合检索':'全文检索');
+      const modeLabel=m=>{
+        const s=String(m||'');
+        if(s.includes('structured')) return '结构化交叉';
+        if(s.includes('hybrid')||s.includes('analysis')) return '智能分析';
+        return '全文检索';
+      };
+      const THINK_HINTS=[
+        '正在理解问题',
+        '正在检索相关材料',
+        '正在梳理多源线索',
+        '正在对照核对',
+        '正在组织回答'
+      ];
+      const stageIndex=step=>{
+        if(step==='route'||step==='retrieve') return 1;
+        if(step==='group'||step==='source') return 2;
+        if(step==='cross') return 3;
+        if(step==='verify') return 4;
+        return 0;
+      };
+      const waitShell=()=>(
+        '<div class="ai-think" id="aiProgress">'
+        +'<div class="ai-think-row">'
+        +'<span class="ai-think-orb" aria-hidden="true"></span>'
+        +'<span class="ai-think-label" id="aiHint">'+THINK_HINTS[0]+'</span>'
+        +'<span class="ai-think-dots" aria-hidden="true"><i></i><i></i><i></i></span>'
+        +'</div>'
+        +'<div class="ai-skel" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>'
+        +'</div>'
+      );
+      const setAnalysisStage=idx=>{
+        if(idx<0) return;
+        const hint=document.getElementById('aiHint');
+        const lab=document.getElementById('aiLab');
+        const text=THINK_HINTS[Math.min(idx, THINK_HINTS.length-1)]||THINK_HINTS[0];
+        if(hint) hint.textContent=text;
+        if(lab) lab.textContent='AI 问答 · 思考中';
+      };
       const winLabel=(df,meta)=>{
         const dt=meta&&meta.date_to;
         const qmeta=meta&&meta.query;
@@ -152,10 +190,10 @@
         const ph=phase||(pending?'stream':'ready');
         const win=winLabel(meta&&meta.date_from, meta);
         const lab=ph==='wait'
-          ? 'AI 问答 · 检索中…'
+          ? 'AI 问答 · 思考中'
           : ('AI 问答 · '+modeLabel(mode)+' · 基于 '+(nCtx||0)+' 条记录'+win+(ph==='stream'?' · 生成中…':''));
         const body=ph==='wait'
-          ? '<div class="ai-skel" aria-hidden="true"><i></i><i></i><i></i></div>'
+          ? waitShell()
           : ('<div class="ai-body"><span id="aiCommitted" class="ai-committed"></span><span id="aiFresh" class="ai-fresh"></span>'+(ph==='stream'?'<span class="ai-caret" aria-hidden="true"></span>':'')+'</div>');
         const existing=out.querySelector('.ai-ans');
         // 同卡片内切阶段，避免二次弹入
@@ -163,13 +201,15 @@
           existing.className='ai-ans is-'+ph;
           const labNode=document.getElementById('aiLab');
           if(labNode) labNode.textContent=lab;
+          const prog=existing.querySelector('.ai-think')||existing.querySelector('.ai-progress');
           const skel=existing.querySelector('.ai-skel');
           const bod=existing.querySelector('.ai-body');
-          if(ph==='wait' && !skel){
+          if(ph==='wait' && !prog){
             if(bod) bod.remove();
             existing.insertAdjacentHTML('beforeend', body);
           } else if(ph!=='wait' && !bod){
-            if(skel) skel.remove();
+            if(prog) prog.remove();
+            else if(skel) skel.remove();
             existing.insertAdjacentHTML('beforeend', body);
           } else if(ph==='stream' && bod && !existing.querySelector('.ai-caret')){
             bod.insertAdjacentHTML('beforeend','<span class="ai-caret" aria-hidden="true"></span>');
@@ -240,11 +280,15 @@
           push(t){
             if(!t) return;
             // 首个 token：从骨架切到正文，保留当前 lab 文案
-            if(!chars.length && out.querySelector('.ai-skel')){
+            if(!chars.length && (out.querySelector('.ai-skel')||out.querySelector('.ai-think')||out.querySelector('.ai-progress'))){
               const prevLab=(document.getElementById('aiLab')||{}).textContent||'';
               paint('lexical', 0, true, 'stream');
               const lab2=document.getElementById('aiLab');
-              if(lab2) lab2.textContent=prevLab.includes('检索')?prevLab.replace(/检索中…?/,'生成中…'):(prevLab||lab2.textContent);
+              if(lab2){
+                if(/思考|分析|检索|梳理|核对|校验/.test(prevLab)) lab2.textContent='AI 问答 · 生成中…';
+                else if(prevLab.includes('检索')) lab2.textContent=prevLab.replace(/检索中…?/,'生成中…');
+                else lab2.textContent=prevLab||lab2.textContent;
+              }
             }
             chars=chars.concat(Array.from(t));
             kick();
@@ -258,7 +302,7 @@
           },
           snap(t){
             chars=Array.from(t||''); shown=chars.length; done=true;
-            if(out.querySelector('.ai-skel')) paint('lexical',0,false,'ready');
+            if(out.querySelector('.ai-skel')||out.querySelector('.ai-think')||out.querySelector('.ai-progress')) paint('lexical',0,false,'ready');
             const c=committedEl(), f=freshEl();
             if(c){ c.textContent=chars.join(''); }
             if(f) f.textContent='';
@@ -267,7 +311,7 @@
           }
         };
       };
-      const askOnce=async()=>{
+      askOnce=async()=>{
         const r=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(meshAskPayload(q)),signal});
         if(!r.ok) throw new Error('HTTP '+r.status);
         const j=await r.json();
@@ -306,7 +350,12 @@
             if(!line) continue;
             let ev; try{ev=JSON.parse(line.slice(6));}catch(_){continue;}
             if(ev.type==='status'){
-              if(labEl()) labEl().textContent='AI 问答 · '+(ev.message||'检索中')+'…';
+              if(labEl() && !document.getElementById('aiProgress'))
+                labEl().textContent='AI 分析 · '+(ev.message||'处理中')+'…';
+            } else if(ev.type==='step'){
+              const idx=stageIndex(ev.step||'');
+              if(idx>=0) setAnalysisStage(idx);
+              // timeout/error 仍推进骨架阶段，不向用户展示技术细节
             } else if(ev.type==='meta'){
               mode=ev.mode||mode; nCtx=ev.n_context||0;
               if('date_from' in ev) dateFrom=ev.date_from;
@@ -314,19 +363,26 @@
               if(ev.query) queryMeta=ev.query;
               if(ev.query && 'date_from' in ev.query && dateFrom===undefined) dateFrom=ev.query.date_from;
               if(ev.query && 'date_to' in ev.query && dateTo===undefined) dateTo=ev.query.date_to;
-              setLab(true);
+              if(!document.getElementById('aiProgress')) setLab(true);
+              else if(nCtx) setAnalysisStage(Math.max(stageIndex('retrieve'), 0));
             } else if(ev.type==='token'){
               const t=ev.text||'';
               answer+=t;
               smooth.push(t);
               setLab(true);
+            } else if(ev.type==='replace'){
+              if(ev.answer!=null){
+                answer=ev.answer;
+                smooth.snap(answer);
+                setLab(true);
+              }
             } else if(ev.type==='error'){
               streaming=false;
               streamFailed=true;
               smooth.snap(ev.message||'问答失败');
               if(labEl()) labEl().textContent='AI 问答 · 失败';
             } else if(ev.type==='done'){
-              if(ev.answer!=null && !answer) answer=ev.answer;
+              if(ev.answer!=null) answer=ev.answer;
               streaming=false;
               streamDone=true;
               smooth.finish(answer);
@@ -351,8 +407,10 @@
         }
       }catch(e){
         if(e&&e.name==='AbortError') return;
-        try{ await askOnce(); }
-        catch(e2){
+        try{
+          if(typeof askOnce==='function') await askOnce();
+          else throw e;
+        }catch(e2){
           if(e2&&e2.name==='AbortError') return;
           out.innerHTML='<div class="ai-ans is-ready">问答失败：'+esc(e2.message||e.message)+'</div>';
         }
@@ -429,6 +487,29 @@
     const LABELS=Object.keys(COLORS);
     let pickEl=null;
     function say(m,ms){if(!toast)return;toast.textContent=m;toast.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>toast.classList.remove('show'),ms||1800);}
+    const previewNote=document.getElementById('previewNote');
+    const qs=new URLSearchParams(location.search);
+    function setPreviewNote(on){
+      if(!previewNote)return;
+      previewNote.hidden=!on;
+    }
+    function stripEditParam(){
+      if(!CFG.isPreview)return;
+      const u=new URL(location.href);
+      if(u.searchParams.get('edit')!=='1')return;
+      u.searchParams.delete('edit');
+      u.searchParams.delete('sync');
+      history.replaceState(null,'',u.pathname+u.search);
+    }
+    function exitEdit(){
+      document.body.classList.remove('editor');
+      const btn=document.getElementById('editToggle');
+      btn&&btn.classList.remove('on');
+      closePick();
+      setPreviewNote(false);
+      stripEditParam();
+      say('已退出编辑模式');
+    }
     const puberr=new URLSearchParams(location.search).get('puberr');
     if(puberr) say(puberr, 8000);
     async function save(path,value,op){
@@ -567,7 +648,7 @@
             const sec=j.section||section;
             const path=sec+'.'+idx;
             const el=document.createElement('div');
-            el.className='card'+(card.weak?' weak':'');
+            el.className='card';
             el.dataset.path=path;
             if(sec==='contacts'){
               const groups=card.groups||[];
@@ -730,7 +811,19 @@
         say('已保存并写入版本记录');
       }
     });
-    document.addEventListener('keydown',e=>{if(e.key==='Escape'){closePick();const a=document.activeElement;if(a&&a.contentEditable==='true'){a.textContent=a.dataset.orig||a.textContent;a.blur();}}});
+    document.addEventListener('keydown',e=>{
+      if(e.key!=='Escape')return;
+      closePick();
+      const pub=document.getElementById('pubMask');
+      if(pub&&!pub.hidden&&pub.classList.contains('on'))return;
+      const a=document.activeElement;
+      if(a&&a.contentEditable==='true'){
+        a.textContent=a.dataset.orig||a.textContent;
+        a.blur();
+        return;
+      }
+      if(document.body.classList.contains('editor')) exitEdit();
+    });
     const btn=document.getElementById('editToggle');
     if(btn){btn.addEventListener('click',()=>{
       // 读者页不能直接改线上稿：跳进草稿预览，改完再上线
@@ -740,11 +833,12 @@
       }
       const on=document.body.classList.toggle('editor');
       btn.classList.toggle('on',on);
-      if(on){markEditable();say(CFG.canPublish?'编辑草稿中 · 改完点「重新上线」':'编辑草稿中 · 上线需所有者确认');}
-      else{closePick();say('已退出编辑模式');}
+      if(on){markEditable();setPreviewNote(CFG.isPreview);say(CFG.canPublish?'编辑草稿中 · 改完点「重新上线」':'编辑草稿中 · 上线需所有者确认');}
+      else exitEdit();
     });}
-    if(new URLSearchParams(location.search).get('edit')==='1'&&btn&&!document.body.classList.contains('editor')) btn.click();
-    const ex=document.getElementById('edExit');if(ex)ex.addEventListener('click',()=>{document.body.classList.remove('editor');btn&&btn.classList.remove('on');closePick();say('已退出编辑模式');});
+    if(qs.get('edit')==='1'&&btn&&!document.body.classList.contains('editor')) btn.click();
+    else if(CFG.isPreview&&qs.get('edit')!=='1') setPreviewNote(true);
+    const ex=document.getElementById('edExit');if(ex)ex.addEventListener('click',exitEdit);
     const es=document.getElementById('edSave');if(es)es.addEventListener('click',()=>say(CFG.canPublish?'已写入草稿；读者页要等「重新上线」后才更新':'已写入草稿；发布请所有者确认上线'));
 
     // 预览页直接发布（仅 owner）——居中弹窗

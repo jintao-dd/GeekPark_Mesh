@@ -282,11 +282,13 @@ def extract_items(
     for it in items:
         zone = int(it.get("zone", 4) or 4); level = str(it.get("level", "L1")).upper()
         blocked = 1 if (zone == 5 or level == "L3") else 0
+        llm_hint = sanitize_owner_team(it.get("owner_team"))
         out.append({"zone": zone, "level": level, "kind": it.get("kind", "fact"), "text": it.get("text", ""),
                     "entities": it.get("entities", []), "roles": it.get("roles", []), "signals": it.get("signals", []),
-                    "owner_team": sanitize_owner_team(it.get("owner_team")),
+                    "llm_owner_team_hint": llm_hint,
                     "source_label": it.get("source_label", ""), "pointer": it.get("pointer", ""), "blocked": blocked, "team": it.get("team") or team})
-    return out
+    from .zone_hard import apply_hard_blocks
+    return apply_hard_blocks(out)
 
 
 def extract_source(
@@ -299,14 +301,28 @@ def extract_source(
     period_end: str = "",
     period_label: str = "",
     channel: str = "manual",
+    skip_split: bool = False,
+    source_id: int | None = None,
 ) -> tuple[list[dict], dict | None]:
     """单个来源抽取：聚合包自动拆段并按段调用 extract_T*.md。
 
     返回 (items, split_meta)。split_meta 仅混合包有值，供 sources.meta 落库与 UI 展示。
+    上传已预拆（skip_split=True）时按单段抽取，避免二次拆分。
     """
     from .aggregator import should_split, split_bundle_ex
+    from .owner_guard import apply_item_owner_guards
 
-    if stype == "T13" or should_split(stype=stype, team=team, channel=channel, title=title, text=text):
+    def _stamp(items: list[dict]) -> list[dict]:
+        if source_id is None:
+            return items
+        for it in items:
+            it["source_id"] = source_id
+        return items
+
+    if (
+        not skip_split
+        and (stype == "T13" or should_split(stype=stype, team=team, channel=channel, title=title, text=text))
+    ):
         split = split_bundle_ex(text, source_title=title or "")
         if not split.segments:
             msg = "；".join(split.warnings) if split.warnings else "正文为空或无可抽取段落"
@@ -322,14 +338,33 @@ def extract_source(
             )
             for it in items:
                 it["item_stype"] = seg.stype
+                it["_segment_team"] = seg.owner_hint or seg.team
                 out.append(it)
-        return out, split.to_meta()
+        return apply_item_owner_guards(_stamp(out)), split.to_meta()
     items = extract_items(
         stype, team, title, text,
         period_start=period_start, period_end=period_end,
         period_label=period_label, channel=channel,
     )
-    return items, None
+    if skip_split:
+        for it in items:
+            it["_segment_team"] = team
+        return apply_item_owner_guards(_stamp(items)), None
+    # 非拆段路径也跑归属守卫，避免同 pointer 冲突双挂
+    return apply_item_owner_guards(_stamp(items)), None
+
+
+def split_needs_review(split_meta: dict | None) -> bool:
+    """拆段置信度低时要求人工确认归属后再上线。"""
+    if not split_meta:
+        return False
+    mode = split_meta.get("mode") or ""
+    if mode in ("fallback", "empty"):
+        return True
+    if mode == "single" and int(split_meta.get("boundaries") or 0) <= 1:
+        # 长文仅 1 段且几乎无边界
+        return bool(split_meta.get("warnings"))
+    return False
 
 # ---------- 2. 团队要点卡 ----------
 def build_team_card(team: str, items: list[dict], period: str) -> dict:
@@ -342,14 +377,36 @@ def build_team_card(team: str, items: list[dict], period: str) -> dict:
     return call_json_compliant(system, user, max_tokens=4000)
 
 # ---------- 3. 周报草稿 ----------
-def build_issue_draft(period: dict, approved_items: list[dict], first_names: list[str], external_items: list[dict], prev_issue_summary: str) -> dict:
-    system = load_prompt("00_base_rules") + "\n\n" + load_prompt("issue_draft") + "\n\n" + load_prompt("91_output_issue")
-    user = (f"期号：{period['slug']}；区间：{period['date_start']} 至 {period['date_end']}；显示：{period['period_label']}\n"
-            f"归档比对得出的『本期首次进入记录的公司/人/话题』候选：{json.dumps(first_names, ensure_ascii=False)}\n"
-            f"上一期摘要（避免重复、便于比较）：{prev_issue_summary[:3000]}\n\n"
-            f"【有效内部条目】\n{json.dumps(approved_items, ensure_ascii=False)[:budget(40000)]}\n\n"
-            f"【外部媒体条目（只用于生成'外部在热聊，我们还没碰'）】\n{json.dumps(external_items, ensure_ascii=False)[:20000]}\n\n"
-            "请输出完整周报 JSON。全篇任何字段都不得出现全局禁用词；关键词墙 rows 也必须换说法，禁止照抄条目原话。")
+def build_issue_draft(
+    period: dict,
+    team_cards: list[dict],
+    relation_candidates: list[dict],
+    first_names: list[str],
+    external_items: list[dict],
+    prev_issue_summary: str,
+) -> dict:
+    system = (
+        load_prompt("00_base_rules")
+        + "\n\n"
+        + load_prompt("issue_draft")
+        + "\n\n"
+        + load_prompt("issue_draft_candidates")
+        + "\n\n"
+        + load_prompt("91_output_issue")
+    )
+    user = (
+        f"期号：{period['slug']}；区间：{period['date_start']} 至 {period['date_end']}；"
+        f"显示：{period['period_label']}\n"
+        f"归档比对得出的『本期首次进入记录的公司/人/话题』候选："
+        f"{json.dumps(first_names, ensure_ascii=False)}\n"
+        f"上一期摘要（避免重复、便于比较）：{prev_issue_summary[:3000]}\n\n"
+        f"【各团队要点卡 team_cards】\n{json.dumps(team_cards, ensure_ascii=False)[:budget(35000)]}\n\n"
+        f"【跨团队关系候选 relation_candidates（relations 节只能用这些）】\n"
+        f"{json.dumps(relation_candidates, ensure_ascii=False)[:budget(20000)]}\n\n"
+        f"【外部媒体条目（只用于「外部在热聊，我们还没碰」）】\n"
+        f"{json.dumps(external_items, ensure_ascii=False)[:15000]}\n\n"
+        "请输出完整周报 JSON。全篇任何字段都不得出现全局禁用词；关键词墙 rows 也必须换说法，禁止照抄条目原话。"
+    )
     return call_json_compliant(system, user, max_tokens=16000)
 
 # ---------- 4. AI 问答 ----------

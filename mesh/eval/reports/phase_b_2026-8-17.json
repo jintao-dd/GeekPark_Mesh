@@ -1,0 +1,157 @@
+{
+  "generated_at": "2026-09-01T06:00:16.193425+00:00",
+  "phase": "B",
+  "slug": "2026-8-17",
+  "issue_id": 6,
+  "status": "published",
+  "draft_published_synced": true,
+  "published": {
+    "kpi_relations": 9,
+    "card_count": 9,
+    "kpi_matches_cards": true,
+    "integrity": {
+      "n_relations": 9,
+      "n_weak": 1,
+      "n_needs_review": 8,
+      "n_strong": 8,
+      "strong_no_evidence": 0,
+      "team_mismatch": 1,
+      "orphan_sources": 1,
+      "duplicate_titles": 0,
+      "blocked_leaks": 0,
+      "bad_cards": 1
+    },
+    "samples": [
+      {
+        "title": "具身智能 · 世界机器人大会",
+        "label": "同一件事，两个部门各知一半",
+        "weak": false,
+        "needs_review": false,
+        "teams": [
+          "社群",
+          "编辑部",
+          "视频号团队"
+        ],
+        "n_evidence": 7,
+        "body_preview": "世界机器人大会与具身智能赛道走向，社群、编辑部、视频号三边各有记录可对照。"
+      },
+      {
+        "title": "千问 · 智能体身份管理体系",
+        "label": "采访对象也是客户",
+        "weak": false,
+        "needs_review": true,
+        "teams": [
+          "商业化团队",
+          "编辑部"
+        ],
+        "n_evidence": 3,
+        "body_preview": "阿里云千问的产品更新由商业化团队签约推进，编辑部同期就智能体下线与合规动态与千问公关交流。"
+      },
+      {
+        "title": "Agent 壁垒 · Evolvent AI",
+        "label": "两个部门各有判断",
+        "weak": false,
+        "needs_review": true,
+        "teams": [
+          "商业化团队",
+          "社群"
+        ],
+        "n_evidence": 2,
+        "body_preview": "Agent 竞争壁垒在上下文积累，商业化团队与社群各自记录了相关判断。"
+      },
+      {
+        "title": "刘靖康 · Insta360 影石",
+        "label": "采访对象也是客户",
+        "weak": false,
+        "needs_review": true,
+        "teams": [
+          "编辑部",
+          "视频号团队"
+        ],
+        "n_evidence": 3,
+        "body_preview": "影石创始人刘靖康在 AGI Playground 与张鹏对谈的内容既进英文站与视频号，也在编辑部建联记录中。"
+      },
+      {
+        "title": "张鹏 · AGI Playground Singapore",
+        "label": "同一公司，不同触点",
+        "weak": false,
+        "needs_review": true,
+        "teams": [
+          "编辑部",
+          "视频号团队"
+        ],
+        "n_evidence": 4,
+        "body_preview": "AGI Playground 现场访谈由英文站成稿，同一批现场素材也在视频号转成视频稿。"
+      },
+      {
+        "title": "MiniMax · AGI Playground 2026",
+        "label": "同一件事，两个部门各知一半",
+        "weak": false,
+        "needs_review": true,
+        "teams": [
+          "编辑部",
+          "视频号团队"
+        ],
+        "n_evidence": 2,
+        "body_preview": "MiniMax 的 AGI Playground 分享由英文站成稿，其开源视频模型同期被视频号团队用于动画开场片探索。"
+      },
+      {
+        "title": "支付宝 · HarmonyOS 7",
+        "label": "一方报道了，另一方在接触",
+        "weak": false,
+        "needs_review": true,
+        "teams": [
+          "商业化团队",
+          "编辑部"
+        ],
+        "n_evidence": 2,
+        "body_preview": "编辑部报道了 HarmonyOS 7 深圳站及支付宝接入案例，商业化团队同期把支付宝 AI 布局列为可跟进方向。"
+      },
+      {
+        "title": "飞书 · WorkBuddy",
+        "label": "一方报道了，另一方在接触",
+        "weak": false,
+        "needs_review": true,
+        "teams": [
+          "商业化团队",
+          "编辑部"
+        ],
+        "n_evidence": 2,
+        "body_preview": "编辑部报道字节、腾讯、阿里办公 Agent 格局提到 WorkBuddy，商业化团队同期在接触飞书合作。"
+      }
+    ]
+  },
+  "draft": {
+    "kpi_relations": 9,
+    "card_count": 9,
+    "kpi_matches_cards": true
+  },
+  "publish_blockers": [
+    "还有关系叙事待核对：千问 · 智能体身份管理体系、Agent 壁垒 · Evolvent AI、刘靖康 · Insta360 影石 等 8 条（请在控制台确认或删改）",
+    "keywords 已删减 12 处 unsupported 行",
+    "plans 已删减 7 处 unsupported 行",
+    "contacts 已删减 7 处 unsupported 行"
+  ],
+  "n_candidates": 19,
+  "likely_llm_skipped_candidates": [
+    "Founder Park · AGI 2026",
+    "AI硬件 · OpenAI",
+    "视频号 · 小红书",
+    "小红书 · AGI 2026",
+    "豆包 · 字节跳动",
+    "字节跳动 · 豆包",
+    "OpenAI · Chrome",
+    "宇树 · 物理AI机器人自进化1.0",
+    "美团 · 抖音生活服务",
+    "英特尔 · Mercury Research",
+    "阿里巴巴 · 蔡崇信"
+  ],
+  "label_distribution": {
+    "同一件事，两个部门各知一半": 2,
+    "采访对象也是客户": 2,
+    "两个部门各有判断": 1,
+    "同一公司，不同触点": 1,
+    "一方报道了，另一方在接触": 2,
+    "海外接触，国内可能承接": 1
+  }
+}

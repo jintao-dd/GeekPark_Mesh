@@ -12,31 +12,25 @@ from dotenv import load_dotenv
 BASE = Path(__file__).resolve().parent
 load_dotenv(BASE.parent / ".env")
 from . import db, ingest, llm, auth, edm, edm_job, merge, pipeline, preview_job, qa_structured, search, tokenize
-from . import ask_engine, ask_scope, conversation, presets, chunk_index, embeddings, retriever, ask_turn, ask_query, ask_concurrency
+from . import ask_engine, ask_scope, conversation, presets, chunk_index, embeddings, retriever, ask_turn, ask_query, ask_concurrency, ask_rate, job_store, ask_analysis
 import time
 
 _ASK_CACHE: dict[str, tuple[float, dict]] = {}
 _ASK_CACHE_LOCK = threading.Lock()
 _ASK_CACHE_TTL = int(os.environ.get("MESH_ASK_CACHE_TTL", "120") or "120")
 _ASK_CACHE_MAX = 256
-_ASK_RATE: dict[str, list[float]] = {}
-_ASK_RATE_LOCK = threading.Lock()
-_ASK_RATE_MAX = int(os.environ.get("MESH_ASK_RATE_PER_MIN", "40") or "40")
+_UVICORN_WORKERS = max(1, int(os.environ.get("MESH_UVICORN_WORKERS", "1") or "1"))
+if _UVICORN_WORKERS > 1 and _ASK_CACHE_TTL > 0:
+    print(
+        f"[mesh] MESH_UVICORN_WORKERS={_UVICORN_WORKERS}: 进程内 Ask 缓存已关闭（多 worker 不一致）",
+        flush=True,
+    )
+    _ASK_CACHE_TTL = 0
 
 
 def _ask_rate_ok(key: str) -> bool:
-    """简易 per-user/IP 速率限制。"""
-    if _ASK_RATE_MAX <= 0:
-        return True
-    now = time.time()
-    with _ASK_RATE_LOCK:
-        hits = [t for t in _ASK_RATE.get(key, []) if now - t < 60]
-        if len(hits) >= _ASK_RATE_MAX:
-            _ASK_RATE[key] = hits
-            return False
-        hits.append(now)
-        _ASK_RATE[key] = hits[-(_ASK_RATE_MAX * 2):]
-    return True
+    """跨 worker 的 per-user/IP 速率限制（落库）。"""
+    return ask_rate.allow(key)
 
 app = FastAPI(title="GeekPark Mesh")
 app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
@@ -183,97 +177,116 @@ def _startup():
 
     def _bg_maintenance():
         con = db.connect()
+        lock_held = False
         try:
-            if not db.try_maintenance_lock(con):
+            lock_held = db.try_maintenance_lock(con)
+            if not lock_held:
                 print("[mesh] maintenance skipped (another worker holds lock)", flush=True)
                 return
+
+            def _cache_bust():
+                with _ASK_CACHE_LOCK:
+                    _ASK_CACHE.clear()
+
+            n_pub = n_if = n_chunk = n_emb = 0
             with db.write_lock():
-                    n_facts = con.execute("SELECT COUNT(*) c FROM entity_team_facts").fetchone()["c"]
-                    n_pub = con.execute("SELECT COUNT(*) c FROM issues WHERE status='published'").fetchone()["c"]
-                    fact_slugs = con.execute("SELECT COUNT(DISTINCT issue_slug) c FROM entity_team_facts").fetchone()["c"]
-                    if n_pub and (not n_facts or fact_slugs < n_pub):
-                        print("[mesh] backfilling entity_team_facts…", flush=True)
-                        db.reindex_all_entity_facts(con)
-                        con.commit()
-                        _ASK_CACHE.clear()
-                    try:
-                        n_if = con.execute("SELECT COUNT(*) c FROM item_facts").fetchone()["c"]
-                    except Exception:
-                        n_if = 0
-                    if n_pub and not n_if:
-                        print("[mesh] backfilling item_facts…", flush=True)
-                        from . import item_facts
-                        item_facts.reindex_all_item_facts(con)
-                        con.commit()
-                        _ASK_CACHE.clear()
-                    try:
-                        n_ie = con.execute("SELECT COUNT(*) c FROM item_entity_facts").fetchone()["c"]
-                    except Exception:
-                        n_ie = 0
-                    if n_pub and n_if and not n_ie:
-                        print("[mesh] backfilling item_entity_facts…", flush=True)
-                        from . import item_facts
-                        item_facts.reindex_all_item_facts(con)
-                        con.commit()
-                        _ASK_CACHE.clear()
-                    try:
-                        con.execute("UPDATE users SET role='editor' WHERE role='dept'")
-                        con.execute(
-                            "UPDATE cards SET status='approved', reviewer='mesh-migrate', "
-                            "reviewed_at=datetime('now') WHERE status IN ('pending','rejected')"
-                        )
-                        con.commit()
-                    except Exception:
-                        pass
-                    n_fts = con.execute("SELECT COUNT(*) c FROM search_fts").fetchone()["c"]
-                    n_iss = con.execute("SELECT COUNT(*) c FROM issues").fetchone()["c"]
-                    need = db.search_needs_reindex(con) or (n_iss and not n_fts)
-                    if need:
-                        print("[mesh] rebuilding search_fts…", flush=True)
-                        db.reindex_all_search(con)
-                        db.clear_search_reindex_flag(con)
-                        con.commit()
-                        _ASK_CACHE.clear()
-                        print("[mesh] search rebuild done", flush=True)
-                    try:
-                        n_chunk = con.execute("SELECT COUNT(*) c FROM chunk_index").fetchone()["c"]
-                    except Exception:
-                        n_chunk = 0
-                    if n_pub and n_if and not n_chunk:
-                        print("[mesh] backfilling chunk_index…", flush=True)
-                        chunk_index.rebuild_all(con)
-                        con.commit()
-                        n_chunk = con.execute("SELECT COUNT(*) c FROM chunk_index").fetchone()["c"]
-                        _ASK_CACHE.clear()
-                    try:
-                        n_emb = con.execute("SELECT COUNT(*) c FROM chunk_embeddings").fetchone()["c"]
-                    except Exception:
-                        n_emb = 0
-                    if n_pub and n_chunk and n_emb < n_chunk and embeddings.is_configured():
-                        print("[mesh] backfilling chunk embeddings…", flush=True)
-                        chunk_index.embed_all_missing(con)
-                        con.commit()
-                        _ASK_CACHE.clear()
-                    elif n_pub and n_chunk and n_emb < n_chunk:
-                        print(f"[mesh] warn: chunk_embeddings={n_emb}/{n_chunk} — configure MESH_EMBED_* for vector search", flush=True)
-                    try:
-                        presets.run_due_pushes(con)
-                        con.commit()
-                    except Exception:
-                        pass
-                    try:
-                        pruned = db.prune_old_logs(con)
-                        if any(pruned.values()):
-                            con.commit()
-                    except Exception:
-                        pass
+                n_facts = con.execute("SELECT COUNT(*) c FROM entity_team_facts").fetchone()["c"]
+                n_pub = con.execute("SELECT COUNT(*) c FROM issues WHERE status='published'").fetchone()["c"]
+                fact_slugs = con.execute("SELECT COUNT(DISTINCT issue_slug) c FROM entity_team_facts").fetchone()["c"]
+                if n_pub and (not n_facts or fact_slugs < n_pub):
+                    print("[mesh] backfilling entity_team_facts…", flush=True)
+                    db.reindex_all_entity_facts(con)
+                    db.commit_retry(con)
+                    _cache_bust()
+                try:
+                    n_if = con.execute("SELECT COUNT(*) c FROM item_facts").fetchone()["c"]
+                except Exception:
+                    n_if = 0
+                if n_pub and not n_if:
+                    print("[mesh] backfilling item_facts…", flush=True)
+                    from . import item_facts
+                    item_facts.reindex_all_item_facts(con)
+                    db.commit_retry(con)
+                    _cache_bust()
+                try:
+                    n_ie = con.execute("SELECT COUNT(*) c FROM item_entity_facts").fetchone()["c"]
+                except Exception:
+                    n_ie = 0
+                if n_pub and n_if and not n_ie:
+                    print("[mesh] backfilling item_entity_facts…", flush=True)
+                    from . import item_facts
+                    item_facts.reindex_all_item_facts(con)
+                    db.commit_retry(con)
+                    _cache_bust()
+                try:
+                    con.execute("UPDATE users SET role='editor' WHERE role='dept'")
+                    con.execute(
+                        "UPDATE cards SET status='approved', reviewer='mesh-migrate', "
+                        "reviewed_at=datetime('now') WHERE status IN ('pending','rejected')"
+                    )
+                    db.commit_retry(con)
+                except Exception:
+                    pass
+                n_fts = con.execute("SELECT COUNT(*) c FROM search_fts").fetchone()["c"]
+                n_iss = con.execute("SELECT COUNT(*) c FROM issues").fetchone()["c"]
+                need = db.search_needs_reindex(con) or (n_iss and not n_fts)
+                if need:
+                    print("[mesh] rebuilding search_fts…", flush=True)
+                    db.reindex_all_search(con)
+                    db.clear_search_reindex_flag(con)
+                    db.commit_retry(con)
+                    _cache_bust()
+                    print("[mesh] search rebuild done", flush=True)
+                try:
+                    n_chunk = con.execute("SELECT COUNT(*) c FROM chunk_index").fetchone()["c"]
+                except Exception:
+                    n_chunk = 0
+                if n_pub and n_if and (not n_chunk or n_chunk < n_if):
+                    print("[mesh] backfilling chunk_index…", flush=True)
+                    chunk_index.rebuild_all(con)
+                    db.commit_retry(con)
+                    n_chunk = con.execute("SELECT COUNT(*) c FROM chunk_index").fetchone()["c"]
+                    _cache_bust()
+                try:
+                    n_emb = con.execute("SELECT COUNT(*) c FROM chunk_embeddings").fetchone()["c"]
+                except Exception:
+                    n_emb = 0
+
+            # embedding 调外部 API，不占用 write_lock，避免阻塞 Ask 落库
+            if n_pub and n_chunk and n_emb < n_chunk and embeddings.is_configured():
+                print(f"[mesh] backfilling chunk embeddings ({n_emb}/{n_chunk})…", flush=True)
+                added = chunk_index.embed_all_missing(con)
+                with db.write_lock():
+                    db.commit_retry(con)
+                _cache_bust()
+                if added <= 0 and n_emb < n_chunk and embeddings.last_error():
+                    print(f"[mesh] embed backfill stalled: {embeddings.last_error()}", flush=True)
+            elif n_pub and n_chunk and n_emb < n_chunk:
+                print(
+                    f"[mesh] warn: chunk_embeddings={n_emb}/{n_chunk} — configure MESH_EMBED_* for vector search",
+                    flush=True,
+                )
+
+            with db.write_lock():
+                try:
+                    presets.run_due_pushes(con)
+                    db.commit_retry(con)
+                except Exception:
+                    pass
+                try:
+                    pruned = db.prune_old_logs(con)
+                    if any(pruned.values()):
+                        db.commit_retry(con)
+                except Exception:
+                    pass
         except Exception as e:
             print(f"[mesh] background maintenance failed: {e}", flush=True)
         finally:
-            try:
-                db.release_maintenance_lock(con)
-            except Exception:
-                pass
+            if lock_held:
+                try:
+                    db.release_maintenance_lock(con)
+                except Exception:
+                    pass
             con.close()
 
     import threading
@@ -286,13 +299,18 @@ def healthz():
     info = {
         "ok": True,
         "schema_version": db.SCHEMA_VERSION,
-        "vector_enabled": embeddings.is_configured(),
+        "vector_enabled": embeddings.enabled(),
+        "embeddings_configured": embeddings.is_configured(),
         "db_team_alias_map": hasattr(db, "team_alias_map") or hasattr(db, "_team_alias_map"),
         "db_normalize_team": hasattr(db, "normalize_team"),
         "qa_structured": hasattr(qa_structured, "parse_intent"),
         "search_fts": hasattr(search, "fts_search"),
         "tokenize": hasattr(tokenize, "build_match_query"),
         "ask_stream_llm": hasattr(llm, "answer_question_stream"),
+        "job_store": True,
+        "zone_hard": True,
+        "job_inline": os.environ.get("MESH_JOB_INLINE", "1"),
+        "ask_analysis": ask_analysis.analysis_enabled(),
     }
     try:
         con = db.connect()
@@ -333,9 +351,16 @@ def healthz():
             info["item_facts_rows"] = -1
         ci = info.get("chunk_index_rows") or 0
         ce = info.get("chunk_embeddings") or 0
-        if ci > 0 and ce < ci and not embeddings.is_configured():
+        if ci > 0 and ce < ci:
             info["embeddings_degraded"] = True
-            info["embeddings_hint"] = "configure MESH_EMBED_API_KEY / MESH_EMBED_BASE_URL / MESH_EMBED_MODEL"
+            info["embeddings_ratio"] = round(ce / ci, 3) if ci else 0
+            if embeddings.is_configured():
+                info["embeddings_hint"] = f"partial backfill {ce}/{ci}"
+                err = embeddings.last_error()
+                if err:
+                    info["embeddings_last_error"] = err[:200]
+            else:
+                info["embeddings_hint"] = "configure MESH_EMBED_API_KEY / MESH_EMBED_BASE_URL / MESH_EMBED_MODEL"
         try:
             info["search_fts_rows"] = con.execute(
                 "SELECT COUNT(*) c FROM search_fts"
@@ -454,6 +479,45 @@ def publish_blockers(con, issue_id: int, draft_json: str) -> list[str]:
         errs.append(f"还有 {n_bad} 条条目归属无效（不能为「内容中心·数据聚合」或「其他」）")
     if not db.draft_is_ready(draft_json):
         errs.append("请先重新生成周报草稿（挖掘或卡片变更后旧草稿已失效）")
+    # 拆段低置信：须人工确认来源归属
+    try:
+        n_review = 0
+        for row in con.execute("SELECT meta FROM sources WHERE issue_id=?", (issue_id,)):
+            try:
+                m = json.loads(row["meta"] or "{}")
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if (m.get("split") or {}).get("needs_review"):
+                n_review += 1
+        if n_review:
+            errs.append(
+                f"有 {n_review} 个来源拆段置信度低，请到来源页点「确认拆段归属」或拆成单部门文件重传"
+            )
+    except Exception:
+        pass
+    try:
+        from . import relation_gate
+        items = relation_gate.items_for_issue(con, issue_id)
+        weak_errs = relation_gate.issue_publish_blockers(draft_json, items)
+        errs.extend(weak_errs)
+        from .attribution_verify import attribution_publish_blockers
+        attr_errs = attribution_publish_blockers(con, issue_id, draft_json)
+        errs.extend(attr_errs)
+        # 附带弱关系标题，方便控制台展示
+        draft_obj = {}
+        try:
+            draft_obj = json.loads(draft_json) if draft_json else {}
+        except (json.JSONDecodeError, TypeError):
+            draft_obj = {}
+        review_titles = [
+            (r.get("title") or "（无标题）")
+            for r in (draft_obj.get("relations") or [])
+            if isinstance(r, dict) and r.get("needs_review")
+        ]
+        if review_titles and not any("叙事待核对" in e for e in errs):
+            errs.append("关系叙事待核对：" + "、".join(review_titles[:5]))
+    except Exception as e:
+        errs.append(f"关系闸门检查失败：{e}")
     return errs
 
 # ---------------- 公开页 ----------------
@@ -466,14 +530,43 @@ def home(request: Request):
     return RedirectResponse(f"/{r['slug']}")
 
 @app.get("/login", response_class=HTMLResponse)
-def login_page(request: Request, next: str = "/"):
+def login_page(request: Request, next: str = "/", debug: int = 0):
     target = auth.normalize_next(next)
     if auth.current_user(request):
         return RedirectResponse(target, status_code=302)
-    return templates.TemplateResponse("login.html", ctx(request, next=target, error=None))
+    preset = (request.cookies.get(auth.DEBUG_PRESET_COOKIE) or "").strip()
+    if preset not in auth.ROLE_RANK:
+        preset = ""
+    return templates.TemplateResponse(
+        "login.html",
+        ctx(request, next=target, error=None, debug_panel=bool(debug), debug_preset=preset),
+    )
+
+@app.post("/login/debug-preset")
+async def login_debug_preset(request: Request):
+    """登录前预选调试视角（飞书 callback 时写入 session，仅对白名单用户生效）。"""
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    role = (payload.get("role") or "").strip()
+    if role and role not in auth.ROLE_RANK:
+        raise HTTPException(400, "未知角色")
+    resp = JSONResponse({"ok": True, "role": role})
+    if role:
+        resp.set_cookie(
+            auth.DEBUG_PRESET_COOKIE, role, httponly=True, samesite="lax",
+            secure=_cookie_secure(request), max_age=3600,
+        )
+    else:
+        resp.delete_cookie(auth.DEBUG_PRESET_COOKIE, path="/", samesite="lax", secure=_cookie_secure(request))
+    return resp
 
 @app.post("/login")
 def login_post(request: Request, username: str = Form(...), password: str = Form(...), next: str = Form("/")):
+    """密码登录已关闭；保留接口供紧急运维（需 MESH_ALLOW_PASSWORD_LOGIN=1）。"""
+    if os.environ.get("MESH_ALLOW_PASSWORD_LOGIN", "").strip() not in ("1", "true", "yes"):
+        raise HTTPException(403, "请使用飞书登录")
     target = auth.normalize_next(next)
     if auth.current_user(request):
         return RedirectResponse(target, status_code=302)
@@ -488,6 +581,7 @@ def login_post(request: Request, username: str = Form(...), password: str = Form
 def logout(request: Request):
     resp = RedirectResponse("/login", status_code=302)
     resp.delete_cookie(auth.COOKIE, path="/", samesite="lax", secure=_cookie_secure(request))
+    resp.delete_cookie(auth.DEBUG_PRESET_COOKIE, path="/", samesite="lax", secure=_cookie_secure(request))
     return resp
 
 @app.get("/auth/feishu")
@@ -504,13 +598,60 @@ def feishu_cb(request: Request, code: str = "", state: str = ""):
     try:
         target = auth.read_feishu_state(state)
         info = auth.feishu_exchange(code); u = auth.upsert_feishu_user(info); u["avatar_url"] = info.get("avatar_url", "")
+        preset = (request.cookies.get(auth.DEBUG_PRESET_COOKIE) or "").strip()
+        debug_role = preset if auth.is_debug_user(u.get("display") or info.get("name") or "", u.get("username") or "") else ""
     except auth.FeishuLoginError as e:
         return templates.TemplateResponse("login.html", ctx(request, next=target, error=e.user_message))
     except Exception:
         return templates.TemplateResponse("login.html", ctx(request, next=target, error="飞书登录暂时不可用，请稍后重试。"))
     resp = RedirectResponse(target, status_code=302)
-    resp.set_cookie(auth.COOKIE, auth.make_session(u), httponly=True, samesite="lax",
+    resp.set_cookie(auth.COOKIE, auth.make_session(u, debug_role=debug_role), httponly=True, samesite="lax",
                     secure=_cookie_secure(request), max_age=auth.SESSION_MAX_AGE)
+    resp.delete_cookie(auth.DEBUG_PRESET_COOKIE, path="/", samesite="lax", secure=_cookie_secure(request))
+    return resp
+
+@app.post("/api/debug/role")
+async def api_debug_role(request: Request):
+    """调试：切换当前会话视角（仅白名单用户）。"""
+    u = auth.current_user(request)
+    if not u:
+        raise HTTPException(401, "未登录")
+    if not auth.is_debug_user(u.get("d") or "", u.get("u") or ""):
+        raise HTTPException(403, "无调试权限")
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    role = (payload.get("role") or "").strip()
+    if role and role not in auth.ROLE_RANK:
+        raise HTTPException(400, "未知角色")
+    con = db.connect()
+    row = con.execute(
+        "SELECT username, role, team, display, avatar_url FROM users WHERE username=?",
+        (u.get("u"),),
+    ).fetchone()
+    con.close()
+    if not row:
+        raise HTTPException(404, "用户不存在")
+    real = dict(row)
+    resp = JSONResponse({
+        "ok": True,
+        "role": role or real["role"],
+        "real_role": real["role"],
+        "debug": bool(role),
+    })
+    resp.set_cookie(
+        auth.COOKIE,
+        auth.make_session({
+            "username": real["username"],
+            "role": real["role"],
+            "team": real["team"],
+            "display": real["display"],
+            "avatar_url": real.get("avatar_url") or u.get("a"),
+        }, debug_role=role),
+        httponly=True, samesite="lax",
+        secure=_cookie_secure(request), max_age=auth.SESSION_MAX_AGE,
+    )
     return resp
 
 @app.get("/archive", response_class=HTMLResponse)
@@ -519,7 +660,7 @@ def archive(request: Request):
     con = db.connect()
     rows = con.execute("SELECT slug, period_label, date_start, date_end, published_at FROM issues WHERE status='published' ORDER BY date_end DESC").fetchall()
     con.close()
-    return templates.TemplateResponse("archive.html", ctx(request, issues=[dict(r) for r in rows]))
+    return templates.TemplateResponse("archive.html", ctx(request, issues=[_enrich_issue(r) for r in rows]))
 
 @app.get("/api/search")
 def api_search(request: Request, q: str = "", slug: str = ""):
@@ -568,21 +709,50 @@ def _run_ask(request: Request, payload: dict):
         )
         if turn.get("cached"):
             return turn["resp"]
-        prepared = turn["prepared"]
         sess = turn["sess"]
         history = turn["history"]
         cache_key = turn["cache_key"]
         use_cache = turn["use_cache"]
+        context_route = turn.get("context_route") or {}
+    finally:
+        con.close()
+
+    con = db.connect()
+    try:
+        prepared = ask_turn.prepare_turn(con, q, scope, history, context_route=context_route)
+        prepared["context_route"] = context_route
     finally:
         con.close()
 
     try:
         if prepared.get("direct_answer") is not None:
             ans = prepared["direct_answer"]
+        elif ask_analysis.analysis_enabled(payload):
+            ans, steps, meta = ask_analysis.run_analysis_collect(
+                q, prepared, history,
+                persist={"session_id": sess["id"], "user_id": user.get("id")},
+            )
+            prepared = dict(prepared)
+            prepared["analysis_steps"] = [
+                {k: v for k, v in s.items() if k != "type"} for s in steps
+            ]
+            prepared["mode"] = (prepared.get("mode") or "lexical") + "+analysis"
+            prepared["report_id"] = meta.get("report_id")
+            prepared["analysis_id"] = meta.get("analysis_id") or meta.get("report_id")
+            prepared["usage"] = meta.get("usage")
+            prepared["verify"] = meta.get("verify")
+            prepared["context_refs"] = meta.get("context_refs")
+            prepared["sources"] = meta.get("sources")
+            prepared["cross"] = meta.get("cross")
         else:
             with ask_concurrency.llm_slot():
                 ans = ask_turn.generate_answer(q, prepared, history)
     except ask_concurrency.AskBusyError as e:
+        return {k: v for k, v in prepared.items() if k not in ("contexts", "direct_answer", "preview")} | {
+            "answer": str(e),
+            "session_id": sess["id"],
+        }
+    except ask_concurrency.JobBusyError as e:
         return {k: v for k, v in prepared.items() if k not in ("contexts", "direct_answer", "preview")} | {
             "answer": str(e),
             "session_id": sess["id"],
@@ -616,6 +786,21 @@ def api_ask_new_session(request: Request):
     auth.require(request, "viewer")
     import secrets
     return {"session_id": secrets.token_hex(8)}
+
+
+@app.get("/api/ask/analysis/{analysis_id}")
+def api_ask_analysis_get(request: Request, analysis_id: str):
+    """按 analysis_id 读取已持久化的分析结果（SSE 断线后可回放）。"""
+    auth.require(request, "viewer")
+    from . import ask_store
+    con = db.connect()
+    try:
+        row = ask_store.get(con, analysis_id)
+    finally:
+        con.close()
+    if not row:
+        raise HTTPException(404, "分析不存在")
+    return row
 
 
 @app.get("/api/ask/sessions")
@@ -696,6 +881,9 @@ def _can_run_preset(user: dict, pd: dict) -> bool:
 @app.post("/api/ask/presets/{preset_id}/run")
 def api_ask_preset_run(request: Request, preset_id: int):
     cookie = auth.require(request, "viewer")
+    rate_key = cookie.get("u") or (request.client.host if request.client else "anon")
+    if not _ask_rate_ok(rate_key):
+        raise HTTPException(429, "请求过于频繁，请稍后再试")
     con = db.connect()
     user = auth.ask_user(con, cookie)
     if not user:
@@ -716,15 +904,26 @@ def api_ask_preset_run(request: Request, preset_id: int):
         "team": pd.get("team_scope") or user.get("team") or "",
     })
     sess = conversation.ensure_session(con, scope, user)
-    history = conversation.recent_messages(con, sess["id"], limit=4)
-    try:
-        ans = llm.answer_question(q, prepared["contexts"], mode=prepared["mode"], history=history)
-    except Exception:
-        con.close()
-        return {"answer": "AI 问答暂不可用", "question": q}
-    conversation.append_turn(con, sess["id"], user_text=q, assistant_text=ans, mode=prepared.get("mode", ""))
-    con.commit()
+    with db.write_lock():
+        db.commit_retry(con)
     con.close()
+    try:
+        with ask_concurrency.llm_slot():
+            # 预设问答：禁止会话 Answer 作为成文上下文
+            ans = llm.answer_question(q, prepared["contexts"], mode=prepared["mode"], history=None)
+    except ask_concurrency.AskBusyError as e:
+        return {"answer": str(e), "question": q}
+    except Exception:
+        return {"answer": "AI 问答暂不可用", "question": q}
+    con = db.connect()
+    try:
+        conversation.append_turn(
+            con, sess["id"], user_text=q, assistant_text=ans, mode=prepared.get("mode", ""),
+        )
+        with db.write_lock():
+            db.commit_retry(con)
+    finally:
+        con.close()
     return {"question": q, "answer": ans, "mode": prepared.get("mode"), "n_context": prepared.get("n_context", 0)}
 
 
@@ -814,11 +1013,21 @@ def api_ask_stream(request: Request, payload: dict):
                 yield sse({"type": "done", "answer": ans})
                 return
 
-            prepared = turn["prepared"]
             sess = turn["sess"]
             history = turn["history"]
             cache_key = turn["cache_key"]
             use_cache = turn["use_cache"]
+            context_route = turn.get("context_route") or {}
+        except Exception as e:
+            yield sse({"type": "error", "message": str(e)})
+            return
+        finally:
+            con.close()
+
+        con = db.connect()
+        try:
+            prepared = ask_turn.prepare_turn(con, q, scope, history, context_route=context_route)
+            prepared["context_route"] = context_route
         except Exception as e:
             yield sse({"type": "error", "message": str(e)})
             return
@@ -828,41 +1037,101 @@ def api_ask_stream(request: Request, payload: dict):
         meta = {k: v for k, v in prepared.items() if k not in ("contexts", "direct_answer", "preview")}
         meta["type"] = "meta"
         meta["session_id"] = sess["id"]
+        if context_route:
+            meta["context_route"] = {
+                "kind": context_route.get("kind"),
+                "reason": context_route.get("reason"),
+                "parent_analysis_id": context_route.get("parent_analysis_id"),
+            }
         yield sse(meta)
 
         parts: list[str] = []
+        ans = ""
+        analysis_done = False
         try:
             if prepared.get("direct_answer") is not None:
                 ans = prepared["direct_answer"]
+                analysis_done = True
                 if ans:
                     parts.append(ans)
                     yield sse({"type": "token", "text": ans})
+            elif ask_analysis.analysis_enabled(payload):
+                yield sse({"type": "status", "message": "多源交叉分析中"})
+                ans, steps, meta = ask_analysis.run_analysis_collect(
+                    q, prepared, history=history,
+                    persist={"session_id": sess["id"], "user_id": user.get("id")},
+                )
+                analysis_done = True
+                for ev in steps:
+                    yield sse(ev)
+                if ans:
+                    chunk_n = 48
+                    for i in range(0, len(ans), chunk_n):
+                        piece = ans[i : i + chunk_n]
+                        parts.append(piece)
+                        yield sse({"type": "token", "text": piece})
+                prepared = dict(prepared)
+                prepared["_analysis_meta"] = {
+                    "report_id": meta.get("report_id"),
+                    "analysis_id": meta.get("analysis_id") or meta.get("report_id"),
+                    "usage": meta.get("usage"),
+                    "verify": meta.get("verify"),
+                    "sources": meta.get("sources"),
+                }
+                prepared["analysis_id"] = meta.get("analysis_id") or meta.get("report_id")
+                prepared["report_id"] = prepared["analysis_id"]
+                prepared["context_refs"] = meta.get("context_refs")
+                prepared["sources"] = meta.get("sources")
+                prepared["cross"] = meta.get("cross")
+                prepared["usage"] = meta.get("usage")
+                prepared["verify"] = meta.get("verify")
             else:
+                yield sse({"type": "status", "message": "生成并校验中"})
                 with ask_concurrency.llm_slot():
-                    for chunk in ask_turn.generate_answer_stream(q, prepared, history):
-                        if not chunk:
-                            continue
-                        parts.append(chunk)
-                        yield sse({"type": "token", "text": chunk})
+                    ans = ask_turn.generate_answer(q, prepared, history)
+                analysis_done = True
+                if ans:
+                    parts.append(ans)
+                    yield sse({"type": "token", "text": ans})
         except ask_concurrency.AskBusyError as e:
+            yield sse({"type": "error", "message": str(e)})
+            return
+        except ask_concurrency.JobBusyError as e:
             yield sse({"type": "error", "message": str(e)})
             return
         except Exception:
             yield sse({"type": "error", "message": "AI 问答暂不可用，请稍后重试。"})
             return
+        finally:
+            if analysis_done and sess and user and scope and prepared is not None:
+                ans_fin = "".join(parts) if parts else (prepared.get("direct_answer") or ans or "")
+                if ans_fin or prepared.get("analysis_id"):
+                    con_fin = db.connect()
+                    try:
+                        ask_turn.complete_turn(
+                            con_fin, user=user, scope=scope, q=q,
+                            sess=sess, prepared=prepared, ans=ans_fin,
+                            cache_key=cache_key, use_cache=use_cache,
+                            cache_put=_ask_cache_put,
+                        )
+                    except Exception:
+                        pass
+                    finally:
+                        con_fin.close()
 
         ans = "".join(parts) if parts else (prepared.get("direct_answer") or "")
-        con = db.connect()
-        try:
-            ask_turn.complete_turn(
-                con, user=user, scope=scope, q=q,
-                sess=sess, prepared=prepared, ans=ans,
-                cache_key=cache_key, use_cache=use_cache,
-                cache_put=_ask_cache_put,
-            )
-        finally:
-            con.close()
-        yield sse({"type": "done", "answer": ans})
+        done_ev: dict = {"type": "done", "answer": ans}
+        am = prepared.get("_analysis_meta") if isinstance(prepared, dict) else None
+        if isinstance(am, dict):
+            if am.get("report_id"):
+                done_ev["report_id"] = am["report_id"]
+            if am.get("analysis_id"):
+                done_ev["analysis_id"] = am["analysis_id"]
+            if am.get("usage") is not None:
+                done_ev["usage"] = am["usage"]
+            if am.get("verify") is not None:
+                done_ev["verify"] = am["verify"]
+        yield sse(done_ev)
 
     return StreamingResponse(
         gen(),
@@ -878,26 +1147,32 @@ def api_ask_stream(request: Request, payload: dict):
 @app.post("/admin/reindex_facts")
 def admin_reindex_facts(request: Request):
     """回填/重建全部已发布期的主体×团队事实表 + 搜索/chunk 索引。"""
-    auth.require(request, "editor")
+    auth.require(request, "owner")
     con = db.connect()
     n = db.reindex_all_entity_facts(con)
     db.reindex_all_search(con)
     c = con.execute("SELECT COUNT(*) c FROM entity_team_facts").fetchone()["c"]
     chunks = con.execute("SELECT COUNT(*) c FROM chunk_index").fetchone()["c"]
+    added_emb = 0
+    if embeddings.is_configured():
+        added_emb = chunk_index.embed_all_missing(con)
     try:
         embs = con.execute("SELECT COUNT(*) c FROM chunk_embeddings").fetchone()["c"]
     except Exception:
         embs = -1
     con.commit(); con.close()
     _ASK_CACHE.clear()
-    return {"ok": True, "issues": n, "facts": c, "chunks": chunks, "embeddings": embs,
-            "embed_configured": embeddings.is_configured()}
+    out = {"ok": True, "issues": n, "facts": c, "chunks": chunks, "embeddings": embs,
+            "embed_configured": embeddings.is_configured(), "embeddings_added": added_emb}
+    if added_emb <= 0 and embeddings.is_configured() and embeddings.last_error():
+        out["embeddings_warn"] = embeddings.last_error()
+    return out
 
 
 @app.post("/admin/reindex_search")
 def admin_reindex_search(request: Request):
     """全量重建 FTS（中文 toks）+ 事实表。"""
-    auth.require(request, "editor")
+    auth.require(request, "owner")
     con = db.connect()
     n = db.reindex_all_search(con)
     fts_n = con.execute("SELECT COUNT(*) c FROM search_fts").fetchone()["c"]
@@ -936,19 +1211,140 @@ def admin_reindex_published(request: Request, slug: str):
 
 @app.post("/admin/embed_backfill")
 def admin_embed_backfill(request: Request):
-    """回填 chunk 向量（需配置 MESH_EMBED_*）。"""
-    auth.require(request, "editor")
+    """异步回填 chunk 向量（状态见 /admin/embed_backfill/status）。"""
+    auth.require(request, "owner")
+    from . import embed_job
+
     if not embeddings.is_configured():
         raise HTTPException(400, "未配置 MESH_EMBED_API_KEY / MESH_EMBED_BASE_URL / MESH_EMBED_MODEL")
+    try:
+        st = embed_job.start(force=False)
+    except RuntimeError as e:
+        raise HTTPException(400, str(e)) from e
+    return {"ok": True, "async": True, **{k: st.get(k) for k in (
+        "running", "done", "message", "added", "error",
+    )}}
+
+
+@app.get("/admin/embed_backfill/status")
+def admin_embed_backfill_status(request: Request):
+    auth.require(request, "owner")
+    from . import embed_job
+
+    st = embed_job.get_state()
+    return {"ok": True, **{k: st.get(k) for k in (
+        "running", "done", "error", "message", "added",
+        "embeddings_before", "embeddings_after",
+    )}}
+
+
+@app.get("/admin/edm/{slug}/status")
+def admin_edm_job_status(request: Request, slug: str):
+    auth.require(request, "owner")
+    return {"ok": True, **edm_job.get_state(slug)}
+
+
+@app.post("/admin/source/{sid}/confirm_split")
+def source_confirm_split(request: Request, sid: int):
+    """核对拆段归属后清除 needs_review，允许上线。"""
+    auth.require(request, "editor")
     con = db.connect()
-    n_before = con.execute("SELECT COUNT(*) c FROM chunk_embeddings").fetchone()["c"]
-    chunk_index.embed_all_missing(con)
-    n_after = con.execute("SELECT COUNT(*) c FROM chunk_embeddings").fetchone()["c"]
+    s = con.execute("SELECT id, meta FROM sources WHERE id=?", (sid,)).fetchone()
+    if not s:
+        con.close()
+        raise HTTPException(404, "素材不存在")
+    try:
+        meta = json.loads(s["meta"] or "{}")
+    except (json.JSONDecodeError, TypeError):
+        meta = {}
+    sp = dict(meta.get("split") or {})
+    sp["needs_review"] = False
+    sp["reviewed_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    meta["split"] = sp
+    con.execute("UPDATE sources SET meta=? WHERE id=?", (json.dumps(meta, ensure_ascii=False), sid))
     con.commit()
     con.close()
-    _ASK_CACHE.clear()
-    return {"ok": True, "embeddings_before": n_before, "embeddings_after": n_after}
+    wants_json = "application/json" in (request.headers.get("accept") or "")
+    if wants_json:
+        return {"ok": True, "id": sid}
+    return RedirectResponse(f"/admin/source/{sid}", status_code=302)
 
+
+@app.get("/admin/issue/{slug}/weak_relations")
+def issue_weak_relations(request: Request, slug: str):
+    auth.require(request, "editor")
+    con = db.connect()
+    r = con.execute("SELECT id, draft_json FROM issues WHERE slug=?", (slug,)).fetchone()
+    if not r:
+        con.close()
+        raise HTTPException(404)
+    try:
+        draft = json.loads(r["draft_json"] or "{}")
+    except (json.JSONDecodeError, TypeError):
+        draft = {}
+    weak = []
+    for i, rel in enumerate(draft.get("relations") or []):
+        if isinstance(rel, dict) and rel.get("weak"):
+            weak.append({
+                "index": i,
+                "title": rel.get("title") or "",
+                "label": rel.get("label") or "",
+                "body": (rel.get("body") or "")[:200],
+                "teams": rel.get("teams") or [],
+            })
+    con.close()
+    return {"ok": True, "weak": weak}
+
+
+@app.post("/admin/issue/{slug}/weak_relations/resolve")
+def issue_weak_relations_resolve(request: Request, slug: str, payload: dict):
+    """action=confirm 取消 weak；action=delete 删除该关系卡。indexes: [int]。"""
+    u = auth.require(request, "editor")
+    action = (payload.get("action") or "").strip()
+    indexes = payload.get("indexes") or []
+    if action not in ("confirm", "delete") or not isinstance(indexes, list):
+        raise HTTPException(400, "需要 action=confirm|delete 与 indexes")
+    idxs = sorted({int(x) for x in indexes}, reverse=True)
+    con = db.connect()
+    r = con.execute("SELECT id, draft_json FROM issues WHERE slug=?", (slug,)).fetchone()
+    if not r:
+        con.close()
+        raise HTTPException(404)
+    try:
+        draft = json.loads(r["draft_json"] or "{}")
+    except (json.JSONDecodeError, TypeError):
+        raise HTTPException(400, "草稿 JSON 无效")
+    rels = list(draft.get("relations") or [])
+    changed = 0
+    for i in idxs:
+        if i < 0 or i >= len(rels):
+            continue
+        if action == "delete":
+            rels.pop(i)
+            changed += 1
+        elif isinstance(rels[i], dict) and (rels[i].get("needs_review") or rels[i].get("weak")):
+            rels[i] = dict(rels[i])
+            rels[i]["needs_review"] = False
+            if action == "confirm" and rels[i].get("weak"):
+                pass  # 虚线卡保留 weak，仅清除核对标记
+            rels[i]["status"] = "weak" if rels[i].get("weak") else "confirmed"
+            changed += 1
+    draft["relations"] = rels
+    from .issue_verify import sync_kpis_from_data
+    draft = sync_kpis_from_data(draft)
+    stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    payload = json.dumps(draft, ensure_ascii=False)
+    con.execute(
+        "UPDATE issues SET draft_json=?, published_json=?, updated_at=? WHERE id=?",
+        (payload, payload, stamp, r["id"]),
+    )
+    con.execute(
+        "INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)",
+        (r["id"], u.get("u") or "", "weak_relations", action, f"{changed} cards"),
+    )
+    con.commit()
+    con.close()
+    return {"ok": True, "changed": changed, "action": action}
 
 # ---------------- 后台 ----------------
 # ---------------- 后台：期管理 ----------------
@@ -962,35 +1358,47 @@ def _parse_iso_date(s: str | None) -> datetime.date | None:
         return None
 
 
+def format_display_date(d: datetime.date) -> str:
+    """读者页单日期：2026.8.27"""
+    return f"{d.year}.{d.month}.{d.day}"
+
+
+def issue_display_date(issue: dict) -> str:
+    """已上线用 published_at；草稿用 date_end（创建默认当天）。"""
+    if issue.get("published_at"):
+        d = _parse_iso_date(str(issue["published_at"])[:10])
+        if d:
+            return format_display_date(d)
+    d = _parse_iso_date(issue.get("date_end"))
+    if d:
+        return format_display_date(d)
+    return (issue.get("period_label") or issue.get("slug") or "").strip()
+
+
+def _enrich_issue(row) -> dict:
+    d = dict(row)
+    d["display_date"] = issue_display_date(d)
+    return d
+
+
 def _period_label(start: datetime.date, end: datetime.date) -> str:
-    """读者页大日期：同年第月日省略年，如 2026.8.15 - 8.21"""
-    if start.year == end.year:
-        return f"{start.year}.{start.month}.{start.day} - {end.month}.{end.day}"
-    return f"{start.year}.{start.month}.{start.day} - {end.year}.{end.month}.{end.day}"
+    """兼容旧调用：展示结束日单日期。"""
+    return format_display_date(end)
 
 
 def suggest_next_issue(con) -> dict:
-    """按最近一期推下一期默认区间（保持相近跨度；无历史则按本周一～日）。"""
+    """新建下一期：默认发布日期为今天，无需手填区间。"""
     row = con.execute(
-        "SELECT date_start, date_end, version FROM issues ORDER BY date_end DESC, id DESC LIMIT 1"
+        "SELECT version FROM issues ORDER BY date_end DESC, id DESC LIMIT 1"
     ).fetchone()
-    if row:
-        prev_end = _parse_iso_date(row["date_end"]) or datetime.date.today()
-        prev_start = _parse_iso_date(row["date_start"]) or (prev_end - datetime.timedelta(days=6))
-        span = max(1, (prev_end - prev_start).days)
-        start = prev_end + datetime.timedelta(days=1)
-        end = start + datetime.timedelta(days=span)
-        version = (row["version"] or "v1.4").strip() or "v1.4"
-    else:
-        today = datetime.date.today()
-        start = today - datetime.timedelta(days=today.weekday())
-        end = start + datetime.timedelta(days=6)
-        version = "v1.4"
+    version = ((row["version"] if row else None) or "v1.4").strip() or "v1.4"
+    today = datetime.date.today()
+    ds = today.isoformat()
     return {
-        "slug": end.isoformat(),
-        "date_start": start.isoformat(),
-        "date_end": end.isoformat(),
-        "period_label": _period_label(start, end),
+        "slug": ds,
+        "date_start": ds,
+        "date_end": ds,
+        "period_label": format_display_date(today),
         "version": version,
     }
 
@@ -1005,8 +1413,8 @@ def admin_home(request: Request):
 def admin_issue_list(request: Request, err: str = ""):
     u = auth.require(request, "editor")
     con = db.connect()
-    issues = [dict(r) for r in con.execute(
-        "SELECT id, slug, period_label, status, updated_at, published_at, draft_json FROM issues ORDER BY date_end DESC"
+    issues = [_enrich_issue(r) for r in con.execute(
+        "SELECT id, slug, period_label, status, updated_at, published_at, date_end, draft_json FROM issues ORDER BY date_end DESC"
     )]
     for i in issues:
         draft = i.pop("draft_json", None)
@@ -1026,23 +1434,27 @@ def admin_issue_list(request: Request, err: str = ""):
     )
 
 @app.post("/admin/issue/new")
-def issue_new(request: Request, slug: str = Form(...), date_start: str = Form(...), date_end: str = Form(...), period_label: str = Form(...), version: str = Form("v1.4")):
+def issue_new(request: Request, slug: str = Form(...), date_start: str = Form(""), date_end: str = Form(""), period_label: str = Form(""), version: str = Form("v1.4")):
     auth.require(request, "editor")
     slug = (slug or "").strip()
-    date_start = (date_start or "").strip()
-    date_end = (date_end or "").strip()
-    period_label = (period_label or "").strip()
     version = (version or "v1.4").strip() or "v1.4"
-    if not slug or not date_start or not date_end or not period_label:
-        raise HTTPException(400, "期号与日期不能为空")
+    today = datetime.date.today()
+    if not date_end:
+        date_end = today.isoformat()
+    if not date_start:
+        date_start = date_end
+    if not period_label:
+        period_label = format_display_date(_parse_iso_date(date_end) or today)
+    if not slug:
+        slug = date_end
     if date_start > date_end:
         raise HTTPException(400, "开始日期不能晚于结束日期")
     con = db.connect()
     exists = con.execute("SELECT 1 FROM issues WHERE slug=?", (slug,)).fetchone()
     if exists:
         suggest = suggest_next_issue(con)
-        issues = [dict(r) for r in con.execute(
-            "SELECT id, slug, period_label, status, updated_at, published_at, draft_json FROM issues ORDER BY date_end DESC"
+        issues = [_enrich_issue(r) for r in con.execute(
+            "SELECT id, slug, period_label, status, updated_at, published_at, date_end, draft_json FROM issues ORDER BY date_end DESC"
         )]
         for i in issues:
             draft = i.pop("draft_json", None)
@@ -1058,7 +1470,7 @@ def issue_new(request: Request, slug: str = Form(...), date_start: str = Form(..
         return templates.TemplateResponse(
             "admin.html",
             ctx(request, issues=issues, suggest=suggest, stypes=ingest.SOURCE_TYPES, teams=ingest.TEAMS,
-                flash_err=f"期号「{slug}」已存在，请换一个（常用结束日）"),
+                flash_err=f"期号「{slug}」已存在，请换一个（例如今天日期）"),
             status_code=400,
         )
     con.execute("INSERT INTO issues(slug,date_start,date_end,period_label,version,status,updated_at) VALUES(?,?,?,?,?,'draft',?)",
@@ -1087,15 +1499,17 @@ def issue_delete(request: Request, slug: str, confirm_slug: str = Form("")):
     if not auth.can_delete_issue(u, r["status"]):
         con.close()
         raise HTTPException(403, "权限不足：已上线期仅所有者可删" if r["status"] == "published" else "权限不足")
+    if (confirm_slug or "").strip() != slug:
+        con.close()
+        if wants_json:
+            return JSONResponse({"ok": False, "error": "请确认期号后再删除"}, status_code=400)
+        raise HTTPException(400, "请确认期号后再删除")
     db.delete_issue(con, slug)
     con.commit()
     con.close()
     try:
-        from . import pipeline, preview_job
-        with pipeline._LOCK:
-            pipeline.JOBS.pop(slug, None)
-        with preview_job._LOCK:
-            preview_job.JOBS.pop(slug, None)
+        job_store.drop("pipeline", slug)
+        job_store.drop("preview", slug)
     except Exception:
         pass
     raw = RAW_DIR / slug
@@ -1118,6 +1532,7 @@ def issue_admin(request: Request, slug: str, step: int | None = None, err: str =
     from .aggregator import split_hint
     for s in sources:
         s["split_hint"] = split_hint(s.get("meta"))
+        s["team"] = ingest.source_pick_for(s.get("team") or "", s.get("stype") or "")
     counts = con.execute("SELECT COUNT(*) AS n, SUM(blocked) AS b FROM items WHERE issue_id=?", (r["id"],)).fetchone()
     cards = [dict(x) for x in con.execute("SELECT * FROM cards WHERE issue_id=? ORDER BY team", (r["id"],))]
     for c in cards: c["card"] = json.loads(c["card_json"] or "{}")
@@ -1132,19 +1547,46 @@ def issue_admin(request: Request, slug: str, step: int | None = None, err: str =
         "SELECT COUNT(*) c FROM sources WHERE issue_id=? AND extracted=0 AND length(COALESCE(text,''))>0",
         (r["id"],),
     ).fetchone()["c"]
+    blockers = publish_blockers(con, r["id"], r["draft_json"] or "")
+    sources_need_review = []
+    for s in sources:
+        try:
+            m = json.loads(s.get("meta") or "{}")
+        except (json.JSONDecodeError, TypeError):
+            m = {}
+        if (m.get("split") or {}).get("needs_review"):
+            sources_need_review.append({"id": s["id"], "title": s.get("title") or f"#{s['id']}"})
+    weak_rels = []
+    try:
+        draft_obj = json.loads(r["draft_json"] or "{}") if r["draft_json"] else {}
+        for i, rel in enumerate(draft_obj.get("relations") or []):
+            if isinstance(rel, dict) and rel.get("needs_review"):
+                weak_rels.append({
+                    "index": i,
+                    "title": rel.get("title") or "",
+                    "label": rel.get("label") or "",
+                    "body": (rel.get("body") or "")[:160],
+                })
+    except (json.JSONDecodeError, TypeError):
+        pass
     con.close()
     p = auth.perms(u)
     # 0 放入素材 · 1 挖掘 · 2 审校 · 3 确认上线
     start_step = 0 if step is None else max(0, min(3, int(step)))
-    return templates.TemplateResponse("issue_console.html", ctx(request, issue=dict(r), sources=sources, n_items=counts["n"] or 0, n_blocked=counts["b"] or 0,
+    return templates.TemplateResponse("issue_console.html", ctx(request, issue=_enrich_issue(r), sources=sources, n_items=counts["n"] or 0, n_blocked=counts["b"] or 0,
                                                               cards=cards, edits=edits, mails=mails, versions=versions, n_merged=n_merged,
                                                               n_noowner=n_noowner,
                                                               has_draft=has_draft, draft_stale=draft_stale,
                                                               sources_need_mine=bool(unextracted),
+                                                              publish_blockers=blockers,
+                                                              sources_need_review=sources_need_review,
+                                                              weak_relations=weak_rels,
                                                               role_cn=p["role_cn"],
                                                               steps=pipeline.steps_for_ui(), start_step=start_step,
                                                               flash_err=err,
                                                               stypes=ingest.SOURCE_TYPES, teams=ingest.TEAMS,
+                                                              source_picks=ingest.SOURCE_PICKS,
+                                                              team_default_stype=ingest.TEAM_DEFAULT_STYPE,
                                                               embeddings_configured=embeddings.is_configured(),
                                                               draft=(r["draft_json"] or ""), external_feeds=os.environ.get("EXTERNAL_FEEDS", ",".join(ingest.EXTERNAL_FEEDS_DEFAULT))))
 
@@ -1206,26 +1648,54 @@ async def upload(
             path = d / filename
         path.write_bytes(data)
         text, meta = ingest.read_upload(filename, data)
-        guessed = ingest.infer_source_meta(filename, text, default_team=default_team)
+        guessed = ingest.infer_source_meta(filename, text, default_team=default_team, filename_only=True)
         use_stype = (stype or "").strip() or guessed["stype"]
         use_team = ingest.canonical_team((team or "").strip() or guessed["team"])
         use_channel = (channel or "").strip() or guessed["channel"]
         use_title = (title or "").strip() or guessed["title"] or filename
         meta["inferred"] = guessed
-        cur = con.execute(
-            "INSERT INTO sources(issue_id,stype,team,title,filename,raw_path,text,meta,channel) VALUES(?,?,?,?,?,?,?,?,?)",
-            (r["id"], use_stype, use_team, use_title, filename, str(path), text, json.dumps(meta, ensure_ascii=False), use_channel),
-        )
-        sources_out.append({
-            "id": cur.lastrowid,
-            "title": use_title,
+        from .aggregator import is_mixed_source, split_bundle_ex, sources_from_split
+        rows = [{
             "stype": use_stype,
             "team": use_team,
+            "title": use_title,
+            "filename": filename,
+            "raw_path": str(path),
+            "text": text,
+            "meta": meta,
             "channel": use_channel,
-            "n": len(text or ""),
-            "extracted": 0,
-        })
-        saved += 1
+        }]
+        if is_mixed_source(stype=use_stype, team=use_team, channel=use_channel, title=use_title, text=text):
+            split = split_bundle_ex(text, source_title=use_title)
+            if split.mode == "multi" and len(split.segments) > 1:
+                rows = sources_from_split(
+                    split,
+                    parent_title=use_title,
+                    parent_filename=filename,
+                    raw_path=str(path),
+                    base_meta={"inferred": guessed},
+                    upload_team=use_team,
+                )
+        for row in rows:
+            sid = db.insert_id(
+                con,
+                "INSERT INTO sources(issue_id,stype,team,title,filename,raw_path,text,meta,channel) VALUES(?,?,?,?,?,?,?,?,?)",
+                (
+                    r["id"], row["stype"], row["team"], row["title"], row["filename"],
+                    row.get("raw_path") or str(path), row["text"],
+                    json.dumps(row["meta"], ensure_ascii=False), row.get("channel") or use_channel,
+                ),
+            )
+            sources_out.append({
+                "id": sid,
+                "title": row["title"],
+                "stype": row["stype"],
+                "team": row["team"],
+                "channel": row.get("channel") or use_channel,
+                "n": len(row.get("text") or ""),
+                "extracted": 0,
+            })
+            saved += 1
     con.commit(); con.close()
     if wants_json:
         if not saved:
@@ -1244,10 +1714,35 @@ def paste(request: Request, slug: str, title: str = Form(""), text: str = Form(.
     use_team = ingest.canonical_team((team or "").strip() or guessed["team"])
     use_channel = (channel or "").strip() or guessed["channel"]
     use_title = (title or "").strip() or "粘贴文本"
-    con.execute(
-        "INSERT INTO sources(issue_id,stype,team,title,filename,text,meta,channel) VALUES(?,?,?,?,?,?,?,?)",
-        (r["id"], use_stype, use_team, use_title, "", text, json.dumps({"inferred": guessed}, ensure_ascii=False), use_channel),
-    )
+    from .aggregator import is_mixed_source, split_bundle_ex, sources_from_split
+    rows = [{
+        "stype": use_stype,
+        "team": use_team,
+        "title": use_title,
+        "filename": "",
+        "raw_path": "",
+        "text": text,
+        "meta": {"inferred": guessed},
+        "channel": use_channel,
+    }]
+    if is_mixed_source(stype=use_stype, team=use_team, channel=use_channel, title=use_title, text=text):
+        split = split_bundle_ex(text, source_title=use_title)
+        if split.mode == "multi" and len(split.segments) > 1:
+            rows = sources_from_split(
+                split,
+                parent_title=use_title,
+                parent_filename=use_title,
+                base_meta={"inferred": guessed},
+                upload_team=use_team,
+            )
+    for row in rows:
+        con.execute(
+            "INSERT INTO sources(issue_id,stype,team,title,filename,text,meta,channel) VALUES(?,?,?,?,?,?,?,?)",
+            (
+                r["id"], row["stype"], row["team"], row["title"], row.get("filename") or "",
+                row["text"], json.dumps(row["meta"], ensure_ascii=False), row.get("channel") or use_channel,
+            ),
+        )
     con.commit(); con.close()
     return RedirectResponse(f"/admin/issue/{slug}", status_code=302)
 
@@ -1306,25 +1801,27 @@ def api_source_meta(request: Request, payload: dict):
     channel = (channel_raw or "").strip() if channel_raw is not None else ""
     if channel and channel not in ("manual", "aggregator"):
         channel = "manual"
-    if stype and stype not in ingest.SOURCE_TYPES:
-        raise HTTPException(400, "未知数据类型")
     if team:
-        team = ingest.canonical_team(team)
-        if team not in ingest.TEAMS:
+        team = ingest.canonical_source_pick(team)
+        if team not in ingest.TEAM_DEFAULT_STYPE:
             raise HTTPException(400, "未知团队")
+        stype = ingest.default_stype_for_team(team)
+    elif stype and stype not in ingest.SOURCE_TYPES:
+        raise HTTPException(400, "未知数据类型")
     con = db.connect()
     s = con.execute("SELECT * FROM sources WHERE id=?", (sid,)).fetchone()
     if not s:
         con.close()
         raise HTTPException(404, "来源不存在")
     new_stype = stype or s["stype"]
-    new_team = ingest.canonical_team(team or s["team"] or "")
+    new_team = ingest.source_pick_for(team or s["team"] or "", new_stype)
+    owner = ingest.owner_team_for_pick(new_team)
     new_channel = channel or (s["channel"] or "manual")
     if new_channel not in ("manual", "aggregator"):
         new_channel = "manual"
     from .aggregator import AGG_TEAM, is_mixed_source
-    team_changed = bool(team) and team != (s["team"] or "")
-    stype_changed = bool(stype) and stype != (s["stype"] or "")
+    team_changed = bool(team) and new_team != ingest.source_pick_for(s["team"] or "", s["stype"] or "")
+    stype_changed = new_stype != (s["stype"] or "")
     was_mixed = is_mixed_source(
         stype=s["stype"] or "", team=s["team"] or "", channel=s["channel"] or "manual",
         title=s["title"] or "", text=s["text"] or "",
@@ -1345,18 +1842,24 @@ def api_source_meta(request: Request, payload: dict):
     elif team_changed and new_team != AGG_TEAM:
         con.execute(
             "UPDATE items SET stype=?, team=?, channel=?, owner_team=? WHERE source_id=?",
-            (new_stype, new_team, new_channel, new_team, sid),
+            (new_stype, owner, new_channel, owner, sid),
         )
     else:
-        fill_team = new_team if new_team != AGG_TEAM else None
-        con.execute(
-            "UPDATE items SET stype=?, team=?, channel=?, owner_team=COALESCE(NULLIF(owner_team,''), ?) WHERE source_id=?",
-            (new_stype, new_team, new_channel, fill_team, sid),
-        )
+        fill_team = owner if new_team != AGG_TEAM else None
+        if team_changed and fill_team:
+            con.execute(
+                "UPDATE items SET stype=?, team=?, channel=?, owner_team=? WHERE source_id=?",
+                (new_stype, owner, new_channel, owner, sid),
+            )
+        else:
+            con.execute(
+                "UPDATE items SET stype=?, team=?, channel=?, owner_team=COALESCE(NULLIF(owner_team,''), ?) WHERE source_id=?",
+                (new_stype, owner, new_channel, fill_team, sid),
+            )
     db.mark_draft_stale(con, s["issue_id"])
     con.commit()
     con.close()
-    return {"ok": True, "need_reextract": need_reextract}
+    return {"ok": True, "need_reextract": need_reextract, "stype": new_stype, "team": new_team}
 
 
 @app.post("/api/item_owner")
@@ -1428,54 +1931,87 @@ def source_view(request: Request, sid: int, err: str = ""):
 @app.post("/admin/source/{sid}/extract")
 def source_extract(request: Request, sid: int):
     auth.require(request, "editor")
-    con = db.connect(); s = con.execute("SELECT * FROM sources WHERE id=?", (sid,)).fetchone()
+    con = db.connect()
+    s = con.execute("SELECT * FROM sources WHERE id=?", (sid,)).fetchone()
+    if not s:
+        con.close()
+        raise HTTPException(404, "素材不存在")
     iss = con.execute("SELECT slug, date_start, date_end, period_label FROM issues WHERE id=?", (s["issue_id"],)).fetchone()
+    if not iss:
+        con.close()
+        raise HTTPException(404, "所属期不存在")
     slug = iss["slug"]
     try:
+        skip_split = False
+        try:
+            meta_obj = json.loads(s["meta"] or "{}") if isinstance(s["meta"], str) else (s["meta"] or {})
+            skip_split = (meta_obj.get("split") or {}).get("mode") == "pre_split"
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            skip_split = False
         items, split_meta = llm.extract_source(
             s["stype"], s["team"], s["title"], s["text"] or "",
             period_start=iss["date_start"] or "",
             period_end=iss["date_end"] or "",
             period_label=iss["period_label"] or "",
             channel=s["channel"] or "manual",
+            skip_split=skip_split,
+            source_id=sid,
         )
     except Exception as e:
         con.close()
         return _flash_redirect(f"/admin/source/{sid}", f"抽取失败：{e}")
     con.execute("DELETE FROM items WHERE source_id=?", (sid,))
-    from .aggregator import merge_source_meta, resolve_item_owner
+    from .aggregator import merge_source_meta
+    from .attribution import apply_attribution_to_item
     for it in items:
         item_stype = it.get("item_stype") or s["stype"]
-        owner = resolve_item_owner(it, source_team=s["team"] or "")
-        con.execute("""INSERT INTO items(issue_id,source_id,team,stype,zone,level,kind,text,entities,roles,signals,source_label,pointer,blocked,owner_team,channel,source_labels)
-                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (s["issue_id"], sid, it["team"], item_stype, it["zone"], it["level"], it["kind"], it["text"], json.dumps(it["entities"], ensure_ascii=False),
-                     json.dumps(it["roles"], ensure_ascii=False), json.dumps(it["signals"], ensure_ascii=False), it["source_label"], it["pointer"], it["blocked"],
+        attr = apply_attribution_to_item(
+            it, source_team=s["team"] or "", segment_team=it.get("_segment_team"),
+        )
+        owner = attr.owner_team
+        blocked = int(it.get("blocked") or 0)
+        con.execute("""INSERT INTO items(issue_id,source_id,team,stype,zone,level,kind,text,entities,roles,signals,source_label,pointer,blocked,owner_team,channel,source_labels,owner_provenance,llm_owner_team_hint)
+                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (s["issue_id"], sid, owner or it.get("team"), item_stype, it["zone"], it["level"], it["kind"], it["text"], json.dumps(it["entities"], ensure_ascii=False),
+                     json.dumps(it["roles"], ensure_ascii=False), json.dumps(it["signals"], ensure_ascii=False), it["source_label"], it["pointer"], blocked,
                      owner, s["channel"] or "manual",
-                     json.dumps([it["source_label"]] if it.get("source_label") else [], ensure_ascii=False)))
+                     json.dumps([it["source_label"]] if it.get("source_label") else [], ensure_ascii=False),
+                     attr.provenance, attr.llm_owner_team_hint or it.get("llm_owner_team_hint")))
         for name in it["entities"]:
             if name: con.execute("INSERT INTO entities(name,kind,first_issue) VALUES(?,?,?) ON CONFLICT(name) DO NOTHING", (name, "auto", slug))
     meta = merge_source_meta(s["meta"], split_meta)
+    try:
+        meta_obj = json.loads(meta) if isinstance(meta, str) else dict(meta or {})
+    except (json.JSONDecodeError, TypeError):
+        meta_obj = {}
+    if llm.split_needs_review(split_meta) or (meta_obj.get("split") or {}).get("mode") == "fallback":
+        sp = dict(meta_obj.get("split") or {})
+        sp["needs_review"] = True
+        meta_obj["split"] = sp
+        meta = json.dumps(meta_obj, ensure_ascii=False)
     con.execute("UPDATE sources SET extracted=1, meta=? WHERE id=?", (meta, sid))
     issue_id = s["issue_id"]
     st = con.execute("SELECT status FROM issues WHERE id=?", (issue_id,)).fetchone()
     if st and st["status"] == "published":
+        # 已上线语料：Ask/读者只认发布快照。重抽只改 live items + 标草稿失效，不改公开索引。
         db.mark_draft_stale(con, issue_id)
-        db.snapshot_published_items(con, issue_id)
-        db.reindex_issue(con, issue_id)
     con.commit(); con.close()
     _ASK_CACHE.clear()
     if st and st["status"] == "published":
         return _flash_redirect(
             f"/admin/source/{sid}",
-            "已重新抽取并更新搜索/问答索引（读者页正文不变，需重新上线才更新页面）。",
+            "已重新抽取（读者页与 Ask 仍为上次上线版本；请生成草稿并由 Owner 重新上线后才会更新公开内容）。",
         )
     return RedirectResponse(f"/admin/source/{sid}", status_code=302)
 
 @app.post("/admin/issue/{slug}/extract_all")
 def extract_all(request: Request, slug: str):
     auth.require(request, "editor")
-    con = db.connect(); r = con.execute("SELECT id FROM issues WHERE slug=?", (slug,)).fetchone()
+    con = db.connect()
+    r = con.execute("SELECT id FROM issues WHERE slug=?", (slug,)).fetchone()
+    if not r:
+        con.close()
+        raise HTTPException(404, "没有这一期")
     ids = [x["id"] for x in con.execute("SELECT id FROM sources WHERE issue_id=? AND extracted=0 AND length(text)>0", (r["id"],))]
     con.close()
     errs = []
@@ -1528,31 +2064,41 @@ def _item_teams_for_draft(con, issue_id: int) -> list[str]:
 
 
 def _build_draft_for_issue(con, r, slug: str) -> dict:
-    """根据全部有效条目（按 owner_team）生成周报草稿 JSON。"""
+    """根据团队要点卡 + 关系候选生成周报草稿 JSON。"""
+    from .relation_candidates import merge_relations_from_candidates, prepare_draft_bundle
+
     merge.apply_merge(con, r["id"])
-    teams = _item_teams_for_draft(con, r["id"])
-    q = (
-        "SELECT owner_team AS team, stype, zone, level, kind, text, entities, roles, signals, "
-        "source_label, source_labels, channel FROM items WHERE issue_id=? AND blocked=0 "
-        "AND merged_into IS NULL AND (owner_team IN (%s) OR stype IN ('T5','T7'))"
-        % (",".join("?" * len(teams)) or "''")
-    )
-    rows = [dict(x) for x in con.execute(q, (r["id"], *teams))]
-    internal = [x for x in rows if x["stype"] != "T7"]
-    external = [x for x in rows if x["stype"] == "T7"]
-    names = []
-    for x in internal:
-        for n in json.loads(x["entities"] or "[]"):
-            e = con.execute("SELECT first_issue FROM entities WHERE name=?", (n,)).fetchone()
-            if not e or e["first_issue"] == slug:
-                names.append(n)
-    names = list(dict.fromkeys(names))[:40]
-    prev = con.execute("SELECT published_json FROM issues WHERE status='published' AND date_end<? ORDER BY date_end DESC LIMIT 1", (r["date_start"],)).fetchone()
+    # 无要点卡时先生成
+    n_cards = con.execute(
+        "SELECT COUNT(*) c FROM cards WHERE issue_id=? AND status='approved'", (r["id"],)
+    ).fetchone()["c"]
+    if not n_cards:
+        _build_cards_for_issue(con, r)
+
+    bundle = prepare_draft_bundle(con, r["id"], slug)
+    prev = con.execute(
+        "SELECT published_json FROM issues WHERE status='published' AND date_end<? "
+        "ORDER BY date_end DESC LIMIT 1",
+        (r["date_start"],),
+    ).fetchone()
     prev_summary = ""
     if prev and prev["published_json"]:
         pj = json.loads(prev["published_json"])
-        prev_summary = pj.get("lead", "") + " " + " / ".join(x.get("title", "") for x in pj.get("relations", []))
-    data = llm.build_issue_draft(dict(r), internal, names, external, prev_summary)
+        prev_summary = pj.get("lead", "") + " " + " / ".join(
+            x.get("title", "") for x in pj.get("relations", [])
+        )
+
+    data = llm.build_issue_draft(
+        dict(r),
+        bundle["team_cards"],
+        bundle["relation_candidates"],
+        bundle["first_names"],
+        bundle["external_items"],
+        prev_summary,
+    )
+    data = merge_relations_from_candidates(
+        data, bundle["relation_candidates"], bundle["item_rows"],
+    )
     data["slug"] = slug
     data["period_label"] = r["period_label"]
     data["version"] = r["version"]
@@ -1599,7 +2145,11 @@ def card_save(request: Request, cid: int, card_json: str = Form(...)):
 @app.post("/admin/issue/{slug}/draft")
 def build_draft(request: Request, slug: str):
     auth.require(request, "editor")
-    con = db.connect(); r = con.execute("SELECT * FROM issues WHERE slug=?", (slug,)).fetchone()
+    con = db.connect()
+    r = con.execute("SELECT * FROM issues WHERE slug=?", (slug,)).fetchone()
+    if not r:
+        con.close()
+        raise HTTPException(404, "没有这一期")
     try:
         data = _build_draft_for_issue(con, r, slug)
     except Exception as e:
@@ -1644,7 +2194,11 @@ def save_draft(request: Request, slug: str, draft: str = Form(...)):
     except Exception as e:
         return _flash_redirect(f"/admin/issue/{slug}?step=2", f"JSON 格式有误：{e}")
     data.pop("_stale", None)
-    con = db.connect(); r = con.execute("SELECT id, draft_json FROM issues WHERE slug=?", (slug,)).fetchone()
+    con = db.connect()
+    r = con.execute("SELECT id, draft_json FROM issues WHERE slug=?", (slug,)).fetchone()
+    if not r:
+        con.close()
+        raise HTTPException(404, "没有这一期")
     con.execute("INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)", (r["id"], u["u"], "draft_json", (r["draft_json"] or "")[:20000], draft[:20000]))
     con.execute("UPDATE issues SET draft_json=?, updated_at=? WHERE id=?", (json.dumps(data, ensure_ascii=False), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), r["id"]))
     con.commit(); con.close()
@@ -1817,9 +2371,13 @@ def merge_issue(request: Request, slug: str):
 
 @app.post("/admin/issue/{slug}/request_publish")
 def request_publish(request: Request, slug: str):
-    """管理员可以准备到这一步，但只能提交；确认上线是所有者的权限。"""
+    """编辑可提交上线请求；确认上线由管理员 / 所有者执行。"""
     u = auth.require(request, "editor")
-    con = db.connect(); r = con.execute("SELECT id FROM issues WHERE slug=?", (slug,)).fetchone()
+    con = db.connect()
+    r = con.execute("SELECT id FROM issues WHERE slug=?", (slug,)).fetchone()
+    if not r:
+        con.close()
+        raise HTTPException(404, "没有这一期")
     con.execute("INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)",
                 (r["id"], u["u"], "request_publish", "", "已提交，等待所有者确认"))
     con.commit(); con.close()
@@ -1828,8 +2386,8 @@ def request_publish(request: Request, slug: str):
 
 @app.post("/admin/issue/{slug}/publish")
 def publish(request: Request, slug: str, confirm: str = Form("")):
-    """上线：仅 owner；写入不可改版本记录。确认由前端对话框完成，不再要求手打文字。"""
-    u = auth.require(request, "owner")
+    """上线：管理员 / 所有者；写入不可改版本记录。确认由前端对话框完成，不再要求手打文字。"""
+    u = auth.require(request, "admin")
     wants_json = "application/json" in (request.headers.get("accept") or "")
     back = f"/{slug}?preview=1&edit=1"
 
@@ -1852,10 +2410,14 @@ def publish(request: Request, slug: str, confirm: str = Form("")):
     data = json.loads(r["draft_json"])
     data.pop("_stale", None)
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    pub_day = datetime.date.today()
+    pub_label = format_display_date(pub_day)
+    pub_iso = pub_day.isoformat()
     payload = json.dumps(data, ensure_ascii=False)
     con.execute(
-        "UPDATE issues SET published_json=?, draft_json=?, status='published', published_at=?, updated_at=? WHERE id=?",
-        (payload, payload, now, now, r["id"]),
+        "UPDATE issues SET published_json=?, draft_json=?, status='published', published_at=?, "
+        "updated_at=?, period_label=?, date_end=?, date_start=? WHERE id=?",
+        (payload, payload, now, now, pub_label, pub_iso, pub_iso, r["id"]),
     )
     db.register_entities(con, data, slug)
     db.snapshot_published_items(con, r["id"])
@@ -1876,7 +2438,7 @@ def publish(request: Request, slug: str, confirm: str = Form("")):
 
 @app.post("/admin/issue/{slug}/unpublish")
 def unpublish(request: Request, slug: str):
-    auth.require(request, "owner")
+    auth.require(request, "admin")
     con = db.connect()
     r = con.execute("SELECT id FROM issues WHERE slug=?", (slug,)).fetchone()
     if not r:
@@ -1906,7 +2468,7 @@ def _edm_json_from_row(row: dict) -> dict:
 
 @app.get("/admin/edm", response_class=HTMLResponse)
 def edm_admin(request: Request, saved: int = 0, err: str = ""):
-    auth.require(request, "editor")
+    auth.require(request, "owner")
     con = db.connect()
     issues = []
     for row in con.execute(
@@ -1914,10 +2476,9 @@ def edm_admin(request: Request, saved: int = 0, err: str = ""):
     ):
         row_d = dict(row)
         data = _edm_json_from_row(row_d)
-        i = dict(row_d)
+        i = _enrich_issue(row_d)
         i.pop("draft_json", None)
         i.pop("published_json", None)
-        i.pop("date_end", None)
         i["edm_subject"] = edm.build_edm_subject(row_d, data, use_llm=False)
         i["mail"] = edm.mail_status_label(con, i["id"])
         i["auto_send"] = edm.issue_auto_send_enabled(con, i["id"])
@@ -1943,7 +2504,7 @@ def edm_admin(request: Request, saved: int = 0, err: str = ""):
 
 @app.post("/admin/edm/settings")
 def edm_settings_save(request: Request, default_to: str = Form(""), auto_default: str = Form("")):
-    auth.require(request, "editor")
+    auth.require(request, "owner")
     con = db.connect()
     db.set_setting(con, "edm_default_to", default_to.strip())
     db.set_setting(con, "edm_auto_send_default", "1" if auto_default == "1" else "0")
@@ -1954,7 +2515,7 @@ def edm_settings_save(request: Request, default_to: str = Form(""), auto_default
 
 @app.post("/admin/edm/issue/{slug}/auto")
 def edm_issue_auto(request: Request, slug: str, enabled: str = Form("")):
-    auth.require(request, "editor")
+    auth.require(request, "owner")
     con = db.connect()
     r = con.execute("SELECT id FROM issues WHERE slug=?", (slug,)).fetchone()
     if not r:
@@ -1968,7 +2529,7 @@ def edm_issue_auto(request: Request, slug: str, enabled: str = Form("")):
 
 @app.post("/admin/edm/issue/{slug}/send")
 def edm_admin_send(request: Request, slug: str, to: str = Form(""), test: int = Form(1)):
-    auth.require(request, "editor")
+    auth.require(request, "owner")
     from urllib.parse import quote
     con = db.connect()
     r, data, source = load_issue_for_edm(con, slug)
@@ -2002,7 +2563,7 @@ def edm_admin_send(request: Request, slug: str, to: str = Form(""), test: int = 
 
 @app.get("/admin/issue/{slug}/edm", response_class=HTMLResponse)
 def edm_preview(request: Request, slug: str, legacy: int = 0):
-    auth.require(request, "editor")
+    auth.require(request, "owner")
     import html as html_mod
 
     con = db.connect()
@@ -2021,19 +2582,20 @@ def edm_preview(request: Request, slug: str, legacy: int = 0):
             "issue_edm.html",
             ctx(
                 request,
-                issue=dict(r),
+                issue=_enrich_issue(r),
                 d=data,
                 n_rel=n_rel,
                 edm_source=source,
                 draft_sync=draft_sync,
             ),
         )
-    subject = edm.build_edm_subject(dict(r), data or {}, use_llm=False)
-    h, _ = edm.render_edm(dict(r), data or {}, BASE_URL, os.environ.get("MESH_LOGO_URL", ""))
+    issue_row = _enrich_issue(r)
+    subject = edm.build_edm_subject(issue_row, data or {}, use_llm=False)
+    h, _ = edm.render_edm(issue_row, data or {}, BASE_URL, os.environ.get("MESH_LOGO_URL", ""))
     con.close()
     src_label = "已上线稿" if source == "published" else "草稿"
     slug_e = html_mod.escape(slug)
-    period_e = html_mod.escape(r.get("period_label") or slug)
+    period_e = html_mod.escape(issue_row.get("display_date") or slug)
     subject_e = html_mod.escape(subject)
     chrome = (
         '<div style="position:sticky;top:0;z-index:9999;background:#14382F;color:#fff;'
@@ -2054,7 +2616,7 @@ def edm_preview(request: Request, slug: str, legacy: int = 0):
 @app.post("/admin/issue/{slug}/edm/send")
 def edm_send(request: Request, slug: str, to: str = Form(...), test: int = Form(1)):
     """兼容旧入口：转发到 EDM 管理页逻辑。"""
-    auth.require(request, "editor")
+    auth.require(request, "owner")
     from urllib.parse import quote
     con = db.connect()
     r, data, source = load_issue_for_edm(con, slug)
@@ -2087,7 +2649,7 @@ def edm_send(request: Request, slug: str, to: str = Form(...), test: int = Form(
 
 @app.get("/admin/users", response_class=HTMLResponse)
 def users_page(request: Request, page: int = 1, saved: int = 0):
-    auth.require(request, "admin")
+    auth.require(request, "owner")
     page_size = 20
     page = max(1, int(page or 1))
     con = db.connect()
@@ -2117,7 +2679,7 @@ def users_page(request: Request, page: int = 1, saved: int = 0):
 
 @app.post("/admin/users/save")
 def users_save(request: Request, uid: int = Form(0), username: str = Form(""), display: str = Form(""), password: str = Form(""), role: str = Form("viewer"), team: str = Form("")):
-    u = auth.require(request, "admin")
+    u = auth.require(request, "owner")
     role = (role or "viewer").strip()
     if role not in auth.ROLE_RANK:
         raise HTTPException(400, "未知角色")
@@ -2178,7 +2740,7 @@ def users_save(request: Request, uid: int = Form(0), username: str = Form(""), d
 
 @app.post("/admin/users/{uid}/delete")
 def users_delete(request: Request, uid: int):
-    u = auth.require(request, "admin")
+    u = auth.require(request, "owner")
     con = db.connect()
     row = con.execute("SELECT username, role FROM users WHERE id=?", (uid,)).fetchone()
     if not row:
@@ -2213,7 +2775,7 @@ def _prompt_path(name: str) -> Path:
 
 @app.get("/admin/prompts", response_class=HTMLResponse)
 def prompts_page(request: Request, err: str = ""):
-    auth.require(request, "admin")
+    auth.require(request, "owner")
     files = sorted(p.name for p in (BASE / "prompts").glob("*.md"))
     return templates.TemplateResponse(
         "prompts.html",
@@ -2222,7 +2784,7 @@ def prompts_page(request: Request, err: str = ""):
 
 @app.post("/admin/prompts/new")
 def prompt_new(request: Request, name: str = Form(...), content: str = Form("")):
-    auth.require(request, "admin")
+    auth.require(request, "owner")
     from urllib.parse import quote
     try:
         p = _prompt_path(name)
@@ -2237,7 +2799,7 @@ def prompt_new(request: Request, name: str = Form(...), content: str = Form(""))
 @app.post("/admin/prompts/upload")
 async def prompt_upload(request: Request, overwrite: int = Form(0)):
     """拖拽 / 选择上传 .md 规则文件。"""
-    auth.require(request, "admin")
+    auth.require(request, "owner")
     form = await request.form()
     uploads = form.getlist("files") if hasattr(form, "getlist") else []
     if not uploads:
@@ -2297,7 +2859,7 @@ async def prompt_upload(request: Request, overwrite: int = Form(0)):
 
 @app.get("/admin/prompts/{name}", response_class=HTMLResponse)
 def prompt_edit(request: Request, name: str, err: str = ""):
-    auth.require(request, "admin")
+    auth.require(request, "owner")
     try:
         p = _prompt_path(name)
     except HTTPException:
@@ -2312,7 +2874,7 @@ def prompt_edit(request: Request, name: str, err: str = ""):
 
 @app.post("/admin/prompts/{name}")
 def prompt_save(request: Request, name: str, content: str = Form(...)):
-    auth.require(request, "admin")
+    auth.require(request, "owner")
     p = _prompt_path(name)
     if not p.exists():
         raise HTTPException(404)
@@ -2321,7 +2883,7 @@ def prompt_save(request: Request, name: str, content: str = Form(...)):
 
 @app.post("/admin/prompts/{name}/delete")
 def prompt_delete(request: Request, name: str):
-    auth.require(request, "admin")
+    auth.require(request, "owner")
     from urllib.parse import quote
     # 核心管线依赖的文件不允许删，避免一键搞挂抽取
     protected = {
@@ -2362,7 +2924,7 @@ def issue_page(request: Request, slug: str, preview: int = 0, edit: int = 0, syn
     r, data = load_issue(con, slug, published_only=not preview)
     con.close()
     if not r: raise HTTPException(404, "没有这一期")
-    if not u: return templates.TemplateResponse("login.html", ctx(request, next=f"/{slug}", error=None, issue=dict(r)))
+    if not u: return templates.TemplateResponse("login.html", ctx(request, next=f"/{slug}", error=None, issue=dict(r), debug_panel=False, debug_preset=""))
     if preview and auth.ROLE_RANK.get(u["r"], 0) < auth.ROLE_RANK["editor"]: raise HTTPException(403)
     if data is None: raise HTTPException(404, "本期尚未发布")
     if preview and not db.issue_json_renderable(data):
@@ -2385,7 +2947,7 @@ def issue_page(request: Request, slug: str, preview: int = 0, edit: int = 0, syn
     data["plans"].setdefault("groups", [])
     data["plans"].setdefault("sources", [])
     con = db.connect()
-    arch = [dict(x) for x in con.execute("SELECT slug, period_label, date_end FROM issues WHERE status='published' ORDER BY date_end DESC LIMIT 12")]
+    arch = [_enrich_issue(x) for x in con.execute("SELECT slug, period_label, date_end, published_at FROM issues WHERE status='published' ORDER BY date_end DESC LIMIT 12")]
     con.close()
-    return templates.TemplateResponse("issue.html", ctx(request, issue=dict(r), d=data, preview=bool(preview), archive_list=arch))
+    return templates.TemplateResponse("issue.html", ctx(request, issue=_enrich_issue(r), d=data, preview=bool(preview), archive_list=arch))
 

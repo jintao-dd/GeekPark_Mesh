@@ -1,15 +1,17 @@
 """向量 embedding：OpenAI 兼容接口 + 本地 cosine 检索（零额外依赖）。"""
 from __future__ import annotations
 
+import heapq
 import json
 import math
-import os
 import re
 from typing import Any
 
 import requests
 
 from .providers.base import env
+
+_HTTP = requests.Session()
 
 
 def enabled() -> bool:
@@ -22,40 +24,91 @@ def model_name() -> str:
 
 
 def _api_key() -> str:
-    return env("MESH_EMBED_API_KEY") or env("MESH_LLM_API_KEY")
+    embed_url = env("MESH_EMBED_BASE_URL")
+    embed_key = env("MESH_EMBED_API_KEY")
+    if embed_url:
+        return embed_key or ""
+    return embed_key or env("MESH_LLM_API_KEY") or ""
+
+
+def _base_urls() -> list[str]:
+    raw = env("MESH_EMBED_BASE_URL")
+    if not raw:
+        return [(env("MESH_LLM_BASE_URL") or "https://api.openai.com/v1").rstrip("/")]
+    return [u.strip().rstrip("/") for u in raw.split(",") if u.strip()]
 
 
 def _base_url() -> str:
-    return (env("MESH_EMBED_BASE_URL") or env("MESH_LLM_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
+    urls = _base_urls()
+    return urls[0] if urls else "https://api.openai.com/v1"
 
 
 def is_configured() -> bool:
-    return enabled() and bool(_api_key())
+    if not enabled():
+        return False
+    if env("MESH_EMBED_BASE_URL"):
+        return bool(env("MESH_EMBED_API_KEY"))
+    return bool(_api_key())
+
+
+def batch_size() -> int:
+    try:
+        return max(1, min(128, int(env("MESH_EMBED_BATCH") or "32")))
+    except ValueError:
+        return 32
+
+
+_last_error: str = ""
+
+
+def last_error() -> str:
+    return _last_error
+
+
+def _post_embeddings(url: str, payload: dict) -> requests.Response:
+    return _HTTP.post(
+        url,
+        headers={"Authorization": f"Bearer {_api_key()}", "Content-Type": "application/json"},
+        json=payload,
+        timeout=120,
+    )
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
-    """批量 embedding；失败返回空列表。"""
+    """批量 embedding；失败返回空列表并记录 last_error。"""
+    global _last_error
+    _last_error = ""
     if not texts or not is_configured():
+        if not is_configured():
+            _last_error = "embedding not configured (MESH_EMBED_API_KEY / MESH_EMBED_BASE_URL / MESH_EMBED_MODEL)"
         return []
     payload = {"model": model_name(), "input": texts}
-    try:
-        r = requests.post(
-            _base_url() + "/embeddings",
-            headers={"Authorization": f"Bearer {_api_key()}", "Content-Type": "application/json"},
-            json=payload,
-            timeout=120,
-        )
-        if r.status_code >= 400:
-            return []
-        data = r.json().get("data") or []
-        out: list[list[float]] = []
-        for row in sorted(data, key=lambda x: x.get("index", 0)):
-            vec = row.get("embedding")
-            if isinstance(vec, list):
-                out.append([float(x) for x in vec])
-        return out
-    except Exception:
-        return []
+    errors: list[str] = []
+    for base in _base_urls():
+        url = base + "/embeddings"
+        try:
+            r = _post_embeddings(url, payload)
+            if r.status_code >= 400:
+                body = (r.text or "")[:500]
+                msg = f"HTTP {r.status_code} {url}: {body}"
+                errors.append(msg)
+                continue
+            data = r.json().get("data") or []
+            out: list[list[float]] = []
+            for row in sorted(data, key=lambda x: x.get("index", 0)):
+                vec = row.get("embedding")
+                if isinstance(vec, list):
+                    out.append([float(x) for x in vec])
+            if len(out) != len(texts):
+                msg = f"expected {len(texts)} vectors, got {len(out)} from {url}"
+                errors.append(msg)
+                continue
+            return out
+        except Exception as e:
+            errors.append(f"{url}: {e}")
+    _last_error = errors[-1] if errors else "embedding request failed"
+    print(f"[mesh] embed error: {_last_error}", flush=True)
+    return []
 
 
 def embed_one(text: str) -> list[float]:
@@ -108,7 +161,8 @@ def vector_search(
     if date_to:
         sql += " AND c.date_end <= ?"
         params.append(date_to)
-    hits: list[dict] = []
+    top_k = max(limit * 4, limit)
+    heap: list[tuple[float, dict]] = []
     for r in con.execute(sql, params):
         try:
             vec = json.loads(r["vector_json"])
@@ -119,7 +173,7 @@ def vector_search(
         sc = cosine(query_vec, vec)
         if sc <= 0.05:
             continue
-        hits.append({
+        hit = {
             "issue_slug": r["issue_slug"],
             "section": r["section"] or "抽取条目",
             "title": r["title"] or "",
@@ -131,8 +185,12 @@ def vector_search(
             "stype": r["stype"] or "",
             "source": "vector",
             "chunk_id": r["chunk_id"],
-        })
-    hits.sort(key=lambda x: x["score"])
+        }
+        if len(heap) < top_k:
+            heapq.heappush(heap, (-sc, hit))
+        elif sc > -heap[0][0]:
+            heapq.heapreplace(heap, (-sc, hit))
+    hits = [h for _, h in sorted(heap, key=lambda x: x[0])]
     return hits[:limit]
 
 

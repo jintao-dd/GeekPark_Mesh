@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}EDM · {{ issue.period_label }} · GeekPark Mesh{% endblock %}
+{% block title %}EDM · {{ issue.display_date }} · GeekPark Mesh{% endblock %}
 {% block bodyattrs %} data-num="a"{% endblock %}
 {% block head %}
 <style>.edm-banner{background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:12px 16px;margin:88px 0 0;font-size:14px;color:#B45309;line-height:1.6}</style>
 {% endblock %}
 {% block body %}
 {% set email_mode = false %}
-{% set edm_banner = '旧版浏览器预览（已弃用） · ' ~ issue.period_label ~ ' · slug ' ~ issue.slug ~ (' · 已上线稿' if issue.status == 'published' else ' · 草稿') ~ ' · 请关闭本页，从 EDM 管理打开「预览」查看与发送一致的邮件' %}
+{% set edm_banner = '旧版浏览器预览（已弃用） · ' ~ issue.display_date ~ ' · slug ' ~ issue.slug ~ (' · 已上线稿' if issue.status == 'published' else ' · 草稿') ~ ' · 请关闭本页，从 EDM 管理打开「预览」查看与发送一致的邮件' %}
 {% include "_issue_edm_inner.html" %}
 {% endblock %}

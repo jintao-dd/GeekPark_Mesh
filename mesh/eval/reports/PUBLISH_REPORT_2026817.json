@@ -1,0 +1,64 @@
+{
+  "slug": "2026-8-17",
+  "timestamp": "2026-08-31T16:53:13",
+  "split_confirmed_source_ids": [],
+  "detail_neutralize": {
+    "neutralized": 7,
+    "keep": 27,
+    "relations_touched": 6,
+    "samples": [
+      {
+        "relation": "AI 硬件全球定义赛道 · OpenAI 路线图",
+        "before": "视频号团队记录：本周观众端对猎奇性硬件产品与创业者破旧立新类观点反应更好，下一步商业化开单重点从 AI 硬件品类切入，计划增加硬件类稿件密度（数据判断，非核实事实）",
+        "after": "记录：本周观众端对猎奇性硬件产品与创业者破旧立新类观点反应更好，下一步商业化开单重点从 AI 硬件品类切入，计划增加硬件类稿件密度（数据判断，非核实事实）"
+      },
+      {
+        "relation": "视频号 · 小红书",
+        "before": "视频号团队记录：视频号计划新增合集/栏目分类，方向定为按行业分（如 AI硬件、AIGC、科技八卦等），封面用统一模板加行业标签，方便观众按领域检索与商务方对照内容类别；「现场/创业者访谈」作为佐证专业度的标签并入相应行业合集，不单独成分类",
+        "after": "记录：视频号计划新增合集/栏目分类，方向定为按行业分（如 AI硬件、AIGC、科技八卦等），封面用统一模板加行业标签，方便观众按领域检索与商务方对照内容类别；「现场/创业者访谈」作为佐证专业度的标签并入相应行业合集，不单独成分类"
+      },
+      {
+        "relation": "具身智能 · 世界机器人大会",
+        "before": "编辑部记录：WRC2026 相关稿件本周播放靠前，观众明显更关注具身智能与人形机器人方向；行业数据采集预算从模型概念转向回归硬件（受访者陈述，非核实事实）",
+        "after": "记录：WRC2026 相关稿件本周播放靠前，观众明显更关注具身智能与人形机器人方向；行业数据采集预算从模型概念转向回归硬件（受访者陈述，非核实事实）"
+      },
+      {
+        "relation": "具身智能 · 世界机器人大会",
+        "before": "视频号团队记录：本周观众端对创业者破旧立新类观点反应更好（数据判断，非核实事实）",
+        "after": "记录：本周观众端对创业者破旧立新类观点反应更好（数据判断，非核实事实）"
+      },
+      {
+        "relation": "豆包 · 字节跳动",
+        "before": "视频号团队记录：豆包接入抖音生活服务，酒店机票景区门票可直达下单、佣金约 12%，约 66.2% 用户仍会回携程美团核对",
+        "after": "记录：豆包接入抖音生活服务，酒店机票景区门票可直达下单、佣金约 12%，约 66.2% 用户仍会回携程美团核对"
+      },
+      {
+        "relation": "字节跳动 · 豆包",
+        "before": "视频号团队记录：团队在推进 AI 动画开场片探索，试用 MiniMax M3 开源视频模型（做 meme/矢量二维动画有成本优势）与字节 seedance 2.5；已完成一支约三分半的 AI 动画成片，采用「AI 生成素材 + 人工剪辑」方式",
+        "after": "记录：团队在推进 AI 动画开场片探索，试用 MiniMax M3 开源视频模型（做 meme/矢量二维动画有成本优势）与字节 seedance 2.5；已完成一支约三分半的 AI 动画成片，采用「AI 生成素材 + 人工剪辑」方式"
+      },
+      {
+        "relation": "MiniMax · AGI Playground 2026",
+        "before": "视频号团队记录：试用 MiniMax M3 开源视频模型做 meme/矢量二维动画，已完成一支约三分半 AI 生成加人工剪辑成片",
+        "after": "记录：试用 MiniMax M3 开源视频模型做 meme/矢量二维动画，已完成一支约三分半 AI 生成加人工剪辑成片"
+      }
+    ]
+  },
+  "evidence_source_label_synced": 0,
+  "owner_integrity_ok": true,
+  "attribution_blockers": [],
+  "narrative_flags_count": 19,
+  "relation_audit_count": 0,
+  "relation_audit_by_category": {},
+  "verify_meta": {
+    "lead_ok": true,
+    "keywords_rows_trimmed": 0,
+    "plans_rows_trimmed": 0,
+    "contacts_rows_trimmed": 0,
+    "views_trimmed": 0,
+    "corpus_chars": 31854
+  },
+  "publish_blockers": [],
+  "publish_ready": true,
+  "pass_attribution": true
+}

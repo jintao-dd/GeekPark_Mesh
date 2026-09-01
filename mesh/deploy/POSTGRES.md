@@ -75,3 +75,16 @@ curl -s http://127.0.0.1:8090/healthz | python -m json.tool
 export MESH_DB_URL=postgresql://mesh:mesh@localhost:5432/mesh
 python -c "from app import db; db.init_db(seed=True)"
 ```
+
+## 每日备份
+
+```bash
+chmod +x deploy/pg_backup.sh
+./deploy/pg_backup.sh
+# crontab -e 示例（每天 3:15）：
+# 15 3 * * * cd /opt/geekpark-mesh && ./deploy/pg_backup.sh >> /opt/geekpark-mesh/backups/backup.log 2>&1
+```
+
+备份文件：`backups/mesh-pg-YYYYMMDD-HHMMSS.sql.gz`，默认保留 14 天。
+
+> **勿**对已有数据的 PG 重复运行 `migrate_to_postgres.py`（会 TRUNCATE）。仅首次迁移或加 `--force` 时覆盖。

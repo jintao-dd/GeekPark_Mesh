@@ -16,10 +16,12 @@ def test_retrieval_query_followup():
 
 
 def test_fts_team_filter():
-    assert _hit_team_allowed({"title": "某话题", "body": "编辑部讨论了芯片"}, "编辑部")
+    # 团队视角只认结构化 owner_team，禁止靠正文提及放行（避免串台）
+    assert not _hit_team_allowed({"title": "某话题", "body": "编辑部讨论了芯片"}, "编辑部")
     assert not _hit_team_allowed({"title": "某话题", "body": "硅谷 BD 团队"}, "编辑部")
     assert _hit_team_allowed({"owner_team": "编辑部", "body": "x"}, "编辑部")
     assert not _hit_team_allowed({"owner_team": "商业化团队", "body": "x"}, "编辑部")
+    assert _hit_team_allowed({"body": "任意"}, "")
 
 
 def test_ask_user_from_cookie():
@@ -42,6 +44,59 @@ def test_merge_dedup_item():
     merged = search.merge_hits(a, b, limit=5)
     assert len(merged) == 1
     assert merged[0]["item_id"] == 9
+
+
+def test_no_evidence_direct_answer():
+    from app import ask_engine
+    from app.qa_structured import empty_result_answer
+
+    assert "未在已上线周报" in ask_engine._NO_EVIDENCE_ANSWER
+    ans = empty_result_answer({
+        "type": "diff",
+        "team_a": "编辑部",
+        "team_b": "商业化团队",
+        "date_from": "2026-01-01",
+        "date_to": "2026-03-01",
+        "window_days": 90,
+    })
+    assert "未找到" in ans
+    assert "编辑部" in ans
+    assert "结构化检索" in ans
+
+    # run_structured 曾只回传 teams[]、丢掉 team_a/b，空结果会显示「None」
+    ans2 = empty_result_answer({
+        "type": "intersect",
+        "teams": ["商业化团队", "编辑部"],
+        "date_from": "2026-05-30",
+        "window_days": 90,
+    })
+    assert "商业化团队" in ans2 and "编辑部" in ans2
+    assert "None" not in ans2
+
+
+def test_prepare_skips_llm_without_hits():
+    import tempfile
+    from app import ask_engine, db, db_conn
+    from app.ask_scope import AskScope
+
+    with tempfile.TemporaryDirectory() as td:
+        old_path, old_url = db_conn.DB_PATH, db_conn.MESH_DB_URL
+        db_conn.DB_PATH = str(Path(td) / "t.db")
+        db_conn.MESH_DB_URL = ""
+        db.DB_PATH = db_conn.DB_PATH
+        con = None
+        try:
+            con = db.connect()
+            db.init_db(seed=False)
+            scope = AskScope(channel="web", slug="no-such-issue", user_id=1, role="viewer")
+            prepared = ask_engine.prepare(con, "完全不存在的随机关键词xyz123", scope, history=[])
+            assert prepared.get("direct_answer")
+            assert prepared.get("n_context") == 0
+            assert "未在已上线周报" in prepared["direct_answer"]
+        finally:
+            if con is not None:
+                con.close()
+            db_conn.DB_PATH, db_conn.MESH_DB_URL = old_path, old_url
 
 
 def test_reindex_skips_items_when_flag_false():
@@ -76,5 +131,7 @@ if __name__ == "__main__":
     test_fts_team_filter()
     test_ask_user_from_cookie()
     test_merge_dedup_item()
+    test_no_evidence_direct_answer()
+    test_prepare_skips_llm_without_hits()
     test_reindex_skips_items_when_flag_false()
     print("ok")

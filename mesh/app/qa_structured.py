@@ -305,9 +305,10 @@ def parse_intent(q: str) -> dict | None:
     return None
 
 
-def _hardware_sql(alias: str = "f") -> tuple[str, list]:
+def _hardware_sql(alias: str = "") -> tuple[str, list]:
+    pref = f"{alias}." if alias else ""
     ors = " OR ".join(
-        f"({alias}.group_title LIKE ? OR {alias}.snippet LIKE ? OR {alias}.name LIKE ?)"
+        f"({pref}group_title LIKE ? OR {pref}snippet LIKE ? OR {pref}name LIKE ?)"
         for _ in HARDWARE_HINTS
     )
     params = []
@@ -350,61 +351,69 @@ def _date_clause(alias: str, date_from: str | None, date_to: str | None = None) 
     return " AND " + " AND ".join(parts), params
 
 
-def query_diff(con, team_a: str, team_b: str, date_from: str | None, section: str = "接触",
-               hardware: bool = False, date_to: str | None = None) -> tuple[list[dict], int]:
+def _entity_norm(name: str) -> str:
+    """主体名归一：去空白/常见后缀，用于交集差集匹配。"""
+    s = re.sub(r"\s+", "", (name or "").strip())
+    for suf in ("股份有限公司", "有限公司", "公司", "集团"):
+        if s.endswith(suf) and len(s) > len(suf) + 1:
+            s = s[: -len(suf)]
+            break
+    return s.lower()
+
+
+def _fetch_team_section_rows(
+    con,
+    team: str,
+    section: str,
+    date_from: str | None,
+    date_to: str | None,
+    *,
+    hardware: bool = False,
+) -> list[dict]:
     hw_sql, hw_params = ("", [])
     if hardware:
-        hw_sql, hw_params = _hardware_sql("a")
+        hw_sql, hw_params = _hardware_sql("")
         hw_sql = " AND " + hw_sql
-    a_date, a_params = _date_clause("a", date_from, date_to)
-    b_date, b_params = _date_clause("b", date_from, date_to)
+    a_date, a_params = _date_clause("", date_from, date_to)
     sql = f"""
-    SELECT a.name, a.team, a.issue_slug, a.section, a.group_title, a.snippet, a.source_hint, a.date_end
-    FROM entity_team_facts a
-    WHERE a.team = ? AND a.section = ?{a_date}
-      AND NOT EXISTS (
-        SELECT 1 FROM entity_team_facts b
-        WHERE b.name = a.name AND b.team = ? AND b.section = ?{b_date}
-      )
-      {hw_sql}
-    ORDER BY a.date_end DESC, a.name
+    SELECT name, team, issue_slug, section, group_title, snippet, source_hint, date_end
+    FROM entity_team_facts
+    WHERE team = ? AND section = ?{a_date.replace('a.', '')}{hw_sql}
+    ORDER BY date_end DESC, name
     """
-    params = [team_a, section, *a_params, team_b, section, *b_params, *hw_params]
-    rows = [dict(r) for r in con.execute(sql, params)]
+    params = [team, section, *a_params, *hw_params]
+    return [dict(r) for r in con.execute(sql, params)]
+
+
+def query_diff(con, team_a: str, team_b: str, date_from: str | None, section: str = "接触",
+               hardware: bool = False, date_to: str | None = None) -> tuple[list[dict], int]:
+    rows_a = _fetch_team_section_rows(con, team_a, section, date_from, date_to, hardware=hardware)
+    keys_b = {_entity_norm(r["name"]) for r in _fetch_team_section_rows(
+        con, team_b, section, date_from, date_to, hardware=hardware,
+    )}
     seen, uniq = set(), []
-    for r in rows:
-        if r["name"] in seen:
+    for r in rows_a:
+        k = _entity_norm(r["name"])
+        if not k or k in keys_b or k in seen:
             continue
-        seen.add(r["name"]); uniq.append(r)
+        seen.add(k)
+        uniq.append(r)
     return _rows_to_contexts(uniq)
 
 
 def query_intersect(con, team_a: str, team_b: str, date_from: str | None, section: str = "接触",
                     hardware: bool = False, date_to: str | None = None) -> tuple[list[dict], int]:
-    hw_sql, hw_params = ("", [])
-    if hardware:
-        hw_sql, hw_params = _hardware_sql("a")
-        hw_sql = " AND " + hw_sql
-    a_date, a_params = _date_clause("a", date_from, date_to)
-    b_date, b_params = _date_clause("b", date_from, date_to)
-    sql = f"""
-    SELECT a.name, a.team, a.issue_slug, a.section, a.group_title, a.snippet, a.source_hint, a.date_end
-    FROM entity_team_facts a
-    WHERE a.team = ? AND a.section = ?{a_date}
-      AND EXISTS (
-        SELECT 1 FROM entity_team_facts b
-        WHERE b.name = a.name AND b.team = ? AND b.section = ?{b_date}
-      )
-      {hw_sql}
-    ORDER BY a.date_end DESC, a.name
-    """
-    params = [team_a, section, *a_params, team_b, section, *b_params, *hw_params]
-    rows = [dict(r) for r in con.execute(sql, params)]
+    rows_a = _fetch_team_section_rows(con, team_a, section, date_from, date_to, hardware=hardware)
+    keys_b = {_entity_norm(r["name"]) for r in _fetch_team_section_rows(
+        con, team_b, section, date_from, date_to, hardware=hardware,
+    )}
     seen, uniq = set(), []
-    for r in rows:
-        if r["name"] in seen:
+    for r in rows_a:
+        k = _entity_norm(r["name"])
+        if not k or k not in keys_b or k in seen:
             continue
-        seen.add(r["name"]); uniq.append(r)
+        seen.add(k)
+        uniq.append(r)
     ctxs, total = _rows_to_contexts(uniq)
     for c in ctxs:
         c["内容"] = f"同时出现在 {team_a} 与 {team_b} · " + c["内容"]
@@ -417,32 +426,18 @@ def query_overseas_gap(con, date_from: str | None, section: str = "接触",
     d_teams = domestic_teams()
     if not o_teams or not d_teams:
         return [], 0
-    o_ph = ",".join("?" * len(o_teams))
-    d_ph = ",".join("?" * len(d_teams))
-    hw_sql, hw_params = ("", [])
-    if hardware:
-        hw_sql, hw_params = _hardware_sql("a")
-        hw_sql = " AND " + hw_sql
-    a_date, a_params = _date_clause("a", date_from, date_to)
-    b_date, b_params = _date_clause("b", date_from, date_to)
-    sql = f"""
-    SELECT a.name, a.team, a.issue_slug, a.section, a.group_title, a.snippet, a.source_hint, a.date_end
-    FROM entity_team_facts a
-    WHERE a.team IN ({o_ph}) AND a.section = ?{a_date}
-      AND NOT EXISTS (
-        SELECT 1 FROM entity_team_facts b
-        WHERE b.name = a.name AND b.team IN ({d_ph}) AND b.section = ?{b_date}
-      )
-      {hw_sql}
-    ORDER BY a.date_end DESC, a.name
-    """
-    params = [*o_teams, section, *a_params, *d_teams, section, *b_params, *hw_params]
-    rows = [dict(r) for r in con.execute(sql, params)]
+    keys_domestic: set[str] = set()
+    for dt in d_teams:
+        for r in _fetch_team_section_rows(con, dt, section, date_from, date_to, hardware=hardware):
+            keys_domestic.add(_entity_norm(r["name"]))
     seen, uniq = set(), []
-    for r in rows:
-        if r["name"] in seen:
-            continue
-        seen.add(r["name"]); uniq.append(r)
+    for ot in o_teams:
+        for r in _fetch_team_section_rows(con, ot, section, date_from, date_to, hardware=hardware):
+            k = _entity_norm(r["name"])
+            if not k or k in keys_domestic or k in seen:
+                continue
+            seen.add(k)
+            uniq.append(r)
     return _rows_to_contexts(uniq)
 
 
@@ -523,6 +518,46 @@ def build_structured_preamble(intent: dict, total: int, shown: int) -> dict:
     }
 
 
+def _window_label(intent: dict) -> str:
+    df = intent.get("date_from") or ""
+    dt = intent.get("date_to") or ""
+    win = intent.get("window_days", DEFAULT_WINDOW_DAYS)
+    if not df and not dt:
+        return "不限时间"
+    if dt:
+        return f"{df or '…'} 至 {dt}（约 {win} 天）"
+    return f"{df} 起至今（约 {win} 天）"
+
+
+def empty_result_answer(intent: dict) -> str:
+    """结构化查询零命中：固定话术，不调用 LLM。"""
+    t = intent.get("type") or ""
+    win_txt = _window_label(intent)
+    teams = intent.get("teams") if isinstance(intent.get("teams"), list) else []
+    team_a = intent.get("team_a") or (teams[0] if len(teams) > 0 else None) or "团队A"
+    team_b = intent.get("team_b") or (teams[1] if len(teams) > 1 else None) or "团队B"
+    if t == "diff":
+        body = (
+            f"在 {win_txt} 范围内，未找到符合以下条件的主体："
+            f"「{team_a}」有记录，且「{team_b}」在该范围内无记录。"
+        )
+    elif t == "intersect":
+        body = (
+            f"在 {win_txt} 范围内，未找到同时出现在"
+            f"「{team_a}」与「{team_b}」的主体。"
+        )
+    elif t == "overseas_gap":
+        body = (
+            f"在 {win_txt} 范围内，未找到「海外团队有接触、国内团队无跟进」的主体。"
+        )
+    elif t == "by_team":
+        topic = intent.get("topic") or "该主题"
+        body = f"在 {win_txt} 范围内，未找到与「{topic}」相关的团队记录。"
+    else:
+        body = f"在 {win_txt} 范围内，结构化检索未返回任何记录。"
+    return body + "\n\n来源：结构化检索（主体×团队事实表）"
+
+
 def run_structured(con, intent: dict, team_scope: str = "") -> dict:
     if intent.get("type") == "error":
         return {"ok": False, "mode": "structured", "contexts": [], "total": 0,
@@ -562,8 +597,11 @@ def run_structured(con, intent: dict, team_scope: str = "") -> dict:
         "total": total,
         "intent": {
             "type": t,
+            "team_a": intent.get("team_a"),
+            "team_b": intent.get("team_b"),
             "teams": [intent.get("team_a"), intent.get("team_b")],
             "topic": intent.get("topic"),
+            "section": intent.get("section"),
             "window_days": intent.get("window_days"),
             "date_from": intent.get("date_from"),
             "date_to": intent.get("date_to"),

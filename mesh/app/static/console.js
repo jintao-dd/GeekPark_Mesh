@@ -194,16 +194,8 @@ function escHtml(t) {
   return String(t || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-function stypeOptions(selected) {
-  const st = A.stypes || {};
-  return Object.keys(st).map(k => {
-    const label = String(st[k] || '').split('（')[0];
-    return `<option value="${escHtml(k)}"${k === selected ? ' selected' : ''}>${escHtml(k)} · ${escHtml(label)}</option>`;
-  }).join('');
-}
-
 function teamOptions(selected) {
-  return (A.teams || []).map(t =>
+  return (A.sourcePicks || A.teams || []).map(t =>
     `<option value="${escHtml(t)}"${t === selected ? ' selected' : ''}>${escHtml(t)}</option>`
   ).join('');
 }
@@ -241,8 +233,8 @@ function sourceRowHtml(s) {
     <div class="nm">
       <b>${escHtml(s.title || '')}</b>
       <div class="meta-edits">
-        <select class="meta-sel" data-field="stype" title="数据类型（T13=内容中心混合包，将按段分别抽取）">${stypeOptions(s.stype)}</select>
-        <select class="meta-sel" data-field="team" title="提交部门 / 默认归属">${teamOptions(s.team)}</select>
+        <label class="meta-lbl">团队</label>
+        <select class="meta-sel" data-field="team" title="选择提交团队或编辑部材料类型">${teamOptions(s.team)}</select>
       </div>
     </div>
     <div class="dept"><div class="hint">${+(s.n || 0)} 字 · ${s.extracted ? '已抽取' : '未抽取'}${splitHint(s.meta)}</div></div>
@@ -252,15 +244,15 @@ function sourceRowHtml(s) {
 
 function bindMetaSels(root) {
   if (!A.canWrite) return;
-  (root || document).querySelectorAll('#frows .meta-sel').forEach(sel => {
+  (root || document).querySelectorAll('#frows .meta-sel[data-field="team"]').forEach(sel => {
     if (sel.dataset.bound) return;
     sel.dataset.bound = '1';
     sel.addEventListener('change', async () => {
       const row = sel.closest('[data-source-id]');
       if (!row) return;
       const id = +row.dataset.sourceId;
-      const payload = { id };
-      row.querySelectorAll('.meta-sel').forEach(s => { payload[s.dataset.field] = s.value; });
+      const team = sel.value;
+      const payload = { id, team };
       sel.disabled = true;
       try {
         const r = await fetch('/api/source_meta', {

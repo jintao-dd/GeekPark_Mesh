@@ -49,7 +49,7 @@ class AskScope:
         return ""
 
     def cache_key(self, q: str, session_id: str = "", history_len: int = 0) -> str:
-        base = f"{self.scope_key}|{self.team_filter}|{self.slug}|{q}"
+        base = f"v2|{self.scope_key}|{self.team_filter}|{self.slug}|{self.date_from or ''}|{self.date_to or ''}|{q}"
         if history_len:
             return f"{base}|s{session_id}|h{history_len}"
         return f"{base}|s{session_id or 'new'}"
@@ -79,10 +79,14 @@ def resolve(con, user: dict | None, payload: dict | None = None) -> AskScope:
         team = user_team
 
     slug = (p.get("slug") or "").strip()
+    date_from = (p.get("date_from") or "").strip() or None
+    date_to = (p.get("date_to") or "").strip() or None
     return AskScope(
         channel=channel,
         slug=slug,
         team=team,
+        date_from=date_from,
+        date_to=date_to,
         user_id=int(user_id) if user_id else None,
         feishu_open_id=feishu_open_id,
         chat_id=chat_id,

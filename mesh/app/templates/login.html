@@ -14,11 +14,15 @@
 .gate-photo{position:absolute;width:min(300px,42vw);aspect-ratio:4/3;border-radius:12px;overflow:hidden;background:#fff;padding:8px 8px 22px;box-shadow:0 24px 60px rgba(20,56,47,.22),0 3px 10px rgba(0,0,0,.10);z-index:1;transform:rotate(-8deg);pointer-events:none}
 .gate-photo img{width:100%;height:100%;object-fit:cover;display:block;border-radius:6px}
 .lg{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:12px;background:rgba(255,255,255,.9);border:1px solid var(--line);border-radius:var(--r-box);padding:18px 22px;box-shadow:0 10px 30px rgba(20,56,47,.10);min-width:300px}
-.lg input{font:inherit;font-size:15px;height:44px;border:1px solid var(--line);border-radius:var(--r-pill);padding:0 16px;width:280px;outline:none}
-.lg input:focus{border-color:var(--tif);box-shadow:0 0 0 3px var(--tif-bg)}
-.lg button,.lg a.btn{font:inherit;font-size:16px;font-weight:700;height:48px;padding:0 24px;border-radius:var(--r-pill);border:1.5px solid var(--deep);background:#fff;color:var(--deep);cursor:pointer;display:inline-flex;align-items:center;gap:8px;text-decoration:none}
-.lg button:hover,.lg a.btn:hover{background:var(--deep);color:#fff}
+.lg a.btn{font:inherit;font-size:16px;font-weight:700;height:48px;padding:0 24px;border-radius:var(--r-pill);border:1.5px solid var(--deep);background:#fff;color:var(--deep);cursor:pointer;display:inline-flex;align-items:center;gap:8px;text-decoration:none}
+.lg a.btn:hover{background:var(--deep);color:#fff}
 .lg .err{color:#B91C1C;font-size:13px}
+.lg .hint{color:var(--ink3);font-size:13px;line-height:1.5}
+.debug-panel{margin-top:4px;padding-top:12px;border-top:1px dashed var(--line);width:100%}
+.debug-panel .lbl{font-size:11px;color:var(--ink4);margin-bottom:8px}
+.debug-roles{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.debug-roles button{font:inherit;font-size:12px;border:1px solid var(--line);background:#F4FAEC;border-radius:999px;padding:5px 10px;cursor:pointer;color:var(--deep)}
+.debug-roles button.on{background:var(--deep);color:#fff;border-color:var(--deep)}
 .gate-note{position:relative;z-index:2;font-size:13px;color:var(--ink4);letter-spacing:.04em}
 .gate-upd{position:absolute;bottom:26px;left:0;right:0;text-align:center;font-family:var(--mono);font-size:12px;color:var(--ink4)}
 @media (max-width:640px){.logo-wrap .ver{position:static;transform:none;display:block;margin-top:6px}}
@@ -27,20 +31,62 @@
 <body class="locked">
 <div class="gate">
   <div class="gate-photo" id="gatePhoto"><img src="/static/assets/login_photo.jpg" alt=""></div>
-  <div class="logo-wrap"><img src="/static/assets/mesh_logo.png" alt="GeekPark Mesh" class="gate-logo"><span class="ver">{{ issue.version if issue else 'v1.4' }}</span></div>
-  <form class="lg" method="post" action="/login">
-    <input type="hidden" name="next" value="{{ next }}">
-    {% if feishu_enabled %}<a class="btn" href="/auth/feishu?next={{ next|urlencode }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12c4-7 12-9 16-8-1 4-3 8-8 11-2 1-4 1-6 0"/><path d="M4 12l6 3"/></svg>飞书登录</a><div style="font-size:12px;color:var(--ink4)">或用内部账号</div>{% endif %}
-    <input name="username" placeholder="账号" autocomplete="username" required>
-    <input name="password" type="password" placeholder="密码" autocomplete="current-password" required>
+  <div class="logo-wrap"><img src="/static/assets/mesh_logo.png" alt="GeekPark Mesh" class="gate-logo"><span class="ver" id="gateVer">{{ issue.version if issue else 'v1.4' }}</span></div>
+  <div class="lg">
+    {% if feishu_enabled %}
+    <a class="btn" href="/auth/feishu?next={{ next|urlencode }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12c4-7 12-9 16-8-1 4-3 8-8 11-2 1-4 1-6 0"/><path d="M4 12l6 3"/></svg>飞书登录</a>
+    {% else %}
+    <p class="hint">飞书登录未配置，请联系管理员。</p>
+    {% endif %}
     {% if error %}<div class="err">{{ error }}</div>{% elif next and next.startswith('/admin') %}<div class="err" style="color:var(--ink3)">请先登录后再进入后台</div>{% endif %}
-    <button type="submit">登录</button>
-  </form>
-  <div class="gate-note">仅限极客公园内部 · 请使用飞书账号登录 · {{ base_url.replace('https://','').replace('http://','') }} · ZSS/DDD</div>
+    {% if debug_panel %}
+    <div class="debug-panel" id="debugPanel">
+      <div class="lbl">调试 · 飞书登录后按此视角预览（仅白名单账号）</div>
+      <div class="debug-roles" id="debugRoles">
+        <button type="button" data-role="">真实权限</button>
+        <button type="button" data-role="viewer">查看者</button>
+        <button type="button" data-role="editor">编辑</button>
+        <button type="button" data-role="admin">管理员</button>
+        <button type="button" data-role="owner">所有者</button>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  <div class="gate-note">仅限极客公园内部 · 请使用飞书账号登录 · {{ base_url.replace('https://','').replace('http://','') }}</div>
   <div class="gate-upd">数据最近更新：{{ issue.updated_at if issue else '—' }}</div>
 </div>
 <script>
-(function(){const ph=document.getElementById('gatePhoto');const spots=[[18,14],[62,10],[70,58],[14,60],[46,68],[26,36],[60,32]];const [x,y]=spots[Math.floor(Math.random()*spots.length)];const rot=(Math.random()*24-12).toFixed(1);ph.style.left=x+'vw';ph.style.top=y+'vh';ph.style.transform='rotate('+rot+'deg)';})();
+(function(){
+  const ph=document.getElementById('gatePhoto');
+  const spots=[[18,14],[62,10],[70,58],[14,60],[46,68],[26,36],[60,32]];
+  const [x,y]=spots[Math.floor(Math.random()*spots.length)];
+  const rot=(Math.random()*24-12).toFixed(1);
+  ph.style.left=x+'vw';ph.style.top=y+'vh';ph.style.transform='rotate('+rot+'deg)';
+  const ver=document.getElementById('gateVer');
+  let taps=0;
+  ver && ver.addEventListener('click', ()=>{
+    taps+=1;
+    if(taps>=5 && !location.search.includes('debug=1')){
+      location.href='/login?debug=1&next='+encodeURIComponent({{ next|tojson }});
+    }
+  });
+  const panel=document.getElementById('debugRoles');
+  const preset={{ (debug_preset|default(''))|tojson }};
+  if(panel){
+    panel.querySelectorAll('button').forEach(btn=>{
+      if((btn.dataset.role||'')===preset) btn.classList.add('on');
+      btn.addEventListener('click', async ()=>{
+        panel.querySelectorAll('button').forEach(b=>b.classList.remove('on'));
+        btn.classList.add('on');
+        await fetch('/login/debug-preset', {
+          method:'POST',
+          headers:{'Content-Type':'application/json',Accept:'application/json'},
+          body:JSON.stringify({role:btn.dataset.role||''}),
+        });
+      });
+    });
+  }
+})();
 </script>
 </body>
 </html>

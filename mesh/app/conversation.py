@@ -38,6 +38,7 @@ def ensure_session(con, scope: AskScope, user: dict | None = None) -> dict:
             ),
         )
     except db.IntegrityError:
+        con.rollback()
         row = con.execute("SELECT * FROM ask_sessions WHERE scope_key=?", (key,)).fetchone()
         if row:
             return dict(row)
@@ -48,10 +49,22 @@ def ensure_session(con, scope: AskScope, user: dict | None = None) -> dict:
 
 def recent_messages(con, session_id: str, limit: int = 8) -> list[dict]:
     rows = con.execute(
-        "SELECT role, content FROM ask_messages WHERE session_id=? ORDER BY id DESC LIMIT ?",
+        "SELECT role, content, meta_json FROM ask_messages WHERE session_id=? ORDER BY id DESC LIMIT ?",
         (session_id, limit),
     ).fetchall()
-    return [{"role": r["role"], "content": r["content"]} for r in reversed(rows)]
+    out = []
+    for r in reversed(rows):
+        meta = {}
+        raw = r["meta_json"] if "meta_json" in r.keys() else None
+        if raw:
+            try:
+                meta = json.loads(raw) if isinstance(raw, str) else (raw or {})
+            except Exception:
+                meta = {}
+            if not isinstance(meta, dict):
+                meta = {}
+        out.append({"role": r["role"], "content": r["content"], "meta": meta})
+    return out
 
 
 def append_turn(

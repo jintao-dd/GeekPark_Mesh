@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% block title %}往期周报 · GeekPark Mesh{% endblock %}
 {% block body %}
 <div class="adm"><a href="/"><img src="/static/assets/mesh_logo.png" style="height:60px"></a><h1>往期周报</h1>
-<table><tr><th>期</th><th>区间</th><th>发布时间</th></tr>
-{% for i in issues %}<tr><td><a href="/{{ i.slug }}"><b>{{ i.period_label }}</b></a></td><td>{{ i.date_start }} — {{ i.date_end }}</td><td>{{ i.published_at }}</td></tr>{% endfor %}
+<table><tr><th>期</th><th>发布时间</th></tr>
+{% for i in issues %}<tr><td><a href="/{{ i.slug }}"><b>{{ i.display_date }}</b></a></td><td>{{ i.published_at or '—' }}</td></tr>{% endfor %}
 </table></div>
 {% endblock %}

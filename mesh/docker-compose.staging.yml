@@ -1,0 +1,70 @@
+# tmesh 测试环境 — 与生产隔离的独立 compose
+# 用法：cd /opt/geekpark-tmesh && docker compose -f docker-compose.staging.yml up -d --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: geekpark-tmesh-pg
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mesh}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mesh}
+      POSTGRES_DB: ${POSTGRES_DB:-tmesh}
+    volumes:
+      - tmesh_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mesh} -d ${POSTGRES_DB:-tmesh}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mesh:
+    build: .
+    container_name: geekpark-tmesh
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MESH_DB_URL: postgresql://${POSTGRES_USER:-mesh}:${POSTGRES_PASSWORD:-mesh}@postgres:5432/${POSTGRES_DB:-tmesh}
+      MESH_UVICORN_WORKERS: ${MESH_UVICORN_WORKERS:-1}
+      MESH_JOB_INLINE: "0"
+      MESH_ASK_LLM_CONCURRENCY: ${MESH_ASK_LLM_CONCURRENCY:-2}
+      MESH_ASK_LLM_GLOBAL: ${MESH_ASK_LLM_GLOBAL:-4}
+      MESH_JOB_LLM_CONCURRENCY: ${MESH_JOB_LLM_CONCURRENCY:-2}
+      MESH_JOB_LLM_GLOBAL: ${MESH_JOB_LLM_GLOBAL:-2}
+      # 测试环境允许 KG/regen 抽检脚本 publish（生产 PG 默认禁止）
+      MESH_ALLOW_PROD_PUBLISH: "1"
+    ports: ["8091:8080"]
+    volumes:
+      - ./data:/srv/mesh/data
+      - ./app/prompts:/srv/mesh/app/prompts
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  mesh-worker:
+    build: .
+    container_name: geekpark-tmesh-worker
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MESH_DB_URL: postgresql://${POSTGRES_USER:-mesh}:${POSTGRES_PASSWORD:-mesh}@postgres:5432/${POSTGRES_DB:-tmesh}
+      MESH_JOB_INLINE: "0"
+      MESH_JOB_POLL_SEC: ${MESH_JOB_POLL_SEC:-1.5}
+      MESH_JOB_LLM_CONCURRENCY: ${MESH_JOB_LLM_CONCURRENCY:-2}
+      MESH_JOB_LLM_GLOBAL: ${MESH_JOB_LLM_GLOBAL:-2}
+      MESH_ASK_LLM_CONCURRENCY: "1"
+      MESH_ASK_LLM_GLOBAL: "1"
+      MESH_ALLOW_PROD_PUBLISH: "1"
+    command: ["python", "-m", "app.job_worker"]
+    volumes:
+      - ./data:/srv/mesh/data
+      - ./app/prompts:/srv/mesh/app/prompts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mesh:
+        condition: service_started
+
+volumes:
+  tmesh_pg_data:

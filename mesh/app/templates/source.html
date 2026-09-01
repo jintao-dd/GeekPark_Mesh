@@ -7,6 +7,13 @@
 {% if split_info.warnings %}
 <p class="tag pend" style="display:inline-block;margin:0 0 14px;max-width:720px;line-height:1.5">{% for w in split_info.warnings %}{{ w }}{% if not loop.last %}<br>{% endif %}{% endfor %}</p>
 {% endif %}
+{% set needs_review = split_info.get('needs_review') if split_info else False %}
+{% if perms.write and needs_review %}
+<form class="inline" method="post" action="/admin/source/{{ s.id }}/confirm_split" style="margin:0 0 14px">
+  <button class="btn pri" type="submit">确认拆段归属（已核对条目归属）</button>
+  <span class="muted" style="margin-left:8px">确认后本条不再拦截上线</span>
+</form>
+{% endif %}
 {% if perms.write %}<form class="inline" method="post" action="/admin/source/{{ s.id }}/extract"><button class="btn pri">{{ '重新抽取' if s.extracted else '抽取' }}</button></form>{% endif %}
 <h2>抽取条目 <span class="muted">{{ items|length }} 条；标红为 ⑤区/L3 硬拦；「归属」为 owner_team，用于要点卡与交叉分析</span></h2>
 <table><tr><th>区</th><th>级</th><th>类</th><th>T</th><th>归属</th><th>内容</th><th>主体</th><th>来源写法</th></tr>

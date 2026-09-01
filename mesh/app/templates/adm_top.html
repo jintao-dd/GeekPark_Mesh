@@ -6,7 +6,9 @@
     <nav class="adm-nav" aria-label="后台导航">
       {% if perms.console %}
       <a href="/admin/issues"{% if nav == 'issues' %} class="on"{% endif %}>各期</a>
+      {% if perms.edm %}
       <a href="/admin/edm"{% if nav == 'edm' %} class="on"{% endif %}>EDM</a>
+      {% endif %}
       {% endif %}
       {% if perms.sysadmin %}
       <a href="/admin/users"{% if nav == 'users' %} class="on"{% endif %}>账号</a>

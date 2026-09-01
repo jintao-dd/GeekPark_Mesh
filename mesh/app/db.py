@@ -7,12 +7,13 @@ from . import db_conn
 
 _log = logging.getLogger("mesh.db")
 DB_PATH = db_conn.DB_PATH
-SCHEMA_VERSION = "1.7.0"
+SCHEMA_VERSION = "1.8.2"
 _DB_WRITE_LOCK = threading.RLock()
 
 IntegrityError = db_conn.IntegrityError
 is_postgres = db_conn.is_postgres
 connect = db_conn.connect
+insert_id = db_conn.insert_id
 try_maintenance_lock = db_conn.try_maintenance_lock
 release_maintenance_lock = db_conn.release_maintenance_lock
 
@@ -283,10 +284,7 @@ def write_lock():
 
 
 def commit_retry(con, *, max_attempts: int = 5) -> None:
-    """写冲突时指数退避重试（SQLite locked / PG serialization）。"""
-    if getattr(con, "dialect", "sqlite") == "postgresql":
-        con.commit()
-        return
+    """写冲突时指数退避重试（SQLite locked / PG deadlock & serialization）。"""
     delay = 0.05
     for attempt in range(max_attempts):
         try:
@@ -300,6 +298,35 @@ def commit_retry(con, *, max_attempts: int = 5) -> None:
                 raise
             time.sleep(delay)
             delay = min(delay * 2, 1.0)
+        except Exception as e:
+            if getattr(con, "dialect", "sqlite") != "postgresql" or not _pg_commit_retriable(e):
+                raise
+            try:
+                con.rollback()
+            except Exception:
+                pass
+            if attempt >= max_attempts - 1:
+                raise
+            time.sleep(delay)
+            delay = min(delay * 2, 1.0)
+
+
+def _pg_commit_retriable(exc: BaseException) -> bool:
+    try:
+        import psycopg2
+        from psycopg2 import errors as pg_errors
+
+        return isinstance(
+            exc,
+            (
+                psycopg2.extensions.TransactionRollbackError,
+                pg_errors.DeadlockDetected,
+                pg_errors.SerializationFailure,
+                pg_errors.LockNotAvailable,
+            ),
+        )
+    except Exception:
+        return False
 
 def hash_pw(pw: str, salt: str | None = None) -> str:
     salt = salt or secrets.token_hex(8)
@@ -326,6 +353,16 @@ def _cols(con, table):
 def migrate(con):
     """就地升级旧库：老部署直接覆盖代码后启动即可，不丢数据。"""
     if is_postgres():
+        pg_add = [
+            ("items", "owner_provenance", "TEXT"),
+            ("items", "llm_owner_team_hint", "TEXT"),
+        ]
+        for table, col, decl in pg_add:
+            try:
+                if col not in _cols(con, table):
+                    con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+            except Exception:
+                pass
         try:
             set_setting(con, "schema_version", SCHEMA_VERSION)
         except Exception:
@@ -338,6 +375,8 @@ def migrate(con):
         ("items", "channel", "TEXT DEFAULT 'manual'"),
         ("items", "merged_into", "INTEGER"),
         ("items", "source_labels", "TEXT"),
+        ("items", "owner_provenance", "TEXT"),
+        ("items", "llm_owner_team_hint", "TEXT"),
         ("users", "avatar_url", "TEXT"),
         ("issues", "published_items_snapshot", "TEXT"),
     ]
@@ -446,6 +485,22 @@ def migrate(con):
           mode TEXT, n_context INTEGER, meta_json TEXT,
           created_at TEXT DEFAULT (datetime('now')))""",
         "CREATE INDEX IF NOT EXISTS idx_ask_msg_sess ON ask_messages(session_id, id)",
+        """CREATE TABLE IF NOT EXISTS ask_analyses(
+          analysis_id TEXT PRIMARY KEY,
+          parent_analysis_id TEXT,
+          session_id TEXT,
+          user_id INTEGER,
+          question TEXT,
+          status TEXT NOT NULL DEFAULT 'running',
+          answer TEXT,
+          context_refs_json TEXT,
+          usage_json TEXT,
+          verify_json TEXT,
+          sources_json TEXT,
+          created_at TEXT,
+          updated_at TEXT,
+          finished_at TEXT)""",
+        "CREATE INDEX IF NOT EXISTS idx_ask_analyses_sess ON ask_analyses(session_id, created_at)",
         """CREATE TABLE IF NOT EXISTS ask_log(
           id INTEGER PRIMARY KEY, session_id TEXT, user_id INTEGER, feishu_open_id TEXT,
           chat_id TEXT, thread_id TEXT, team_scope TEXT, query TEXT NOT NULL, mode TEXT,
@@ -463,6 +518,17 @@ def migrate(con):
           id INTEGER PRIMARY KEY, preset_id INTEGER NOT NULL, user_id INTEGER,
           answer_snippet TEXT, ok INTEGER DEFAULT 1, error TEXT,
           pushed_at TEXT DEFAULT (datetime('now')))""",
+        """CREATE TABLE IF NOT EXISTS mesh_jobs(
+          job_kind TEXT NOT NULL, job_key TEXT NOT NULL,
+          token INTEGER NOT NULL DEFAULT 0, running INTEGER NOT NULL DEFAULT 0,
+          done INTEGER NOT NULL DEFAULT 0, error TEXT, payload_json TEXT,
+          updated_at TEXT DEFAULT (datetime('now')),
+          PRIMARY KEY (job_kind, job_key))""",
+        """CREATE TABLE IF NOT EXISTS ask_rate_hits(
+          rate_key TEXT NOT NULL, hit_at REAL NOT NULL)""",
+        "CREATE INDEX IF NOT EXISTS idx_ask_rate_key ON ask_rate_hits(rate_key, hit_at)",
+        """CREATE TABLE IF NOT EXISTS mesh_llm_slots(
+          slot_id INTEGER PRIMARY KEY, holder TEXT, taken_at REAL)""",
     ):
         try:
             con.execute(ddl)
@@ -617,6 +683,10 @@ _TEAM_ALIAS_DEFAULT = {
     "播客": "音频播客团队",
     "播客团队": "音频播客团队",
     "视频号": "视频号团队",
+    "GeekPark English": "英文站",
+    "Geekpark English": "英文站",
+    "极客公园英文站": "英文站",
+    "GeekPark English站": "英文站",
 }
 
 def _team_alias_map() -> dict:
@@ -704,6 +774,7 @@ def _infer_kind(section: str, name: str, sub: str = "") -> str:
     return "unknown"
 
 def _collect_item_teams(it: dict, parent_label: str = "", group_title: str = "") -> list[str]:
+    """只采显式 teams[] 或「来源/归属」行；避免从正文 blob 误抠跨团队。"""
     teams = []
     for t in it.get("teams") or []:
         n = normalize_team(t)
@@ -713,12 +784,14 @@ def _collect_item_teams(it: dict, parent_label: str = "", group_title: str = "")
         return teams
     src_bits = []
     for row in it.get("rows") or []:
-        if row.get("k") in ("来源", "来源团队") or "来源" in str(row.get("k") or ""):
+        k = str(row.get("k") or "")
+        if (
+            k in ("来源", "来源团队", "归属", "归属团队")
+            or "来源" in k
+            or "归属" in k
+        ):
             src_bits.append(str(row.get("v") or ""))
-        else:
-            src_bits.append(str(row.get("v") or ""))
-    inferred = teams_from_blob(parent_label, group_title, " ".join(src_bits), it.get("sub") or "")
-    return inferred
+    return teams_from_blob(*src_bits)
 
 def reindex_entity_facts(con, issue_id: int):
     """从已发布 JSON 物化 主体×团队×期号；仅 published 写入，草稿不进交叉语料。"""
@@ -794,7 +867,8 @@ def reindex_entity_facts(con, issue_id: int):
     for v in data.get("views") or []:
         topic = v.get("topic") or ""
         text = (v.get("text") or "") + " " + (v.get("source") or "")
-        teams = teams_from_blob(v.get("source") or "", text)
+        # 仅从来源字段抠团队，避免看法正文里的提及被物化为「主体×团队」
+        teams = teams_from_blob(v.get("source") or "")
         if not teams:
             continue
         for team in teams:
