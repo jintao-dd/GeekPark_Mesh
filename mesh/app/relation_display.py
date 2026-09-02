@@ -131,7 +131,8 @@ def count_reader_relations(relations: list | None) -> int:
 def draft_backlog_relations(relations: list | None) -> list[dict]:
     """预览/编辑态「草稿积压」条目（含原 relations 下标 index）。
 
-    含 parallel / watch，以及未进读者页的 strong（不完整等）。不含 skip。
+    仅 explicit parallel / watch，以及不完整的 strong。
+    无 decision_tier 的旧稿不算积压（与已发 EDM 一样进读者区展示）。
     """
     out: list[dict] = []
     for i, r in enumerate(relations or []):
@@ -140,7 +141,9 @@ def draft_backlog_relations(relations: list | None) -> list[dict]:
         if reader_visible(r):
             continue
         tier = (r.get("decision_tier") or "").strip().lower()
-        if tier == "skip":
+        if tier == "skip" or not tier:
+            continue
+        if tier not in BACKLOG_TIERS and tier != "strong":
             continue
         row = dict(r)
         row["reader_visible"] = False

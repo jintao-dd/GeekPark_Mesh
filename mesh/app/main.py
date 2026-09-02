@@ -3169,16 +3169,23 @@ def issue_page(request: Request, slug: str, preview: int = 0, edit: int = 0, syn
     data.setdefault("plans", {})
     data["plans"].setdefault("groups", [])
     data["plans"].setdefault("sources", [])
-    # KPI「可同步的关系」始终对齐读者卡；预览态另传草稿积压供编辑审视
-    try:
-        from .issue_verify import sync_kpis_from_data
-        data = sync_kpis_from_data(data)
-    except Exception:
-        pass
+    # 预览：KPI=strong 读者卡 + 草稿积压；已发布：KPI=published_json 卡数（与已发 EDM 一致）
     relations_backlog = []
     if preview:
+        try:
+            from .issue_verify import sync_kpis_from_data
+            data = sync_kpis_from_data(data)
+        except Exception:
+            pass
         from .relation_display import draft_backlog_relations
         relations_backlog = draft_backlog_relations(data.get("relations") or [])
+    else:
+        try:
+            from .relation_display import _sync_relation_kpi
+            n_pub = sum(1 for x in (data.get("relations") or []) if isinstance(x, dict))
+            _sync_relation_kpi(data, n_pub)
+        except Exception:
+            pass
     con = db.connect()
     arch = [_enrich_issue(x) for x in con.execute("SELECT slug, period_label, date_end, published_at FROM issues WHERE status='published' ORDER BY date_end DESC LIMIT 12")]
     con.close()

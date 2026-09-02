@@ -119,6 +119,7 @@ def test_draft_backlog_includes_parallel_watch_keeps_index():
         {"decision_tier": "watch", "title": "W", "body": "b", "evidence": [{}]},
         {"decision_tier": "skip", "title": "X", "body": "b", "evidence": [{}]},
         {"decision_tier": "strong", "title": "Incomplete", "body": "", "evidence": [{}]},
+        {"title": "Legacy", "body": "b"},  # 无 tier：不算积压
     ]
     backlog = draft_backlog_relations(rels)
     assert [x["rel"]["title"] for x in backlog] == ["P", "W", "Incomplete"]
