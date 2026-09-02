@@ -1,0 +1,466 @@
+{% extends "base.html" %}
+{% block title %}评测看板 · GeekPark Mesh{% endblock %}
+{% block head %}
+<style>
+  .ev { max-width: 1080px; margin: 0 auto 64px; padding: 0 20px; }
+  .ev-banner {
+    border: 1px solid #D6D3D1; background: #FAFAF9; color: #44403C;
+    padding: 10px 14px; border-radius: 8px; font-size: 13px; margin: 0 0 14px;
+  }
+  .ev-verdict {
+    border: 1px solid #D6D3D1; border-radius: 10px; padding: 14px 16px; margin: 0 0 14px;
+    background: #fff; font-size: 15px; line-height: 1.55; color: #1C1917; font-weight: 550;
+  }
+  .ev-verdict .tagline { font-size: 12px; color: #78716C; font-weight: 500; margin-bottom: 6px; }
+  .ev-verdict.tone-ok { border-color: #A7F3D0; background: #F0FDF4; }
+  .ev-verdict.tone-warn { border-color: #FDE68A; background: #FFFBEB; }
+  .ev-verdict.tone-block { border-color: #FECACA; background: #FEF2F2; }
+  .ev-verdict.tone-same { border-color: #E7E5E4; background: #FAFAF9; }
+  .ev-q { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 0 0 4px; }
+  .ev-q-item {
+    border: 1px solid #E7E5E4; border-radius: 10px; background: #fff; padding: 10px 14px;
+  }
+  .ev-q-item .q { font-size: 12px; color: #78716C; margin-bottom: 3px; }
+  .ev-q-item .a { font-size: 14px; color: #1C1917; line-height: 1.45; }
+  .ev-grid { display: grid; gap: 12px; }
+  .ev-grid-4 { grid-template-columns: repeat(4, 1fr); }
+  .ev-grid-3 { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 860px) {
+    .ev-grid-4, .ev-grid-3 { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 520px) {
+    .ev-grid-4, .ev-grid-3 { grid-template-columns: 1fr; }
+  }
+  .ev-card {
+    border: 1px solid #E7E5E4; border-radius: 10px; background: #fff;
+    padding: 14px 16px; min-height: 96px;
+  }
+  .ev-card.proxy { border-style: dashed; }
+  .ev-card .k { font-size: 13px; color: #57534E; font-weight: 600; }
+  .ev-card .v { font-size: 26px; font-weight: 650; color: #1C1917; margin-top: 6px; line-height: 1.15; }
+  .ev-card .s { font-size: 12px; color: #A8A29E; margin-top: 6px; line-height: 1.4; }
+  .ev-sec { margin-top: 28px; }
+  .ev-sec h2 { font-size: 18px; margin: 0 0 4px; color: #1C1917; }
+  .ev-sec .lede { font-size: 13px; color: #78716C; margin: 0 0 12px; line-height: 1.55; }
+  .ev-pill {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px;
+    border-radius: 999px; border: 1px solid #D6D3D1; color: #57534E; background: #F5F5F4;
+    vertical-align: middle;
+  }
+  .ev-pill.ok { border-color: #A7F3D0; background: #ECFDF5; color: #065F46; }
+  .ev-pill.warn { border-color: #FDE68A; background: #FFFBEB; color: #92400E; }
+  .ev-pill.block { border-color: #FECACA; background: #FEF2F2; color: #991B1B; }
+  .ev-pill.proxy { border-color: #FDBA74; background: #FFF7ED; color: #9A3412; }
+  .ev-pill.same { color: #78716C; }
+  .ev-funnel { display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px; margin-top: 8px; }
+  .ev-step {
+    flex: 1 1 110px; border: 1px solid #E7E5E4; border-radius: 10px; padding: 12px 10px;
+    background: #fff; text-align: center; cursor: pointer; transition: box-shadow .15s;
+  }
+  .ev-step:hover, .ev-step.on { box-shadow: 0 0 0 2px #1C1917; }
+  .ev-step.drop { border-color: #FDE68A; background: #FFFBEB; }
+  .ev-step.zero { border-color: #FECACA; background: #FEF2F2; }
+  .ev-step .n { font-size: 28px; font-weight: 650; color: #1C1917; }
+  .ev-step .l { font-size: 13px; color: #1C1917; margin-top: 4px; font-weight: 600; }
+  .ev-step .h { font-size: 11px; color: #A8A29E; margin-top: 2px; }
+  .ev-step .d { font-size: 11px; color: #78716C; margin-top: 6px; }
+  .ev-arrow { align-self: center; color: #A8A29E; font-size: 16px; padding: 0 2px; }
+  .ev-reasons {
+    margin-top: 12px; border: 1px solid #E7E5E4; border-radius: 10px; background: #fff; padding: 12px 14px;
+  }
+  .ev-reasons h3 { margin: 0 0 8px; font-size: 14px; color: #1C1917; }
+  .ev-reasons .row { font-size: 13px; color: #44403C; padding: 8px 0; border-bottom: 1px solid #F5F5F4; line-height: 1.45; }
+  .ev-reasons .row:last-child { border-bottom: 0; }
+  .ev-reasons .t { font-weight: 600; }
+  .ev-reasons .c { color: #9A3412; font-size: 12px; margin-left: 6px; }
+  .ev-reasons .r { display: block; color: #78716C; font-size: 12px; margin-top: 3px; }
+  .ev-cases {
+    display: none; margin-top: 12px; border: 1px solid #1C1917; border-radius: 10px;
+    background: #FAFAF9; padding: 12px 14px; max-height: 360px; overflow: auto;
+  }
+  .ev-cases.open { display: block; }
+  .ev-cases h3 { margin: 0 0 8px; font-size: 14px; }
+  .ev-cases .item { font-size: 13px; padding: 8px 0; border-bottom: 1px solid #E7E5E4; }
+  .ev-cases .item:last-child { border-bottom: 0; }
+  .ev-cases .meta { font-size: 12px; color: #78716C; margin-top: 2px; }
+  .ev-skip-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .ev-skip-chip {
+    border: 1px solid #E7E5E4; border-radius: 8px; padding: 6px 10px; background: #fff; font-size: 13px;
+  }
+  .ev-skip-chip b { font-size: 16px; margin-left: 4px; }
+  .ev-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .ev-table th, .ev-table td { text-align: left; padding: 9px 10px; border-bottom: 1px solid #E7E5E4; vertical-align: top; }
+  .ev-table th { color: #78716C; font-weight: 600; font-size: 12px; }
+  .ev-table tr.expandable { cursor: pointer; }
+  .ev-table tr.expandable:hover td { background: #FAFAF9; }
+  .ev-why { display: none; color: #57534E; font-size: 12px; line-height: 1.45; margin-top: 6px; }
+  .ev-why.open { display: block; }
+  .ev-env {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 18px;
+    font-size: 13px; color: #44403C; margin-top: 10px;
+  }
+  @media (max-width: 720px) { .ev-env { grid-template-columns: 1fr; } }
+  .ev-env b { color: #1C1917; font-weight: 600; }
+  .ev-callout {
+    border-left: 3px solid #D97706; background: #FFFBEB; padding: 10px 12px;
+    font-size: 13px; color: #78350F; border-radius: 0 8px 8px 0; margin: 10px 0 0; line-height: 1.5;
+  }
+  .ev-callout.info { border-left-color: #57534E; background: #F5F5F4; color: #44403C; }
+  .ev-hist a {
+    display: block; padding: 12px 14px; border: 1px solid #E7E5E4; border-radius: 8px;
+    text-decoration: none; color: #1C1917; margin-bottom: 8px; font-size: 13px;
+  }
+  .ev-hist a:hover { background: #FAFAF9; }
+  .ev-hist a.on { border-color: #1C1917; background: #F5F5F4; }
+  .ev-hist .meta { color: #78716C; font-size: 12px; margin-top: 4px; line-height: 1.45; }
+  .ev-hist .metrics { margin-top: 6px; font-size: 12px; color: #44403C; }
+  .ev-hist .vs { margin-top: 4px; font-size: 12px; color: #57534E; }
+  .ev-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; justify-content: space-between; margin-bottom: 8px; }
+  .ev-head h1 { margin: 0; font-size: 24px; color: #1C1917; }
+  .ev-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .ev-form label { font-size: 12px; color: #78716C; }
+  .ev-form select { font: inherit; padding: 6px 8px; border: 1px solid #D6D3D1; border-radius: 6px; max-width: 220px; }
+  .ev-form button {
+    font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid #1C1917;
+    background: #1C1917; color: #fff; cursor: pointer;
+  }
+  .num-neg { color: #B45309; }
+  .num-pos { color: #047857; }
+  .ev-hint-click { font-size: 12px; color: #A8A29E; }
+</style>
+{% endblock %}
+{% block body %}
+<div class="adm ev">
+{% with nav='eval' %}{% include "adm_top.html" %}{% endwith %}
+
+{% if not view.ok %}
+  <h1>评测看板</h1>
+  <p class="tag pend">{{ view.error }}</p>
+{% else %}
+
+<div class="ev-head">
+  <div>
+    <h1>评测看板</h1>
+    <p class="lede" style="margin:6px 0 0;color:#78716C;font-size:13px">先看结论，再翻细节。</p>
+  </div>
+  <form class="ev-form" method="get" action="/admin/eval">
+    <label>当前实验</label>
+    <select name="current">
+      {% for ex in view.experiments %}
+      <option value="{{ ex.name }}" {% if ex.name == view.current_file %}selected{% endif %}>{{ ex.name }}</option>
+      {% endfor %}
+    </select>
+    <label>对比基线</label>
+    <select name="baseline">
+      {% for ex in view.experiments %}
+      <option value="{{ ex.name }}" {% if ex.name == view.baseline_file %}selected{% endif %}>{{ ex.name }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">对比</button>
+  </form>
+</div>
+
+<div class="ev-banner">{{ view.readonly_note }}</div>
+
+{# 当前结论 #}
+<div class="ev-verdict tone-{{ view.headline.tone }}">
+  <div class="tagline">当前结论</div>
+  {{ view.headline.verdict }}
+</div>
+
+<section class="ev-sec" style="margin-top:8px">
+  <div class="ev-q">
+    <div class="ev-q-item">
+      <div class="q">① 质量怎么样？</div>
+      <div class="a">{{ view.headline.quality }}</div>
+    </div>
+    <div class="ev-q-item">
+      <div class="q">② 关系链掉在哪？</div>
+      <div class="a">{{ view.headline.relation_drop }}</div>
+    </div>
+    <div class="ev-q-item">
+      <div class="q">③ 优化变好还是变坏？</div>
+      <div class="a">{{ view.headline.delta }}</div>
+    </div>
+  </div>
+</section>
+
+<section class="ev-sec">
+  <h2>① 当前基线是哪一套配置</h2>
+  <p class="lede">分数必须挂在具体代码与语料上。文件 <code>{{ view.env.file }}</code> · schema {{ view.env.schema }}</p>
+  <div class="ev-grid ev-grid-4">
+    <div class="ev-card">
+      <div class="k">边界失败</div>
+      <div class="v">{{ view.boundary.fails }}</div>
+      <div class="s">必须为 0</div>
+    </div>
+    <div class="ev-card">
+      <div class="k">警告</div>
+      <div class="v">{{ view.boundary.warns }}</div>
+      <div class="s">已知小问题，故意保留</div>
+    </div>
+    <div class="ev-card">
+      <div class="k">通过</div>
+      <div class="v">{{ view.boundary.passes }}</div>
+      <div class="s">产品边界检查项</div>
+    </div>
+    <div class="ev-card">
+      <div class="k">代码版本</div>
+      <div class="v" style="font-size:18px">{{ view.env.commit_short or '—' }}</div>
+      <div class="s">脏工作区={{ view.env.git_dirty }} · {{ view.env.branch or '' }}</div>
+    </div>
+  </div>
+  <div class="ev-env">
+    <div>语料 <b>{{ view.env.corpus or '—' }}</b>{% if view.env.slug %} / {{ view.env.slug }}{% endif %}</div>
+    <div>模型 <b>{{ view.env.llm_model or view.env.provider or '—' }}</b></div>
+    <div>向量模型 <b>{{ view.env.embedding_model or '—' }}</b></div>
+    <div>Ask 题集 <b>{{ view.env.ask_eval_set or '—' }}</b> · hash {{ view.env.eval_dataset_hash or '—' }}</div>
+    <div>分析开关 <b>{{ view.env.analysis_ask or '—' }}</b> · 组数 {{ view.env.analysis_max_groups or '—' }}</div>
+    <div>提示词哈希 <b>{{ view.env.prompt_hash_count }}</b> 个
+      {% for k,v in (view.env.prompt_hashes_focus or {}).items() %}
+        · {{ k.split('.')[0] }}={{ v }}
+      {% endfor %}
+    </div>
+  </div>
+  {% for note in view.boundary.warn_notes %}
+  <div class="ev-callout">⚠ {{ note }}</div>
+  {% endfor %}
+</section>
+
+<section class="ev-sec">
+  <h2>② Ask 问答质量</h2>
+  <p class="lede">看「整题能不能答对」，不是检索召回率。延迟是每题一个端到端耗时。</p>
+  <div class="ev-grid ev-grid-4">
+    <div class="ev-card">
+      <div class="k">端到端通过</div>
+      <div class="v">{{ view.ask.e2e_frac or '—' }}</div>
+      <div class="s">通过题数 / 总题数</div>
+    </div>
+    <div class="ev-card">
+      <div class="k">有据可依</div>
+      <div class="v">{{ view.ask.grounding_s }}</div>
+      <div class="s">硬底线</div>
+    </div>
+    <div class="ev-card">
+      <div class="k">耗时 P50 / P95 / P99</div>
+      <div class="v" style="font-size:17px">{{ view.ask.p50_s }} / {{ view.ask.p95_s }} / {{ view.ask.p99_s }}</div>
+      <div class="s">中位 / 较慢 / 最慢档</div>
+    </div>
+    <div class="ev-card">
+      <div class="k">Token / 重试率</div>
+      <div class="v" style="font-size:18px">{{ view.ask.token_s }} / {{ view.ask.retry_s }}</div>
+      <div class="s">「无数据」≠ 0</div>
+    </div>
+  </div>
+</section>
+
+<section class="ev-sec">
+  <h2>③ 关系质量 <span class="ev-pill proxy">{{ view.relation.proxy_badge }}</span></h2>
+  <p class="lede">{{ view.relation.proxy_disclaimer }}</p>
+  <div class="ev-grid ev-grid-4">
+    <div class="ev-card proxy">
+      <div class="k">候选保留率 <span class="ev-pill proxy">代理</span></div>
+      <div class="v">{{ view.relation.keep_s }}</div>
+      <div class="s">草稿数 ÷ 候选数，不是召回率</div>
+    </div>
+    <div class="ev-card proxy">
+      <div class="k">门控通过率 <span class="ev-pill proxy">代理</span></div>
+      <div class="v">{{ view.relation.gate_s }}</div>
+      <div class="s">不是精确率</div>
+    </div>
+    <div class="ev-card">
+      <div class="k">关系完整性</div>
+      <div class="v">{{ view.relation.grounding_s }}{% if view.relation.grounding == 0 %} <span class="ev-pill warn">⚠</span>{% endif %}</div>
+      <div class="s">库存合格卡 / 库存卡</div>
+    </div>
+    <div class="ev-card">
+      <div class="k">待人工复核</div>
+      <div class="v">{{ view.relation.human_review if view.relation.human_review is not none else '—' }}</div>
+      <div class="s">见下方口径说明</div>
+    </div>
+  </div>
+  <div class="ev-callout info">{{ view.relation.grounding_note }}</div>
+  <div class="ev-callout info">{{ view.relation.human_review_note }}</div>
+</section>
+
+<section class="ev-sec">
+  <h2>④ 关系漏斗 <span class="ev-pill">本次决策流水</span></h2>
+  <p class="lede">{{ view.funnel.click_hint }} 改 Decision / Gate / Writer 时重点看这里。</p>
+  {% if view.funnel.drop_hint %}
+  <div class="ev-callout">📍 {{ view.funnel.drop_hint }}</div>
+  {% endif %}
+
+  {% if view.funnel.skip_rows %}
+  <div class="ev-skip-bar">
+    {% for row in view.funnel.skip_rows %}
+    <div class="ev-skip-chip">{{ row.label }}<b>{{ row.n }}</b></div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="ev-funnel" id="funnelSteps">
+    {% for step in view.funnel.steps %}
+      {% if not loop.first %}<div class="ev-arrow">→</div>{% endif %}
+      <div class="ev-step {% if step.n == 0 %}zero{% elif loop.index > 2 and step.n is not none and step.n < (view.funnel.steps[0].n or 0) %}drop{% endif %}"
+           data-case-key="{{ step.case_key }}"
+           data-drop-key="{{ step.drop_key or '' }}"
+           data-label="{{ step.label }}">
+        <div class="n">{{ step.n if step.n is not none else '—' }}</div>
+        <div class="l">{{ step.label }}</div>
+        {% if step.hint %}<div class="h">{{ step.hint }}</div>{% endif %}
+        {% if step.detail %}<div class="d">{{ step.detail }}</div>{% endif %}
+      </div>
+    {% endfor %}
+  </div>
+
+  {% if view.funnel.reason_preview %}
+  <div class="ev-reasons">
+    <h3>掉量原因（直接可见）</h3>
+    {% for row in view.funnel.reason_preview %}
+    <div class="row">
+      <span class="t">{{ row.title }}</span>
+      {% if row.label %}<span class="c">{{ row.label }}</span>{% endif %}
+      {% if row.reason %}<span class="r">{{ row.reason }}</span>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="ev-cases" id="funnelCases">
+    <h3 id="funnelCasesTitle">Cases</h3>
+    <div id="funnelCasesBody"></div>
+  </div>
+
+  <h2 style="margin-top:26px">④′ {{ view.integrity.title }} <span class="ev-pill warn">另一套数据</span></h2>
+  <p class="lede">{{ view.integrity.disclaimer }}</p>
+  <div class="ev-grid ev-grid-3">
+    <div class="ev-card">
+      <div class="k">合格 / 库存关系卡</div>
+      <div class="v" style="font-size:20px">{{ view.integrity.n_ok if view.integrity.n_ok is not none else '—' }} / {{ view.integrity.n_relations if view.integrity.n_relations is not none else '—' }}</div>
+      <div class="s">关系完整性 {{ view.integrity.grounding_s }}</div>
+    </div>
+    <div class="ev-card">
+      <div class="k">强关系缺证据</div>
+      <div class="v">{{ view.integrity.strong_no_evidence if view.integrity.strong_no_evidence is not none else '—' }}</div>
+    </div>
+    <div class="ev-card">
+      <div class="k">缺档位 / 团队不一致</div>
+      <div class="v" style="font-size:20px">{{ view.integrity.missing_tier if view.integrity.missing_tier is not none else '—' }} / {{ view.integrity.team_mismatch if view.integrity.team_mismatch is not none else '—' }}</div>
+      <div class="s">库存草稿卡 {{ view.integrity.n_draft_store if view.integrity.n_draft_store is not none else '—' }} 张</div>
+    </div>
+  </div>
+</section>
+
+<section class="ev-sec">
+  <h2>⑤ 相对基线变好了吗</h2>
+  <p class="lede">
+    用 <code>{{ view.baseline_file }}</code> 对比当前 <code>{{ view.current_file }}</code>。
+    <span class="ev-hint-click">点一行展开「为什么」</span>
+  </p>
+  <table class="ev-table" id="deltaTable">
+    <thead>
+      <tr><th>指标</th><th>基线</th><th>当前</th><th>变化</th><th>结论</th></tr>
+    </thead>
+    <tbody>
+    {% for r in view.delta %}
+      <tr class="expandable">
+        <td>{{ r.metric_cn or r.metric }}</td>
+        <td>{{ r.baseline_s }}</td>
+        <td>{{ r.new_s }}</td>
+        <td class="{% if r.delta is not none and r.delta < 0 %}num-neg{% elif r.delta is not none and r.delta > 0 %}num-pos{% endif %}">{{ r.delta_display }}</td>
+        <td>
+          {% if r.status == '[BLOCKER]' %}<span class="ev-pill block">{{ r.status_cn }}</span>
+          {% elif r.status == '[WARN]' %}<span class="ev-pill warn">{{ r.status_cn }}</span>
+          {% elif r.status == '[OK]' %}<span class="ev-pill ok">{{ r.status_cn }}</span>
+          {% elif r.status == '[.]' %}<span class="ev-pill same">{{ r.status_cn }}</span>
+          {% else %}<span class="ev-pill">{{ r.status_cn or r.status }}</span>{% endif %}
+          <div class="ev-why">{{ r.why }}</div>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="ev-sec">
+  <h2>实验历史</h2>
+  <p class="lede">每次优化冻一份报告。列表直接显示 Ask / 关系代理 / P95，以及相对当前所选基线的 Δ 摘要。</p>
+  <div class="ev-hist">
+    {% for ex in view.experiments %}
+    <a class="{% if ex.name == view.current_file %}on{% endif %}"
+       href="/admin/eval?current={{ ex.name }}&baseline={{ view.baseline_file }}">
+      <b>{% if ex.is_current_pointer %}当前指针 · {% endif %}{% if ex.is_baseline %}基线 · {% endif %}{{ ex.label or ex.name }}</b>
+      <div class="meta">{{ ex.name }} · {{ ex.commit or '—' }} · dirty={{ ex.git_dirty }} · {{ ex.corpus or '' }}{% if ex.slug %} / {{ ex.slug }}{% endif %} · {{ ex.frozen_at or '' }}</div>
+      <div class="metrics">
+        Ask {{ ex.ask_e2e_frac or '—' }} · 有据 {{ ex.ask_grounding_s or '—' }} · 保留率(代理) {{ ex.rel_keep_s or '—' }} · 完整性 {{ ex.rel_integrity_s or '—' }} · P95 {{ ex.p95_s or '—' }}
+      </div>
+      {% if ex.vs_baseline %}<div class="vs">{{ ex.vs_baseline }}</div>{% endif %}
+    </a>
+    {% else %}
+    <p class="muted">暂无实验快照。</p>
+    {% endfor %}
+  </div>
+</section>
+
+{% if view.notes_proxy %}
+<section class="ev-sec">
+  <h2>口径备注</h2>
+  <ul style="font-size:13px;color:#57534E;line-height:1.55;margin:0;padding-left:18px">
+    {% for n in view.notes_proxy %}<li>{{ n }}</li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<script id="funnelCasesData" type="application/json">{{ view.cases_json | safe }}</script>
+<script>
+(function () {
+  var cases = {};
+  try {
+    cases = JSON.parse(document.getElementById('funnelCasesData').textContent || '{}');
+  } catch (e) { cases = {}; }
+
+  var panel = document.getElementById('funnelCases');
+  var title = document.getElementById('funnelCasesTitle');
+  var body = document.getElementById('funnelCasesBody');
+  var steps = document.querySelectorAll('#funnelSteps .ev-step');
+
+  function render(key, label, preferDrop) {
+    var dropKey = preferDrop || '';
+    var rows = (dropKey && cases[dropKey] && cases[dropKey].length) ? cases[dropKey] : (cases[key] || []);
+    var mode = (dropKey && cases[dropKey] && cases[dropKey].length) ? '掉量 cases' : '本层 cases';
+    title.textContent = label + ' · ' + mode + '（' + rows.length + '）';
+    if (!rows.length) {
+      body.innerHTML = '<div class="meta">该层没有明细（可能本层为 0，或基线未写入 ledger）。</div>';
+    } else {
+      body.innerHTML = rows.map(function (c) {
+        return '<div class="item"><b>' + (c.title || c.id || '') + '</b>' +
+          (c.skip_label ? ' <span class="ev-pill warn">' + c.skip_label + '</span>' : '') +
+          (c.outcome ? '<div class="meta">' + c.outcome + '</div>' : '') +
+          (c.reason ? '<div class="meta">' + c.reason + '</div>' : '') +
+          (c.review_hint ? '<div class="meta">复核提示：' + c.review_hint + '</div>' : '') +
+          '</div>';
+      }).join('');
+    }
+    panel.classList.add('open');
+  }
+
+  steps.forEach(function (el) {
+    el.addEventListener('click', function () {
+      steps.forEach(function (s) { s.classList.remove('on'); });
+      el.classList.add('on');
+      render(el.getAttribute('data-case-key'), el.getAttribute('data-label'), el.getAttribute('data-drop-key'));
+    });
+  });
+
+  document.querySelectorAll('#deltaTable tr.expandable').forEach(function (tr) {
+    tr.addEventListener('click', function () {
+      var why = tr.querySelector('.ev-why');
+      if (why) why.classList.toggle('open');
+    });
+  });
+})();
+</script>
+
+{% endif %}
+</div>
+{% endblock %}

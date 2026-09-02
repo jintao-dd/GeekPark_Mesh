@@ -1494,6 +1494,19 @@ def admin_home(request: Request):
     auth.require(request, "editor")
     return RedirectResponse("/admin/issues", status_code=302)
 
+
+@app.get("/admin/eval", response_class=HTMLResponse)
+def admin_eval_dashboard(request: Request, current: str = "", baseline: str = ""):
+    """Eval Dashboard V1 — 只读 eval/reports，不触发 Preview/Ask/Embed/Publish。"""
+    auth.require(request, "editor")
+    from .eval_dashboard import build_view
+
+    view = build_view(current_name=current or None, baseline_name=baseline or None)
+    return templates.TemplateResponse(
+        "eval_dashboard.html",
+        ctx(request, nav="eval", view=view),
+    )
+
 @app.get("/admin/issues", response_class=HTMLResponse)
 def admin_issue_list(request: Request, err: str = ""):
     u = auth.require(request, "editor")
