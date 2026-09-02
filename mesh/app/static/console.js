@@ -509,6 +509,10 @@ async function runMining(opts = {}) {
 const to2 = $('#to2');
 if (to2) to2.onclick = () => {
   if (!A.canWrite) { toast('当前身份不能生成预览'); return; }
+  if (A.issueStatus === 'published') {
+    toast('已上线期不能直接生成预览。请先「创建修订草稿」。');
+    return;
+  }
   if (!document.querySelectorAll('#frows .frow').length) {
     toast('请先放入素材');
     return;

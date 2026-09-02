@@ -454,6 +454,12 @@ def load_issue(con, slug: str, published_only=True):
     if not r: return None, None
     if published_only and r["status"] != "published": return r, None
     data = json.loads((r["published_json"] if published_only else (r["draft_json"] or r["published_json"])) or "{}")
+    if published_only and isinstance(data, dict):
+        from .relation_display import is_reader_tier
+        data["relations"] = [
+            rel for rel in (data.get("relations") or [])
+            if isinstance(rel, dict) and is_reader_tier(rel)
+        ]
     return r, data
 
 
@@ -474,6 +480,12 @@ def load_issue_for_edm(con, slug: str):
     except json.JSONDecodeError:
         data = {}
         source = "invalid"
+    if source == "published" and isinstance(data, dict):
+        from .relation_display import is_reader_tier
+        data["relations"] = [
+            rel for rel in (data.get("relations") or [])
+            if isinstance(rel, dict) and is_reader_tier(rel)
+        ]
     return row, data, source
 
 
@@ -1373,10 +1385,19 @@ def issue_weak_relations_resolve(request: Request, slug: str, payload: dict):
     from .issue_verify import sync_kpis_from_data
     draft = sync_kpis_from_data(draft)
     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    payload = json.dumps(draft, ensure_ascii=False)
+    from .relation_display import attach_reader_flags, build_published_projection, split_relations_for_publish
+    draft["relations"] = attach_reader_flags(
+        [r for r in (draft.get("relations") or []) if isinstance(r, dict)]
+    )
+    reader, backlog = split_relations_for_publish(draft["relations"])
+    draft["_relations_reader"] = reader
+    draft["_relations_backlog"] = backlog
+    draft_payload = json.dumps(draft, ensure_ascii=False)
+    # 已上线期：published 只写投影；草稿期可与 draft 同写（仍投影，避免误漏）
+    pub_payload = json.dumps(build_published_projection(draft), ensure_ascii=False)
     con.execute(
         "UPDATE issues SET draft_json=?, published_json=?, updated_at=? WHERE id=?",
-        (payload, payload, stamp, r["id"]),
+        (draft_payload, pub_payload, stamp, r["id"]),
     )
     con.execute(
         "INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)",
@@ -2235,6 +2256,8 @@ def build_draft(request: Request, slug: str):
 def preview_start(request: Request, slug: str, force: int = 0):
     u = auth.require(request, "editor")
     st = preview_job.start(slug, u["u"], force=bool(force))
+    if st.get("error_code") == "published_preview_forbidden":
+        return JSONResponse({"ok": False, **st}, status_code=409)
     return {"ok": True, **st}
 
 
@@ -2242,6 +2265,49 @@ def preview_start(request: Request, slug: str, force: int = 0):
 def preview_status(request: Request, slug: str):
     auth.require(request, "editor")
     return preview_job.get_state(slug)
+
+
+@app.post("/admin/issue/{slug}/create_revision")
+def create_revision(request: Request, slug: str):
+    """已上线期 → 修订草稿：status=draft，保留 published_json 快照，清 Ask 索引。
+
+    之后可 Preview；再由 Owner Publish 生成 v2。禁止在 published 上直接 Preview。
+    """
+    u = auth.require(request, "editor")
+    wants_json = "application/json" in (request.headers.get("accept") or "")
+    con = db.connect()
+    r = con.execute("SELECT * FROM issues WHERE slug=?", (slug,)).fetchone()
+    if not r:
+        con.close()
+        raise HTTPException(404, "没有这一期")
+    if (r["status"] or "") != "published":
+        con.close()
+        msg = "仅已上线期需要「创建修订草稿」；当前已是草稿，可直接生成预览。"
+        if wants_json:
+            return JSONResponse({"ok": False, "error": msg, "status": r["status"]}, status_code=400)
+        return _flash_redirect(f"/admin/issue/{slug}", msg)
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    ensure_draft_for_edit(con, r, sync_from_published=True)
+    con.execute(
+        "UPDATE issues SET status='draft', updated_at=? WHERE id=?",
+        (now, r["id"]),
+    )
+    db.reindex_issue(con, r["id"])  # 清正式 Ask 索引；published_json 仍保留至再次 Publish
+    con.execute(
+        "INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)",
+        (r["id"], u["u"], "create_revision", "published", "draft revision from published"),
+    )
+    con.commit()
+    con.close()
+    _ASK_CACHE.clear()
+    if wants_json:
+        return JSONResponse({
+            "ok": True,
+            "slug": slug,
+            "status": "draft",
+            "message": "已创建修订草稿。正式读者/Ask 暂下线该期，改完后请生成预览再确认上线。",
+        })
+    return RedirectResponse(f"/admin/issue/{slug}?revision=1", status_code=302)
 
 
 @app.post("/admin/issue/{slug}/prepare_preview")
@@ -2502,27 +2568,43 @@ def publish(request: Request, slug: str, confirm: str = Form("")):
         return fail(msg)
     data = json.loads(r["draft_json"])
     data.pop("_stale", None)
+    from .relation_display import attach_reader_flags, build_published_projection, split_relations_for_publish
+    data["relations"] = attach_reader_flags(
+        [x for x in (data.get("relations") or []) if isinstance(x, dict)]
+    )
+    reader, backlog = split_relations_for_publish(data["relations"])
+    data["_relations_reader"] = reader
+    data["_relations_backlog"] = backlog
+    published = build_published_projection(data)
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     pub_day = datetime.date.today()
     pub_label = format_display_date(pub_day)
     pub_iso = pub_day.isoformat()
-    payload = json.dumps(data, ensure_ascii=False)
+    draft_payload = json.dumps(data, ensure_ascii=False)
+    pub_payload = json.dumps(published, ensure_ascii=False)
     con.execute(
         "UPDATE issues SET published_json=?, draft_json=?, status='published', published_at=?, "
         "updated_at=?, period_label=?, date_end=?, date_start=? WHERE id=?",
-        (payload, payload, now, now, pub_label, pub_iso, pub_iso, r["id"]),
+        (pub_payload, draft_payload, now, now, pub_label, pub_iso, pub_iso, r["id"]),
     )
-    db.register_entities(con, data, slug)
+    db.register_entities(con, published, slug)
     db.snapshot_published_items(con, r["id"])
     db.reindex_issue(con, r["id"])
     _ASK_CACHE.clear()
     seq = con.execute("SELECT COUNT(*) c FROM versions WHERE issue_id=?", (r["id"],)).fetchone()["c"] + 1
-    cards_out = len(data.get("relations", [])) + sum(len(g.get("items", [])) for c in data.get("contacts", []) for g in c.get("groups", []))
+    cards_out = len(published.get("relations", [])) + sum(
+        len(g.get("items", [])) for c in published.get("contacts", []) for g in c.get("groups", [])
+    )
     edited = con.execute("SELECT COUNT(*) c FROM edits WHERE issue_id=? AND target LIKE '%%.%%'", (r["id"],)).fetchone()["c"]
-    con.execute("INSERT INTO versions(issue_id,version,at,by_user,cards_out,edited_count,url,snapshot_json) VALUES(?,?,?,?,?,?,?,?)",
-                (r["id"], f"v{seq}", now, u.get("d") or u["u"], cards_out, edited,
-                 f"{os.environ.get('MESH_BASE_URL','').rstrip('/')}/{slug}", json.dumps(data, ensure_ascii=False)))
-    con.execute("INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)", (r["id"], u["u"], "publish", "", f"v{seq}"))
+    con.execute(
+        "INSERT INTO versions(issue_id,version,at,by_user,cards_out,edited_count,url,snapshot_json) VALUES(?,?,?,?,?,?,?,?)",
+        (r["id"], f"v{seq}", now, u.get("d") or u["u"], cards_out, edited,
+         f"{os.environ.get('MESH_BASE_URL','').rstrip('/')}/{slug}", pub_payload),
+    )
+    con.execute(
+        "INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)",
+        (r["id"], u["u"], "publish", "", f"v{seq} reader_relations={len(published.get('relations') or [])}"),
+    )
     con.commit()
     embed_info: dict = {"persisted": True, "queued": False, "skipped": True}
     if embeddings.is_configured():

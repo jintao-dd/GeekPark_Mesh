@@ -643,6 +643,8 @@ def run_analysis(
         user_id=persist_ctx.get("user_id"),
     )
     usage = {"llm_calls": 0, "source_groups": 0, "elapsed_ms": 0, "path": "analysis", "cross": False}
+    from app import llm as _llm_mod
+    _llm_mod.reset_usage_accum()
 
     ctx_route = prepared.get("context_route")
     if not isinstance(ctx_route, dict):
@@ -723,6 +725,8 @@ def run_analysis(
                 verified=0, rejected=0, downgraded=0,
             )
             usage["elapsed_ms"] = int((time.time() - t0) * 1000)
+            for k, v in _llm_mod.take_usage_accum().items():
+                usage[k] = v
             early = {
                 "answer": ans, "analysis_id": analysis_id, "report_id": report_id, "usage": usage,
                 "verify": {"verified": 0, "rejected": 0, "downgraded": 0},
@@ -794,6 +798,8 @@ def run_analysis(
             verified=0, rejected=0, downgraded=0,
         )
         usage["elapsed_ms"] = int((time.time() - t0) * 1000)
+        for k, v in _llm_mod.take_usage_accum().items():
+            usage[k] = v
         early = {
             "answer": ans, "analysis_id": analysis_id, "report_id": report_id, "usage": usage,
             "verify": {"verified": 0, "rejected": 0, "downgraded": 0},
@@ -854,6 +860,12 @@ def run_analysis(
     )
 
     usage["elapsed_ms"] = int((time.time() - t0) * 1000)
+    tok = _llm_mod.take_usage_accum()
+    for k, v in tok.items():
+        usage[k] = v
+    if tok.get("n_calls") is not None:
+        # prefer measured call count from provider path
+        usage["llm_calls"] = max(int(usage.get("llm_calls") or 0), int(tok["n_calls"]))
     sources_out = [
         {
             "group_id": r.get("group_id"),

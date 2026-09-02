@@ -3,7 +3,7 @@
 本文件**不得 import 任何厂商 SDK**。所有模型调用经 providers 适配层，
 切换模型只改 .env 里的 MESH_LLM_PROVIDER，业务代码零改动。
 """
-import json, re
+import json, re, threading
 from pathlib import Path
 from .providers import get_provider, LLMError
 
@@ -32,6 +32,71 @@ _REWRITE_SYSTEM = (
     + "。可用：认为、判断、已接触、待核对、各有判断、已联动等。"
 )
 
+# Process-wide token/retry accum for Ask Baseline (Ask analysis uses a thread pool).
+_usage_lock = threading.Lock()
+_usage_acc = {
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "n_calls": 0,
+    "n_retries": 0,
+}
+
+
+def reset_usage_accum() -> None:
+    with _usage_lock:
+        _usage_acc["prompt_tokens"] = 0
+        _usage_acc["completion_tokens"] = 0
+        _usage_acc["total_tokens"] = 0
+        _usage_acc["n_calls"] = 0
+        _usage_acc["n_retries"] = 0
+
+
+def take_usage_accum() -> dict:
+    """Snapshot + reset. Prefer total_tokens when providers send it."""
+    with _usage_lock:
+        pt = int(_usage_acc.get("prompt_tokens") or 0)
+        ct = int(_usage_acc.get("completion_tokens") or 0)
+        tt = int(_usage_acc.get("total_tokens") or 0)
+        nc = int(_usage_acc.get("n_calls") or 0)
+        nr = int(_usage_acc.get("n_retries") or 0)
+        out = {
+            "prompt_tokens": pt or None,
+            "completion_tokens": ct or None,
+            "total_tokens": tt or (pt + ct) or None,
+            "n_calls": nc or None,
+            # 0 retries is meaningful once we actually called the LLM
+            "n_retries": nr if nc else None,
+        }
+        _usage_acc["prompt_tokens"] = 0
+        _usage_acc["completion_tokens"] = 0
+        _usage_acc["total_tokens"] = 0
+        _usage_acc["n_calls"] = 0
+        _usage_acc["n_retries"] = 0
+    return {k: v for k, v in out.items() if v is not None}
+
+
+def _accum_usage(usage: dict | None, *, attempts: int = 1) -> None:
+    with _usage_lock:
+        _usage_acc["n_calls"] = int(_usage_acc.get("n_calls") or 0) + 1
+        # attempts>1 means this call is a retry of a previous attempt in the same call()
+        if attempts > 1:
+            _usage_acc["n_retries"] = int(_usage_acc.get("n_retries") or 0) + 1
+        if not isinstance(usage, dict):
+            return
+        if usage.get("prompt_tokens") is not None:
+            _usage_acc["prompt_tokens"] = int(_usage_acc.get("prompt_tokens") or 0) + int(usage["prompt_tokens"])
+        if usage.get("completion_tokens") is not None:
+            _usage_acc["completion_tokens"] = int(_usage_acc.get("completion_tokens") or 0) + int(
+                usage["completion_tokens"]
+            )
+        if usage.get("total_tokens") is not None:
+            _usage_acc["total_tokens"] = int(_usage_acc.get("total_tokens") or 0) + int(usage["total_tokens"])
+        elif usage.get("prompt_tokens") is not None or usage.get("completion_tokens") is not None:
+            _usage_acc["total_tokens"] = int(_usage_acc.get("total_tokens") or 0) + int(
+                usage.get("prompt_tokens") or 0
+            ) + int(usage.get("completion_tokens") or 0)
+
 def provider_info() -> dict:
     """后台"规则提示词"页显示当前模型配置，便于换模型后核对。"""
     try:
@@ -59,8 +124,15 @@ def load_prompt(name: str) -> str:
 def call(system: str, user: str, max_tokens: int = 4000, json_mode: bool = True):
     """模型调用。json_mode 下解析失败会自动再请求一次。"""
     last_err = None
+    provider = get_provider()
     for attempt in range(2 if json_mode else 1):
-        text = get_provider().complete(system, user, max_tokens=max_tokens)
+        if hasattr(provider, "complete_detail"):
+            detail = provider.complete_detail(system, user, max_tokens=max_tokens)
+            text = detail.get("content") or ""
+            _accum_usage(detail.get("usage"), attempts=attempt + 1)
+        else:
+            text = provider.complete(system, user, max_tokens=max_tokens)
+            _accum_usage(None, attempts=attempt + 1)
         if not json_mode:
             return text
         try:

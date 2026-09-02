@@ -1,9 +1,30 @@
-"""读者页展示 vs draft 全量 backlog。"""
+"""读者页展示 vs draft 全量 backlog。
+
+产品投影（唯一业务语义）：
+  strong   → Reader（published）
+  parallel → Draft backlog
+  watch    → Draft backlog
+  skip     → 不保留
+
+`reader_visible` 是派生字段，不得反过来定义业务规则。
+`build_published_projection(draft)` 是 Publish / Preview-reader 切片的唯一入口。
+"""
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 VALID_DECISION_TIERS = frozenset({"strong", "parallel", "watch", "skip"})
+READER_TIERS = frozenset({"strong"})
+BACKLOG_TIERS = frozenset({"parallel", "watch"})
+
+# Publish 投影时从 published_json 剥离的内部键（draft 可保留）
+_INTERNAL_DRAFT_KEYS = frozenset({
+    "_stale",
+    "_relations_reader",
+    "_relations_backlog",
+    "_relation_decision_audit",
+})
 
 # label → 默认 tier（LLM 未给 decision_tier 时）
 _LABEL_DEFAULT_TIER: dict[str, str] = {
@@ -51,20 +72,31 @@ def normalize_decision_tier(decision: str, label: str, tier: str | None, *, rela
     return infer_decision_tier(label, relation_type=relation_type)
 
 
-def reader_visible(rel: dict) -> bool:
-    """读者页展示：有证据与完整叙事的成卡均可展示（不再仅 strong）。"""
-    if not isinstance(rel, dict):
-        return False
-    tier = (rel.get("decision_tier") or "").strip().lower()
-    if tier == "skip":
-        return False
+def _card_complete(rel: dict) -> bool:
     if not (rel.get("evidence") or []):
         return False
     return bool((rel.get("title") or "").strip() and (rel.get("body") or "").strip())
 
 
+def reader_visible(rel: dict) -> bool:
+    """派生字段：decision_tier==strong 且卡完整 → 读者可见。"""
+    if not isinstance(rel, dict):
+        return False
+    tier = (rel.get("decision_tier") or "").strip().lower()
+    if tier not in READER_TIERS:
+        return False
+    return _card_complete(rel)
+
+
+def is_reader_tier(rel: dict) -> bool:
+    """防御性过滤：仅看 decision_tier（Reader UI 双保险）。"""
+    if not isinstance(rel, dict):
+        return False
+    return (rel.get("decision_tier") or "").strip().lower() in READER_TIERS
+
+
 def split_relations_for_publish(relations: list[dict]) -> tuple[list[dict], list[dict]]:
-    """(reader_relations, backlog_relations)"""
+    """(reader_relations, backlog_relations) — tier 驱动，并写回 reader_visible。"""
     reader: list[dict] = []
     backlog: list[dict] = []
     for r in relations or []:
@@ -106,3 +138,39 @@ def display_summary(relations: list[dict]) -> dict[str, Any]:
         "reader_titles": [(r.get("title") or "").strip() for r in reader],
         "backlog_titles": [(r.get("title") or "").strip() for r in backlog],
     }
+
+
+def _sync_relation_kpi(data: dict, n_reader: int) -> None:
+    kpis = list(data.get("kpis") or [])
+    found = False
+    for k in kpis:
+        if isinstance(k, dict) and k.get("label") == "可同步的关系":
+            k["n"] = str(n_reader)
+            found = True
+            break
+    if not found and n_reader:
+        kpis.insert(0, {"n": str(n_reader), "label": "可同步的关系"})
+    data["kpis"] = kpis
+
+
+def build_published_projection(draft: dict | None) -> dict:
+    """draft_json → published_json 唯一投影入口。
+
+    - 仅 strong（且完整）关系进入 relations
+    - 剥离内部 `_…` 字段
+    - KPI「可同步的关系」对齐读者卡数量
+    """
+    src = draft if isinstance(draft, dict) else {}
+    data = copy.deepcopy(src)
+    for k in list(data.keys()):
+        if k.startswith("_") or k in _INTERNAL_DRAFT_KEYS:
+            data.pop(k, None)
+
+    raw_rels = [r for r in (data.get("relations") or []) if isinstance(r, dict)]
+    flagged = attach_reader_flags(raw_rels)
+    reader, _backlog = split_relations_for_publish(flagged)
+    # 双保险：即使 reader_visible 被误写，仍只留 strong
+    reader = [r for r in reader if is_reader_tier(r) and reader_visible(r)]
+    data["relations"] = reader
+    _sync_relation_kpi(data, len(reader))
+    return data

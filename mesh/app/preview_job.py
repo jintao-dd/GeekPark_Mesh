@@ -74,8 +74,29 @@ def _upsert_team_card(con, issue_id: int, team: str, card: dict) -> None:
 
 
 def start(slug: str, username: str, *, force: bool = False) -> dict:
-    """启动预览生成。force=True 时取消卡住任务并重新开跑。"""
+    """启动预览生成。force=True 时取消卡住任务并重新开跑。
+
+    status=published 时拒绝：禁止 Preview 覆盖 published_json / 正式 Ask 索引。
+    需继续编辑时先走 create_revision（回到 draft）再 Preview。
+    """
     from . import job_runtime
+
+    con = db.connect()
+    try:
+        row = con.execute("SELECT status FROM issues WHERE slug=?", (slug,)).fetchone()
+    finally:
+        con.close()
+    if row and (row["status"] or "") == "published":
+        st = _defaults(slug)
+        st["running"] = False
+        st["done"] = False
+        st["error"] = (
+            "本期已上线，不能直接「生成预览」。"
+            "请先「创建修订草稿」（回到 draft），改完后再 Preview，最后由 Owner 确认上线。"
+        )
+        st["error_code"] = "published_preview_forbidden"
+        job_store.put(KIND, slug, st)
+        return st
 
     st0 = _new_state(slug)
     st0["_username"] = username
@@ -102,6 +123,18 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                 r = con.execute("SELECT * FROM issues WHERE slug=?", (slug,)).fetchone()
                 if not r:
                     _set(slug, running=False, done=False, error="没有这一期")
+                    return
+                if (r["status"] or "") == "published":
+                    _set(
+                        slug,
+                        running=False,
+                        done=False,
+                        error=(
+                            "本期已上线，不能直接「生成预览」。"
+                            "请先「创建修订草稿」再 Preview。"
+                        ),
+                        error_code="published_preview_forbidden",
+                    )
                     return
                 issue_id = r["id"]
                 period_label = r["period_label"]
@@ -250,13 +283,8 @@ def _run(slug: str, username: str, token: int = 0) -> None:
             con = db.connect()
             try:
                 payload = json.dumps(data, ensure_ascii=False)
-                reader_payload = json.dumps({
-                    **data,
-                    "relations": data.get("_relations_reader") or [
-                        r for r in (data.get("relations") or [])
-                        if isinstance(r, dict) and r.get("reader_visible")
-                    ],
-                }, ensure_ascii=False)
+                from .relation_display import build_published_projection
+                reader_payload = json.dumps(build_published_projection(data), ensure_ascii=False)
                 con.execute(
                     "UPDATE issues SET draft_json=?, published_json=?, updated_at=? WHERE id=?",
                     (payload, reader_payload, stamp, issue_id),

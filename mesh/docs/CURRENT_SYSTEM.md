@@ -1,6 +1,6 @@
 # GeekPark Mesh · 当前系统说明
 
-> 写的是 **2026-08-31 代码里实际在跑的系统**，不是规划。  
+> 写的是 **2026-09-02 代码里实际在跑的系统**（Relation 两阶段 + `decision_tier` + 上线与 Embedding 解耦），不是规划。  
 > 部署操作看 `README.md`；更细的模块索引看 `ARCHITECTURE_HANDOVER.md`；知识图谱方案看 `KNOWLEDGE_GRAPH_DESIGN.md`（设计，未全面落地）。
 
 ---
@@ -41,16 +41,18 @@ Mesh 是极客公园内部用的两件事：
     ▼
 FastAPI  mesh/app/main.py
     │
-    ├──────── 周报（人手按钮 + 异步 Job）────────┐
-    │  上传 → pipeline 挖掘 → preview 出稿      │
-    │  → owner 上线 → 建索引 → 可选发 EDM        │
-    │                                            │
-    └──────── Ask（请求内同步）─────────────────┐
-       Guard → 规则路由 → 检索 → 分析成文        │
-                                                 ▼
+    ├──────── 周报（人手按钮 + 异步 Job）────────────────────┐
+    │  上传 → pipeline 挖掘 → preview 出稿                    │
+    │    （要点卡 → 周报壳 → Relation Decision→Gate→Writer）   │
+    │  → owner 上线 → 建索引 → 异步 embedding → 可选发 EDM     │
+    │                                                          │
+    └──────── Ask（请求内同步）────────────────────────────────┐
+       Guard → 规则路由 → 检索 → 分析成文                       │
+                                                                ▼
                               PostgreSQL / SQLite
                          issues / sources / items / cards
-                         published_json
+                         draft_json / published_json
+                         embedding_status*
                          search_fts / item_facts / chunks
                          ask_sessions / ask_analyses
 ```
@@ -73,8 +75,9 @@ FastAPI  mesh/app/main.py
 | 上传 / 粘贴 / RSS | `/admin/issue/{slug}/upload\|paste\|fetch` | 同步，写入 `sources` |
 | 挖掘 | `POST .../pipeline/start` | 异步 Job `kind=pipeline` |
 | 生成预览 | `POST .../preview/start` | 异步 Job `kind=preview` |
-| 上线 | `POST .../publish` | 同步，仅 owner |
-| 发信 | 上线后 `edm_job.enqueue_auto_send` | 异步 Job `kind=edm` |
+| 上线 | `POST .../publish` | 同步，仅 owner；**不等** embedding |
+| 向量补齐 | 上线后 `embed_job.ensure_for_slug` | 异步 Job `kind=embed` |
+| 发信 | 上线后 `edm_job.enqueue_auto_send` | 异步 Job `kind=edm`（可关） |
 
 ### 4.2 挖掘（`pipeline._run`）
 
@@ -93,56 +96,142 @@ FastAPI  mesh/app/main.py
 
 T13 混合包：`aggregator.split_bundle_ex` 按章节切开再分别抽取。
 
-### 4.3 出稿（`preview_job._run`）
+### 4.3 点「生成预览」之后（详细）
 
-1. 确认已有 items、来源都抽完  
-2. 再 merge 一次  
-3. 每个 `owner_team`（排除外部媒体）一次 `llm.build_team_card` → 表 `cards`  
-4. `prepare_draft_bundle`：要点卡 + `build_relation_candidates` + 首次名 + T7 外媒 + 上一期 lead  
-5. 一次 `llm.build_issue_draft` 出五块 JSON  
-6. `merge_relations_from_candidates` 用代码候选锁 teams/sources，并挂上 evidence  
-7. 写入 `issues.draft_json`
+入口：控制台素材页主按钮 `#to2`（`console.js`）。  
+接口：可能先 `POST .../pipeline/start`，再 `POST .../preview/start`。
 
-周报 JSON 五块（`prompts/91_output_issue.md`）：
+#### A. 前端怎么串（人只点一次）
 
-`question` / `lead` / `kpis` / **`relations`** / `contacts` / `keywords` / `plans` / `views` / `gaps` / `data_sources`
+```
+点「生成预览」
+  ├─ 已有 items 且来源未脏
+  │     → 直接 startPreparePreview（preview Job）
+  │     → 文案：「正在生成要点卡与草稿…」
+  │
+  └─ 还没有 items，或 sourcesDirty
+        → setAutoPreview(true)
+        → runMining（pipeline Job）
+        → 文案：「正在挖掘与脱敏…」
+        → pipeline done 后自动再调 preview/start
+```
 
-### 4.4 关系卡怎么来
+忙态下再点同一按钮：`force=1` 重启卡住的挖掘或预览。
 
-纯代码发现，LLM 只改写读者文案：
+#### B. 若触发了挖掘（`pipeline._run`）
+
+见上一节：抽 items → 归属/⑤区 → merge → 草稿 stale。  
+**挖掘阶段不做关系卡**（`relation-link` / `compose` 等标 `defer`）。
+
+#### C. 预览主流程（`preview_job._run`）——核心
+
+进度文案大致：`跨通道合并…` → `要点卡 i/N · 团队` → `正在生成周报草稿…` → `完成，读者页已更新`。
+
+```
+1) 闸门
+   - 必须有 items
+   - 有正文的 source 必须都 extracted=1
+   - 否则直接 error，不进 LLM
+
+2) merge.apply_merge（再合一次）
+
+3) 要点卡（每团队 1 次 LLM）
+   - 团队 = DISTINCT owner_team（排除「外部媒体」、blocked、已 merged）
+   - llm.build_team_card(team, items, period_label)
+   - 写入 cards，status='approved'，reviewer=mesh-auto
+   - UI：要点卡 1/N · 编辑部 …
+
+4) mark_draft_stale → prepare_draft_bundle
+   - 再 merge 一次
+   - 读出：team_cards、relation_candidates、item_rows、
+     first_names、external_items（T7）
+   - 上一期 published lead + 关系标题 → prev_summary
+
+5) 周报壳（1 次大 LLM）← 易 524 超时处
+   - llm.build_issue_draft(...)
+   - 提示词要求 relations 必须为 []
+   - 产出 question/lead/kpis/contacts/keywords/plans/views/gaps…
+
+6) 关系两阶段（见 4.4）
+   - merge_relations_from_candidates
+     → build_relations_two_phase
+   - Decision → Gate → Writer → Verify / reader 切分
+
+7) 落库
+   - draft_json = 全量草稿（含 relations + audit + _relations_reader/backlog）
+   - published_json = 同结构，但 relations 换成读者可见切片（预览同步）
+   - register_entities、reindex_issue
+   - 记 edits：prepare_preview
+   - status 仍是 draft（未上线）
+
+8) Job done → 前端跳 /{slug}（预览编辑）
+```
+
+Modelink/Cloudflare **524** 时：多半死在步骤 5 的 `build_issue_draft`；provider 已把 524 当可重试。关系两阶段在 5 成功之后才跑。
+
+---
+
+### 4.4 关系卡怎么来（Decision → Gate → Writer）
+
+**当前主链路（2026-09）**：代码候选 + LLM 决策 + 代码闸门 + LLM 写作；**`decision_tier` 必须写入草稿**。
 
 ```
 items（未拦截、未合并）
-  → 丢掉无团队、外部媒体
-  → 实体名 → 出现在哪些团队
-  → 至少 2 个团队
-  → 两队不能只来自同一 (source_id, pointer)   ← provenance
-  → relation_candidates
-  → LLM 写成 relations[]
-  → 按标题对上候选，锁字段，写入 evidence
+  → build_relation_candidates          [代码]
+  → assign_candidate_ids
+  → Decision LLM                       [llm.build_relation_decisions_with_coverage]
+       keep/skip · label · relation_type · decision_tier · evidence_refs · reason
+       提示词：issue_relation_decisions.md
+       要求覆盖全部 candidate_id（缺 id 会重试/报错）
+  → Evidence Gate                      [apply_evidence_gate]
+       校验 refs → 拼 evidence → 锁 teams/sources
+       keep 但无有效证据 → skip
+       decision_tier 空则按 label 推断（normalize_decision_tier）
+       输出 RelationObject（含 decision_tier / relation_type）
+  → Writer LLM                         [relation_writer.write_relations]
+       只写 title / body / details
+       LOCKED_FIELDS 含 decision_tier、relation_type、label、evidence…
+       提示词：issue_relation_writer.md
+  → 后处理
+       去弱重复、narrative verify、attach_reader_flags
+       filter_draft_relations、无 evidence 丢弃
+       split_relations_for_publish → _relations_reader / _relations_backlog
+       verify_issue_draft
+       finalize_decision_audit → _relation_decision_audit
 ```
 
-读者页一张关系卡展示：`label`、`title`、`body`、`details[]`、`sources[]`、`teams[]`、`weak`。
+**`decision_tier` 取值**：`strong` / `parallel` / `watch` / `skip`。  
+读者可见（`reader_visible`，**派生字段**）：仅 `decision_tier == strong` 且卡完整（evidence + title/body）。  
+投影入口：`build_published_projection(draft)` → `published_json`（Publish / Preview reader 切片共用）。  
+parallel / watch → draft backlog；skip → 不展示。
 
-生成后还会在 JSON 里带（读者页暂不渲染）：
+**Preview 闸门：** `status=published` 时禁止普通 Preview（不改 `published_json`、不 reindex）。继续编辑须先 `POST .../create_revision` → `status=draft` → Preview → Publish v2。
 
-- `item_ids`
-- `evidence[]`：`item_id` / `source_id` / `team` / `snippet` / `quote` / `source_label` / `pointer`
-- `relation_type`、`confidence`、`status`、`provenance_ok`
+关系卡上常见字段：
 
-上线闸门 `relation_publish_blockers`：弱关系必须人确认；跨团队必须真有两边条目；强关系不能空 details/sources。
+| 字段 | 谁写 |
+|------|------|
+| `label` / `teams` / `sources` / `evidence` / `item_ids` | Gate 锁死 |
+| `decision_tier` / `relation_type` | Decision → Gate → Writer 锁死 |
+| `title` / `body` / `details` | Writer |
+| `reader_visible` | Display 代码 |
+| `_relation_decision_audit` | 整期审计（coverage、by_tier、drop 原因） |
+
+上线闸门仍走 `relation_gate` / `issue_verify` / attribution blockers（弱关系确认、证据不足等）。
+
+---
 
 ### 4.5 上线之后
 
-`published_json` = 当时的草稿副本。同时：
+`published_json` = 当时草稿副本（读者正式版）。同时：
 
 - 冻条目快照 `published_items_snapshot`
-- `register_entities`（只登记名字 + first_issue）
-- `reindex_issue`：FTS、`entity_team_facts`、`item_facts`、`chunk_index`
-- 可选 SMTP 发 EDM
+- `register_entities`（名字 + first_issue）
+- `reindex_issue`：FTS、`entity_team_facts`、`item_facts`、`chunk_index`（**同步向量已从 publish 路径拿掉**）
+- **`embed_job.ensure_for_slug`**：异步补 embedding；`embedding_status`：`pending → running → completed|partial|failed`
+- 可选 SMTP：`edm_job.enqueue_auto_send`（关自动则只排队后跳过）
 
-读者页跟 `published_json`；Ask 跟索引。重抽条目会更新 Ask 索引，页面正文要重新上线才变。
-
+读者页跟 `published_json`；Ask 跟索引。向量未完成不挡上线与 Ask（检索可退回 FTS）。
 ---
 
 ## 5. Ask 怎么回答
@@ -186,7 +275,7 @@ SSE 会发 step 事件；简单路径会先收完全文再校验，再按块吐�
 
 | 表 | 作用 |
 |----|------|
-| `issues` | 一期周报。`draft_json` / `published_json` / 快照 |
+| `issues` | 一期周报。`draft_json` / `published_json` / 快照；**`embedding_status` 等向量进度列（schema 1.8.4）** |
 | `sources` | 原始材料（T1–T13） |
 | `items` | 抽出来的原子条。`owner_team`、`blocked`、`merged_into`、`entities`（JSON 文本） |
 | `cards` | 各团队要点卡 JSON |
@@ -204,8 +293,8 @@ SSE 会发 step 事件；简单路径会先收完全文再校验，再按块吐�
 | 名字 | 在哪 | 说明 |
 |------|------|------|
 | 周报「Report」 | `issues.published_json` | 五块结构，不是独立表 |
-| 关系卡 | `published_json.relations[]` | 展示字段 + 现已附带 evidence |
-| 关系候选 | 生成时内存 | `build_relation_candidates` 的输出，不落库 |
+| 关系卡 | `draft_json` / `published_json.relations[]` | 展示字段 + evidence + **`decision_tier`** |
+| 关系候选 | 生成时内存 | `build_relation_candidates`；Decision 审计在 `_relation_decision_audit` |
 | Ask Evidence | `ask_analyses.sources_json` | `{ref, quote}`，组内编号，不绑 item/chunk |
 | context_refs | 分析表 + 消息 meta | 追问种子 |
 
@@ -219,8 +308,9 @@ SSE 会发 step 事件；简单路径会先收完全文再校验，再按块吐�
 
 - 人手周报生产、要点卡、五块草稿、上线闸门、EDM  
 - 团队名归一（GP → Global Partnership 团队 等）  
-- 跨团队关系共现发现 + provenance  
-- 关系 JSON 可带 `item_id` / `source_id` / snippet（生成链路已写入；读者页未用来跳转）  
+- **Relation 两阶段**：候选 → Decision → Gate → Writer；**`decision_tier` 落草稿**  
+- 关系 JSON 带 `item_id` / `source_id` / snippet / `decision_tier` / `relation_type`  
+- 上线与 Embedding **解耦**（异步 `embed_job`，管理台可见进度）  
 - 已上线语料的 FTS / 结构化差集交集 / 可选向量  
 - 乱码拒答、无命中拒答、句级归属过滤  
 - 禁用词字段改写、弱关系必须人确认  
@@ -230,8 +320,7 @@ SSE 会发 step 事件；简单路径会先收完全文再校验，再按块吐�
 - 周报自动周更  
 - Agent / ReAct / LLM Planner  
 - 公司别名合并、人名归一、entity resolution  
-- 关系类型体系（提示词有标签库；代码只区分两三种）  
-- 关系按价值打分排序  
+- 关系价值排序（有 tier，但无独立打分模型）  
 - 人工改稿回流到下一期规则  
 - 跨期关系 id（只有 `first_issue` 和上一期 lead 进 prompt）  
 - 点回原文的统一 Evidence 层  
@@ -249,7 +338,7 @@ SSE 会发 step 事件；简单路径会先收完全文再校验，再按块吐�
 | 分析规模 | 最多 4 组 × 6 条 |
 | 默认检索窗 | 约 90 天 |
 | 速率 | 40 问 / 分钟 / 用户 |
-| Schema | 代码 `1.8.1`；README 仍写 1.6.3（文档过期） |
+| Schema | 代码 **`1.8.4`**（含 embedding_* 列） |
 
 黄金评测（2026-08-30）：检索 22/25，E2E 3/3。失败题是 structured 意图漏判（e08/e10/e21），hybrid 会给出容易误导的命中。生产同口径是否已重跑：**未确认**。
 
@@ -261,18 +350,23 @@ SSE 会发 step 事件；简单路径会先收完全文再校验，再按块吐�
 |------|------|
 | `app/main.py` | 路由、上线闸门、Ask 入口 |
 | `app/pipeline.py` | 挖掘 |
-| `app/preview_job.py` | 要点卡 + 草稿 |
-| `app/relation_candidates.py` | 关系候选与 evidence 挂载 |
+| `app/preview_job.py` | 要点卡 + 周报壳 + 触发关系两阶段 |
+| `app/relation_candidates.py` | 候选构建；`merge_relations_from_candidates` 入口 |
+| `app/relation_decision.py` | Decision 编排 + Evidence Gate + `build_relations_two_phase` |
+| `app/relation_writer.py` | Writer；锁 `decision_tier` 等字段 |
+| `app/relation_display.py` | tier 归一、`reader_visible`、reader/backlog 切分 |
+| `app/relation_decision_audit.py` | 决策审计 / human report |
 | `app/relation_gate.py` | 上线前关系检查 |
-| `app/llm.py` | 抽取 / 要点卡 / 周报 / 问答的 LLM 出口 |
+| `app/embed_job.py` | 上线后异步向量 |
+| `app/llm.py` | 抽取 / 要点卡 / 周报壳 / relation decisions / writer / 问答 |
 | `app/ask_engine.py` | 检索编排 |
 | `app/ask_analysis.py` | 多源分析成文 |
 | `app/retriever.py` / `qa_structured.py` | hybrid / 结构化查询 |
-| `app/db.py` / `schema_pg.sql` | 库 |
+| `app/db.py` / `schema_pg.sql` | 库（含 embedding 列） |
 | `app/job_worker.py` | 异步任务 |
 | `eval/run_final_eval.py` | 25 题验收 |
 
-LLM 提示词在 `app/prompts/`：`extract_T*.md`、`card_team.md`、`issue_draft.md`、`issue_draft_candidates.md`、`91_output_issue.md`、`qa.md`。
+LLM 提示词在 `app/prompts/`：`extract_T*.md`、`card_team.md`、`issue_draft.md`、`issue_draft_candidates.md`、`issue_relation_decisions.md`、`issue_relation_writer.md`、`91_output_issue.md`、`qa.md`。
 
 ---
 
@@ -280,7 +374,11 @@ LLM 提示词在 `app/prompts/`：`extract_T*.md`、`card_team.md`、`issue_draf
 
 | 文件 | 用途 |
 |------|------|
-| 本文件 | **当前系统怎么跑** |
+| **本文** | **当前系统怎么跑**（含 Preview 详细节） |
+| `FULL_PIPELINE_DETAIL.md` | **端到端逐步详解**：建期→Ask，含接口/提示词/库表/限制/索引与向量 |
+| **`MESH_BASELINE_v1.md`** | **优化契约（完整版）**：proxy 命名、实验条件冻结、Grounding 硬底线、P95、Eval Delta |
+| `AI_EVAL_POLICY.md`（仓库根） | PR 强制评测纪律 |
+| `CONTRIBUTING.md`（仓库根） | 贡献入口，指向 Eval Policy |
 | `README.md` | 怎么部署、怎么每周点按钮 |
 | `ARCHITECTURE_HANDOVER.md` | 模块级交接、RAG 逐步对照 |
 | `ASK_ANALYSIS_CONTRACT.md` | Ask SSE / context_refs 契约 |

@@ -230,13 +230,13 @@ def _write_phase1_closeout(p: dict) -> Path:
     return path
 
 
-def run_retrieval_suite(con, cases, *, e2e: bool) -> list[dict]:
+def run_retrieval_suite(con, cases, *, e2e: bool, e2e_all: bool = False) -> list[dict]:
     from eval.eval_lib import evaluate_e2e, evaluate_retrieval
 
     rows = []
     for case in cases:
         row = evaluate_retrieval(con, case)
-        if e2e and case.get("e2e"):
+        if e2e and (e2e_all or case.get("e2e")):
             row = evaluate_e2e(con, case, row)
         # strip heavy prepared
         row.pop("prepared", None)
@@ -249,6 +249,11 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--corpus", choices=("golden", "prod"), default="golden")
     parser.add_argument("--e2e", action="store_true")
+    parser.add_argument(
+        "--e2e-all",
+        action="store_true",
+        help="With --e2e: run analysis E2E for every case (Baseline freeze needs latency.total_ms + usage on all 25)",
+    )
     parser.add_argument("--followup", action="store_true")
     parser.add_argument("--sse", action="store_true")
     args = parser.parse_args()
@@ -267,7 +272,12 @@ def main() -> int:
     payload: dict = {}
     exit_code = 0
     try:
-        questions = run_retrieval_suite(con, cases, e2e=args.e2e)
+        if args.e2e_all and not args.e2e:
+            print("note: --e2e-all implies --e2e", flush=True)
+            args.e2e = True
+        questions = run_retrieval_suite(
+            con, cases, e2e=args.e2e, e2e_all=args.e2e_all,
+        )
         retr_pass = sum(1 for r in questions if r.get("pass"))
         payload = {
             "generated_at": datetime.now().isoformat(timespec="seconds"),
@@ -275,6 +285,7 @@ def main() -> int:
             "db_stats": stats,
             "questions": questions,
             "retrieval_summary": f"{retr_pass}/{len(cases)} pass",
+            "e2e_mode": "all" if args.e2e_all else ("tagged" if args.e2e else "off"),
             "verified": [],
             "not_verified": [],
             "known_limits": [],

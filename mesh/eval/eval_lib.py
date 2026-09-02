@@ -278,6 +278,9 @@ def evaluate_e2e(con, case: dict, row: dict, *, persist: dict | None = None) -> 
     usage["retrieve_ms"] = retrieve_ms
     usage["analysis_ms"] = analysis_ms
     usage["total_ms"] = retrieve_ms + analysis_ms
+    # surface retries on the question row for Baseline
+    n_retries = usage.get("n_retries")
+    n_llm_calls = usage.get("n_calls") or usage.get("llm_calls")
     checks = list(row.get("checks") or [])
     ok = row.get("pass", True)
 
@@ -323,4 +326,6 @@ def evaluate_e2e(con, case: dict, row: dict, *, persist: dict | None = None) -> 
             "total_ms": retrieve_ms + analysis_ms,
         },
         "usage": usage,
+        "n_retries": n_retries,
+        "n_llm_calls": n_llm_calls,
     }

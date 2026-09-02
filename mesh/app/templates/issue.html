@@ -45,14 +45,18 @@
     <div class="sec-h"><div class="hrow"><img class="num" src="/static/assets/num_1.png" alt="1"><h2>可同步的关系</h2><span class="k">权重最高</span></div><p>被不止一个团队碰到，或一个团队碰到、另一个明显用得上。只列各团队各自的事实，不给建议。<strong>实线团队标签</strong>表示该团队本期有具体记录；<strong>虚线「→ 团队」</strong>表示建议该团队关注、内容可能与其相关。</p></div>
     <div class="cards" data-addable="relations">
     {% for r in d.relations %}
+      {# 双保险：仅 decision_tier==strong 进入读者页（与 build_published_projection 一致） #}
+      {% if (r.decision_tier or '')|lower == 'strong' %}
       <div class="card" data-path="relations.{{ loop.index0 }}">
         <span class="flag" {{ flagstyle(r.label) }} data-path="relations.{{ loop.index0 }}.label" title="单击换标签，双击改文字">{{ r.label }}</span>
+        {% if r.decision_tier %}<span class="tier" style="font-size:11px;opacity:.65;margin-left:6px">{{ r.decision_tier }}</span>{% endif %}
         <p class="t" data-path="relations.{{ loop.index0 }}.title">{{ r.title }}</p>
         <p class="b" data-path="relations.{{ loop.index0 }}.body">{{ r.body }}</p>
         {% if r.details %}<div class="detail"><ul>{% set ri=loop.index0 %}{% for li in r.details %}<li data-path="relations.{{ ri }}.details.{{ loop.index0 }}">{{ li }}</li>{% endfor %}</ul></div>{% endif %}
         <div class="srcs">{% set ri=loop.index0 %}{% for s in r.sources %}<p><span class="lab">来源</span><span data-path="relations.{{ ri }}.sources.{{ loop.index0 }}">{{ s }}</span></p>{% endfor %}</div>
         <div class="deps">{% set ri=loop.index0 %}{% for t in r.teams %}<span class="dep{% if t.startswith('→') or t.startswith('->') %} dep-sug{% endif %}" data-path="relations.{{ ri }}.teams.{{ loop.index0 }}">{{ t }}</span>{% endfor %}</div>
       </div>
+      {% endif %}
     {% endfor %}
     </div>
   </section>
