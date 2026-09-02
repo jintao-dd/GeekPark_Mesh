@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.relation_display import (
     build_published_projection,
+    draft_backlog_relations,
     is_reader_tier,
     reader_visible,
     split_relations_for_publish,
@@ -109,3 +110,16 @@ def test_projection_ignores_false_reader_visible_flag():
     pub = build_published_projection(draft)
     assert [r["title"] for r in pub["relations"]] == ["S"]
     assert pub["relations"][0]["reader_visible"] is True
+
+
+def test_draft_backlog_includes_parallel_watch_keeps_index():
+    rels = [
+        {"decision_tier": "strong", "title": "S", "body": "b", "evidence": [{}]},
+        {"decision_tier": "parallel", "title": "P", "body": "b", "evidence": [{}]},
+        {"decision_tier": "watch", "title": "W", "body": "b", "evidence": [{}]},
+        {"decision_tier": "skip", "title": "X", "body": "b", "evidence": [{}]},
+        {"decision_tier": "strong", "title": "Incomplete", "body": "", "evidence": [{}]},
+    ]
+    backlog = draft_backlog_relations(rels)
+    assert [x["rel"]["title"] for x in backlog] == ["P", "W", "Incomplete"]
+    assert [x["index"] for x in backlog] == [1, 2, 4]

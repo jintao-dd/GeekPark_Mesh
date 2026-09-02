@@ -7,21 +7,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.issue_verify import sync_kpis_from_data
 
 
+def _strong(title: str) -> dict:
+    return {
+        "title": title,
+        "body": "x",
+        "decision_tier": "strong",
+        "evidence": [{"item_id": 1}],
+        "label": "已联动",
+        "teams": ["编辑部"],
+        "details": [],
+        "sources": [],
+    }
+
+
 def test_kpi_relations_count_matches_cards():
     out = sync_kpis_from_data({
-        "relations": [
-            {
-                "title": "破壳创智",
-                "teams": ["编辑部", "Global Partnership 团队"],
-                "body": "x",
-                "details": [],
-                "sources": [],
-                "label": "合作机会",
-                "weak": False,
-                "decision_tier": "strong",
-                "evidence": [{"item_id": 1, "team": "编辑部"}],
-            }
-        ],
+        "relations": [_strong("破壳创智")],
         "contacts": [],
         "keywords": {"groups": []},
     })
@@ -30,9 +31,36 @@ def test_kpi_relations_count_matches_cards():
     assert len(out["relations"]) == 1
 
 
+def test_kpi_relations_counts_reader_only_not_backlog():
+    """KPI 对齐读者卡：parallel/watch 进草稿积压，不计 KPI。"""
+    out = sync_kpis_from_data({
+        "relations": [
+            _strong("S1"),
+            _strong("S2"),
+            {
+                "title": "P",
+                "body": "b",
+                "decision_tier": "parallel",
+                "evidence": [{}],
+                "label": "同一赛道，各自在做",
+            },
+            {
+                "title": "W",
+                "body": "b",
+                "decision_tier": "watch",
+                "evidence": [{}],
+                "label": "一方有需求，另一方尚未接触",
+            },
+        ],
+        "contacts": [],
+        "keywords": {"groups": []},
+    })
+    assert next(k for k in out["kpis"] if k["label"] == "可同步的关系")["n"] == "2"
+
+
 def test_sync_kpis_founder_dialogue_from_contacts():
     data = sync_kpis_from_data({
-        "relations": [{"title": "a"}, {"title": "b"}],
+        "relations": [_strong("a"), _strong("b")],
         "contacts": [
             {
                 "label": "编辑部一手对话 · 3 场",

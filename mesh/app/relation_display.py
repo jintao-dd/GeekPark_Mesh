@@ -123,6 +123,31 @@ def attach_reader_flags(relations: list[dict]) -> list[dict]:
     return out
 
 
+def count_reader_relations(relations: list | None) -> int:
+    """KPI / 读者卡口径：decision_tier==strong 且卡完整。"""
+    return sum(1 for r in (relations or []) if isinstance(r, dict) and reader_visible(r))
+
+
+def draft_backlog_relations(relations: list | None) -> list[dict]:
+    """预览/编辑态「草稿积压」条目（含原 relations 下标 index）。
+
+    含 parallel / watch，以及未进读者页的 strong（不完整等）。不含 skip。
+    """
+    out: list[dict] = []
+    for i, r in enumerate(relations or []):
+        if not isinstance(r, dict):
+            continue
+        if reader_visible(r):
+            continue
+        tier = (r.get("decision_tier") or "").strip().lower()
+        if tier == "skip":
+            continue
+        row = dict(r)
+        row["reader_visible"] = False
+        out.append({"index": i, "rel": row})
+    return out
+
+
 def display_summary(relations: list[dict]) -> dict[str, Any]:
     rels = attach_reader_flags(relations)
     reader, backlog = split_relations_for_publish(rels)

@@ -628,7 +628,8 @@
         g.appendChild(a);
       }
       function syncRelationsKpi(){
-      const n=document.querySelectorAll('#rel .card[data-path^="relations."]').length;
+      // 只计读者区 #rel 卡，不含 #rel-backlog 草稿积压
+      const n=document.querySelectorAll('#rel .cards > .card[data-path^="relations."]').length;
       document.querySelectorAll('.kpis .kpi').forEach(k=>{
         const lab=(k.querySelector('span')?.textContent||'').trim();
         if(lab==='可同步的关系'){
@@ -694,10 +695,11 @@
                 '<div class="deps">'+(card.teams||[]).map((t,ti)=>'<span class="dep'+((/^→|^->/.test(String(t||'')))?' dep-sug':'')+'" data-path="'+path+'.teams.'+ti+'">'+escHtml(t)+'</span>').join('')+'</div>';
             }
             g.insertBefore(el, a);
+            if(sec==='relations') syncRelationsKpi();
             // 给新卡挂删除钮
             if(!el.querySelector('.del')){
               const d=document.createElement('button');d.type='button';d.className='del';d.title='删除卡片';d.textContent='×';
-              d.addEventListener('click',async ev=>{ev.preventDefault();ev.stopPropagation();if(!(await MeshDialog.confirm({title:'删除卡片',body:'删除这张卡片？会写入版本记录。',okText:'删除',danger:true})))return;if(await save(el.dataset.path,null,'delete')){el.remove();say('已删除并保存');}});
+              d.addEventListener('click',async ev=>{ev.preventDefault();ev.stopPropagation();if(!(await MeshDialog.confirm({title:'删除卡片',body:'删除这张卡片？会写入版本记录。',okText:'删除',danger:true})))return;if(await save(el.dataset.path,null,'delete')){el.remove();if((el.dataset.path||'').startsWith('relations.'))syncRelationsKpi();say('已删除并保存');}});
               el.appendChild(d);
             }
             if(sec==='contacts' && !el.querySelector('.addgroup')){

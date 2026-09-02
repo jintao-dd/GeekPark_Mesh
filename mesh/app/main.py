@@ -2381,21 +2381,23 @@ def api_edit(request: Request, payload: dict):
             else: ref[last] = value
     except Exception as e:
         con.close(); raise HTTPException(400, f"路径无效：{e}")
-    # 增删/改关系卡后重算 KPI，避免「可同步的关系」与卡片数脱节
+    # 增删/改关系卡后重算 KPI，避免「可同步的关系」与读者卡脱节
     if keys and keys[0] == "relations":
         try:
             from .issue_verify import sync_kpis_from_data
             data = sync_kpis_from_data(data)
         except Exception:
+            from .relation_display import count_reader_relations
             rels = [x for x in (data.get("relations") or []) if isinstance(x, dict)]
+            n_reader = count_reader_relations(rels)
             kpis = list(data.get("kpis") or [])
             found = False
             for k in kpis:
                 if k.get("label") == "可同步的关系":
-                    k["n"] = str(len(rels))
+                    k["n"] = str(n_reader)
                     found = True
             if not found:
-                kpis.insert(0, {"n": str(len(rels)), "label": "可同步的关系"})
+                kpis.insert(0, {"n": str(n_reader), "label": "可同步的关系"})
             data["kpis"] = kpis
         from .relation_display import attach_reader_flags, split_relations_for_publish
         rels = attach_reader_flags([r for r in (data.get("relations") or []) if isinstance(r, dict)])
@@ -2451,15 +2453,23 @@ def api_add_card(request: Request, payload: dict):
         card = {
             "label": "已联动",
             "weak": False,
+            "decision_tier": "strong",
             "title": "新卡片（双击编辑）",
             "body": "只写事实与来源，不写建议。",
             "details": [],
             "sources": ["双击填写来源"],
             "teams": ["团队"],
+            "evidence": [{"source": "manual_edit"}],
+            "reader_visible": True,
         }
         data.setdefault("relations", []).append(card)
         section = "relations"
         idx = len(data["relations"]) - 1
+        try:
+            from .issue_verify import sync_kpis_from_data
+            data = sync_kpis_from_data(data)
+        except Exception:
+            pass
     con.execute(
         f"UPDATE issues SET {col}=?, updated_at=? WHERE id=?",
         (json.dumps(data, ensure_ascii=False), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), r["id"]),
@@ -3159,8 +3169,28 @@ def issue_page(request: Request, slug: str, preview: int = 0, edit: int = 0, syn
     data.setdefault("plans", {})
     data["plans"].setdefault("groups", [])
     data["plans"].setdefault("sources", [])
+    # KPI「可同步的关系」始终对齐读者卡；预览态另传草稿积压供编辑审视
+    try:
+        from .issue_verify import sync_kpis_from_data
+        data = sync_kpis_from_data(data)
+    except Exception:
+        pass
+    relations_backlog = []
+    if preview:
+        from .relation_display import draft_backlog_relations
+        relations_backlog = draft_backlog_relations(data.get("relations") or [])
     con = db.connect()
     arch = [_enrich_issue(x) for x in con.execute("SELECT slug, period_label, date_end, published_at FROM issues WHERE status='published' ORDER BY date_end DESC LIMIT 12")]
     con.close()
-    return templates.TemplateResponse("issue.html", ctx(request, issue=_enrich_issue(r), d=data, preview=bool(preview), archive_list=arch))
+    return templates.TemplateResponse(
+        "issue.html",
+        ctx(
+            request,
+            issue=_enrich_issue(r),
+            d=data,
+            preview=bool(preview),
+            archive_list=arch,
+            relations_backlog=relations_backlog,
+        ),
+    )
 

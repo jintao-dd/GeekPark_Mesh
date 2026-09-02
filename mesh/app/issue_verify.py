@@ -342,7 +342,13 @@ def _format_kpi_n(n: int, *, use_plus: bool = False) -> str:
 
 
 def sync_kpis_from_data(data: dict) -> dict:
-    """首屏 KPI 与下方卡片数量对齐（merge/verify 后以实际数据为准）。"""
+    """首屏 KPI 与下方卡片数量对齐（merge/verify 后以实际数据为准）。
+
+    「可同步的关系」= 读者可见 strong 卡数（与 build_published_projection / 读者区一致），
+    不含 parallel/watch 草稿积压。
+    """
+    from .relation_display import count_reader_relations
+
     data = dict(data)
     relations = list(data.get("relations") or [])
     contacts = list(data.get("contacts") or [])
@@ -350,7 +356,7 @@ def sync_kpis_from_data(data: dict) -> dict:
     kw_items = _items_from_groups(data.get("keywords"))
     founder_n = _founder_dialogue_count(contacts)
     data["kpis"] = [
-        {"n": _format_kpi_n(len(relations)), "label": "可同步的关系"},
+        {"n": _format_kpi_n(count_reader_relations(relations)), "label": "可同步的关系"},
         {"n": _format_kpi_n(len(contact_names), use_plus=True), "label": "接触过的人"},
         {"n": _format_kpi_n(founder_n), "label": "创始人级一手对话"},
         {"n": _format_kpi_n(len(kw_items)), "label": "关注的事"},
@@ -368,7 +374,7 @@ def issue_field_inventory() -> list[dict]:
         {"field": "plans.groups[].items[].rows[].v", "path": "llm.build_issue_draft", "evidence": "issue_verify (items corpus)"},
         {"field": "views[].text", "path": "llm.build_issue_draft", "evidence": "issue_verify (items corpus)"},
         {"field": "contacts[].groups[].items[].rows (要点等)", "path": "llm.build_issue_draft", "evidence": "issue_verify (items corpus)"},
-        {"field": "kpis", "path": "sync_kpis_from_data (after merge/verify)", "evidence": "len(relations/contacts/keywords)"},
+        {"field": "kpis", "path": "sync_kpis_from_data (after merge/verify)", "evidence": "count_reader_relations + contacts/keywords"},
         {"field": "gaps", "path": "llm.build_issue_draft", "evidence": "未约束（缺口说明）"},
         {"field": "data_sources", "path": "llm.build_issue_draft", "evidence": "未约束（接入状态）"},
         {"field": "question", "path": "模板固定", "evidence": "N/A"},
