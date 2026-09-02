@@ -454,12 +454,9 @@ def load_issue(con, slug: str, published_only=True):
     if not r: return None, None
     if published_only and r["status"] != "published": return r, None
     data = json.loads((r["published_json"] if published_only else (r["draft_json"] or r["published_json"])) or "{}")
-    if published_only and isinstance(data, dict):
-        from .relation_display import is_reader_tier
-        data["relations"] = [
-            rel for rel in (data.get("relations") or [])
-            if isinstance(rel, dict) and is_reader_tier(rel)
-        ]
+    # 已发布页：信任 published_json 原样（与已发 EDM 一致）。
+    # strong 切片只在 Publish 时由 build_published_projection 写入，这里不再二次过滤，
+    # 否则无 decision_tier 的旧稿会被全部抹掉。
     return r, data
 
 
@@ -480,12 +477,7 @@ def load_issue_for_edm(con, slug: str):
     except json.JSONDecodeError:
         data = {}
         source = "invalid"
-    if source == "published" and isinstance(data, dict):
-        from .relation_display import is_reader_tier
-        data["relations"] = [
-            rel for rel in (data.get("relations") or [])
-            if isinstance(rel, dict) and is_reader_tier(rel)
-        ]
+    # 同上：已上线稿不做 is_reader_tier 二次过滤
     return row, data, source
 
 
