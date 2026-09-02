@@ -207,8 +207,22 @@ def _teams_in_relation(r: dict) -> list[str]:
 
 
 def _title_entities(title: str) -> set[str]:
-    parts = re.split(r"[·•/\s]+", (title or "").strip())
-    return {p.strip() for p in parts if len(p.strip()) >= 2}
+    """从卡标题抽出可匹配实体名（兼容「OJO：…」「张岩（Notta）…」）。"""
+    s = (title or "").strip()
+    if not s:
+        return set()
+    parts = re.split(r"[·•/\s：:，,、；;\|（）()【】\[\]「」]+", s)
+    out = {p.strip() for p in parts if len(p.strip()) >= 2}
+    # 标题主体常在冒号前：OJO：编辑部已发稿…
+    head = re.split(r"[：:]", s, maxsplit=1)[0].strip()
+    if len(head) >= 2:
+        out.add(head)
+        # 人（公司）形态：戴若犁（Noitom）
+        m = re.match(r"^(.{2,24}?)\s*[（(]([^）)]{2,40})[）)]", head)
+        if m:
+            out.add(m.group(1).strip())
+            out.add(m.group(2).strip())
+    return out
 
 
 def _item_matches_entity(it: dict, title: str) -> bool:
@@ -276,6 +290,15 @@ def cross_team_provenance_ok(items: list[dict], title: str, teams: list[str]) ->
     return True
 
 
+def _relation_entity_title(r: dict) -> str:
+    """两阶段 gate 卡用 candidate_title 做实体匹配，避免 narrative 标题误裁 teams。"""
+    return ((r.get("candidate_title") or r.get("title") or "").strip())
+
+
+def _gate_locked_relation(r: dict) -> bool:
+    return bool(r.get("candidate_id") and r.get("provenance_ok") and (r.get("evidence") or []))
+
+
 def filter_draft_relations(draft: dict, items: list[dict]) -> dict:
     """去掉同源同 pointer 误标的跨团队关系/detail。"""
     data = dict(draft)
@@ -284,11 +307,13 @@ def filter_draft_relations(draft: dict, items: list[dict]) -> dict:
         rel = _sanitize_relation(r, items)
         if rel:
             teams = _teams_in_relation(rel)
-            title = (rel.get("title") or "").strip()
-            if title:
+            entity_title = _relation_entity_title(rel)
+            if entity_title:
                 if not teams:
                     continue
-                if not any(team_has_entity_items(items, title, t) for t in teams):
+                if not _gate_locked_relation(rel) and not any(
+                    team_has_entity_items(items, entity_title, t) for t in teams
+                ):
                     continue
             _align_sources(rel, teams)
             rels.append(rel)
@@ -297,7 +322,12 @@ def filter_draft_relations(draft: dict, items: list[dict]) -> dict:
 
 
 def _sanitize_relation(r: dict, items: list[dict]) -> dict | None:
-    title = (r.get("title") or "").strip()
+    if _gate_locked_relation(r):
+        rel = dict(r)
+        teams = _teams_in_relation(rel)
+        _align_sources(rel, teams)
+        return rel
+    title = _relation_entity_title(r)
     details_in = list(r.get("details") or [])
     details: list[str] = []
     for line in details_in:

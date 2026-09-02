@@ -8,10 +8,11 @@
 {% if flash_err %}<p class="tag pend" style="display:inline-block;margin:0 0 14px">{{ flash_err }}</p>{% endif %}
 
 <h2>已有各期</h2>
-<table><tr><th>期</th><th>状态</th><th>更新时间</th><th>发布时间</th><th></th></tr>
+<table><tr><th>期</th><th>状态</th><th>向量</th><th>更新时间</th><th>发布时间</th><th></th></tr>
 {% for i in issues %}<tr data-slug="{{ i.slug }}" data-label="{{ i.display_date }}" data-can-delete-draft="{{ '1' if perms.delete_draft else '0' }}">
-  <td>{% if perms.console %}<a href="/admin/issue/{{ i.slug }}{% if not perms.write %}?step=2{% endif %}"><b>{{ i.display_date }}</b></a>{% else %}<b>{{ i.display_date }}</b>{% endif %} <span class="muted">{{ i.slug }}</span></td>
+  <td>{% if perms.console %}<a href="/admin/issue/{{ i.slug }}{% if not perms.write %}?step=2{% endif %}"><b>{{ i.display_date }}</b></a>{% else %}<b>{{ i.display_date }}</b>{% endif %}</td>
   <td class="col-status">{% if i.status=='published' %}<span class="tag ok">已上线</span>{% else %}<span class="tag pend">草稿</span>{% endif %}</td>
+  <td class="col-embed muted">{% if i.status=='published' and i.embedding_label %}{{ i.embedding_label }}{% else %}—{% endif %}</td>
   <td class="col-updated">{{ i.updated_at }}</td>
   <td class="col-published">{{ i.published_at or '—' }}</td>
   <td class="acts">
@@ -161,20 +162,34 @@
     });
   }
 
+  async function askConfirm(opts) {
+    try {
+      if (window.MeshDialog && MeshDialog.confirm) {
+        return await MeshDialog.confirm(opts);
+      }
+    } catch (err) {
+      console.warn('MeshDialog.confirm failed', err);
+    }
+    return window.confirm((opts && opts.title ? opts.title + '\n' : '') + (opts && opts.body ? String(opts.body).replace(/<br\s*\/?>/gi, '\n') : ''));
+  }
+
   function bindPublish(form) {
     form.addEventListener('submit', async function (e) {
       e.preventDefault();
+      e.stopPropagation();
+      if (form.dataset.submitting === '1') return;
       var slug = form.dataset.slug || '';
       var label = form.dataset.label || slug;
-      var ok = await MeshDialog.confirm({
+      var btn = form.querySelector('button[type="submit"]');
+      var ok = await askConfirm({
         title: '确认上线',
         body: '上线后读者可见「' + esc(label) + '」。此操作不可撤回。',
         okText: '确认上线',
         cancelText: '取消',
       });
       if (!ok) return;
-      var btn = form.querySelector('button[type="submit"]');
-      if (btn) { btn.disabled = true; btn.classList.add('is-busy'); }
+      form.dataset.submitting = '1';
+      if (btn) { btn.disabled = true; btn.classList.add('is-busy'); btn.textContent = '上线中…'; }
       try {
         var body = new URLSearchParams();
         var r = await fetch(form.action, {
@@ -193,9 +208,19 @@
         }
         var tr = form.closest('tr');
         if (tr) replacePubForm(tr, 'published', data.published_at || '');
+        else location.reload();
       } catch (err) {
-        if (btn) { btn.disabled = false; btn.classList.remove('is-busy'); }
-        await MeshDialog.alert({ title: '上线失败', body: String(err.message || err) });
+        form.dataset.submitting = '0';
+        if (btn) { btn.disabled = false; btn.classList.remove('is-busy'); btn.textContent = '上线'; }
+        try {
+          if (window.MeshDialog && MeshDialog.alert) {
+            await MeshDialog.alert({ title: '上线失败', body: String(err.message || err) });
+          } else {
+            alert('上线失败：' + String(err.message || err));
+          }
+        } catch (_) {
+          alert('上线失败：' + String(err.message || err));
+        }
       }
     });
   }

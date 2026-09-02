@@ -11,10 +11,16 @@ from .attribution import (
     PUBLISHABLE_PROVENANCES,
     PROVENANCE_LLM_HINT,
     PROVENANCE_MANUAL,
+    PROVENANCE_SEGMENT,
     PROVENANCE_UNKNOWN,
     manual_owner_from_source,
 )
-from .owner_guard import _DETAIL_TEAM, _teams_in_relation, team_has_entity_items
+from .owner_guard import (
+    _DETAIL_TEAM,
+    solid_team_badges,
+    suggested_team_badges,
+    team_has_entity_items,
+)
 
 _NARRATIVE_PREFIX = re.compile(
     r"^([\u4e00-\u9fffA-Za-z0-9 /·&]{2,24})(?:沟通|建联|记录|例会|周报|数据|妙记)"
@@ -166,7 +172,12 @@ def scan_draft(draft_json: str | dict | None, items: list[dict]) -> AttributionS
         if not isinstance(r, dict):
             continue
         title = (r.get("title") or "").strip() or "（无标题）"
-        rel_teams = _teams_in_relation(r)
+        # 只校验实线团队；「→ 投资团队」等虚线路由不要求有 item.owner_team
+        rel_teams = []
+        for t in solid_team_badges(r):
+            ot = sanitize_owner_team(t) or str(t).strip()
+            if ot and ot not in rel_teams:
+                rel_teams.append(ot)
 
         for ev in r.get("evidence") or []:
             iid = ev.get("item_id")
@@ -197,15 +208,19 @@ def scan_draft(draft_json: str | dict | None, items: list[dict]) -> AttributionS
                         f"关系「{title}」evidence #{iid} source_label 叙事 {nar!r} ≠ owner {item_owner!r}"
                     )
 
-        # 7. relation teams 须有 item owner 支撑，不得仅靠 detail 叙事
+        # 7. 实线团队须有 item owner 支撑；虚线/一方观察卡不拦
         active = [
             x for x in items
             if not int(x.get("blocked") or 0) and not x.get("merged_into")
         ]
-        if len(rel_teams) >= 2 and title:
+        if suggested_team_badges(r) and len(rel_teams) < 2:
+            pass  # watch / one-sided：允许只有一侧实线
+        elif len(rel_teams) >= 2 and title:
             for t in rel_teams:
                 if not team_has_entity_items(active, title, t):
-                    out.blockers.append(f"关系「{title}」团队 {t!r} 无 item.owner_team 支撑（非 narrative 推断）")
+                    out.blockers.append(
+                        f"关系「{title}」团队 {t!r} 无 item.owner_team 支撑（非 narrative 推断）"
+                    )
 
     out.stats["relations"] = len(draft.get("relations") or [])
     return out

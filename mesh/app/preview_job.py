@@ -233,7 +233,10 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                 prev_summary,
             )
         data = merge_relations_from_candidates(
-            data, bundle["relation_candidates"], bundle["item_rows"],
+            data,
+            bundle["relation_candidates"],
+            bundle["item_rows"],
+            team_cards=bundle["team_cards"],
         )
         data["slug"] = slug
         data["period_label"] = period_label
@@ -247,9 +250,16 @@ def _run(slug: str, username: str, token: int = 0) -> None:
             con = db.connect()
             try:
                 payload = json.dumps(data, ensure_ascii=False)
+                reader_payload = json.dumps({
+                    **data,
+                    "relations": data.get("_relations_reader") or [
+                        r for r in (data.get("relations") or [])
+                        if isinstance(r, dict) and r.get("reader_visible")
+                    ],
+                }, ensure_ascii=False)
                 con.execute(
                     "UPDATE issues SET draft_json=?, published_json=?, updated_at=? WHERE id=?",
-                    (payload, payload, stamp, issue_id),
+                    (payload, reader_payload, stamp, issue_id),
                 )
                 db.register_entities(con, data, slug)
                 db.reindex_issue(con, issue_id)

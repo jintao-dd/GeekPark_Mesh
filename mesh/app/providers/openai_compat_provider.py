@@ -10,7 +10,7 @@ from .base import Provider, LLMError, env
 
 def _transient(status: int, body: str) -> bool:
     """Modelink/Bedrock 偶发拒流：短请求常成功，批量抽取时会抖 400。"""
-    if status in (408, 409, 425, 429, 500, 502, 503, 504):
+    if status in (408, 409, 425, 429, 500, 502, 503, 504, 524):
         return True
     b = (body or "").lower()
     return any(x in b for x in (
@@ -38,13 +38,22 @@ class OpenAICompatProvider(Provider):
     def is_configured(self) -> bool:
         return bool(self.key and self.model and self.base)
 
-    def complete(self, system: str, user: str, max_tokens: int = 4000) -> str:
+    def _request_payload(self, system: str, user: str, max_tokens: int) -> dict:
+        return {
+            "model": self.model,
+            "max_tokens": max_tokens,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+        }
+
+    def complete_detail(self, system: str, user: str, max_tokens: int = 4000) -> dict:
+        """完整 API 响应（诊断用）：content / finish_reason / usage / raw_response。"""
         if not self.is_configured():
             raise LLMError("未配置 MESH_LLM_API_KEY / MESH_LLM_MODEL / MESH_LLM_BASE_URL（见 .env）")
-        payload = json.dumps({
-            "model": self.model, "max_tokens": max_tokens,
-            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-        }, ensure_ascii=False).encode("utf-8")
+        req = self._request_payload(system, user, max_tokens)
+        payload = json.dumps(req, ensure_ascii=False).encode("utf-8")
         last_err = None
         for attempt in range(1, 4):
             try:
@@ -61,13 +70,26 @@ class OpenAICompatProvider(Provider):
                     continue
                 raise last_err
             if r.status_code < 400:
-                return r.json()["choices"][0]["message"]["content"]
+                body = r.json()
+                choice = (body.get("choices") or [{}])[0]
+                msg = choice.get("message") or {}
+                return {
+                    "content": msg.get("content") or "",
+                    "finish_reason": choice.get("finish_reason"),
+                    "usage": body.get("usage"),
+                    "model": body.get("model") or self.model,
+                    "raw_response": body,
+                    "request_payload": req,
+                }
             last_err = LLMError(f"模型接口返回 {r.status_code}：{r.text[:500]}")
             if attempt < 3 and _transient(r.status_code, r.text):
                 time.sleep(2 * attempt)
                 continue
             raise last_err
         raise last_err or LLMError("模型接口调用失败")
+
+    def complete(self, system: str, user: str, max_tokens: int = 4000) -> str:
+        return self.complete_detail(system, user, max_tokens=max_tokens)["content"]
 
     def stream(self, system: str, user: str, max_tokens: int = 4000):
         if not self.is_configured():

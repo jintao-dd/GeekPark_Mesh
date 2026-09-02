@@ -383,21 +383,26 @@ def _is_verified_skeleton_body(body: str, rel: dict) -> bool:
     return f"「{title}」" in b and "本期均有与" in b
 
 
-def collect_unsupported_flags(draft: dict) -> list[str]:
-    """发布前：汇总仍可能含 unsupported narrative 的标记。"""
+def collect_unsupported_flags(draft: dict, *, hard_only: bool = False) -> list[str]:
+    """发布前：汇总仍可能含 unsupported narrative 的标记。
+
+    hard_only=True 时只返回仍可能伤害读者稿的硬问题；
+    「已删减 N 处」表示 verify 已处理，不再拦上线。
+    """
     flags: list[str] = []
     vmeta = draft.get("_verify") or {}
-    if vmeta.get("lead_ok") is False:
-        flags.append("lead 含已删减的 unsupported 表述")
-    for key, label in (
-        ("keywords_rows_trimmed", "keywords"),
-        ("plans_rows_trimmed", "plans"),
-        ("contacts_rows_trimmed", "contacts"),
-        ("views_trimmed", "views"),
-    ):
-        n = int(vmeta.get(key) or 0)
-        if n:
-            flags.append(f"{label} 已删减 {n} 处 unsupported 行")
+    if not hard_only:
+        if vmeta.get("lead_ok") is False:
+            flags.append("lead 含已删减的 unsupported 表述")
+        for key, label in (
+            ("keywords_rows_trimmed", "keywords"),
+            ("plans_rows_trimmed", "plans"),
+            ("contacts_rows_trimmed", "contacts"),
+            ("views_trimmed", "views"),
+        ):
+            n = int(vmeta.get(key) or 0)
+            if n:
+                flags.append(f"{label} 已删减 {n} 处 unsupported 行")
 
     for r in draft.get("relations") or []:
         if not isinstance(r, dict):

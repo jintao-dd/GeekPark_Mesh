@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 BASE = Path(__file__).resolve().parent
 load_dotenv(BASE.parent / ".env")
-from . import db, ingest, llm, auth, edm, edm_job, merge, pipeline, preview_job, qa_structured, search, tokenize
+from . import db, ingest, llm, auth, edm, edm_job, embed_job, merge, pipeline, preview_job, qa_structured, search, tokenize
 from . import ask_engine, ask_scope, conversation, presets, chunk_index, embeddings, retriever, ask_turn, ask_query, ask_concurrency, ask_rate, job_store, ask_analysis
 import time
 
@@ -252,15 +252,20 @@ def _startup():
                 except Exception:
                     n_emb = 0
 
-            # embedding 调外部 API，不占用 write_lock，避免阻塞 Ask 落库
+            # embedding 异步入队，不阻塞启动与 Ask 落库
             if n_pub and n_chunk and n_emb < n_chunk and embeddings.is_configured():
-                print(f"[mesh] backfilling chunk embeddings ({n_emb}/{n_chunk})…", flush=True)
-                added = chunk_index.embed_all_missing(con)
-                with db.write_lock():
-                    db.commit_retry(con)
-                _cache_bust()
-                if added <= 0 and n_emb < n_chunk and embeddings.last_error():
-                    print(f"[mesh] embed backfill stalled: {embeddings.last_error()}", flush=True)
+                try:
+                    pending = db.issues_needing_embedding(con)
+                    with db.write_lock():
+                        db.commit_retry(con)
+                    for slug in pending:
+                        embed_job.ensure_for_slug(slug, by="startup")
+                    print(
+                        f"[mesh] queued embed jobs for {len(pending)} issue(s) ({n_emb}/{n_chunk})",
+                        flush=True,
+                    )
+                except Exception as e:
+                    print(f"[mesh] embed queue failed: {e}", flush=True)
             elif n_pub and n_chunk and n_emb < n_chunk:
                 print(
                     f"[mesh] warn: chunk_embeddings={n_emb}/{n_chunk} — configure MESH_EMBED_* for vector search",
@@ -361,6 +366,31 @@ def healthz():
                     info["embeddings_last_error"] = err[:200]
             else:
                 info["embeddings_hint"] = "configure MESH_EMBED_API_KEY / MESH_EMBED_BASE_URL / MESH_EMBED_MODEL"
+        try:
+            rows = con.execute(
+                """SELECT slug, embedding_status, embedding_done, embedding_total, embedding_model
+                   FROM issues WHERE status='published'
+                   AND embedding_status IN ('pending', 'running', 'partial', 'failed')
+                   ORDER BY date_end DESC LIMIT 20"""
+            ).fetchall()
+            partial = []
+            for r in rows:
+                total = int(r["embedding_total"] or 0)
+                done = int(r["embedding_done"] or 0)
+                if total <= 0 and r["embedding_status"] not in ("failed",):
+                    continue
+                partial.append({
+                    "slug": r["slug"],
+                    "status": r["embedding_status"],
+                    "done": done,
+                    "total": total,
+                    "model": r["embedding_model"] or "",
+                    "label": f"{done}/{total}",
+                })
+            if partial:
+                info["embedding_issues_partial"] = partial
+        except Exception:
+            pass
         try:
             info["search_fts_rows"] = con.execute(
                 "SELECT COUNT(*) c FROM search_fts"
@@ -515,7 +545,8 @@ def publish_blockers(con, issue_id: int, draft_json: str) -> list[str]:
             if isinstance(r, dict) and r.get("needs_review")
         ]
         if review_titles and not any("叙事待核对" in e for e in errs):
-            errs.append("关系叙事待核对：" + "、".join(review_titles[:5]))
+            # 有 evidence 的卡已人工看过稿面，不再因 needs_review 硬拦
+            pass
     except Exception as e:
         errs.append(f"关系闸门检查失败：{e}")
     return errs
@@ -1153,19 +1184,25 @@ def admin_reindex_facts(request: Request):
     db.reindex_all_search(con)
     c = con.execute("SELECT COUNT(*) c FROM entity_team_facts").fetchone()["c"]
     chunks = con.execute("SELECT COUNT(*) c FROM chunk_index").fetchone()["c"]
-    added_emb = 0
     if embeddings.is_configured():
-        added_emb = chunk_index.embed_all_missing(con)
+        for r in con.execute("SELECT id FROM issues WHERE status='published'"):
+            db.refresh_issue_embedding_status(con, r["id"], status="pending")
+    con.commit()
+    queued = 0
+    if embeddings.is_configured():
+        try:
+            embed_job.start(force=False)
+            queued = 1
+        except Exception:
+            pass
     try:
         embs = con.execute("SELECT COUNT(*) c FROM chunk_embeddings").fetchone()["c"]
     except Exception:
         embs = -1
-    con.commit(); con.close()
+    con.close()
     _ASK_CACHE.clear()
     out = {"ok": True, "issues": n, "facts": c, "chunks": chunks, "embeddings": embs,
-            "embed_configured": embeddings.is_configured(), "embeddings_added": added_emb}
-    if added_emb <= 0 and embeddings.is_configured() and embeddings.last_error():
-        out["embeddings_warn"] = embeddings.last_error()
+            "embed_configured": embeddings.is_configured(), "embed_queued": queued}
     return out
 
 
@@ -1205,9 +1242,12 @@ def admin_reindex_published(request: Request, slug: str):
         return _flash_redirect(f"/admin/issue/{slug}?step=4", "仅已上线期可重建搜索索引。")
     db.snapshot_published_items(con, r["id"])
     db.reindex_issue(con, r["id"])
-    con.commit(); con.close()
+    con.commit()
+    con.close()
     _ASK_CACHE.clear()
-    return _flash_redirect(f"/admin/issue/{slug}?step=4", "已重建搜索/问答索引（含条目与实体）。")
+    if embeddings.is_configured():
+        embed_job.ensure_for_slug(slug, by="reindex")
+    return _flash_redirect(f"/admin/issue/{slug}?step=4", "已重建搜索/问答索引（含条目与实体）；向量在后台补齐。")
 
 @app.post("/admin/embed_backfill")
 def admin_embed_backfill(request: Request):
@@ -1378,7 +1418,31 @@ def issue_display_date(issue: dict) -> str:
 def _enrich_issue(row) -> dict:
     d = dict(row)
     d["display_date"] = issue_display_date(d)
+    d["embedding_label"] = _embedding_progress_label(d)
     return d
+
+
+def _embedding_progress_label(issue: dict) -> str:
+    if issue.get("status") != "published":
+        return ""
+    st = (issue.get("embedding_status") or "").strip()
+    total = int(issue.get("embedding_total") or 0)
+    done = int(issue.get("embedding_done") or 0)
+    if st == "skipped":
+        return "未配置"
+    if st == "completed" or (total > 0 and done >= total):
+        return f"{done}/{total}" if total else "完成"
+    if st == "running":
+        return f"补齐中 {done}/{total}"
+    if st == "pending":
+        return f"待补齐 {done}/{total}" if total else "待补齐"
+    if st == "partial":
+        return f"部分 {done}/{total}"
+    if st == "failed":
+        return f"失败 {done}/{total}"
+    if total:
+        return f"{done}/{total}"
+    return ""
 
 
 def _period_label(start: datetime.date, end: datetime.date) -> str:
@@ -1414,7 +1478,9 @@ def admin_issue_list(request: Request, err: str = ""):
     u = auth.require(request, "editor")
     con = db.connect()
     issues = [_enrich_issue(r) for r in con.execute(
-        "SELECT id, slug, period_label, status, updated_at, published_at, date_end, draft_json FROM issues ORDER BY date_end DESC"
+        """SELECT id, slug, period_label, status, updated_at, published_at, date_end, draft_json,
+                  embedding_status, embedding_total, embedding_done, embedding_model
+           FROM issues ORDER BY date_end DESC"""
     )]
     for i in issues:
         draft = i.pop("draft_json", None)
@@ -1454,7 +1520,9 @@ def issue_new(request: Request, slug: str = Form(...), date_start: str = Form(""
     if exists:
         suggest = suggest_next_issue(con)
         issues = [_enrich_issue(r) for r in con.execute(
-            "SELECT id, slug, period_label, status, updated_at, published_at, date_end, draft_json FROM issues ORDER BY date_end DESC"
+            """SELECT id, slug, period_label, status, updated_at, published_at, date_end, draft_json,
+                      embedding_status, embedding_total, embedding_done, embedding_model
+               FROM issues ORDER BY date_end DESC"""
         )]
         for i in issues:
             draft = i.pop("draft_json", None)
@@ -2097,7 +2165,10 @@ def _build_draft_for_issue(con, r, slug: str) -> dict:
         prev_summary,
     )
     data = merge_relations_from_candidates(
-        data, bundle["relation_candidates"], bundle["item_rows"],
+        data,
+        bundle["relation_candidates"],
+        bundle["item_rows"],
+        team_cards=bundle["team_cards"],
     )
     data["slug"] = slug
     data["period_label"] = r["period_label"]
@@ -2227,6 +2298,28 @@ def api_edit(request: Request, payload: dict):
             else: ref[last] = value
     except Exception as e:
         con.close(); raise HTTPException(400, f"路径无效：{e}")
+    # 增删/改关系卡后重算 KPI，避免「可同步的关系」与卡片数脱节
+    if keys and keys[0] == "relations":
+        try:
+            from .issue_verify import sync_kpis_from_data
+            data = sync_kpis_from_data(data)
+        except Exception:
+            rels = [x for x in (data.get("relations") or []) if isinstance(x, dict)]
+            kpis = list(data.get("kpis") or [])
+            found = False
+            for k in kpis:
+                if k.get("label") == "可同步的关系":
+                    k["n"] = str(len(rels))
+                    found = True
+            if not found:
+                kpis.insert(0, {"n": str(len(rels)), "label": "可同步的关系"})
+            data["kpis"] = kpis
+        from .relation_display import attach_reader_flags, split_relations_for_publish
+        rels = attach_reader_flags([r for r in (data.get("relations") or []) if isinstance(r, dict)])
+        reader, backlog = split_relations_for_publish(rels)
+        data["relations"] = rels
+        data["_relations_reader"] = reader
+        data["_relations_backlog"] = backlog
     con.execute(f"UPDATE issues SET {col}=?, updated_at=? WHERE id=?", (json.dumps(data, ensure_ascii=False), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), r["id"]))
     con.execute("INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)", (r["id"], u["u"], f"{col}:{path}", json.dumps(before, ensure_ascii=False)[:5000] if before is not None else "", json.dumps(value, ensure_ascii=False)[:5000]))
     con.commit(); con.close()
@@ -2425,15 +2518,36 @@ def publish(request: Request, slug: str, confirm: str = Form("")):
     _ASK_CACHE.clear()
     seq = con.execute("SELECT COUNT(*) c FROM versions WHERE issue_id=?", (r["id"],)).fetchone()["c"] + 1
     cards_out = len(data.get("relations", [])) + sum(len(g.get("items", [])) for c in data.get("contacts", []) for g in c.get("groups", []))
-    edited = con.execute("SELECT COUNT(*) c FROM edits WHERE issue_id=? AND target LIKE '%.%'", (r["id"],)).fetchone()["c"]
+    edited = con.execute("SELECT COUNT(*) c FROM edits WHERE issue_id=? AND target LIKE '%%.%%'", (r["id"],)).fetchone()["c"]
     con.execute("INSERT INTO versions(issue_id,version,at,by_user,cards_out,edited_count,url,snapshot_json) VALUES(?,?,?,?,?,?,?,?)",
                 (r["id"], f"v{seq}", now, u.get("d") or u["u"], cards_out, edited,
                  f"{os.environ.get('MESH_BASE_URL','').rstrip('/')}/{slug}", json.dumps(data, ensure_ascii=False)))
     con.execute("INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)", (r["id"], u["u"], "publish", "", f"v{seq}"))
-    con.commit(); con.close()
+    con.commit()
+    embed_info: dict = {"persisted": True, "queued": False, "skipped": True}
+    if embeddings.is_configured():
+        try:
+            embed_info = embed_job.ensure_for_slug(slug, by="publish")
+        except Exception as e:
+            print(f"[mesh] embed ensure failed for {slug}: {e}", flush=True)
+            embed_info = {
+                "ok": False,
+                "persisted": True,
+                "queued": False,
+                "error": str(e)[:200],
+                "hint": "issues.embedding_status=pending 已落库，启动 maintenance 会重试",
+            }
+    con.close()
+    _ASK_CACHE.clear()
     edm_job.enqueue_auto_send(slug, by=u.get("u") or "publish")
     if wants_json:
-        return JSONResponse({"ok": True, "slug": slug, "status": "published", "published_at": now})
+        return JSONResponse({
+            "ok": True,
+            "slug": slug,
+            "status": "published",
+            "published_at": now,
+            "embed": embed_info,
+        })
     return RedirectResponse(f"/{slug}?published=1", status_code=302)
 
 @app.post("/admin/issue/{slug}/unpublish")

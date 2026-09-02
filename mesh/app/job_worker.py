@@ -92,14 +92,14 @@ def _tick_once() -> int:
                 traceback.print_exc()
             handled += 1
         elif kind == "embed":
-            defaults = embed_job._defaults()
+            defaults = embed_job._defaults(key)
             if not job_runtime.mark_executor(kind, key, defaults, holder):
                 continue
             st = job_store.get(kind, key, defaults)
             token = int(st.get("token") or 0)
-            print(f"[mesh-worker] embed token={token}", flush=True)
+            print(f"[mesh-worker] embed {key} token={token}", flush=True)
             try:
-                embed_job._run(token)
+                embed_job._run(key, token)
             except Exception:
                 traceback.print_exc()
             handled += 1

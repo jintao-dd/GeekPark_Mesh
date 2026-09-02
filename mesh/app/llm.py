@@ -403,11 +403,186 @@ def build_issue_draft(
         f"【各团队要点卡 team_cards】\n{json.dumps(team_cards, ensure_ascii=False)[:budget(35000)]}\n\n"
         f"【跨团队关系候选 relation_candidates（relations 节只能用这些）】\n"
         f"{json.dumps(relation_candidates, ensure_ascii=False)[:budget(20000)]}\n\n"
-        f"【外部媒体条目（只用于「外部在热聊，我们还没碰」）】\n"
+        f"【外部媒体条目（只用于 gaps / 弱关系背景，勿写入 relations）】\n"
         f"{json.dumps(external_items, ensure_ascii=False)[:15000]}\n\n"
-        "请输出完整周报 JSON。全篇任何字段都不得出现全局禁用词；关键词墙 rows 也必须换说法，禁止照抄条目原话。"
+        "请输出完整周报 JSON。**relations 必须为空数组 []**（关系卡由独立两阶段流程生成）。"
+        "全篇任何字段都不得出现全局禁用词；关键词墙 rows 也必须换说法，禁止照抄条目原话。"
     )
     return call_json_compliant(system, user, max_tokens=16000)
+
+
+RELATION_DECISIONS_MAX_TOKENS = 8000
+RELATION_DECISIONS_RETRIES = 2
+
+
+class RelationDecisionCoverageError(LLMError):
+    """LLM 未对全部 candidate 返回 decision。"""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        missing_ids: list[str],
+        meta: dict | None = None,
+        decisions: list[dict] | None = None,
+    ):
+        super().__init__(message)
+        self.missing_ids = list(missing_ids)
+        self.meta = dict(meta or {})
+        self.decisions = list(decisions or [])
+
+
+def prepare_relation_decisions_messages(
+    candidates: list[dict],
+    team_cards: list[dict],
+    *,
+    extra_user_suffix: str = "",
+) -> tuple[str, str, dict]:
+    system = (
+        load_prompt("00_base_rules")
+        + "\n\n"
+        + load_prompt("issue_relation_decisions")
+        + "\n\n"
+        '输出严格 JSON：{"relation_decisions":[...]}'
+    )
+    slim = []
+    for c in candidates:
+        slim.append({
+            "candidate_id": c.get("candidate_id"),
+            "title": c.get("title"),
+            "teams": c.get("teams"),
+            "suggested_label": c.get("suggested_label"),
+            "team_facts": [
+                {
+                    "team": tf.get("team"),
+                    "item_ids": tf.get("item_ids"),
+                    "snippets": (tf.get("snippets") or [])[:2],
+                }
+                for tf in (c.get("team_facts") or [])
+            ],
+        })
+    user_budget = budget(18000)
+    cards_budget = budget(8000)
+    slim_json = json.dumps(slim, ensure_ascii=False)
+    cards_json = json.dumps(team_cards, ensure_ascii=False)
+    user = (
+        f"【relation_candidates】\n{slim_json[:user_budget]}\n\n"
+        f"【team_cards 摘要】\n{cards_json[:cards_budget]}\n\n"
+        "对每个 candidate_id 输出一条 relation_decisions；禁止 title/body/details/teams/sources。"
+        f"{extra_user_suffix}"
+    )
+    meta = {
+        "n_candidates": len(candidates),
+        "candidate_ids": [c.get("candidate_id") for c in candidates],
+        "system_chars": len(system),
+        "user_chars": len(user),
+        "slim_json_chars": len(slim_json),
+        "slim_json_truncated": len(slim_json) > user_budget,
+        "team_cards_json_chars": len(cards_json),
+        "team_cards_truncated": len(cards_json) > cards_budget,
+        "max_tokens": RELATION_DECISIONS_MAX_TOKENS,
+    }
+    return system, user, meta
+
+
+def missing_decision_ids(candidates: list[dict], decisions: list[dict]) -> list[str]:
+    expected = [
+        (c.get("candidate_id") or "").strip()
+        for c in candidates
+        if (c.get("candidate_id") or "").strip()
+    ]
+    got: set[str] = set()
+    for d in decisions:
+        if not isinstance(d, dict):
+            continue
+        cid = (d.get("candidate_id") or "").strip()
+        if cid:
+            got.add(cid)
+    return [cid for cid in expected if cid not in got]
+
+
+def build_relation_decisions(
+    candidates: list[dict],
+    team_cards: list[dict],
+) -> list[dict]:
+    decisions, _meta = build_relation_decisions_with_coverage(candidates, team_cards)
+    return decisions
+
+
+def build_relation_decisions_with_coverage(
+    candidates: list[dict],
+    team_cards: list[dict],
+    *,
+    max_retries: int = RELATION_DECISIONS_RETRIES,
+) -> tuple[list[dict], dict]:
+    """带 coverage 校验与 retry；仍缺则抛 RelationDecisionCoverageError。"""
+    attempts: list[dict] = []
+    decisions: list[dict] = []
+    missing: list[str] = list(missing_decision_ids(candidates, []))
+    suffix = ""
+
+    for attempt in range(max_retries + 1):
+        system, user, prep_meta = prepare_relation_decisions_messages(
+            candidates, team_cards, extra_user_suffix=suffix,
+        )
+        out = call_json_compliant(system, user, max_tokens=RELATION_DECISIONS_MAX_TOKENS)
+        batch = [d for d in (out.get("relation_decisions") or []) if isinstance(d, dict)]
+        by_id: dict[str, dict] = {}
+        for d in decisions:
+            cid = (d.get("candidate_id") or "").strip()
+            if cid:
+                by_id[cid] = d
+        for d in batch:
+            cid = (d.get("candidate_id") or "").strip()
+            if cid:
+                by_id[cid] = d
+        decisions = [by_id[cid] for cid in prep_meta["candidate_ids"] if cid in by_id]
+        # preserve any extra order from batch for unknown ids
+        seen = {d.get("candidate_id") for d in decisions}
+        for d in batch:
+            cid = (d.get("candidate_id") or "").strip()
+            if cid and cid not in seen:
+                decisions.append(d)
+                seen.add(cid)
+        missing = missing_decision_ids(candidates, decisions)
+        attempts.append({
+            "attempt": attempt + 1,
+            "n_returned": len(batch),
+            "n_merged": len(decisions),
+            "missing_ids": list(missing),
+            **prep_meta,
+        })
+        if not missing:
+            break
+        suffix = (
+            f"\n\n【硬性补全】以下 candidate_id 必须各输出一条 relation_decisions，"
+            f"不得遗漏：{', '.join(missing)}。"
+            f"共 {len(prep_meta['candidate_ids'])} 条候选，你已漏 {len(missing)} 条。"
+        )
+
+    meta = {
+        "n_candidates": len(candidates),
+        "n_decisions_received": len(decisions),
+        "missing_ids": missing,
+        "attempts": attempts,
+        "retries_used": max(0, len(attempts) - 1),
+        "coverage_ok": not missing,
+    }
+    if missing:
+        raise RelationDecisionCoverageError(
+            f"LLM 漏答 {len(missing)} 条 relation_decisions：{', '.join(missing)}",
+            missing_ids=missing,
+            meta=meta,
+            decisions=decisions,
+        )
+    return decisions, meta
+
+
+def build_relation_narratives(locked_relations: list[dict]) -> list[dict]:
+    """兼容旧接口 → Relation Writing Module。"""
+    from .relation_writer import call_writer_llm
+
+    return call_writer_llm(locked_relations)
 
 # ---------- 4. AI 问答 ----------
 def _qa_prompt(

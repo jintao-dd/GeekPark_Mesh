@@ -285,8 +285,9 @@ body.editor .flag[data-path][contenteditable="true"]{outline:2px solid #fff;box-
 .pubmodal .row .k[disabled]{background:#D0D5DD;color:#98A2B3;cursor:not-allowed}
 
 /* 统一确认/输入对话框（替代浏览器 UI） */
-.mesh-dlg-mask{position:fixed;inset:0;background:rgba(20,56,47,.48);display:none;align-items:center;justify-content:center;z-index:240;padding:24px;touch-action:manipulation}
-.mesh-dlg-mask.on{display:flex}
+.mesh-dlg-mask{position:fixed;inset:0;background:rgba(20,56,47,.48);display:none;align-items:center;justify-content:center;z-index:10050;padding:24px;touch-action:manipulation}
+.mesh-dlg-mask.on{display:flex !important}
+.mesh-dlg-mask[hidden]{display:none !important}
 .mesh-dlg{background:#fff;border-radius:22px;padding:32px;width:min(440px,92vw);box-shadow:0 30px 80px -20px rgba(0,0,0,.4);margin:0;transform:translateZ(0)}
 .mesh-dlg h3{margin:0 0 10px;font-size:20px;color:var(--ink)}
 .mesh-dlg .mesh-dlg-body{margin:0 0 18px;color:var(--ink3);font-size:14px;line-height:1.55;white-space:pre-wrap}

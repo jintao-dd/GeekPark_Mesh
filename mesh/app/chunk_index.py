@@ -93,8 +93,26 @@ def rebuild_issue(con, issue_id: int, *, items: bool = True) -> int:
                 "meta": {"stype": r["stype"]},
             })
             n += 1
-    embed_all_missing(con)
     return n
+
+
+def embedding_counts_for_slug(con, issue_slug: str, model: str | None = None) -> tuple[int, int]:
+    """返回 (chunk 总数, 已有 embedding 数)。"""
+    model = model or embeddings.model_name()
+    total = int(
+        con.execute(
+            "SELECT COUNT(*) c FROM chunk_index WHERE issue_slug=?", (issue_slug,),
+        ).fetchone()["c"]
+    )
+    done = int(
+        con.execute(
+            """SELECT COUNT(*) c FROM chunk_index c
+               INNER JOIN chunk_embeddings e ON e.chunk_id = c.chunk_id AND e.model = ?
+               WHERE c.issue_slug=?""",
+            (model, issue_slug),
+        ).fetchone()["c"]
+    )
+    return total, done
 
 
 def embed_all_missing(con, batch: int | None = None, max_rounds: int = 200) -> int:
@@ -140,6 +158,56 @@ def embed_missing_chunks(con, batch: int | None = None) -> int:
             return n
         return 0
     return _write_embeddings(con, model, rows, vecs)
+
+
+def embed_missing_for_slug(con, issue_slug: str, batch: int | None = None) -> int:
+    """为某期尚无 embedding 的 chunk 批量写入向量。"""
+    if not embeddings.is_configured():
+        return 0
+    bs = batch or embeddings.batch_size()
+    model = embeddings.model_name()
+    rows = con.execute(
+        """SELECT c.chunk_id, c.title, c.body FROM chunk_index c
+           LEFT JOIN chunk_embeddings e ON e.chunk_id = c.chunk_id AND e.model = ?
+           WHERE e.chunk_id IS NULL AND c.issue_slug=? ORDER BY c.chunk_id LIMIT ?""",
+        (model, issue_slug, bs),
+    ).fetchall()
+    if not rows:
+        return 0
+    texts = [f"{r['title'] or ''}\n{r['body'] or ''}"[:4000] for r in rows]
+    vecs = embeddings.embed_texts(texts)
+    if len(rows) != len(vecs):
+        err = embeddings.last_error()
+        if err:
+            print(f"[mesh] embed batch skipped ({issue_slug}, {len(rows)} rows): {err}", flush=True)
+        if bs > 1 and len(rows) > 1:
+            half = max(1, len(rows) // 2)
+            n = 0
+            for sub_rows, sub_texts in ((rows[:half], texts[:half]), (rows[half:], texts[half:])):
+                if not sub_rows:
+                    continue
+                sub_vecs = embeddings.embed_texts(sub_texts)
+                if len(sub_rows) == len(sub_vecs):
+                    n += _write_embeddings(con, model, sub_rows, sub_vecs)
+            return n
+        return 0
+    return _write_embeddings(con, model, rows, vecs)
+
+
+def embed_all_missing_for_slug(
+    con,
+    issue_slug: str,
+    batch: int | None = None,
+    max_rounds: int = 200,
+) -> int:
+    bs = batch or embeddings.batch_size()
+    total = 0
+    for _ in range(max_rounds):
+        n = embed_missing_for_slug(con, issue_slug, batch=bs)
+        if n <= 0:
+            break
+        total += n
+    return total
 
 
 def _write_embeddings(con, model: str, rows, vecs) -> int:

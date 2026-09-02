@@ -66,8 +66,16 @@ def test_reindex_roundtrip():
 
 
 def test_multi_entity_reindex():
+    import tempfile
+    from app import db_conn
+
+    td = tempfile.mkdtemp(prefix="mesh_if_")
+    old_path, old_url = db_conn.DB_PATH, db_conn.MESH_DB_URL
+    db_conn.DB_PATH = str(Path(td) / "if.db")
+    db_conn.MESH_DB_URL = ""
+    db.DB_PATH = db_conn.DB_PATH
     con = db.connect()
-    db.migrate(con)
+    db.init_db(seed=False)
     try:
         con.execute(
             "INSERT OR IGNORE INTO issues(id,slug,date_start,date_end,period_label,status,published_json) "
@@ -96,6 +104,8 @@ def test_multi_entity_reindex():
         item_facts.sync_fts(con)
         con.commit()
         con.close()
+        db_conn.DB_PATH, db_conn.MESH_DB_URL = old_path, old_url
+        db.DB_PATH = old_path
 
 
 if __name__ == "__main__":

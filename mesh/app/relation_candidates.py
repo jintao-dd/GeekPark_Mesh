@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections import defaultdict
 
 from .aggregator import sanitize_owner_team
@@ -18,6 +19,16 @@ from .relation_verify import editorial_weak
 _MIN_ENTITY_LEN = 2
 _MAX_SNIPPETS = 3
 _SNIP_LEN = 120
+
+_KNOWN_TEAMS = frozenset({
+    "编辑部", "商业化团队", "硅谷 BD 团队", "Global Partnership 团队", "英文站",
+    "品牌创意团队", "社群", "投资团队", "音频播客团队", "视频号团队",
+    "CEO / 总裁办", "CEO", "总裁办",
+})
+_OVERSEAS_TEAMS = frozenset({"Global Partnership 团队", "硅谷 BD 团队"})
+_ROUTE_PHRASE = re.compile(
+    r"用得上|可供|对照|承接|联动|采访池|嘉宾|路由|值得关注|可对齐|国内谁用|谁用得上",
+)
 
 
 def _parse_entities(raw) -> list[str]:
@@ -41,10 +52,62 @@ def _item_row(it: dict) -> dict:
     }
 
 
-def build_relation_candidates(items: list[dict]) -> list[dict]:
-    """从 items 算出可写入 relations 的跨团队候选（已校验 provenance）。"""
+def _parse_roles(raw) -> list[str]:
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return []
+    return [str(x).strip() for x in (raw or []) if str(x).strip()]
+
+
+def _routing_targets(owner: str, roles: list[str], text: str) -> list[str]:
+    """从 roles 或带路由短语的文本解析建议承接团队。"""
+    owner = sanitize_owner_team(owner) or owner
+    targets: list[str] = []
+    seen: set[str] = set()
+    for r in roles:
+        rt = sanitize_owner_team(r) or r
+        if rt in _KNOWN_TEAMS and rt != owner and rt not in seen:
+            targets.append(rt)
+            seen.add(rt)
+    if _ROUTE_PHRASE.search(text or ""):
+        for team in _KNOWN_TEAMS:
+            if team == owner or team in seen:
+                continue
+            if team in text:
+                targets.append(team)
+                seen.add(team)
+    return targets
+
+
+def _routing_title_from_row(row: dict) -> str:
+    ents = row.get("entities") or []
+    if ents:
+        primary = ents[0]
+        for co in ents[1:]:
+            if co != primary and len(co) >= 2:
+                return f"{primary} · {co}" if primary not in co else primary
+        return primary
+    ptr = (row.get("pointer") or "").strip()
+    if ptr:
+        return ptr
+    t = (row.get("text") or "").strip()
+    return t[:40] if t else "跨团队路由"
+
+
+def _routing_suggest_label(owner: str, target: str) -> str:
+    if owner in _OVERSEAS_TEAMS:
+        return (
+            "（参考：海外接触、国内可能承接，可用「海外接触，国内可能承接」"
+            "或「一方接触，另一方用得上」）"
+        )
+    return "（参考：若仅一方有记录，可用「一方接触，另一方用得上」）"
+
+
+def _build_entity_cooccurrence_candidates(items: list[dict]) -> list[dict]:
+    """entity 跨团队共现候选（原 raw 路径）。"""
     active = [dict(x) for x in items if not x.get("blocked")]
-    # entity -> team -> items
     by_entity: dict[str, dict[str, list[dict]]] = defaultdict(lambda: defaultdict(list))
     for it in active:
         ot = sanitize_owner_team(it.get("owner_team"))
@@ -79,10 +142,14 @@ def build_relation_candidates(items: list[dict]) -> list[dict]:
                     srcs.append(row["source_label"])
                 if len(snippets) >= _MAX_SNIPPETS:
                     break
-            team_facts.append({"team": t, "item_ids": [x["id"] for x in team_map[t] if x.get("id")], "snippets": snippets[:_MAX_SNIPPETS], "sources": srcs[:3]})
+            team_facts.append({
+                "team": t,
+                "item_ids": [x["id"] for x in team_map[t] if x.get("id")],
+                "snippets": snippets[:_MAX_SNIPPETS],
+                "sources": srcs[:3],
+            })
             sources.extend(s for s in srcs if s not in sources)
         title = entity
-        # 若同一组 item 上还有更长的共现实体，合并标题
         co = _coentities(all_items, entity)
         if co:
             title = f"{entity} · {co}" if entity not in co else co
@@ -90,14 +157,110 @@ def build_relation_candidates(items: list[dict]) -> list[dict]:
             "title": title,
             "teams": teams,
             "weak": False,
+            "candidate_kind": "cooccurrence",
             "suggested_label": _suggest_label(teams, team_facts),
             "team_facts": team_facts,
             "sources": sources[:6],
             "item_ids": item_ids,
             "provenance_ok": True,
         })
+    return raw_cands
 
-    return _dedupe_candidates(raw_cands)
+
+def _build_routing_candidates(items: list[dict]) -> list[dict]:
+    """roles/文本路由：一方有记录、另一方用得上。
+
+    同一 owner + 同一标题主体只出 **一张** 候选，多个承接方合并为多个 `→ 团队`
+   （避免张岩→投资、张岩→编辑部拆成两张卡）。
+    """
+    buckets: dict[tuple[str, str], dict] = {}
+
+    for it in items:
+        if it.get("blocked"):
+            continue
+        owner = sanitize_owner_team(it.get("owner_team")) or ""
+        if not owner or owner == "外部媒体":
+            continue
+        row = _item_row(it)
+        roles = _parse_roles(it.get("roles"))
+        text = (it.get("text") or "").strip()
+        targets = _routing_targets(owner, roles, text)
+        if not targets:
+            continue
+        title = _routing_title_from_row(row)
+        key = (owner, title.strip().lower())
+        if key not in buckets:
+            buckets[key] = {
+                "title": title,
+                "teams": [owner],
+                "weak": True,
+                "candidate_kind": "routing",
+                "routing_targets": [],
+                "suggested_label": _routing_suggest_label(owner, targets[0]),
+                "team_facts": [{
+                    "team": owner,
+                    "item_ids": [],
+                    "snippets": [],
+                    "sources": [],
+                }],
+                "sources": [],
+                "item_ids": [],
+                "provenance_ok": True,
+            }
+        b = buckets[key]
+        for target in targets:
+            badge = f"→ {target}"
+            if target not in b["routing_targets"]:
+                b["routing_targets"].append(target)
+            if badge not in b["teams"]:
+                b["teams"].append(badge)
+        tf = b["team_facts"][0]
+        iid = row.get("id")
+        if iid is not None and iid not in tf["item_ids"]:
+            tf["item_ids"].append(iid)
+            b["item_ids"].append(iid)
+            if row["text"] and row["text"] not in tf["snippets"]:
+                tf["snippets"].append(row["text"])
+            if row["source_label"] and row["source_label"] not in tf["sources"]:
+                tf["sources"].append(row["source_label"])
+                if row["source_label"] not in b["sources"]:
+                    b["sources"].append(row["source_label"])
+
+    out = []
+    for b in buckets.values():
+        b["team_facts"][0]["snippets"] = b["team_facts"][0]["snippets"][:_MAX_SNIPPETS]
+        b["team_facts"][0]["sources"] = b["team_facts"][0]["sources"][:3]
+        b["sources"] = b["sources"][:6]
+        b["item_ids"] = sorted(set(b["item_ids"]))
+        out.append(b)
+    return out
+
+
+def _build_raw_candidates(items: list[dict]) -> list[dict]:
+    """共现 + 路由两路召回；不在此阶段去重或截断。"""
+    cooc = _build_entity_cooccurrence_candidates(items)
+    route = _build_routing_candidates(items)
+    return cooc + route
+
+
+def build_relation_candidates(items: list[dict]) -> list[dict]:
+    """从 items 算出跨团队候选（宽召回；去重/分级留给 Decision）。"""
+    return _build_raw_candidates(items)
+
+
+def candidate_build_stats(items: list[dict]) -> dict[str, int]:
+    """候选构建各阶段数量（审计用）。"""
+    cooc = _build_entity_cooccurrence_candidates(items)
+    route = _build_routing_candidates(items)
+    raw = cooc + route
+    return {
+        "raw": len(raw),
+        "raw_cooccurrence": len(cooc),
+        "raw_routing": len(route),
+        "for_llm": len(raw),
+        # 兼容旧审计字段：Candidate 不再 dedupe/cap
+        "deduped": len(raw),
+    }
 
 
 def _coentities(items: list[dict], primary: str) -> str:
@@ -121,27 +284,45 @@ def _suggest_label(teams: list[str], team_facts: list[dict]) -> str:
     return "（参考：若仅一方有记录，可用「一方接触，另一方用得上」）"
 
 
-_MAX_CANDIDATES_FOR_LLM = 28
+_MAX_CANDIDATES_FOR_LLM = 28  # 仅诊断/历史对比；build 路径不再 cap
 
 
 def _cap_candidates(cands: list[dict]) -> list[dict]:
-    """限制喂给 LLM 的候选数量，避免 entity 共现淹没编辑判断。"""
+    """诊断用：模拟旧版 28 条 cap（生产 build 路径不调用）。"""
     cands.sort(key=lambda c: (-len(c.get("item_ids") or []), -(len(c.get("teams") or [])), c.get("title") or ""))
     return cands[:_MAX_CANDIDATES_FOR_LLM]
 
 
-def _dedupe_candidates(cands: list[dict]) -> list[dict]:
-    """去掉 item 集合高度重叠的重复候选。"""
+def _dedupe_only(cands: list[dict]) -> list[dict]:
+    """诊断用：模拟旧版 item 重叠去重（生产 build 路径不调用）。"""
+    cands = list(cands)
     cands.sort(key=lambda c: (-len(c.get("item_ids") or []), c.get("title") or ""))
     kept: list[dict] = []
     seen_ids: list[set] = []
+    seen_routing: set[tuple] = set()
     for c in cands:
+        if c.get("candidate_kind") == "routing":
+            solid = [t for t in (c.get("teams") or []) if not str(t).strip().startswith(("→", "->"))]
+            owner = solid[0] if solid else ""
+            tgts = tuple(sorted(c.get("routing_targets") or []))
+            rkey = (owner, tgts, (c.get("title") or "").strip().lower())
+            if rkey in seen_routing:
+                continue
+            seen_routing.add(rkey)
+            kept.append(c)
+            seen_ids.append(set(c.get("item_ids") or []))
+            continue
         ids = set(c.get("item_ids") or [])
         if any(len(ids & old) / max(1, len(ids | old)) > 0.85 for old in seen_ids):
             continue
         kept.append(c)
         seen_ids.append(ids)
-    return _cap_candidates(kept)
+    return kept
+
+
+def _dedupe_candidates(cands: list[dict]) -> list[dict]:
+    """诊断用：dedupe + cap 旧链路（生产 build 路径不调用）。"""
+    return _cap_candidates(_dedupe_only(cands))
 
 
 def _title_match(a: str, b: str) -> bool:
@@ -386,8 +567,7 @@ def _facts_consistent(rel: dict) -> bool:
     if not evidence:
         return True
     ev_teams = _teams_from_evidence(evidence)
-    rel_teams = [sanitize_owner_team(str(t).lstrip("→").lstrip("->").strip()) or "" for t in rel.get("teams") or []]
-    rel_teams = [t for t in rel_teams if t and not str(t).startswith("→")]
+    rel_teams = _solid_teams(rel)
     if rel_teams != ev_teams:
         return False
     ev_sources = _sources_from_evidence(evidence)
@@ -396,15 +576,86 @@ def _facts_consistent(rel: dict) -> bool:
 
 
 def _dedupe_relations_by_title(rels: list[dict]) -> list[dict]:
-    seen: set[str] = set()
-    out: list[dict] = []
+    """同标题保留一张；一方接触卡额外按主体名合并多个 → 团队。"""
+    import re
+    from .owner_guard import is_suggested_team_badge
+    from .aggregator import sanitize_owner_team as _sot
+
+    def _entity_key(title: str) -> str:
+        t = (title or "").strip()
+        m = re.match(r"^([^（(：:\s·•]{2,24})", t)
+        return (m.group(1).strip().lower() if m else t[:24].lower())
+
+    def _merge_teams(a: list, b: list) -> list[str]:
+        solid: list[str] = []
+        sug: list[str] = []
+        for t in list(a or []) + list(b or []):
+            s = str(t).strip()
+            if not s:
+                continue
+            if is_suggested_team_badge(s):
+                name = _sot(s.lstrip("→").lstrip("->").strip()) or s.lstrip("→").lstrip("->").strip()
+                badge = f"→ {name}"
+                if badge not in sug:
+                    sug.append(badge)
+            else:
+                name = _sot(s) or s
+                if name and name not in solid:
+                    solid.append(name)
+        return solid + sug
+
+    def _is_onesided(r: dict) -> bool:
+        label = r.get("label") or ""
+        return "一方接触" in label or bool(r.get("weak")) or (r.get("decision_tier") == "watch")
+
+    # 1) exact title dedupe
+    by_title: dict[str, dict] = {}
+    order: list[str] = []
     for r in rels:
-        key = (r.get("title") or "").strip().lower()
-        if not key or key in seen:
+        if not isinstance(r, dict):
             continue
-        seen.add(key)
-        out.append(r)
-    return out
+        key = (r.get("title") or "").strip().lower()
+        if not key:
+            continue
+        if key not in by_title:
+            by_title[key] = dict(r)
+            order.append(key)
+        else:
+            cur = by_title[key]
+            cur["teams"] = _merge_teams(cur.get("teams") or [], r.get("teams") or [])
+            for field in ("details", "sources", "evidence"):
+                acc = list(cur.get(field) or [])
+                for x in r.get(field) or []:
+                    if x not in acc:
+                        acc.append(x)
+                cur[field] = acc
+
+    # 2) onesided entity merge (张岩→投资 + 张岩→编辑部)
+    entity_map: dict[str, str] = {}  # entity -> first title key
+    drop: set[str] = set()
+    for key in order:
+        r = by_title[key]
+        if not _is_onesided(r):
+            continue
+        ek = _entity_key(r.get("title") or "")
+        if not ek:
+            continue
+        if ek not in entity_map:
+            entity_map[ek] = key
+            continue
+        primary = entity_map[ek]
+        cur = by_title[primary]
+        other = r
+        cur["teams"] = _merge_teams(cur.get("teams") or [], other.get("teams") or [])
+        for field in ("details", "sources", "evidence"):
+            acc = list(cur.get(field) or [])
+            for x in other.get(field) or []:
+                if x not in acc:
+                    acc.append(x)
+            cur[field] = acc
+        drop.add(key)
+
+    return [by_title[k] for k in order if k not in drop]
 
 
 def _finalize_relation_facts(rels: list[dict]) -> list[dict]:
@@ -428,42 +679,19 @@ def _finalize_relation_facts(rels: list[dict]) -> list[dict]:
     return _dedupe_relations_by_title(out)
 
 
-def merge_relations_from_candidates(draft: dict, candidates: list[dict], items: list[dict]) -> dict:
-    """LLM 精选 + candidate 挂 evidence；虚线卡可无 evidence；事实字段以 evidence 为准。"""
-    data = dict(draft)
-    llm_rels = list(data.get("relations") or [])
-    used_cand: set[int] = set()
-    merged: list[dict] = []
-    items_by_id = _items_index(items)
+def merge_relations_from_candidates(
+    draft: dict,
+    candidates: list[dict],
+    items: list[dict],
+    *,
+    team_cards: list[dict] | None = None,
+) -> dict:
+    """两阶段关系：Decision → Evidence Gate → Narrative。"""
+    from .relation_decision import build_relations_two_phase
 
-    for r in llm_rels:
-        if not isinstance(r, dict):
-            continue
-        rel = dict(r)
-        suggested = _suggested_teams(rel)
-        cand, ci = _find_candidate_for_rel(rel.get("title") or "", candidates, used_cand)
-        if cand is not None:
-            used_cand.add(ci)
-            rel = _attach_relation_assets(rel, cand, items_by_id)
-            rel = _align_relation_from_evidence(rel, suggested=suggested)
-            if _facts_consistent(rel):
-                merged.append(rel)
-        elif editorial_weak(rel) or suggested:
-            rel = normalize_relation_team_badges(rel, suggest_extra_solid=True)
-            rel["needs_review"] = True
-            rel["status"] = "needs_review"
-            rel.setdefault("evidence", [])
-            merged.append(rel)
-
-    data["relations"] = merged
-    from .relation_verify import verify_relations_narratives
-
-    data["relations"] = verify_relations_narratives(data["relations"])
-    data = filter_draft_relations(data, items)
-    data["relations"] = _finalize_relation_facts(data.get("relations") or [])
-    from .issue_verify import verify_issue_draft
-
-    return verify_issue_draft(data, items)
+    return build_relations_two_phase(
+        draft, candidates, items, team_cards=team_cards or [],
+    )
 
 
 def prepare_draft_bundle(con, issue_id: int, slug: str) -> dict:
@@ -474,7 +702,7 @@ def prepare_draft_bundle(con, issue_id: int, slug: str) -> dict:
     item_rows = [
         dict(x)
         for x in con.execute(
-            """SELECT id, source_id, owner_team, pointer, entities, text, source_label, blocked
+            """SELECT id, source_id, owner_team, pointer, entities, roles, text, source_label, blocked
                FROM items WHERE issue_id=? AND blocked=0 AND merged_into IS NULL""",
             (issue_id,),
         )

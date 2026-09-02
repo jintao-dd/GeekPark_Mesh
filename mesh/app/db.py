@@ -7,7 +7,7 @@ from . import db_conn
 
 _log = logging.getLogger("mesh.db")
 DB_PATH = db_conn.DB_PATH
-SCHEMA_VERSION = "1.8.2"
+SCHEMA_VERSION = "1.8.4"
 _DB_WRITE_LOCK = threading.RLock()
 
 IntegrityError = db_conn.IntegrityError
@@ -31,7 +31,10 @@ CREATE TABLE IF NOT EXISTS issues(
   id INTEGER PRIMARY KEY, slug TEXT UNIQUE, date_start TEXT, date_end TEXT, period_label TEXT,
   version TEXT DEFAULT 'v1.4', status TEXT DEFAULT 'draft',   -- draft | published
   draft_json TEXT, published_json TEXT, published_items_snapshot TEXT,
-  updated_at TEXT, published_at TEXT, created_at TEXT DEFAULT (datetime('now'))
+  updated_at TEXT, published_at TEXT, created_at TEXT DEFAULT (datetime('now')),
+  embedding_status TEXT DEFAULT '', embedding_total INTEGER DEFAULT 0,
+  embedding_done INTEGER DEFAULT 0, embedding_model TEXT DEFAULT '',
+  embedding_at TEXT, embedding_error TEXT
 );
 CREATE TABLE IF NOT EXISTS sources(
   id INTEGER PRIMARY KEY, issue_id INTEGER, stype TEXT, team TEXT, title TEXT, filename TEXT, raw_path TEXT,
@@ -352,11 +355,19 @@ def _cols(con, table):
 
 def migrate(con):
     """就地升级旧库：老部署直接覆盖代码后启动即可，不丢数据。"""
+    _embedding_cols = [
+        ("issues", "embedding_status", "TEXT DEFAULT ''"),
+        ("issues", "embedding_total", "INTEGER DEFAULT 0"),
+        ("issues", "embedding_done", "INTEGER DEFAULT 0"),
+        ("issues", "embedding_model", "TEXT DEFAULT ''"),
+        ("issues", "embedding_at", "TEXT"),
+        ("issues", "embedding_error", "TEXT"),
+    ]
     if is_postgres():
         pg_add = [
             ("items", "owner_provenance", "TEXT"),
             ("items", "llm_owner_team_hint", "TEXT"),
-        ]
+        ] + _embedding_cols
         for table, col, decl in pg_add:
             try:
                 if col not in _cols(con, table):
@@ -379,7 +390,7 @@ def migrate(con):
         ("items", "llm_owner_team_hint", "TEXT"),
         ("users", "avatar_url", "TEXT"),
         ("issues", "published_items_snapshot", "TEXT"),
-    ]
+    ] + _embedding_cols
     for table, col, decl in add:
         try:
             if col not in _cols(con, table):
@@ -946,6 +957,97 @@ def reindex_issue(con, issue_id: int, *, items: bool = True):
         item_facts.sync_fts(con)
     reindex_entity_facts(con, issue_id)
     chunk_index.rebuild_issue(con, issue_id, items=items)
+    refresh_issue_embedding_status(con, issue_id)
+
+
+def refresh_issue_embedding_status(
+    con,
+    issue_id: int,
+    *,
+    status: str | None = None,
+    error: str | None = None,
+    running: bool = False,
+) -> dict:
+    """按 chunk_index / chunk_embeddings（当前 model）刷新该期 embedding 进度。"""
+    from . import chunk_index, embeddings
+
+    row = con.execute(
+        "SELECT slug, status, embedding_model FROM issues WHERE id=?", (issue_id,),
+    ).fetchone()
+    if not row:
+        return {}
+    slug = row["slug"]
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    model = embeddings.model_name() if embeddings.is_configured() else ""
+    if row["status"] != "published":
+        con.execute(
+            "UPDATE issues SET embedding_status='', embedding_total=0, embedding_done=0, "
+            "embedding_model='', embedding_at=NULL, embedding_error=NULL WHERE id=?",
+            (issue_id,),
+        )
+        return {"slug": slug, "embedding_status": "", "embedding_model": ""}
+    if not embeddings.is_configured():
+        con.execute(
+            "UPDATE issues SET embedding_status='skipped', embedding_total=0, embedding_done=0, "
+            "embedding_model='', embedding_at=?, embedding_error=NULL WHERE id=?",
+            (now, issue_id),
+        )
+        return {"slug": slug, "embedding_status": "skipped", "embedding_model": ""}
+    total, done = chunk_index.embedding_counts_for_slug(con, slug, model=model)
+    stored_model = (row["embedding_model"] or "").strip()
+    err = (error or "").strip() or None
+    if status:
+        st = status
+    elif running:
+        st = "running"
+    elif total <= 0:
+        st = "completed"
+    elif done >= total:
+        st = "completed"
+    elif stored_model and stored_model != model:
+        # 换模型后：旧 completed 不能沿用，按当前 model 缺口重算
+        st = "partial" if done > 0 else "pending"
+    elif err and done <= 0:
+        st = "failed"
+    elif done > 0:
+        st = "partial"
+    else:
+        st = "pending"
+    record_model = model if st in ("completed", "running", "partial", "pending", "failed") else stored_model
+    if st == "completed":
+        record_model = model
+    con.execute(
+        "UPDATE issues SET embedding_status=?, embedding_total=?, embedding_done=?, "
+        "embedding_model=?, embedding_at=?, embedding_error=? WHERE id=?",
+        (st, total, done, record_model, now, err, issue_id),
+    )
+    return {
+        "slug": slug,
+        "embedding_status": st,
+        "embedding_total": total,
+        "embedding_done": done,
+        "embedding_model": record_model,
+        "embedding_error": err,
+    }
+
+
+def issues_needing_embedding(con) -> list[str]:
+    """已发布且向量未齐的期号（供启动回填 / 运维）。"""
+    from . import embeddings
+
+    if not embeddings.is_configured():
+        return []
+    out: list[str] = []
+    for r in con.execute(
+        "SELECT id, slug FROM issues WHERE status='published' ORDER BY date_end DESC"
+    ):
+        slug = r["slug"]
+        if not slug:
+            continue
+        info = refresh_issue_embedding_status(con, r["id"])
+        if info.get("embedding_status") in ("pending", "partial", "failed"):
+            out.append(slug)
+    return out
 
 
 def reindex_all_search(con) -> int:

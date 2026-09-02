@@ -26,7 +26,13 @@ CREATE TABLE IF NOT EXISTS issues(
   published_items_snapshot TEXT,
   updated_at TEXT,
   published_at TEXT,
-  created_at TEXT DEFAULT to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')
+  created_at TEXT DEFAULT to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'),
+  embedding_status TEXT DEFAULT '',
+  embedding_total INTEGER DEFAULT 0,
+  embedding_done INTEGER DEFAULT 0,
+  embedding_model TEXT DEFAULT '',
+  embedding_at TEXT,
+  embedding_error TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sources(

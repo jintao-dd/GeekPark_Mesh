@@ -77,6 +77,21 @@
     if (r) r(value);
   }
 
+  function escapeHtml(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function formatBody(raw) {
+    // 允许调用方直接传 HTML（含 <br>）；纯文本则转义并保留换行
+    var s = String(raw || "");
+    if (/<[a-z][\s\S]*>/i.test(s)) return s;
+    return escapeHtml(s).replace(/\r\n|\r|\n/g, "<br>");
+  }
+
   function open(opts) {
     ensure();
     return new Promise(function (resolve) {
@@ -90,7 +105,7 @@
       mode = opts.mode || "confirm";
       expect = opts.expect || "";
       titleEl.textContent = opts.title || "";
-      bodyEl.innerHTML = opts.body || "";
+      bodyEl.innerHTML = formatBody(opts.body || "");
       bodyEl.hidden = !opts.body;
       errEl.hidden = true;
       errEl.textContent = "";
