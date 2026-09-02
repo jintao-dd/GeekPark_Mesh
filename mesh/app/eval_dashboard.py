@@ -13,6 +13,16 @@ ROOT = Path(__file__).resolve().parents[1]
 REPORTS = ROOT / "eval" / "reports"
 
 CURRENT_POINTER = "BASELINE_v1_current.json"
+PRODUCTION_POINTER = "PRODUCTION_current.json"
+LATEST_ROLES = ("baseline", "latest", "production")
+
+STAGE_CN = {
+    "retrieve_ms": "检索",
+    "source_ms": "溯源",
+    "cross_ms": "交叉",
+    "verify_ms": "校验",
+    "generation_ms": "生成",
+}
 
 # 边界审查记分板（与最近一次人工审查一致；Dashboard 不美化、不隐藏 WARN）
 BOUNDARY_SCORECARD = [
@@ -81,7 +91,11 @@ def _safe_name(name: str | None) -> str | None:
     name = Path(name).name
     if ".." in name or "/" in name or "\\" in name:
         return None
-    if not (name.startswith("BASELINE_") or name.startswith("OPTIMIZED_")):
+    if not (
+        name.startswith("BASELINE_")
+        or name.startswith("OPTIMIZED_")
+        or name.startswith("PRODUCTION_")
+    ):
         return None
     if not name.endswith(".json"):
         return None
@@ -174,6 +188,8 @@ def list_experiments() -> list[dict[str, Any]]:
         if "demo" in p.name.lower():
             continue
         rows.append(_brief(p))
+    for p in sorted(REPORTS.glob("PRODUCTION_*.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        rows.append(_brief(p))
     seen: set[str] = set()
     out: list[dict[str, Any]] = []
     for r in rows:
@@ -212,7 +228,11 @@ def _brief(path: Path) -> dict[str, Any]:
         "rel_keep_s": fmt_pct(m.get("rel_candidate_keep_rate_proxy"), digits=0),
         "rel_integrity_s": fmt_pct(m.get("rel_grounding"), digits=0),
         "p95_s": fmt_sec_ms(m.get("ask_p95_ms"), digits=1),
-        "kind": "baseline" if path.name.startswith("BASELINE_") else "optimized",
+        "kind": (
+            "production" if path.name.startswith("PRODUCTION_")
+            else ("baseline" if path.name.startswith("BASELINE_") else "optimized")
+        ),
+        "is_production_pointer": path.name == PRODUCTION_POINTER,
     })
     return meta
 
@@ -236,6 +256,61 @@ def load_experiment(name: str | None) -> dict[str, Any] | None:
     return doc
 
 
+def resolve_role_files() -> dict[str, dict[str, Any]]:
+    """三态：基线 / 最新实验 / 生产。只解析文件名，不写库。"""
+    baseline = CURRENT_POINTER if (REPORTS / CURRENT_POINTER).is_file() else None
+    if not baseline:
+        dated = sorted(REPORTS.glob("BASELINE_v1_20*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+        baseline = dated[0].name if dated else None
+
+    opts = sorted(
+        [p for p in REPORTS.glob("OPTIMIZED_*.json") if "demo" not in p.name.lower()],
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    if opts:
+        latest = opts[0].name
+    else:
+        dated = sorted(REPORTS.glob("BASELINE_v1_20*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+        latest = dated[0].name if dated else baseline
+
+    has_prod = (REPORTS / PRODUCTION_POINTER).is_file()
+    production = PRODUCTION_POINTER if has_prod else baseline
+    production_note = None if has_prod else "尚未单独冻 PRODUCTION_current.json，暂与基线同一份。"
+
+    def _meta(name: str | None) -> dict[str, Any]:
+        if not name:
+            return {"file": None, "ok": False}
+        doc = load_experiment(name)
+        if not doc:
+            return {"file": name, "ok": False}
+        env = doc.get("env") or {}
+        m = doc.get("metrics") or {}
+        return {
+            "file": doc.get("_file") or name,
+            "ok": True,
+            "commit": (env.get("commit") or "")[:7] or None,
+            "git_dirty": env.get("git_dirty"),
+            "ask_e2e_frac": (
+                f"{m.get('ask_n_pass')}/{m.get('ask_n')}"
+                if m.get("ask_n_pass") is not None and m.get("ask_n")
+                else None
+            ),
+            "frozen_at": doc.get("frozen_at"),
+        }
+
+    return {
+        "baseline": {**_meta(baseline), "label": "基线", "role": "baseline"},
+        "latest": {**_meta(latest), "label": "最新实验", "role": "latest"},
+        "production": {
+            **_meta(production),
+            "label": "生产",
+            "role": "production",
+            "note": production_note,
+        },
+    }
+
+
 def boundary_summary() -> dict[str, Any]:
     fails = sum(1 for r in BOUNDARY_SCORECARD if r["verdict"] == "FAIL")
     warns = sum(1 for r in BOUNDARY_SCORECARD if r["verdict"] == "WARN")
@@ -253,6 +328,44 @@ def ask_board(doc: dict) -> dict[str, Any]:
     m = doc.get("metrics") or {}
     n = m.get("ask_n") or 0
     n_pass = m.get("ask_n_pass")
+    stages_raw = (doc.get("cases") or {}).get("ask_latency_stages") or {}
+    stages = []
+    for key, label in STAGE_CN.items():
+        st = stages_raw.get(key) or {}
+        nn = int(st.get("n") or 0)
+        stages.append({
+            "key": key,
+            "label": label,
+            "n": nn,
+            "p50_s": fmt_sec_ms(st.get("p50")) if nn else "—",
+            "p95_s": fmt_sec_ms(st.get("p95")) if nn else "—",
+            "p99_s": fmt_sec_ms(st.get("p99")) if nn else "—",
+            "has_data": nn > 0,
+        })
+
+    ask_cases = [c for c in ((doc.get("cases") or {}).get("ask") or []) if isinstance(c, dict)]
+    fails = []
+    for c in ask_cases:
+        if c.get("pass"):
+            continue
+        fails.append({
+            "id": c.get("id") or "?",
+            "layer": c.get("failure_layer") or "unknown",
+            "latency_s": fmt_sec_ms(c.get("latency_ms")),
+            "tokens": c.get("tokens"),
+        })
+    slow = sorted(
+        [c for c in ask_cases if c.get("latency_ms") is not None],
+        key=lambda x: -float(x.get("latency_ms") or 0),
+    )[:5]
+    slow_rows = [{
+        "id": c.get("id") or "?",
+        "pass": bool(c.get("pass")),
+        "latency_s": fmt_sec_ms(c.get("latency_ms")),
+        "retrieve_s": fmt_sec_ms((c.get("latency_stages_ms") or {}).get("retrieve_ms")),
+        "tokens": c.get("tokens"),
+    } for c in slow]
+
     return {
         "e2e_pass_rate": m.get("ask_e2e_pass_rate"),
         "e2e_frac": f"{n_pass}/{n}" if n_pass is not None and n else None,
@@ -270,6 +383,9 @@ def ask_board(doc: dict) -> dict[str, Any]:
         "retry_rate": m.get("retry_rate"),
         "retry_s": fmt_pct(m.get("retry_rate"), digits=2) if m.get("retry_rate") is not None else "无数据",
         "latency_sources": m.get("ask_latency_sources"),
+        "stages": stages,
+        "fail_cases": fails,
+        "slow_cases": slow_rows,
     }
 
 
@@ -370,11 +486,6 @@ def relation_funnel(doc: dict) -> dict[str, Any]:
         else:
             drop_hint = "候选有量，但最终草稿为 0；请对照各层数字看掉在哪。"
 
-    skip_rows = []
-    for code, cnt in (audit.get("by_skip_code") or {}).items():
-        skip_rows.append({"code": code, "label": SKIP_CODE_CN.get(code, code), "n": cnt})
-    skip_rows.sort(key=lambda r: -int(r["n"] or 0))
-
     def _pick(pred) -> list[dict]:
         return [_case_brief(c) for c in ledger if pred(c)]
 
@@ -385,10 +496,22 @@ def relation_funnel(doc: dict) -> dict[str, Any]:
         "gate": _pick(lambda c: bool(c.get("gate_keep") or (c.get("draft_kept") and not c.get("gate_skip")))),
         "draft": _pick(lambda c: bool(c.get("draft_kept"))),
         "reader": _pick(lambda c: bool(c.get("reader_visible"))),
-        # 掉量视图：模型跳过 / 门控拦截
         "decision_drop": _pick(lambda c: bool(c.get("decision_skip") or c.get("final_outcome") == "skipped_llm")),
         "gate_drop": _pick(lambda c: bool(c.get("gate_overrode_llm") or c.get("final_outcome") == "skipped_gate_override")),
     }
+
+    skip_rows = []
+    for code, cnt in (audit.get("by_skip_code") or {}).items():
+        rows = _pick(lambda c, code=code: (c.get("skip_reason_code") or c.get("gate_reason_code")) == code)
+        case_key = f"skip:{code}"
+        cases_by_step[case_key] = rows
+        skip_rows.append({
+            "code": code,
+            "label": SKIP_CODE_CN.get(code, code),
+            "n": cnt,
+            "case_key": case_key,
+        })
+    skip_rows.sort(key=lambda r: -int(r["n"] or 0))
 
     # 每层直接可见的原因摘要（标题 + 原因码）
     reason_preview = []
@@ -397,6 +520,7 @@ def relation_funnel(doc: dict) -> dict[str, Any]:
             "title": c["title"],
             "label": c["skip_label"] or c["outcome"],
             "reason": c["reason"],
+            "skip_code": c.get("skip_code") or "",
         })
 
     steps = [
@@ -441,7 +565,7 @@ def relation_funnel(doc: dict) -> dict[str, Any]:
         "skip_rows": skip_rows,
         "reason_preview": reason_preview,
         "cases_by_step": cases_by_step,
-        "click_hint": "点击漏斗节点可查看该层 cases（只读）。",
+        "click_hint": "点漏斗节点或拒绝原因，直接落到 cases。",
     }
 
 
@@ -513,7 +637,7 @@ def env_card(doc: dict) -> dict[str, Any]:
     }
 
 
-def compare_delta(base: dict, current: dict) -> list[dict[str, Any]]:
+def compare_delta(base: dict, current: dict, *, funnel: dict | None = None) -> list[dict[str, Any]]:
     try:
         from deploy.mesh_baseline import compare
     except ImportError:
@@ -529,6 +653,7 @@ def compare_delta(base: dict, current: dict) -> list[dict[str, Any]]:
     for r in rows:
         key = r.get("key") or ""
         st = r.get("status") or ""
+        evidence = _delta_evidence(key, current, funnel or {})
         out.append({
             **r,
             "metric_cn": METRIC_CN.get(key, r.get("metric") or key),
@@ -537,8 +662,49 @@ def compare_delta(base: dict, current: dict) -> list[dict[str, Any]]:
             "new_s": fmt_metric(key, r.get("new")),
             "delta_display": fmt_delta(key, r.get("delta"), r.get("delta_s")),
             "why": _why(r),
+            "evidence": evidence,
         })
     return out
+
+
+def _delta_evidence(key: str, current: dict, funnel: dict) -> list[dict[str, str]]:
+    """给 Δ 行挂上可点的具体 case，方便 2 分钟定位。"""
+    ask_cases = [c for c in ((current.get("cases") or {}).get("ask") or []) if isinstance(c, dict)]
+    by_step = funnel.get("cases_by_step") or {}
+
+    if key == "ask_e2e_pass_rate":
+        return [{
+            "id": str(c.get("id") or "?"),
+            "detail": f"失败层={c.get('failure_layer') or '?'} · {fmt_sec_ms(c.get('latency_ms'))}",
+        } for c in ask_cases if not c.get("pass")][:8]
+
+    if key in MS_KEYS:
+        slow = sorted(
+            [c for c in ask_cases if c.get("latency_ms") is not None],
+            key=lambda x: -float(x.get("latency_ms") or 0),
+        )[:5]
+        return [{
+            "id": str(c.get("id") or "?"),
+            "detail": f"{fmt_sec_ms(c.get('latency_ms'))} · retrieve {fmt_sec_ms((c.get('latency_stages_ms') or {}).get('retrieve_ms'))}",
+        } for c in slow]
+
+    if key == "ask_token_total":
+        heavy = sorted(
+            [c for c in ask_cases if c.get("tokens")],
+            key=lambda x: -int(x.get("tokens") or 0),
+        )[:5]
+        return [{"id": str(c.get("id") or "?"), "detail": f"tokens={c.get('tokens')}"} for c in heavy]
+
+    if key.startswith("rel_") and "proxy" in key:
+        rows = by_step.get("gate_drop") or by_step.get("decision_drop") or []
+        return [{"id": c.get("title") or c.get("id") or "?", "detail": c.get("skip_label") or c.get("reason") or ""} for c in rows[:6]]
+
+    if key in ("rel_grounding", "rel_strong_no_evidence", "rel_missing_tier", "rel_blocked_leaks"):
+        integ = ((current.get("cases") or {}).get("relation") or {}).get("integrity") or {}
+        bad = integ.get("bad_titles") or []
+        return [{"id": t, "detail": "库存体检 bad_title"} for t in bad[:8]]
+
+    return []
 
 
 def _why(row: dict) -> str:
@@ -654,33 +820,50 @@ def _enrich_experiments(exps: list[dict], baseline_file: str | None, current_fil
     return out
 
 
-def build_view(*, current_name: str | None = None, baseline_name: str | None = None) -> dict[str, Any]:
+def build_view(
+    *,
+    current_name: str | None = None,
+    baseline_name: str | None = None,
+    role: str | None = None,
+) -> dict[str, Any]:
     """Assemble read-only dashboard payload."""
+    roles = resolve_role_files()
+    active_role = role if role in ("baseline", "latest", "production") else None
+    if active_role and not current_name:
+        current_name = (roles.get(active_role) or {}).get("file")
+
     current = load_experiment(current_name or CURRENT_POINTER)
     if not current:
         return {"ok": False, "error": "未找到 Baseline JSON（eval/reports/BASELINE_*.json）"}
 
     if not baseline_name:
-        baseline_name = CURRENT_POINTER
-        for ex in list_experiments():
-            if ex["name"].startswith("BASELINE_v1_20") and ex.get("commit") == (current.get("env") or {}).get("commit", "")[:10]:
-                baseline_name = ex["name"]
-                break
+        baseline_name = (roles.get("baseline") or {}).get("file") or CURRENT_POINTER
     baseline = load_experiment(baseline_name) or current
+
+    # infer role from filename if not provided
+    if not active_role:
+        cur_file = current.get("_file")
+        for rname, meta in roles.items():
+            if meta.get("file") == cur_file:
+                active_role = rname
+                break
+        active_role = active_role or "latest"
 
     ask = ask_board(current)
     boundary = boundary_summary()
     funnel = relation_funnel(current)
     relation = relation_board(current)
-    delta = compare_delta(baseline, current)
+    delta = compare_delta(baseline, current, funnel=funnel)
     headline = _conclusion(ask, boundary, funnel, delta, relation)
     experiments = _enrich_experiments(list_experiments(), baseline.get("_file"), current.get("_file"))
 
     return {
         "ok": True,
         "readonly": True,
-        "readonly_note": "本页只读评测报告，不会触发 Preview / Ask / 向量化 / 发布，不会污染实验。",
+        "readonly_note": "目标：30 秒发现问题，2 分钟定位到具体 case。只读报告，不触发业务任务。",
         "headline": headline,
+        "roles": roles,
+        "active_role": active_role,
         "boundary": boundary,
         "env": env_card(current),
         "ask": ask,

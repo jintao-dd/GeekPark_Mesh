@@ -30,7 +30,7 @@ def test_build_view_loads_current_baseline():
     view = build_view()
     assert view["ok"] is True
     assert view["readonly"] is True
-    assert "Preview" in view["readonly_note"]
+    assert "只读" in view["readonly_note"] or "2 分钟" in view["readonly_note"]
     env = view["env"]
     assert (env.get("commit") or "").startswith("2c6e8c3")
     assert env["git_dirty"] is False
@@ -120,6 +120,32 @@ def test_funnel_helpers_on_minimal_doc():
     assert f["cases_by_step"]["gate_drop"]
     assert i["title"] == "关系完整性（库存体检）"
     assert i["n_relations"] == 14
+
+
+def test_ask_stages_and_roles():
+    view = build_view(role="baseline")
+    assert view["ok"]
+    assert view["active_role"] == "baseline"
+    assert view["roles"]["baseline"]["file"]
+    assert view["roles"]["latest"]["file"]
+    assert view["roles"]["production"]["file"]
+    stages = view["ask"]["stages"]
+    assert stages
+    retrieve = next(s for s in stages if s["key"] == "retrieve_ms")
+    assert retrieve["has_data"]
+    assert "秒" in retrieve["p95_s"]
+    assert "399999" not in retrieve["p95_s"]
+    assert view["ask"]["slow_cases"]
+
+
+def test_funnel_skip_drilldown_and_delta_evidence():
+    view = build_view()
+    assert any(r.get("case_key", "").startswith("skip:") for r in view["funnel"]["skip_rows"])
+    assert any(k.startswith("skip:") for k in view["funnel"]["cases_by_step"])
+    lat_rows = [r for r in view["delta"] if r["key"] == "ask_p95_ms"]
+    assert lat_rows and lat_rows[0]["evidence"]
+    proxy_rows = [r for r in view["delta"] if "proxy" in r["key"]]
+    assert proxy_rows and proxy_rows[0]["evidence"] is not None
 
 
 def test_experiment_history_enriched():

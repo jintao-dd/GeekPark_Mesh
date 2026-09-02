@@ -126,7 +126,21 @@
   }
   .num-neg { color: #B45309; }
   .num-pos { color: #047857; }
-  .ev-hint-click { font-size: 12px; color: #A8A29E; }
+  .ev-roles { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+  .ev-role {
+    border: 1px solid #D6D3D1; background: #fff; color: #44403C; text-decoration: none;
+    padding: 8px 12px; border-radius: 8px; font-size: 13px; min-width: 140px;
+  }
+  .ev-role.on { border-color: #1C1917; background: #F5F5F4; font-weight: 600; }
+  .ev-role .rl { font-size: 12px; color: #78716C; }
+  .ev-role .rv { margin-top: 2px; color: #1C1917; }
+  .ev-mini { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+  .ev-mini th, .ev-mini td { text-align: left; padding: 5px 8px; border-bottom: 1px solid #E7E5E4; }
+  .ev-mini th { color: #78716C; font-weight: 600; }
+  .ev-skip-chip { cursor: pointer; }
+  .ev-skip-chip:hover, .ev-skip-chip.on { border-color: #1C1917; }
+  .ev-ev { margin-top: 6px; font-size: 12px; color: #57534E; }
+  .ev-ev div { margin-top: 2px; }
 </style>
 {% endblock %}
 {% block body %}
@@ -161,6 +175,21 @@
 </div>
 
 <div class="ev-banner">{{ view.readonly_note }}</div>
+
+{# 三态：基线 / 最新 / 生产 #}
+<div class="ev-roles">
+  {% for key in ['baseline', 'latest', 'production'] %}
+  {% set r = view.roles[key] %}
+  <a class="ev-role {% if view.active_role == key %}on{% endif %}"
+     href="/admin/eval?role={{ key }}&baseline={{ view.roles.baseline.file or view.baseline_file }}">
+    <div class="rl">{{ r.label }}{% if view.active_role == key %} · 当前{% endif %}</div>
+    <div class="rv">{{ r.commit or '—' }} · Ask {{ r.ask_e2e_frac or '—' }}</div>
+  </a>
+  {% endfor %}
+</div>
+{% if view.roles.production.note %}
+<div class="ev-callout info" style="margin-top:0">{{ view.roles.production.note }}</div>
+{% endif %}
 
 {# 当前结论 #}
 <div class="ev-verdict tone-{{ view.headline.tone }}">
@@ -252,6 +281,35 @@
       <div class="s">「无数据」≠ 0</div>
     </div>
   </div>
+  <table class="ev-mini">
+    <thead><tr><th>Ask 阶段</th><th>样本</th><th>P50</th><th>P95</th><th>P99</th></tr></thead>
+    <tbody>
+    {% for st in view.ask.stages %}
+      <tr>
+        <td>{{ st.label }}</td>
+        <td>{{ st.n }}</td>
+        <td>{{ st.p50_s }}</td>
+        <td>{{ st.p95_s }}</td>
+        <td>{{ st.p99_s }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if view.ask.fail_cases %}
+  <div class="ev-callout" style="margin-top:10px">
+    失败题（点开定位）：
+    {% for c in view.ask.fail_cases %}
+      <code>{{ c.id }}</code> {{ c.layer }} {{ c.latency_s }}{% if not loop.last %} · {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if view.ask.slow_cases %}
+  <p class="lede" style="margin-top:8px">最慢 5 题：
+    {% for c in view.ask.slow_cases %}
+      <code>{{ c.id }}</code> {{ c.latency_s }} (retrieve {{ c.retrieve_s }}){% if not loop.last %} · {% endif %}
+    {% endfor %}
+  </p>
+  {% endif %}
 </section>
 
 <section class="ev-sec">
@@ -291,9 +349,9 @@
   {% endif %}
 
   {% if view.funnel.skip_rows %}
-  <div class="ev-skip-bar">
+  <div class="ev-skip-bar" id="skipChips">
     {% for row in view.funnel.skip_rows %}
-    <div class="ev-skip-chip">{{ row.label }}<b>{{ row.n }}</b></div>
+    <div class="ev-skip-chip" data-case-key="{{ row.case_key }}" data-label="{{ row.label }}">{{ row.label }}<b>{{ row.n }}</b></div>
     {% endfor %}
   </div>
   {% endif %}
@@ -374,7 +432,17 @@
           {% elif r.status == '[OK]' %}<span class="ev-pill ok">{{ r.status_cn }}</span>
           {% elif r.status == '[.]' %}<span class="ev-pill same">{{ r.status_cn }}</span>
           {% else %}<span class="ev-pill">{{ r.status_cn or r.status }}</span>{% endif %}
-          <div class="ev-why">{{ r.why }}</div>
+          <div class="ev-why">
+            <div>{{ r.why }}</div>
+            {% if r.evidence %}
+            <div class="ev-ev">
+              相关 case：
+              {% for e in r.evidence %}
+              <div><code>{{ e.id }}</code> {{ e.detail }}</div>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
         </td>
       </tr>
     {% endfor %}
@@ -447,8 +515,18 @@
   steps.forEach(function (el) {
     el.addEventListener('click', function () {
       steps.forEach(function (s) { s.classList.remove('on'); });
+      document.querySelectorAll('#skipChips .ev-skip-chip').forEach(function (c) { c.classList.remove('on'); });
       el.classList.add('on');
       render(el.getAttribute('data-case-key'), el.getAttribute('data-label'), el.getAttribute('data-drop-key'));
+    });
+  });
+
+  document.querySelectorAll('#skipChips .ev-skip-chip').forEach(function (el) {
+    el.addEventListener('click', function () {
+      steps.forEach(function (s) { s.classList.remove('on'); });
+      document.querySelectorAll('#skipChips .ev-skip-chip').forEach(function (c) { c.classList.remove('on'); });
+      el.classList.add('on');
+      render(el.getAttribute('data-case-key'), el.getAttribute('data-label'), '');
     });
   });
 
