@@ -1,0 +1,93 @@
+{
+  "generated_at": "2026-09-02T08:24:16.679706+00:00",
+  "slug": "2026-8-17",
+  "corpus": "golden",
+  "checks": {
+    "ask_25": {
+      "ok": true,
+      "exit_code": 0,
+      "summary": "检索: 25/25 pass"
+    },
+    "relation_pytest": {
+      "ok": true,
+      "tail": "................................................                         [100%]\n48 passed in 1.24s"
+    },
+    "relation_integrity_published": {
+      "ok": false,
+      "n_relations": 14,
+      "n_ok": 0,
+      "strong_no_evidence": 10,
+      "team_mismatch": 24,
+      "orphan_sources": 25,
+      "blocked_leaks": 0,
+      "bad_titles": [
+        "破壳创智",
+        "面壁智能 · 詹杨帆",
+        "深圳 Physical AI 近场研究",
+        "阿里千问",
+        "追觅",
+        "Flowtica · 成旭然、陈洁茹",
+        "memopin · 叶志伟",
+        "李源 · 具身智能账号矩阵"
+      ]
+    },
+    "relation_integrity_draft": {
+      "ok": false,
+      "n_relations": 14,
+      "n_ok": 0,
+      "strong_no_evidence": 10,
+      "team_mismatch": 24,
+      "orphan_sources": 25,
+      "blocked_leaks": 0,
+      "bad_titles": [
+        "破壳创智",
+        "面壁智能 · 詹杨帆",
+        "深圳 Physical AI 近场研究",
+        "阿里千问",
+        "追觅",
+        "Flowtica · 成旭然、陈洁茹",
+        "memopin · 叶志伟",
+        "李源 · 具身智能账号矩阵"
+      ]
+    },
+    "new_fields": {
+      "ok": false,
+      "n_draft_relations": 14,
+      "n_reader_visible": 0,
+      "n_draft_backlog": 14,
+      "decision_tier_counts": {
+        "null": 14
+      },
+      "missing_decision_tier": [
+        "破壳创智",
+        "面壁智能 · 詹杨帆",
+        "深圳 Physical AI 近场研究",
+        "阿里千问",
+        "追觅",
+        "Flowtica · 成旭然、陈洁茹",
+        "memopin · 叶志伟",
+        "李源 · 具身智能账号矩阵",
+        "众筹与出海调研",
+        "字节豆包 · Agent 巨头战役"
+      ],
+      "audit_summary": null,
+      "issue_status": "published",
+      "embedding_status": "skipped",
+      "embedding_progress": "0/0",
+      "embedding_model": ""
+    },
+    "relation_25": {
+      "ok": false,
+      "published_relations": 14,
+      "published_ok": 0,
+      "evidence_100": false,
+      "team_mismatch": 24,
+      "blocked_leakage": 0
+    }
+  },
+  "pass": false,
+  "failures": [
+    "relation: strong_no_ev=10 team_mis=24 blocked=0",
+    "new_fields: missing decision_tier on ['破壳创智', '面壁智能 · 詹杨帆', '深圳 Physical AI 近场研究', '阿里千问', '追觅', 'Flowtica · 成旭然、陈洁茹', 'memopin · 叶志伟', '李源 · 具身智能账号矩阵', '众筹与出海调研', '字节豆包 · Agent 巨头战役']"
+  ]
+}
