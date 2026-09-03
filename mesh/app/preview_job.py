@@ -332,12 +332,23 @@ def _run(slug: str, username: str, token: int = 0) -> None:
         data["period_label"] = period_label
         data["version"] = issue_row.get("version")
         data.pop("_stale", None)
+
+        # 论证不过关的关系卡：直接不展示，不拦整期进预览
+        from . import relation_gate as _rg
+        from .relation_display import _sync_relation_kpi, build_published_projection, reader_visible
+
+        data, dropped_rels = _rg.filter_ungrounded_relations(data, bundle["item_rows"])
+        n_reader = sum(
+            1 for r in (data.get("relations") or []) if isinstance(r, dict) and reader_visible(r)
+        )
+        _sync_relation_kpi(data, n_reader)
+
         stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
         if not _is_current(slug, token):
             return
 
-        # 草稿级闸门：evidence / 关系完整性等。不过关不发 preview_url（进不了预览页）
+        # 结构性闸门（无素材/无卡/待归属等）。关系论证失败已在上方滤掉，不再整期拦截。
         with db.write_lock():
             con = db.connect()
             try:
@@ -372,7 +383,6 @@ def _run(slug: str, username: str, token: int = 0) -> None:
             con = db.connect()
             try:
                 payload = json.dumps(data, ensure_ascii=False)
-                from .relation_display import build_published_projection
                 reader_payload = json.dumps(build_published_projection(data), ensure_ascii=False)
                 con.execute(
                     "UPDATE issues SET draft_json=?, published_json=?, updated_at=? WHERE id=?",
@@ -380,22 +390,29 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                 )
                 db.register_entities(con, data, slug)
                 db.reindex_issue(con, issue_id)
+                note = "生成要点卡与草稿，已通过进预览检查"
+                if dropped_rels:
+                    note += f"；已隐藏 {len(dropped_rels)} 张论证不足的关系卡"
                 con.execute(
                     "INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)",
-                    (issue_id, username, "prepare_preview", "", "生成要点卡与草稿，已通过进预览检查"),
+                    (issue_id, username, "prepare_preview", "", note),
                 )
                 con.commit()
             finally:
                 con.close()
 
+        msg = "完成，已通过检查，可进入预览"
+        if dropped_rels:
+            msg = f"完成：已隐藏 {len(dropped_rels)} 张论证不足的关系卡，其余可进预览"
         _set(
             slug,
             running=False,
             done=True,
             error=None,
             phase="done",
-            message="完成，已通过检查，可进入预览",
+            message=msg,
             preview_url=f"/{slug}?preview=1&edit=1",
+            dropped_relations=dropped_rels[:20],
         )
     except Exception as e:
         traceback.print_exc()

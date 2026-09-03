@@ -542,14 +542,13 @@ def publish_blockers(con, issue_id: int, draft_json: str) -> list[str]:
     except Exception:
         pass
     try:
-        from . import relation_gate
-        items = relation_gate.items_for_issue(con, issue_id)
-        weak_errs = relation_gate.issue_publish_blockers(draft_json, items)
-        errs.extend(weak_errs)
-        from .attribution_verify import attribution_publish_blockers
-        attr_errs = attribution_publish_blockers(con, issue_id, draft_json)
-        errs.extend(attr_errs)
-        # 附带弱关系标题，方便控制台展示
+        # 关系论证不足：生成预览时会滤掉该卡，不作为整期硬拦
+        from .attribution_verify import scan_issue
+
+        for b in scan_issue(con, issue_id, draft_json).blockers:
+            if isinstance(b, str) and b.startswith("关系「"):
+                continue
+            errs.append(b)
         draft_obj = {}
         try:
             draft_obj = json.loads(draft_json) if draft_json else {}

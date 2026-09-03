@@ -97,6 +97,53 @@ def issue_publish_blockers(draft_json: str | dict | None, items: list[dict]) -> 
     return errs
 
 
+def relation_fails_grounding(rel: dict, items: list[dict]) -> list[str]:
+    """单张关系卡是否经不起论证（缺团队证据 / body 无法证明等）。"""
+    if not isinstance(rel, dict):
+        return ["非对象关系"]
+    mini = {"relations": [rel]}
+    errs = relation_publish_blockers(mini, items)
+    for flag in collect_unsupported_flags(mini, hard_only=True):
+        if flag not in errs:
+            errs.append(flag)
+    try:
+        from .attribution_verify import scan_draft
+
+        for b in scan_draft(mini, items).blockers:
+            if b not in errs:
+                errs.append(b)
+    except Exception:
+        pass
+    return errs
+
+
+def filter_ungrounded_relations(
+    draft_json: str | dict | None,
+    items: list[dict],
+) -> tuple[dict, list[str]]:
+    """不过关的关系卡直接拿掉，其余保留。返回 (新草稿, 被拿掉的标题)。
+
+    产品约定：论证失败 = 不展示该卡，不是整期进不了预览。
+    """
+    draft = dict(_parse_draft(draft_json))
+    kept: list[dict] = []
+    dropped: list[str] = []
+    for r in draft.get("relations") or []:
+        if not isinstance(r, dict):
+            continue
+        title = (r.get("title") or "").strip() or "（无标题）"
+        if relation_fails_grounding(r, items):
+            dropped.append(title)
+        else:
+            kept.append(r)
+    draft["relations"] = kept
+    if dropped:
+        draft["_relations_dropped_ungrounded"] = dropped
+    else:
+        draft.pop("_relations_dropped_ungrounded", None)
+    return draft, dropped
+
+
 def items_for_issue(con, issue_id: int) -> list[dict[str, Any]]:
     rows = con.execute(
         """SELECT id, source_id, owner_team, pointer, entities, blocked, text
