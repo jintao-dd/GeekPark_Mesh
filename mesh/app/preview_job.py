@@ -26,6 +26,9 @@ def _defaults(slug: str) -> dict:
         "preview_url": None,
         "log": [],
         "token": 0,
+        "resilience": None,
+        "final_status": None,
+        "dropped_relations": None,
     }
 
 
@@ -234,6 +237,10 @@ def _run(slug: str, username: str, token: int = 0) -> None:
         total = max(1, len(teams)) + 1
         _set(slug, total=total, cur=0, phase="cards", message=f"准备生成 {len(teams)} 张要点卡…")
 
+        from .job_resilience import ResilienceReport, run_with_retries, try_unit
+
+        resilience = ResilienceReport()
+        ok_cards = 0
         for i, team in enumerate(teams):
             if not _is_current(slug, token):
                 return
@@ -243,6 +250,7 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                 cur=i + 1,
                 total=total,
                 message=f"要点卡 {i + 1}/{len(teams)} · {team}",
+                resilience=resilience.to_dict(),
             )
             with db.write_lock():
                 con = db.connect()
@@ -259,8 +267,23 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                 finally:
                     con.close()
 
-            with ask_concurrency.llm_slot(pool="job"):
-                card = llm.build_team_card(team, items, period_label)
+            def _build_card(_team=team, _items=items):
+                with ask_concurrency.llm_slot(pool="job"):
+                    return llm.build_team_card(_team, _items, period_label)
+
+            card = try_unit(
+                _build_card,
+                unit=_team_label(team),
+                kind="card",
+                report=resilience,
+            )
+            if card is None:
+                _set(
+                    slug,
+                    message=f"要点卡跳过 · {team}（已重试仍失败）",
+                    resilience=resilience.to_dict(),
+                )
+                continue
 
             if not _is_current(slug, token):
                 return
@@ -271,8 +294,21 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                     con.commit()
                 finally:
                     con.close()
+            ok_cards += 1
 
         if not _is_current(slug, token):
+            return
+        if teams and ok_cards == 0:
+            _set(
+                slug,
+                running=False,
+                done=False,
+                error="全部要点卡生成失败：" + resilience.summary_message(ok_units=0, unit_label="卡"),
+                error_code="preview_cards_failed",
+                final_status="failed",
+                resilience=resilience.to_dict(),
+                phase="cards",
+            )
             return
 
         with db.write_lock():
@@ -309,19 +345,42 @@ def _run(slug: str, username: str, token: int = 0) -> None:
             cur=total,
             total=total,
             message="正在生成周报草稿…",
+            resilience=resilience.to_dict(),
         )
         if not _is_current(slug, token):
             return
 
-        with ask_concurrency.llm_slot(pool="job"):
-            data = llm.build_issue_draft(
-                issue_row,
-                bundle["team_cards"],
-                bundle["relation_candidates"],
-                bundle["first_names"],
-                bundle["external_items"],
-                prev_summary,
+        def _build_draft():
+            with ask_concurrency.llm_slot(pool="job"):
+                return llm.build_issue_draft(
+                    issue_row,
+                    bundle["team_cards"],
+                    bundle["relation_candidates"],
+                    bundle["first_names"],
+                    bundle["external_items"],
+                    prev_summary,
+                )
+
+        try:
+            data = run_with_retries(
+                _build_draft,
+                unit="issue_draft",
+                kind="draft",
+                report=resilience,
             )
+        except Exception as e:
+            _set(
+                slug,
+                running=False,
+                done=False,
+                error=f"草稿生成失败（已自动重试）：{str(e).replace(chr(10), ' ')[:180]}",
+                error_code="preview_draft_failed",
+                final_status="failed",
+                resilience=resilience.to_dict(),
+                phase="draft",
+            )
+            return
+
         data = merge_relations_from_candidates(
             data,
             bundle["relation_candidates"],
@@ -372,11 +431,15 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                 error_code="preview_gate_blocked",
                 phase="gate",
                 message="草稿未通过论证检查",
+                final_status="failed",
+                resilience=resilience.to_dict(),
             )
             return
 
         data["_preview_gate_ok"] = True
         data["_preview_gate_at"] = stamp
+        if resilience.skipped or dropped_rels:
+            data["_preview_degraded"] = True
         if not _is_current(slug, token):
             return
         with db.write_lock():
@@ -393,6 +456,10 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                 note = "生成要点卡与草稿，已通过进预览检查"
                 if dropped_rels:
                     note += f"；已隐藏 {len(dropped_rels)} 张论证不足的关系卡"
+                if resilience.skipped:
+                    note += f"；跳过要点卡 {len(resilience.skipped)}"
+                if resilience.retry_total:
+                    note += f"；自动重试 {resilience.retry_total} 次"
                 con.execute(
                     "INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)",
                     (issue_id, username, "prepare_preview", "", note),
@@ -401,9 +468,17 @@ def _run(slug: str, username: str, token: int = 0) -> None:
             finally:
                 con.close()
 
+        final = "degraded" if (resilience.skipped or dropped_rels) else "ok"
         msg = "完成，已通过检查，可进入预览"
+        bits = []
         if dropped_rels:
-            msg = f"完成：已隐藏 {len(dropped_rels)} 张论证不足的关系卡，其余可进预览"
+            bits.append(f"已隐藏 {len(dropped_rels)} 张论证不足的关系卡")
+        if resilience.skipped:
+            bits.append(f"跳过 {len(resilience.skipped)} 张要点卡")
+        if resilience.retry_total:
+            bits.append(f"自动重试 {resilience.retry_total} 次")
+        if bits:
+            msg = "完成（" + "；".join(bits) + "），可进入预览"
         _set(
             slug,
             running=False,
@@ -413,6 +488,8 @@ def _run(slug: str, username: str, token: int = 0) -> None:
             message=msg,
             preview_url=f"/{slug}?preview=1&edit=1",
             dropped_relations=dropped_rels[:20],
+            final_status=final,
+            resilience=resilience.to_dict(),
         )
     except Exception as e:
         traceback.print_exc()
@@ -420,4 +497,14 @@ def _run(slug: str, username: str, token: int = 0) -> None:
             return
         msg = str(e).replace("\n", " ")[:200]
         # 闸门失败或异常：绝不带未通过检查的草稿进预览页
-        _set(slug, running=False, done=False, error=msg or "生成失败")
+        _set(
+            slug,
+            running=False,
+            done=False,
+            error=msg or "生成失败",
+            final_status="failed",
+        )
+
+
+def _team_label(team: str) -> str:
+    return (team or "团队")[:40]
