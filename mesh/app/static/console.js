@@ -517,22 +517,18 @@ if (to2) to2.onclick = () => {
     toast('请先放入素材');
     return;
   }
-  // 忙态下再点：强制重启卡住的挖掘或预览任务
+  // 忙态下再点：强制从头重跑（挖掘 → 预览）
   if (document.body.classList.contains('ai-busy')) {
-    if (S.running) runMining({ force: true });
-    else startPreparePreview({ force: true });
+    to2.disabled = true;
+    setAutoPreview(true);
+    showBusy('正在挖掘与脱敏…', '大文件可能需要几分钟，请勿关闭页面');
+    runMining({ force: true });
     return;
   }
-  // 先给即时反馈，再跑异步，避免「点了没反应」
+  // 每次「生成预览」都先重新挖掘，再自动出卡+草稿（避免跳过挖掘导致 provenance 等字段陈旧）
   to2.disabled = true;
-  const needMine = !A.hasItems || !!A.sourcesDirty;
-  if (!needMine) {
-    showBusy('正在生成要点卡与草稿…', '完成后自动进入预览编辑页');
-    submitPreparePreview();
-    return;
-  }
   setAutoPreview(true);
-  showBusy('正在挖掘与脱敏…', '大文件可能需要几分钟，请勿关闭页面');
+  showBusy('正在挖掘与脱敏…', '完成后将自动生成要点卡与草稿');
   runMining({ force: true });
 };
 const gen = $('#gen'); if (gen) gen.onclick = () => runMining({ force: document.body.classList.contains('ai-busy') || S.running });

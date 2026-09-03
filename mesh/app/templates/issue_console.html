@@ -151,7 +151,7 @@
     <span class="hint" style="font-size:13px;color:var(--ink3);margin-left:12px">已上线不能直接 Preview；创建修订后 Ask 暂下线该期，改完再预览并重新上线</span>
     {% else %}
     <button class="cta" id="to2" {% if not sources %}disabled{% endif %}>生成预览 <span class="arw">→</span></button>
-    <span class="hint" style="font-size:13px;color:var(--ink3);margin-left:12px">将自动生成要点卡与草稿，并进入预览编辑页</span>
+    <span class="hint" style="font-size:13px;color:var(--ink3);margin-left:12px">将先重新挖掘全部来源，再生成要点卡与草稿，并进入预览编辑页</span>
     {% endif %}
     {% else %}
     <button class="cta" data-go="2" disabled title="需要编辑权限">生成预览 <span class="arw">→</span></button>
@@ -379,6 +379,6 @@ window.MESHADMIN = {
 };
 </script>
 <script src="/static/dialog.js?v=mesh-dlg-2"></script>
-<script src="/static/console.js?v=team-stype-3"></script>
+<script src="/static/console.js?v=team-stype-4"></script>
 </body>
 </html>
