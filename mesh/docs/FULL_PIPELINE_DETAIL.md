@@ -252,15 +252,15 @@ Job：`mesh_jobs.job_kind='preview'`。
     finalize_decision_audit → _relation_decision_audit
 ```
 
-**`decision_tier`：** `strong` | `parallel` | `watch` | `skip`。  
-**读者投影：** `strong` → Reader；`parallel`/`watch` → draft backlog；`skip` → 无。  
+**`decision_tier`：** `strong` | `parallel` | `watch` | `skip`（排序用）。  
+**读者投影：** 卡完整且非 `skip` → 读者可见；论证不足的卡在预览时 `filter_ungrounded_relations` 直接隐藏。  
 `reader_visible` 为派生字段。正式入口：`build_published_projection(draft)`。
 
 #### 4.6 落库
 ```sql
 UPDATE issues SET draft_json=?, published_json=?, updated_at=? WHERE id=?;
--- draft_json: 全量（含 backlog + audit）
--- published_json: build_published_projection(draft) → 仅 strong relations，剥离内部字段
+-- draft_json: 全量（含 audit；通过 gate 后带 _preview_gate_ok）
+-- published_json: build_published_projection(draft) → 非 skip 可读卡，剥离内部字段
 INSERT INTO edits(..., 'prepare_preview', ...);
 ```
 另：`register_entities`、`reindex_issue`（此时若仍 draft，索引侧对 Ask **不开放**；见 Publish）。  
@@ -307,9 +307,9 @@ owner：`POST /admin/issue/{slug}/publish`（控制台 / 列表 / 预览页）�
 
 ### 同步（同一请求内，commit 前）
 
-1. 再跑一遍 `publish_blockers`，有则拒绝  
-2. `draft_json` 去掉 `_stale`，刷新 `_relations_reader` / `_relations_backlog`  
-3. `published = build_published_projection(draft)`（仅 strong + 剥离内部字段）  
+1. 若草稿有 `_preview_gate_ok` 则跳过重复 blockers；改稿后 gate 作废须重新「生成预览」  
+2. `draft_json` 去掉 `_stale` / gate 标记，刷新 `_relations_reader` / `_relations_backlog`  
+3. `published = build_published_projection(draft)`（非 skip 可读卡 + 剥离内部字段）  
 4. ```sql
    UPDATE issues SET
      published_json=?,   -- projection

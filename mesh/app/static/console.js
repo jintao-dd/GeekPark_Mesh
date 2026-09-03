@@ -59,7 +59,26 @@ async function pollPreview() {
       return;
     }
     if (st.done && st.preview_url) {
-      showBusy(st.message || '完成，正在进入预览…', '请稍候');
+      const bits = [];
+      const dropped = st.dropped_relations || [];
+      const res = st.resilience || {};
+      const skipped = res.skipped || [];
+      if (dropped.length) bits.push('已隐藏关系卡 ' + dropped.length + ' 张');
+      if (skipped.length) bits.push('跳过 ' + skipped.length + ' 项');
+      if (res.retry_total) bits.push('自动重试 ' + res.retry_total + ' 次');
+      if (bits.length) {
+        try {
+          sessionStorage.setItem('meshPreviewDegrade:' + A.slug, JSON.stringify({
+            message: st.message || '',
+            dropped: dropped,
+            skipped: skipped,
+            retry_total: res.retry_total || 0,
+            final_status: st.final_status || 'ok',
+          }));
+        } catch (_) {}
+        toast(bits.join('；'), 5000);
+      }
+      showBusy(st.message || '完成，正在进入预览…', bits.length ? bits.join('；') : '请稍候');
       location.href = st.preview_url;
       return;
     }
@@ -119,9 +138,9 @@ function syncState() {
   el.textContent = labels[S.step] || '收集素材';
 }
 
-function toast(t) {
+function toast(t, ms) {
   const e = $('#toast'); e.textContent = t; e.classList.add('on');
-  clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove('on'), 2600);
+  clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove('on'), ms || 2600);
 }
 function renderReviewSummary() {
   const verdict = $('#verdict');
@@ -446,7 +465,18 @@ async function poll() {
       const g = $('#resGrid');
       g.innerHTML = A.steps.filter(x => st.results[x.sk]).map(x =>
         `<div><b>${st.results[x.sk]}</b><span>${x.k}</span></div>`).join('');
-      toast('挖掘与脱敏完成');
+      const res = st.resilience || {};
+      const skipped = res.skipped || [];
+      if (st.final_status === 'degraded' || skipped.length) {
+        toast(
+          '挖掘完成（部分跳过）：' + skipped.slice(0, 3).join('、')
+            + (skipped.length > 3 ? '…' : '')
+            + (res.retry_total ? '；自动重试 ' + res.retry_total + ' 次' : ''),
+          6000,
+        );
+      } else {
+        toast('挖掘与脱敏完成');
+      }
       A.hasItems = true;
       A.hasDraft = false;
       A.draftStale = true;

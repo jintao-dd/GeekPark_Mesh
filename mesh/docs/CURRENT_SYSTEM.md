@@ -201,9 +201,9 @@ items（未拦截、未合并）
 ```
 
 **`decision_tier` 取值**：`strong` / `parallel` / `watch` / `skip`。  
-读者可见（`reader_visible`，**派生字段**）：仅 `decision_tier == strong` 且卡完整（evidence + title/body）。  
+读者可见（`reader_visible`，**派生字段**）：卡完整（evidence + title/body）且非 `skip` → 读者可见；`strong` / `parallel` / `watch` **只影响展示排序**，不再做「仅 strong 上读者页」。  
 投影入口：`build_published_projection(draft)` → `published_json`（Publish / Preview reader 切片共用）。  
-parallel / watch → draft backlog；skip → 不展示。
+论证不足的卡在生成预览时 **直接隐藏**（`filter_ungrounded_relations`），不拦整期进预览。
 
 **Preview 闸门：** `status=published` 时禁止普通 Preview（不改 `published_json`、不 reindex）。继续编辑须先 `POST .../create_revision` → `status=draft` → Preview → Publish v2。
 

@@ -128,6 +128,6 @@
 {% endif %}
 <script src="/static/dialog.js?v=mesh-dlg-3"></script>
 <script>window.MESH={slug:"{{ issue.slug if issue else '' }}",target:"draft",canEdit:{{ 'true' if perms.write else 'false' }},canPublish:{{ 'true' if preview and perms.publish else 'false' }},isPreview:{{ 'true' if preview else 'false' }},askStream:true,flagColors:{{ flag_colors|tojson }},teamOrder:{{ team_order|tojson }}};</script>
-<script src="/static/app.js?v=rel-v2-4"></script>
+<script src="/static/app.js?v=rel-v2-5"></script>
 </body>
 </html>

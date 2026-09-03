@@ -17,9 +17,9 @@ from .attribution import (
 )
 from .owner_guard import (
     _DETAIL_TEAM,
+    relation_team_supported,
     solid_team_badges,
     suggested_team_badges,
-    team_has_entity_items,
 )
 
 _NARRATIVE_PREFIX = re.compile(
@@ -217,7 +217,7 @@ def scan_draft(draft_json: str | dict | None, items: list[dict]) -> AttributionS
             pass  # watch / one-sided：允许只有一侧实线
         elif len(rel_teams) >= 2 and title:
             for t in rel_teams:
-                if not team_has_entity_items(active, title, t):
+                if not relation_team_supported(active, r, t):
                     out.blockers.append(
                         f"关系「{title}」团队 {t!r} 无 item.owner_team 支撑（非 narrative 推断）"
                     )

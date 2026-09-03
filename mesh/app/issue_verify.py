@@ -415,10 +415,9 @@ def collect_unsupported_flags(draft: dict, *, hard_only: bool = False) -> list[s
         title = (r.get("title") or "（无标题）").strip()
         if not r.get("evidence") and not r.get("weak"):
             flags.append(f"关系「{title}」无 evidence 且未标 weak")
-        if r.get("needs_review"):
-            continue
         if r.get("status") == "weak" or r.get("weak"):
             continue
+        # needs_review 不再豁免 body 论证；过不了就进硬 flag，由 filter 藏卡
         body = (r.get("body") or "").strip()
         if body and not _is_verified_skeleton_body(body, r) and not line_grounded(body, r):
             flags.append(f"关系「{title}」body 无法由 evidence 证明")

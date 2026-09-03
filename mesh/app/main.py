@@ -490,6 +490,16 @@ def edm_draft_out_of_sync(row: dict) -> bool:
         return False
     return d != p
 
+def _clear_preview_gate(data: dict) -> dict:
+    from .preview_gate_state import clear_preview_gate
+    return clear_preview_gate(data)
+
+
+def _edit_invalidates_preview_gate(path: str) -> bool:
+    from .preview_gate_state import edit_invalidates_preview_gate
+    return edit_invalidates_preview_gate(path)
+
+
 def publish_blockers(con, issue_id: int, draft_json: str) -> list[str]:
     """与后台第四步检查清单一致的服务端拦截项。"""
     errs = []
@@ -2383,6 +2393,7 @@ def save_draft(request: Request, slug: str, draft: str = Form(...)):
     except Exception as e:
         return _flash_redirect(f"/admin/issue/{slug}?step=2", f"JSON 格式有误：{e}")
     data.pop("_stale", None)
+    data = _clear_preview_gate(data)
     con = db.connect()
     r = con.execute("SELECT id, draft_json FROM issues WHERE slug=?", (slug,)).fetchone()
     if not r:
@@ -2440,10 +2451,12 @@ def api_edit(request: Request, payload: dict):
         data["relations"] = rels
         data["_relations_reader"] = reader
         data["_relations_backlog"] = backlog
+    if _edit_invalidates_preview_gate(path):
+        data = _clear_preview_gate(data)
     con.execute(f"UPDATE issues SET {col}=?, updated_at=? WHERE id=?", (json.dumps(data, ensure_ascii=False), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), r["id"]))
     con.execute("INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)", (r["id"], u["u"], f"{col}:{path}", json.dumps(before, ensure_ascii=False)[:5000] if before is not None else "", json.dumps(value, ensure_ascii=False)[:5000]))
     con.commit(); con.close()
-    return {"ok": True}
+    return {"ok": True, "preview_gate_stale": bool(data.get("_preview_gate_stale"))}
 
 @app.post("/api/add_card")
 def api_add_card(request: Request, payload: dict):
@@ -2505,6 +2518,7 @@ def api_add_card(request: Request, payload: dict):
             data = sync_kpis_from_data(data)
         except Exception:
             pass
+    data = _clear_preview_gate(data)
     con.execute(
         f"UPDATE issues SET {col}=?, updated_at=? WHERE id=?",
         (json.dumps(data, ensure_ascii=False), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), r["id"]),
@@ -2515,7 +2529,13 @@ def api_add_card(request: Request, payload: dict):
     )
     con.commit()
     con.close()
-    return {"ok": True, "index": idx, "section": section, "card": card}
+    return {
+        "ok": True,
+        "index": idx,
+        "section": section,
+        "card": card,
+        "preview_gate_stale": bool(data.get("_preview_gate_stale")),
+    }
 
 @app.post("/api/add_item")
 def api_add_item(request: Request, payload: dict):
@@ -2568,6 +2588,8 @@ def api_add_item(request: Request, payload: dict):
         if kind == "plan":
             item["cert"] = "计划中"
     ref.append(item)
+    if _edit_invalidates_preview_gate(path):
+        data = _clear_preview_gate(data)
     con.execute(
         f"UPDATE issues SET {col}=?, updated_at=? WHERE id=?",
         (json.dumps(data, ensure_ascii=False), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), r["id"]),
@@ -2578,7 +2600,14 @@ def api_add_item(request: Request, payload: dict):
     )
     con.commit()
     con.close()
-    return {"ok": True, "index": len(ref) - 1, "path": path, "kind": kind, "item": item}
+    return {
+        "ok": True,
+        "index": len(ref) - 1,
+        "path": path,
+        "kind": kind,
+        "item": item,
+        "preview_gate_stale": bool(data.get("_preview_gate_stale")),
+    }
 
 @app.post("/admin/issue/{slug}/merge")
 def merge_issue(request: Request, slug: str):
@@ -2623,25 +2652,31 @@ def publish(request: Request, slug: str, confirm: str = Form("")):
     if not r or not r["draft_json"]:
         con.close()
         return fail("没有草稿可发布")
-    # 进预览前已用同一套检查闸过；进入预览后上线不再重复拦截（用户可继续改稿上线）。
+    # 进预览检查通过后可上线；若改过稿（gate 已作废）必须重新生成预览。
     draft_obj = {}
     try:
         draft_obj = json.loads(r["draft_json"] or "{}")
     except (json.JSONDecodeError, TypeError):
         draft_obj = {}
     if not draft_obj.get("_preview_gate_ok"):
-        # 旧草稿未走过新闸门：仍拦一次，避免绕过「生成预览」直接上线
         blockers = publish_blockers(con, r["id"], r["draft_json"] or "")
+        hint = (
+            "稿面已改动或尚未通过进预览检查，请重新点「生成预览」后再上线"
+            if draft_obj.get("_preview_gate_stale")
+            else "上线前检查未通过（请重新点「生成预览」通过检查后再上线）"
+        )
         if blockers:
-            msg = "上线前检查未通过（请重新点「生成预览」通过检查后再上线）：\n" + "\n".join(
-                f"· {x}" for x in blockers
-            )
+            msg = hint + "：\n" + "\n".join(f"· {x}" for x in blockers)
             con.close()
             return fail(msg)
+        # 无结构性 blockers 但仍无 gate：也要求重跑预览，避免改稿绕过论证
+        con.close()
+        return fail(hint)
     data = draft_obj
     data.pop("_stale", None)
     data.pop("_preview_gate_ok", None)
     data.pop("_preview_gate_at", None)
+    data.pop("_preview_gate_stale", None)
     from .relation_display import attach_reader_flags, build_published_projection, split_relations_for_publish
     data["relations"] = attach_reader_flags(
         [x for x in (data.get("relations") or []) if isinstance(x, dict)]
@@ -3203,13 +3238,19 @@ def issue_page(request: Request, slug: str, preview: int = 0, edit: int = 0, syn
             f"/admin/issue/{slug}?err=" + quote("尚未生成预览，请先在素材页点「生成预览」"),
             status_code=302,
         )
-    if preview and not (data.get("_preview_gate_ok") if isinstance(data, dict) else False):
+    gate_ok = bool(isinstance(data, dict) and data.get("_preview_gate_ok"))
+    gate_stale = bool(isinstance(data, dict) and data.get("_preview_gate_stale"))
+    if preview and not gate_ok and not gate_stale:
         from urllib.parse import quote
         return RedirectResponse(
             f"/admin/issue/{slug}?err="
             + quote("草稿尚未通过进预览检查，请重新点「生成预览」（检查通过后才会进入预览页）"),
             status_code=302,
         )
+    preview_gate_stale = preview and gate_stale and not gate_ok
+    dropped_ungrounded = []
+    if isinstance(data, dict):
+        dropped_ungrounded = list(data.get("_relations_dropped_ungrounded") or [])[:20]
     # 模板依赖 keywords/plans 等对象；缺省时给空结构，避免半成品草稿炸页
     data.setdefault("kpis", [])
     data.setdefault("relations", [])
@@ -3256,6 +3297,8 @@ def issue_page(request: Request, slug: str, preview: int = 0, edit: int = 0, syn
             preview=bool(preview),
             archive_list=arch,
             relations_view=relations_view,
+            preview_gate_stale=bool(preview_gate_stale),
+            dropped_ungrounded=dropped_ungrounded,
         ),
     )
 

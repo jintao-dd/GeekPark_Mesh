@@ -1,4 +1,4 @@
-"""进预览闸门：投影剥离；论证不足的关系卡应被滤掉而非整期拦截。"""
+"""进预览闸门：投影剥离；论证不足的关系卡应被滤掉而非整期拦截；改稿作废 gate。"""
 from __future__ import annotations
 
 import sys
@@ -6,6 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.preview_gate_state import clear_preview_gate, edit_invalidates_preview_gate
 from app.relation_display import build_published_projection
 from app.relation_gate import filter_ungrounded_relations
 
@@ -28,6 +29,20 @@ def test_preview_gate_ok_means_publish_may_skip_recheck():
     """产品约定：草稿带 _preview_gate_ok 后上线不再跑 publish_blockers。"""
     draft = {"_preview_gate_ok": True, "relations": []}
     assert draft.get("_preview_gate_ok") is True
+
+
+def test_clear_preview_gate_on_edit():
+    data = {"_preview_gate_ok": True, "_preview_gate_at": "t", "question": "q"}
+    out = clear_preview_gate(data)
+    assert "_preview_gate_ok" not in out
+    assert "_preview_gate_at" not in out
+    assert out.get("_preview_gate_stale") is True
+
+
+def test_edit_path_invalidates_gate():
+    assert edit_invalidates_preview_gate("relations.0.title")
+    assert edit_invalidates_preview_gate("lead")
+    assert not edit_invalidates_preview_gate("_internal.foo")
 
 
 def test_filter_ungrounded_drops_card_without_evidence():

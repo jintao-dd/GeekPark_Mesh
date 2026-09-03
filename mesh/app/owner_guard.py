@@ -266,6 +266,40 @@ def team_has_entity_items(items: list[dict], title: str, team: str) -> bool:
     return False
 
 
+def _relation_entity_title(r: dict) -> str:
+    """两阶段 gate 卡用 candidate_title 做实体匹配，避免 narrative 标题误裁 teams。"""
+    return ((r.get("candidate_title") or r.get("title") or "").strip())
+
+
+def relation_team_supported(items: list[dict], rel: dict, team: str) -> bool:
+    """团队是否被本卡论证支撑。
+
+    优先：evidence 引用的 item.owner_team == team（论点/证据对齐）。
+    其次：candidate_title / title 与该团队条目实体重合（兼容旧卡）。
+    """
+    team = sanitize_owner_team(team) or ""
+    if not team or not isinstance(rel, dict):
+        return False
+    by_id: dict = {}
+    for it in items:
+        iid = it.get("id")
+        if iid is not None:
+            by_id[iid] = it
+    for ev in rel.get("evidence") or []:
+        if not isinstance(ev, dict):
+            continue
+        iid = ev.get("item_id")
+        row = by_id.get(iid) if iid is not None else None
+        if not row or row.get("blocked") or row.get("merged_into"):
+            continue
+        if sanitize_owner_team(row.get("owner_team")) == team:
+            return True
+    title = _relation_entity_title(rel)
+    if title and team_has_entity_items(items, title, team):
+        return True
+    return False
+
+
 def cross_team_provenance_ok(items: list[dict], title: str, teams: list[str]) -> bool:
     """两团队各有一手：必须来自不同 (source_id, pointer) 桶。"""
     if len(teams) < 2:
@@ -288,11 +322,6 @@ def cross_team_provenance_ok(items: list[dict], title: str, teams: list[str]) ->
             if shared and team_buckets[a] == shared and team_buckets[b] == shared:
                 return False
     return True
-
-
-def _relation_entity_title(r: dict) -> str:
-    """两阶段 gate 卡用 candidate_title 做实体匹配，避免 narrative 标题误裁 teams。"""
-    return ((r.get("candidate_title") or r.get("title") or "").strip())
 
 
 def _gate_locked_relation(r: dict) -> bool:

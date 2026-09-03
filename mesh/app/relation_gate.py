@@ -7,9 +7,10 @@ from typing import Any
 from .issue_verify import collect_unsupported_flags
 from .owner_guard import (
     cross_team_provenance_ok,
+    relation_team_supported,
     solid_team_badges,
     suggested_team_badges,
-    team_has_entity_items,
+    _relation_entity_title,
 )
 from .aggregator import sanitize_owner_team
 
@@ -68,13 +69,15 @@ def relation_publish_blockers(
             continue
 
         if len(solid) >= 2 and title:
-            missing = [t for t in solid if not team_has_entity_items(items, title, t)]
+            missing = [t for t in solid if not relation_team_supported(items, r, t)]
             if missing:
                 errs.append(f"关系「{title}」缺少团队证据：{'、'.join(missing)}")
-            elif not cross_team_provenance_ok(items, title, solid):
-                errs.append(
-                    f"关系「{title}」跨团队出处不足（同源同 pointer 不能冒充两团队各有一手）"
-                )
+            else:
+                entity_title = _relation_entity_title(r) or title
+                if not cross_team_provenance_ok(items, entity_title, solid):
+                    errs.append(
+                        f"关系「{title}」跨团队出处不足（同源同 pointer 不能冒充两团队各有一手）"
+                    )
 
         details = r.get("details") or []
         sources = r.get("sources") or []

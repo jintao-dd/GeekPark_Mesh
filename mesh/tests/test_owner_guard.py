@@ -10,6 +10,7 @@ from app.owner_guard import (
     cross_team_provenance_ok,
     filter_draft_relations,
     parse_section_team,
+    relation_team_supported,
     resolve_item_owner,
 )
 
@@ -101,6 +102,35 @@ def test_filter_draft_relations():
     assert rel.get("weak") is True
 
 
+def test_relation_team_supported_by_evidence_item_owner():
+    """优先 evidence.item_id → owner_team，不依赖标题词面命中。"""
+    items = [
+        {"id": 10, "owner_team": "编辑部", "entities": '["无关实体"]', "blocked": 0, "text": "x"},
+        {"id": 11, "owner_team": "商业化团队", "entities": '["另一实体"]', "blocked": 0, "text": "y"},
+    ]
+    rel = {
+        "title": "跨团队协作主题",
+        "candidate_title": "跨团队协作主题",
+        "teams": ["编辑部", "商业化团队"],
+        "evidence": [{"item_id": 10}, {"item_id": 11}],
+    }
+    assert relation_team_supported(items, rel, "编辑部")
+    assert relation_team_supported(items, rel, "商业化团队")
+    assert not relation_team_supported(items, rel, "视频号团队")
+
+
+def test_relation_team_supported_fallback_title_entity():
+    items = [
+        {"id": 1, "owner_team": "编辑部", "entities": '["面壁智能"]', "blocked": 0, "text": "面壁"},
+    ]
+    rel = {
+        "title": "面壁智能 · 合作",
+        "teams": ["编辑部"],
+        "evidence": [{"source": "legacy"}],
+    }
+    assert relation_team_supported(items, rel, "编辑部")
+
+
 if __name__ == "__main__":
     test_parse_section_team()
     test_manual_beats_segment_on_agg_source()
@@ -110,4 +140,6 @@ if __name__ == "__main__":
     test_dedupe_same_pointer()
     test_cross_team_same_source_false()
     test_filter_draft_relations()
+    test_relation_team_supported_by_evidence_item_owner()
+    test_relation_team_supported_fallback_title_entity()
     print("ok")

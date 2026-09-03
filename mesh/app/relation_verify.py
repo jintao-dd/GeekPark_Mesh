@@ -134,8 +134,20 @@ def verify_relation_narrative(rel: dict) -> dict:
 
     body = (rel.get("body") or "").strip()
     needs_review = bool(not body or (body and not line_grounded(body, rel, min_ratio=0.28)))
-    rel["needs_review"] = needs_review
-    rel["status"] = "needs_review" if needs_review else "confirmed"
+    if needs_review:
+        # 论点无法由 evidence 证明：降级为证据骨架，而不是带着 needs_review 混过闸门
+        skeleton = "；".join(kept_details[:3]) if kept_details else ""
+        if skeleton:
+            rel["body"] = skeleton[:500]
+            rel["needs_review"] = False
+            rel["status"] = "confirmed"
+            rel["_body_from_evidence"] = True
+        else:
+            rel["needs_review"] = True
+            rel["status"] = "needs_review"
+    else:
+        rel["needs_review"] = False
+        rel["status"] = "confirmed"
     return rel
 
 

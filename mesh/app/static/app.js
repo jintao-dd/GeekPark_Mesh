@@ -519,6 +519,12 @@
         try{const j=await r.json();msg+='：'+(j.detail||j.error||r.status);}catch(_){msg+='：'+r.status;}
         say(msg);return false;
       }
+      try{
+        const j=await r.json();
+        if(j && j.preview_gate_stale){
+          say('稿件已改，预览门禁已失效——请重新生成预览后再发布', 6000);
+        }
+      }catch(_){}
       return true;
     }
     function closePick(){if(pickEl){pickEl.remove();pickEl=null;}}
@@ -654,6 +660,9 @@
             const r=await fetch('/api/add_card',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({slug:CFG.slug,target:CFG.target,section})});
             const j=await r.json().catch(()=>({}));
             if(!r.ok){say('新增失败：'+(j.detail||j.error||r.status));return;}
+            if(j.preview_gate_stale){
+              say('稿件已改，预览门禁已失效——请重新生成预览后再发布', 6000);
+            }
             const idx=j.index;
             const card=j.card||{};
             const sec=j.section||section;

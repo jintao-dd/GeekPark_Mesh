@@ -438,8 +438,13 @@ def _run(slug: str, username: str, token: int = 0) -> None:
 
         data["_preview_gate_ok"] = True
         data["_preview_gate_at"] = stamp
+        data.pop("_preview_gate_stale", None)
         if resilience.skipped or dropped_rels:
             data["_preview_degraded"] = True
+        if dropped_rels:
+            data["_relations_dropped_ungrounded"] = dropped_rels
+        else:
+            data.pop("_relations_dropped_ungrounded", None)
         if not _is_current(slug, token):
             return
         with db.write_lock():
