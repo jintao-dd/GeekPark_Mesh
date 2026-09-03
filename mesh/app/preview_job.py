@@ -157,6 +157,52 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                         error=f"还有 {unextracted} 个来源未挖掘，请先完成挖掘",
                     )
                     return
+                # 进预览前（出卡前）拦条目级问题：拆段待确认、归属/provenance
+                n_review = 0
+                for row in con.execute("SELECT meta FROM sources WHERE issue_id=?", (issue_id,)):
+                    try:
+                        m = json.loads(row["meta"] or "{}")
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+                    if (m.get("split") or {}).get("needs_review"):
+                        n_review += 1
+                if n_review:
+                    _set(
+                        slug,
+                        running=False,
+                        done=False,
+                        error=(
+                            f"有 {n_review} 个来源拆段置信度低，请到来源页点「确认拆段归属」"
+                            "或拆成单部门文件重传后再生成预览"
+                        ),
+                        error_code="preview_gate_blocked",
+                    )
+                    return
+                from .attribution_verify import attribution_publish_blockers
+                attr_early = attribution_publish_blockers(con, issue_id, "{}")
+                if attr_early:
+                    _set(
+                        slug,
+                        running=False,
+                        done=False,
+                        error="进预览前检查未通过：" + "；".join(attr_early[:8]),
+                        error_code="preview_gate_blocked",
+                    )
+                    return
+                n_noowner = con.execute(
+                    "SELECT COUNT(*) c FROM items WHERE issue_id=? AND (owner_team IS NULL OR owner_team='') "
+                    "AND COALESCE(blocked,0)=0 AND (merged_into IS NULL OR merged_into=0)",
+                    (issue_id,),
+                ).fetchone()["c"]
+                if n_noowner:
+                    _set(
+                        slug,
+                        running=False,
+                        done=False,
+                        error=f"还有 {n_noowner} 条条目待指定归属，不能进入预览",
+                        error_code="preview_gate_blocked",
+                    )
+                    return
 
                 _set(slug, phase="merge", message="跨通道合并…", cur=0, total=1)
                 merge.apply_merge(con, issue_id)
@@ -279,6 +325,38 @@ def _run(slug: str, username: str, token: int = 0) -> None:
 
         if not _is_current(slug, token):
             return
+
+        # 草稿级闸门：evidence / 关系完整性等。不过关不发 preview_url（进不了预览页）
+        with db.write_lock():
+            con = db.connect()
+            try:
+                payload = json.dumps(data, ensure_ascii=False)
+                con.execute(
+                    "UPDATE issues SET draft_json=?, updated_at=? WHERE id=?",
+                    (payload, stamp, issue_id),
+                )
+                con.commit()
+                from .main import publish_blockers as _pub_blockers
+                blockers = _pub_blockers(con, issue_id, payload)
+            finally:
+                con.close()
+
+        if blockers:
+            _set(
+                slug,
+                running=False,
+                done=False,
+                error="进预览前检查未通过：" + "；".join(blockers[:10]),
+                error_code="preview_gate_blocked",
+                phase="gate",
+                message="草稿未通过论证检查",
+            )
+            return
+
+        data["_preview_gate_ok"] = True
+        data["_preview_gate_at"] = stamp
+        if not _is_current(slug, token):
+            return
         with db.write_lock():
             con = db.connect()
             try:
@@ -293,7 +371,7 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                 db.reindex_issue(con, issue_id)
                 con.execute(
                     "INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)",
-                    (issue_id, username, "prepare_preview", "", "生成要点卡与草稿，读者页已同步"),
+                    (issue_id, username, "prepare_preview", "", "生成要点卡与草稿，已通过进预览检查"),
                 )
                 con.commit()
             finally:
@@ -305,33 +383,13 @@ def _run(slug: str, username: str, token: int = 0) -> None:
             done=True,
             error=None,
             phase="done",
-            message="完成，读者页已更新",
-            preview_url=f"/{slug}",
+            message="完成，已通过检查，可进入预览",
+            preview_url=f"/{slug}?preview=1&edit=1",
         )
     except Exception as e:
         traceback.print_exc()
         if not _is_current(slug, token):
             return
         msg = str(e).replace("\n", " ")[:200]
-        try:
-            con = db.connect()
-            try:
-                r = con.execute(
-                    "SELECT draft_json FROM issues WHERE slug=?", (slug,)
-                ).fetchone()
-                if r and db.draft_is_ready(r["draft_json"] or ""):
-                    _set(
-                        slug,
-                        running=False,
-                        done=True,
-                        error=None,
-                        phase="done",
-                        message="草稿生成异常，已用现有草稿进入预览",
-                        preview_url=f"/{slug}?preview=1&edit=1&warn=1",
-                    )
-                    return
-            finally:
-                con.close()
-        except Exception:
-            pass
+        # 闸门失败或异常：绝不带未通过检查的草稿进预览页
         _set(slug, running=False, done=False, error=msg or "生成失败")

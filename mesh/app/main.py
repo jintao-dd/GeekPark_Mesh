@@ -2580,13 +2580,25 @@ def publish(request: Request, slug: str, confirm: str = Form("")):
     if not r or not r["draft_json"]:
         con.close()
         return fail("没有草稿可发布")
-    blockers = publish_blockers(con, r["id"], r["draft_json"] or "")
-    if blockers:
-        msg = "上线前检查未通过：\n" + "\n".join(f"· {x}" for x in blockers)
-        con.close()
-        return fail(msg)
-    data = json.loads(r["draft_json"])
+    # 进预览前已用同一套检查闸过；进入预览后上线不再重复拦截（用户可继续改稿上线）。
+    draft_obj = {}
+    try:
+        draft_obj = json.loads(r["draft_json"] or "{}")
+    except (json.JSONDecodeError, TypeError):
+        draft_obj = {}
+    if not draft_obj.get("_preview_gate_ok"):
+        # 旧草稿未走过新闸门：仍拦一次，避免绕过「生成预览」直接上线
+        blockers = publish_blockers(con, r["id"], r["draft_json"] or "")
+        if blockers:
+            msg = "上线前检查未通过（请重新点「生成预览」通过检查后再上线）：\n" + "\n".join(
+                f"· {x}" for x in blockers
+            )
+            con.close()
+            return fail(msg)
+    data = draft_obj
     data.pop("_stale", None)
+    data.pop("_preview_gate_ok", None)
+    data.pop("_preview_gate_at", None)
     from .relation_display import attach_reader_flags, build_published_projection, split_relations_for_publish
     data["relations"] = attach_reader_flags(
         [x for x in (data.get("relations") or []) if isinstance(x, dict)]
@@ -3146,6 +3158,13 @@ def issue_page(request: Request, slug: str, preview: int = 0, edit: int = 0, syn
         from urllib.parse import quote
         return RedirectResponse(
             f"/admin/issue/{slug}?err=" + quote("尚未生成预览，请先在素材页点「生成预览」"),
+            status_code=302,
+        )
+    if preview and not (data.get("_preview_gate_ok") if isinstance(data, dict) else False):
+        from urllib.parse import quote
+        return RedirectResponse(
+            f"/admin/issue/{slug}?err="
+            + quote("草稿尚未通过进预览检查，请重新点「生成预览」（检查通过后才会进入预览页）"),
             status_code=302,
         )
     # 模板依赖 keywords/plans 等对象；缺省时给空结构，避免半成品草稿炸页
