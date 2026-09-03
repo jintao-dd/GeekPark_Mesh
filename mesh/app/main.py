@@ -513,10 +513,21 @@ def publish_blockers(con, issue_id: int, draft_json: str) -> list[str]:
         errs.append(f"还有 {n_bad} 条条目归属无效（不能为「内容中心·数据聚合」或「其他」）")
     if not db.draft_is_ready(draft_json):
         errs.append("请先重新生成周报草稿（挖掘或卡片变更后旧草稿已失效）")
-    # 拆段低置信：须人工确认来源归属
+    # 仅内容聚合包：拆段低置信须人工确认（单团队来源选了谁就是谁，不拦）
     try:
+        from .ingest import is_aggregation_source
+
         n_review = 0
-        for row in con.execute("SELECT meta FROM sources WHERE issue_id=?", (issue_id,)):
+        for row in con.execute(
+            "SELECT stype, team, channel, meta FROM sources WHERE issue_id=?",
+            (issue_id,),
+        ):
+            if not is_aggregation_source(
+                stype=row["stype"] or "",
+                team=row["team"] or "",
+                channel=row["channel"] or "",
+            ):
+                continue
             try:
                 m = json.loads(row["meta"] or "{}")
             except (json.JSONDecodeError, TypeError):
@@ -525,7 +536,8 @@ def publish_blockers(con, issue_id: int, draft_json: str) -> list[str]:
                 n_review += 1
         if n_review:
             errs.append(
-                f"有 {n_review} 个来源拆段置信度低，请到来源页点「确认拆段归属」或拆成单部门文件重传"
+                f"有 {n_review} 个内容聚合来源拆段置信度低，请到来源页点「确认拆段归属」"
+                "或拆成单部门文件重传"
             )
     except Exception:
         pass
@@ -1648,6 +1660,12 @@ def issue_admin(request: Request, slug: str, step: int | None = None, err: str =
     blockers = publish_blockers(con, r["id"], r["draft_json"] or "")
     sources_need_review = []
     for s in sources:
+        if not ingest.is_aggregation_source(
+            stype=s.get("stype") or "",
+            team=s.get("team") or "",
+            channel=s.get("channel") or "",
+        ):
+            continue
         try:
             m = json.loads(s.get("meta") or "{}")
         except (json.JSONDecodeError, TypeError):
@@ -2012,6 +2030,14 @@ def source_view(request: Request, sid: int, err: str = ""):
         split_info = (json.loads(sdict.get("meta") or "{}") or {}).get("split") or {}
     except (json.JSONDecodeError, TypeError):
         split_info = {}
+    # 单团队来源：不展示「确认拆段」按钮（选了谁就是谁）
+    if not ingest.is_aggregation_source(
+        stype=sdict.get("stype") or "",
+        team=sdict.get("team") or "",
+        channel=sdict.get("channel") or "",
+    ):
+        split_info = dict(split_info or {})
+        split_info["needs_review"] = False
     return templates.TemplateResponse(
         "source.html",
         ctx(
@@ -2082,11 +2108,29 @@ def source_extract(request: Request, sid: int):
         meta_obj = json.loads(meta) if isinstance(meta, str) else dict(meta or {})
     except (json.JSONDecodeError, TypeError):
         meta_obj = {}
-    if llm.split_needs_review(split_meta) or (meta_obj.get("split") or {}).get("mode") == "fallback":
+    if llm.split_needs_review(
+        split_meta,
+        stype=s.get("stype") or "",
+        team=s.get("team") or "",
+        channel=s.get("channel") or "",
+    ) or (
+        ingest.is_aggregation_source(
+            stype=s.get("stype") or "",
+            team=s.get("team") or "",
+            channel=s.get("channel") or "",
+        )
+        and (meta_obj.get("split") or {}).get("mode") == "fallback"
+    ):
         sp = dict(meta_obj.get("split") or {})
         sp["needs_review"] = True
         meta_obj["split"] = sp
         meta = json.dumps(meta_obj, ensure_ascii=False)
+    else:
+        sp = dict(meta_obj.get("split") or {})
+        if sp.get("needs_review"):
+            sp["needs_review"] = False
+            meta_obj["split"] = sp
+            meta = json.dumps(meta_obj, ensure_ascii=False)
     con.execute("UPDATE sources SET extracted=1, meta=? WHERE id=?", (meta, sid))
     issue_id = s["issue_id"]
     st = con.execute("SELECT status FROM issues WHERE id=?", (issue_id,)).fetchone()

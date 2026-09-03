@@ -157,9 +157,20 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                         error=f"还有 {unextracted} 个来源未挖掘，请先完成挖掘",
                     )
                     return
-                # 进预览前（出卡前）拦条目级问题：拆段待确认、归属/provenance
+                # 进预览前：仅内容聚合包的拆段待确认 + 归属/provenance
+                from .ingest import is_aggregation_source
+
                 n_review = 0
-                for row in con.execute("SELECT meta FROM sources WHERE issue_id=?", (issue_id,)):
+                for row in con.execute(
+                    "SELECT stype, team, channel, meta FROM sources WHERE issue_id=?",
+                    (issue_id,),
+                ):
+                    if not is_aggregation_source(
+                        stype=row["stype"] or "",
+                        team=row["team"] or "",
+                        channel=row["channel"] or "",
+                    ):
+                        continue
                     try:
                         m = json.loads(row["meta"] or "{}")
                     except (json.JSONDecodeError, TypeError):
@@ -172,7 +183,7 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                         running=False,
                         done=False,
                         error=(
-                            f"有 {n_review} 个来源拆段置信度低，请到来源页点「确认拆段归属」"
+                            f"有 {n_review} 个内容聚合来源拆段置信度低，请到来源页点「确认拆段归属」"
                             "或拆成单部门文件重传后再生成预览"
                         ),
                         error_code="preview_gate_blocked",

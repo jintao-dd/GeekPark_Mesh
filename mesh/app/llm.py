@@ -426,8 +426,18 @@ def extract_source(
     return apply_item_owner_guards(_stamp(items)), None
 
 
-def split_needs_review(split_meta: dict | None) -> bool:
-    """拆段置信度低时要求人工确认归属后再上线。"""
+def split_needs_review(
+    split_meta: dict | None,
+    *,
+    stype: str = "",
+    team: str = "",
+    channel: str = "",
+) -> bool:
+    """仅内容聚合包在拆段置信度低时要求人工确认；单团队来源不拦。"""
+    from .ingest import is_aggregation_source
+
+    if not is_aggregation_source(stype=stype, team=team, channel=channel):
+        return False
     if not split_meta:
         return False
     mode = split_meta.get("mode") or ""

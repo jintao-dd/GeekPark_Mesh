@@ -257,7 +257,7 @@
         <li class="{% if cards %}ok{% else %}bad{% endif %}"><span class="m"></span><span>已生成团队要点卡<small>{% if not cards %}请点「生成预览」{% else %}{{ cards|length }} 张{% endif %}</small></span></li>
         <li class="{% if has_draft and not draft_stale %}ok{% else %}bad{% endif %}"><span class="m"></span><span>已生成周报草稿<small>{% if draft_stale %}挖掘/卡片已变更，请重新生成{% elif has_draft %}可预览{% else %}尚未生成{% endif %}</small></span></li>
         <li class="{% if n_noowner==0 %}ok{% else %}bad{% endif %}"><span class="m"></span><span>条目归属团队均已判定<small>{% if n_noowner %}{{ n_noowner }} 条待指定{% else %}无遗留{% endif %}</small></span></li>
-        <li class="{% if not sources_need_review %}ok{% else %}bad{% endif %}"><span class="m"></span><span>拆段归属已确认<small>{% if sources_need_review %}{{ sources_need_review|length }} 条待确认{% else %}无待确认{% endif %}</small></span></li>
+        <li class="{% if not sources_need_review %}ok{% else %}bad{% endif %}"><span class="m"></span><span>内容聚合拆段已确认<small>{% if sources_need_review %}{{ sources_need_review|length }} 条待确认{% else %}无待确认（仅聚合包需要）{% endif %}</small></span></li>
         <li class="{% if not weak_relations %}ok{% else %}bad{% endif %}"><span class="m"></span><span>弱关系已处理<small>{% if weak_relations %}{{ weak_relations|length }} 条待确认/删除{% else %}无弱关系{% endif %}</small></span></li>
       </ul>
       {% if sources_need_review %}

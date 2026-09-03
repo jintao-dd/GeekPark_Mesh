@@ -19,6 +19,22 @@ SOURCE_TYPES = {
     "T13": "内容中心·数据聚合（混合多类型，系统按段分别抽取）",
 }
 AGG_STYPE = "T13"
+AGG_TEAM = "内容中心·数据聚合"
+
+
+def is_aggregation_source(*, stype: str = "", team: str = "", channel: str = "") -> bool:
+    """仅内容中心混合包需要拆段/混挂确认。
+
+    其他来源上传时选了哪个团队，就是该团队提供的内容，不因「长文只拆 1 段」拦预览。
+    channel=aggregator 不能单独作依据（单团队纪要也可能被标成 aggregator）。
+    """
+    if (stype or "").strip() == AGG_STYPE:
+        return True
+    if (team or "").strip() == AGG_TEAM:
+        return True
+    return False
+
+
 TEAMS = [
     "编辑部", "商业化团队", "硅谷 BD 团队", "Global Partnership 团队", "英文站",
     "品牌创意团队", "社群", "投资团队", "音频播客团队", "视频号团队",

@@ -11,7 +11,7 @@
 {% if perms.write and needs_review %}
 <form class="inline" method="post" action="/admin/source/{{ s.id }}/confirm_split" style="margin:0 0 14px">
   <button class="btn pri" type="submit">确认拆段归属（已核对条目归属）</button>
-  <span class="muted" style="margin-left:8px">确认后本条不再拦截上线</span>
+  <span class="muted" style="margin-left:8px">仅内容聚合包需要；确认后本条不再拦截预览/上线</span>
 </form>
 {% endif %}
 {% if perms.write %}<form class="inline" method="post" action="/admin/source/{{ s.id }}/extract"><button class="btn pri">{{ '重新抽取' if s.extracted else '抽取' }}</button></form>{% endif %}

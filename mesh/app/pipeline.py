@@ -212,11 +212,23 @@ def _run(slug: str, token: int = 0) -> None:
                 meta_obj = json.loads(meta) if isinstance(meta, str) else dict(meta or {})
             except (json.JSONDecodeError, TypeError):
                 meta_obj = {}
-            if llm.split_needs_review(split_meta):
+            if llm.split_needs_review(
+                split_meta,
+                stype=s.get("stype") or "",
+                team=s.get("team") or "",
+                channel=s.get("channel") or "",
+            ):
                 sp = dict(meta_obj.get("split") or {})
                 sp["needs_review"] = True
                 meta_obj["split"] = sp
                 meta = json.dumps(meta_obj, ensure_ascii=False)
+            else:
+                # 非聚合来源：清掉历史误标的 needs_review
+                sp = dict(meta_obj.get("split") or {})
+                if sp.get("needs_review"):
+                    sp["needs_review"] = False
+                    meta_obj["split"] = sp
+                    meta = json.dumps(meta_obj, ensure_ascii=False)
             con.execute("UPDATE sources SET extracted=1, meta=? WHERE id=?", (meta, s["id"]))
             con.commit()
             _mark(slug, "extract", f"已完成 {i}/{total} · 候选 {got}")
