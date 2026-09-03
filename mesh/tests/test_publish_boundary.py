@@ -88,18 +88,18 @@ def test_draft_preview_payload_not_in_fts():
         con.close()
 
 
-def test_publish_projection_only_strong():
-    """Test B: Publish 投影只含 strong。"""
+def test_publish_projection_all_keep_tiers_sorted():
+    """Publish 投影：进草稿的 keep 档全部进入，按强度排序。"""
     from app.relation_display import build_published_projection
 
     draft = {
         "relations": [
+            {"decision_tier": "watch", "title": "W1", "body": "b", "evidence": [{"x": 6}]},
             {"decision_tier": "strong", "title": "S1", "body": "b", "evidence": [{"x": 1}]},
-            {"decision_tier": "strong", "title": "S2", "body": "b", "evidence": [{"x": 2}]},
             {"decision_tier": "parallel", "title": "P1", "body": "b", "evidence": [{"x": 3}]},
+            {"decision_tier": "strong", "title": "S2", "body": "b", "evidence": [{"x": 2}]},
             {"decision_tier": "parallel", "title": "P2", "body": "b", "evidence": [{"x": 4}]},
             {"decision_tier": "parallel", "title": "P3", "body": "b", "evidence": [{"x": 5}]},
-            {"decision_tier": "watch", "title": "W1", "body": "b", "evidence": [{"x": 6}]},
             {"decision_tier": "watch", "title": "W2", "body": "b", "evidence": [{"x": 7}]},
         ],
         "_relations_backlog": [{"title": "leak"}],
@@ -107,8 +107,8 @@ def test_publish_projection_only_strong():
     }
     pub = build_published_projection(draft)
     titles = [r["title"] for r in pub["relations"]]
-    assert titles == ["S1", "S2"]
-    assert all(r["decision_tier"] == "strong" for r in pub["relations"])
+    assert titles == ["S1", "S2", "P1", "P2", "P3", "W1", "W2"]
+    assert pub["kpis"][0]["n"] == "7"
     assert "_stale" not in pub
     assert "_relations_backlog" not in pub
 

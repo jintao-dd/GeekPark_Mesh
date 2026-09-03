@@ -1,12 +1,11 @@
-"""读者页展示 vs draft 全量 backlog。
+"""关系展示与 Publish 投影。
 
-产品投影（唯一业务语义）：
-  strong   → Reader（published）
-  parallel → Draft backlog
-  watch    → Draft backlog
-  skip     → 不保留
+产品口径（2026-09 更正）：
+  能进 draft_json.relations 的（有 evidence、能落到条目）= 要发给读者的。
+  decision_tier（strong / parallel / watch）只影响**展示排序强度**，不决定可见性。
+  skip 不保留。
 
-`reader_visible` 是派生字段，不得反过来定义业务规则。
+`reader_visible` 是派生字段：卡完整（evidence + title/body）且非 skip → 读者可见。
 `build_published_projection(draft)` 是 Publish / Preview-reader 切片的唯一入口。
 """
 from __future__ import annotations
@@ -15,8 +14,10 @@ import copy
 from typing import Any
 
 VALID_DECISION_TIERS = frozenset({"strong", "parallel", "watch", "skip"})
-READER_TIERS = frozenset({"strong"})
-BACKLOG_TIERS = frozenset({"parallel", "watch"})
+# 读者可见的 keep 档（强度仅用于排序）
+READER_TIERS = frozenset({"strong", "parallel", "watch"})
+# 兼容旧名：不再表示「不上读者页」
+BACKLOG_TIERS = frozenset()
 
 # Publish 投影时从 published_json 剥离的内部键（draft 可保留）
 _INTERNAL_DRAFT_KEYS = frozenset({
@@ -25,6 +26,13 @@ _INTERNAL_DRAFT_KEYS = frozenset({
     "_relations_backlog",
     "_relation_decision_audit",
 })
+
+# 展示顺序：数值越小越靠前
+_TIER_SORT_RANK: dict[str, int] = {
+    "strong": 0,
+    "parallel": 1,
+    "watch": 2,
+}
 
 # label → 默认 tier（LLM 未给 decision_tier 时）
 _LABEL_DEFAULT_TIER: dict[str, str] = {
@@ -78,25 +86,60 @@ def _card_complete(rel: dict) -> bool:
     return bool((rel.get("title") or "").strip() and (rel.get("body") or "").strip())
 
 
+def tier_sort_key(rel: dict) -> tuple:
+    """排序键：strong → parallel → watch → 其他；同档保持原相对顺序由稳定 sort 保证。"""
+    tier = (rel.get("decision_tier") or "").strip().lower()
+    return (_TIER_SORT_RANK.get(tier, 1),)
+
+
+def sort_relations_by_strength(relations: list[dict] | None) -> list[dict]:
+    """按强度排序；稳定排序保留同档原顺序。"""
+    rels = [r for r in (relations or []) if isinstance(r, dict)]
+    return sorted(rels, key=tier_sort_key)
+
+
+def sort_relation_entries_by_strength(entries: list[dict]) -> list[dict]:
+    """entries: [{index, rel}, ...] 按 rel 强度排序，保留原 relations 下标。"""
+    return sorted(entries, key=lambda e: tier_sort_key(e.get("rel") or {}))
+
+
+def indexed_relations_for_display(relations: list | None) -> list[dict]:
+    """页面展示用：按强度排序，index 仍指向 data.relations 原下标（编辑路径不乱）。"""
+    entries = []
+    for i, r in enumerate(relations or []):
+        if not isinstance(r, dict):
+            continue
+        entries.append({"index": i, "rel": r})
+    return sort_relation_entries_by_strength(entries)
+
+
 def reader_visible(rel: dict) -> bool:
-    """派生字段：decision_tier==strong 且卡完整 → 读者可见。"""
+    """派生字段：进草稿且卡完整（有 evidence + title/body）→ 读者可见。
+
+    decision_tier 只影响排序，不决定是否可见。skip / 不完整 → 不可见。
+    """
     if not isinstance(rel, dict):
         return False
     tier = (rel.get("decision_tier") or "").strip().lower()
-    if tier not in READER_TIERS:
+    if tier == "skip":
         return False
     return _card_complete(rel)
 
 
 def is_reader_tier(rel: dict) -> bool:
-    """防御性过滤：仅看 decision_tier（Reader UI 双保险）。"""
+    """兼容旧调用：非 skip 的 keep 档（含无 tier 旧稿）视为可上读者页的档。"""
     if not isinstance(rel, dict):
         return False
-    return (rel.get("decision_tier") or "").strip().lower() in READER_TIERS
+    tier = (rel.get("decision_tier") or "").strip().lower()
+    if tier == "skip":
+        return False
+    if not tier:
+        return True  # 旧稿无 tier
+    return tier in READER_TIERS
 
 
 def split_relations_for_publish(relations: list[dict]) -> tuple[list[dict], list[dict]]:
-    """(reader_relations, backlog_relations) — tier 驱动，并写回 reader_visible。"""
+    """(reader_relations, incomplete_backlog) — 完整卡全部进读者；不完整进 backlog 仅供审计。"""
     reader: list[dict] = []
     backlog: list[dict] = []
     for r in relations or []:
@@ -109,6 +152,7 @@ def split_relations_for_publish(relations: list[dict]) -> tuple[list[dict], list
             reader.append(row)
         else:
             backlog.append(row)
+    reader = sort_relations_by_strength(reader)
     return reader, backlog
 
 
@@ -124,16 +168,12 @@ def attach_reader_flags(relations: list[dict]) -> list[dict]:
 
 
 def count_reader_relations(relations: list | None) -> int:
-    """KPI / 读者卡口径：decision_tier==strong 且卡完整。"""
+    """KPI / 读者卡口径：进草稿且完整的关系卡数（含 parallel/watch）。"""
     return sum(1 for r in (relations or []) if isinstance(r, dict) and reader_visible(r))
 
 
 def draft_backlog_relations(relations: list | None) -> list[dict]:
-    """预览/编辑态「草稿积压」条目（含原 relations 下标 index）。
-
-    仅 explicit parallel / watch，以及不完整的 strong。
-    无 decision_tier 的旧稿不算积压（与已发 EDM 一样进读者区展示）。
-    """
+    """仅不完整 / skip 残留（正常管线不应进草稿）。兼容旧调用，预览页不再展示积压区。"""
     out: list[dict] = []
     for i, r in enumerate(relations or []):
         if not isinstance(r, dict):
@@ -141,9 +181,7 @@ def draft_backlog_relations(relations: list | None) -> list[dict]:
         if reader_visible(r):
             continue
         tier = (r.get("decision_tier") or "").strip().lower()
-        if tier == "skip" or not tier:
-            continue
-        if tier not in BACKLOG_TIERS and tier != "strong":
+        if tier == "skip":
             continue
         row = dict(r)
         row["reader_visible"] = False
@@ -184,7 +222,7 @@ def _sync_relation_kpi(data: dict, n_reader: int) -> None:
 def build_published_projection(draft: dict | None) -> dict:
     """draft_json → published_json 唯一投影入口。
 
-    - 仅 strong（且完整）关系进入 relations
+    - 进草稿且完整的关系（strong/parallel/watch）全部进入 relations，按强度排序
     - 剥离内部 `_…` 字段
     - KPI「可同步的关系」对齐读者卡数量
     """
@@ -197,8 +235,8 @@ def build_published_projection(draft: dict | None) -> dict:
     raw_rels = [r for r in (data.get("relations") or []) if isinstance(r, dict)]
     flagged = attach_reader_flags(raw_rels)
     reader, _backlog = split_relations_for_publish(flagged)
-    # 双保险：即使 reader_visible 被误写，仍只留 strong
-    reader = [r for r in reader if is_reader_tier(r) and reader_visible(r)]
-    data["relations"] = reader
-    _sync_relation_kpi(data, len(reader))
+    # 双保险：可见性以 reader_visible 为准（完整卡），不因 tier 再砍
+    reader = [r for r in reader if reader_visible(r)]
+    data["relations"] = sort_relations_by_strength(reader)
+    _sync_relation_kpi(data, len(data["relations"]))
     return data

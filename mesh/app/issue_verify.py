@@ -344,8 +344,7 @@ def _format_kpi_n(n: int, *, use_plus: bool = False) -> str:
 def sync_kpis_from_data(data: dict) -> dict:
     """首屏 KPI 与下方卡片数量对齐（merge/verify 后以实际数据为准）。
 
-    「可同步的关系」= 读者可见 strong 卡数（与 build_published_projection / 读者区一致），
-    不含 parallel/watch 草稿积压。
+    「可同步的关系」= 进草稿且完整的关系卡数（strong/parallel/watch 均计入；按强度排序展示）。
     """
     from .relation_display import count_reader_relations
 

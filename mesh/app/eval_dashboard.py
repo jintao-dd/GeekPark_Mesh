@@ -552,7 +552,7 @@ def relation_funnel(doc: dict) -> dict[str, Any]:
             "drop_key": "gate_drop",
         },
         {"id": "draft", "label": "进草稿", "hint": "写入 draft", "n": n_draft, "case_key": "draft"},
-        {"id": "reader", "label": "读者可见", "hint": "仅 strong 档", "n": n_reader, "case_key": "reader"},
+        {"id": "reader", "label": "读者可见", "hint": "进草稿且完整（按强度排序）", "n": n_reader, "case_key": "reader"},
     ]
 
     return {

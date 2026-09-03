@@ -1,4 +1,4 @@
-"""Decision tier + draft/reader 分离 + Publish projection。"""
+"""Decision tier + Publish projection：进草稿即读者可见，按强度排序。"""
 from __future__ import annotations
 
 import sys
@@ -9,27 +9,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.relation_display import (
     build_published_projection,
     draft_backlog_relations,
+    indexed_relations_for_display,
     is_reader_tier,
     reader_visible,
+    sort_relations_by_strength,
     split_relations_for_publish,
 )
 
 
-def test_only_strong_reader_visible():
-    for tier in ("parallel", "watch"):
+def test_all_keep_tiers_reader_visible_when_complete():
+    for tier in ("strong", "parallel", "watch"):
         rel = {
             "decision_tier": tier,
             "title": "t",
             "body": "b",
             "evidence": [{}],
         }
-        assert not reader_visible(rel), tier
-    assert reader_visible({
-        "decision_tier": "strong",
-        "title": "t",
-        "body": "b",
-        "evidence": [{}],
-    })
+        assert reader_visible(rel), tier
+        assert is_reader_tier(rel), tier
 
 
 def test_skip_or_incomplete_not_visible():
@@ -40,32 +37,44 @@ def test_skip_or_incomplete_not_visible():
         "decision_tier": "strong", "title": "t", "body": "", "evidence": [{}],
     })
     assert not reader_visible({
-        "decision_tier": "strong", "title": "t", "body": "b", "evidence": [],
+        "decision_tier": "parallel", "title": "t", "body": "b", "evidence": [],
     })
 
 
-def test_split_strong_to_reader_rest_backlog():
+def test_split_all_complete_to_reader():
     rels = [
         {"candidate_id": "c1", "decision_tier": "strong", "title": "A", "body": "a", "evidence": [{}]},
         {"candidate_id": "c2", "decision_tier": "parallel", "title": "B", "body": "b", "evidence": [{}]},
         {"candidate_id": "c3", "decision_tier": "watch", "title": "C", "body": "c", "evidence": [{}]},
     ]
     reader, backlog = split_relations_for_publish(rels)
-    assert len(reader) == 1
-    assert reader[0]["candidate_id"] == "c1"
-    assert reader[0]["reader_visible"] is True
-    assert len(backlog) == 2
-    assert all(not r["reader_visible"] for r in backlog)
+    assert len(reader) == 3
+    assert [r["candidate_id"] for r in reader] == ["c1", "c2", "c3"]
+    assert all(r["reader_visible"] for r in reader)
+    assert backlog == []
 
 
-def test_build_published_projection_strong_only_strips_internal():
+def test_sort_relations_by_strength():
+    rels = [
+        {"decision_tier": "watch", "title": "W", "body": "b", "evidence": [{}]},
+        {"decision_tier": "strong", "title": "S", "body": "b", "evidence": [{}]},
+        {"decision_tier": "parallel", "title": "P", "body": "b", "evidence": [{}]},
+    ]
+    ordered = sort_relations_by_strength(rels)
+    assert [r["title"] for r in ordered] == ["S", "P", "W"]
+    view = indexed_relations_for_display(rels)
+    assert [x["rel"]["title"] for x in view] == ["S", "P", "W"]
+    assert [x["index"] for x in view] == [1, 2, 0]
+
+
+def test_build_published_projection_all_tiers_sorted_strips_internal():
     draft = {
         "title": "期",
         "relations": [
-            {"decision_tier": "strong", "title": "S1", "body": "b", "evidence": [{"ref": "e1"}]},
-            {"decision_tier": "strong", "title": "S2", "body": "b", "evidence": [{"ref": "e2"}]},
-            {"decision_tier": "parallel", "title": "P", "body": "b", "evidence": [{"ref": "e3"}]},
             {"decision_tier": "watch", "title": "W", "body": "b", "evidence": [{"ref": "e4"}]},
+            {"decision_tier": "strong", "title": "S1", "body": "b", "evidence": [{"ref": "e1"}]},
+            {"decision_tier": "parallel", "title": "P", "body": "b", "evidence": [{"ref": "e3"}]},
+            {"decision_tier": "strong", "title": "S2", "body": "b", "evidence": [{"ref": "e2"}]},
             {"decision_tier": "skip", "title": "X", "body": "b", "evidence": [{"ref": "e5"}]},
         ],
         "_relations_reader": [{"title": "leak"}],
@@ -75,25 +84,24 @@ def test_build_published_projection_strong_only_strips_internal():
         "kpis": [{"n": "99", "label": "可同步的关系"}],
     }
     pub = build_published_projection(draft)
-    assert [r["title"] for r in pub["relations"]] == ["S1", "S2"]
-    assert all(is_reader_tier(r) for r in pub["relations"])
+    assert [r["title"] for r in pub["relations"]] == ["S1", "S2", "P", "W"]
+    assert all(reader_visible(r) for r in pub["relations"])
     assert "_relations_reader" not in pub
     assert "_relations_backlog" not in pub
     assert "_relation_decision_audit" not in pub
     assert "_stale" not in pub
-    assert pub["kpis"][0]["n"] == "2"
-    # draft 未被原地修改
+    assert pub["kpis"][0]["n"] == "4"
     assert len(draft["relations"]) == 5
     assert draft.get("_relations_reader")
 
 
-def test_projection_ignores_false_reader_visible_flag():
-    """业务语义以 decision_tier 为准，不信任被写坏的 reader_visible。"""
+def test_projection_trusts_completeness_not_false_flag():
+    """可见性以卡完整为准；误写的 reader_visible 不影响投影。"""
     draft = {
         "relations": [
             {
                 "decision_tier": "parallel",
-                "reader_visible": True,
+                "reader_visible": False,
                 "title": "P",
                 "body": "b",
                 "evidence": [{}],
@@ -108,19 +116,18 @@ def test_projection_ignores_false_reader_visible_flag():
         ],
     }
     pub = build_published_projection(draft)
-    assert [r["title"] for r in pub["relations"]] == ["S"]
-    assert pub["relations"][0]["reader_visible"] is True
+    assert [r["title"] for r in pub["relations"]] == ["S", "P"]
+    assert all(r["reader_visible"] is True for r in pub["relations"])
 
 
-def test_draft_backlog_includes_parallel_watch_keeps_index():
+def test_draft_backlog_only_incomplete():
     rels = [
         {"decision_tier": "strong", "title": "S", "body": "b", "evidence": [{}]},
         {"decision_tier": "parallel", "title": "P", "body": "b", "evidence": [{}]},
         {"decision_tier": "watch", "title": "W", "body": "b", "evidence": [{}]},
         {"decision_tier": "skip", "title": "X", "body": "b", "evidence": [{}]},
         {"decision_tier": "strong", "title": "Incomplete", "body": "", "evidence": [{}]},
-        {"title": "Legacy", "body": "b"},  # 无 tier：不算积压
     ]
     backlog = draft_backlog_relations(rels)
-    assert [x["rel"]["title"] for x in backlog] == ["P", "W", "Incomplete"]
-    assert [x["index"] for x in backlog] == [1, 2, 4]
+    assert [x["rel"]["title"] for x in backlog] == ["Incomplete"]
+    assert [x["index"] for x in backlog] == [4]

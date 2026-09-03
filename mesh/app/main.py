@@ -3161,23 +3161,27 @@ def issue_page(request: Request, slug: str, preview: int = 0, edit: int = 0, syn
     data.setdefault("plans", {})
     data["plans"].setdefault("groups", [])
     data["plans"].setdefault("sources", [])
-    # 预览：KPI=strong 读者卡 + 草稿积压；已发布：KPI=published_json 卡数（与已发 EDM 一致）
-    relations_backlog = []
-    if preview:
-        try:
-            from .issue_verify import sync_kpis_from_data
+    # 进草稿即读者可见：展示按强度排序（保留原下标）；KPI 对齐卡数
+    relations_view = []
+    try:
+        from .relation_display import indexed_relations_for_display, _sync_relation_kpi
+        from .issue_verify import sync_kpis_from_data
+        relations_view = indexed_relations_for_display(data.get("relations") or [])
+        if preview:
             data = sync_kpis_from_data(data)
-        except Exception:
-            pass
-        from .relation_display import draft_backlog_relations
-        relations_backlog = draft_backlog_relations(data.get("relations") or [])
-    else:
-        try:
-            from .relation_display import _sync_relation_kpi
-            n_pub = sum(1 for x in (data.get("relations") or []) if isinstance(x, dict))
+        else:
+            n_pub = sum(
+                1
+                for x in (data.get("relations") or [])
+                if isinstance(x, dict) and (x.get("decision_tier") or "").strip().lower() != "skip"
+            )
             _sync_relation_kpi(data, n_pub)
-        except Exception:
-            pass
+    except Exception:
+        relations_view = [
+            {"index": i, "rel": r}
+            for i, r in enumerate(data.get("relations") or [])
+            if isinstance(r, dict)
+        ]
     con = db.connect()
     arch = [_enrich_issue(x) for x in con.execute("SELECT slug, period_label, date_end, published_at FROM issues WHERE status='published' ORDER BY date_end DESC LIMIT 12")]
     con.close()
@@ -3189,7 +3193,7 @@ def issue_page(request: Request, slug: str, preview: int = 0, edit: int = 0, syn
             d=data,
             preview=bool(preview),
             archive_list=arch,
-            relations_backlog=relations_backlog,
+            relations_view=relations_view,
         ),
     )
 
