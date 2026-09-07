@@ -179,6 +179,11 @@ items（未拦截、未合并）
 
 **写入硬边界（`publish_lane`）：** 任何 `UPDATE issues SET … published_json` 须在 `allow_published_write` 内；`MeshConnection.execute` 运行时拦截。静态扫描见 `tests/test_published_write_boundary.py`。Publish 是唯一业务入口（`write_publish_projection`）。
 
+**壁钟缓存：**
+- 多源抽取：job LLM 池内并行 preheat（`pipeline._run`）。
+- T13 段级：`segment_cache` + `§sd:{digest}|` pointer；未变段 reuse，变段/新段 LLM，删段自然丢弃。
+- 周报壳+关系：`_relation_input_fp`（candidates × item_ids/evidence/snippets × team_cards × prompt 文件 hash）；`force` / gate_stale / building / `_stale` 均不复用。
+
 关系卡上常见字段：
 
 | 字段 | 谁写 |

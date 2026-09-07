@@ -189,7 +189,7 @@ def _run(slug: str, token: int = 0) -> None:
                 skip_split = False
             pending.append((i, s, skip_split, unit))
 
-        def _llm_extract(_s: dict, _skip: bool):
+        def _llm_extract(_s: dict, _skip: bool, _prior: list | None):
             try:
                 with ask_concurrency.llm_slot(pool="job"):
                     return llm.extract_source(
@@ -200,14 +200,27 @@ def _run(slug: str, token: int = 0) -> None:
                         channel=_s.get("channel") or "manual",
                         skip_split=_skip,
                         source_id=_s["id"],
+                        prior_items=_prior or None,
                     )
             except ask_concurrency.AskBusyError as e:
                 raise RuntimeError(f"抽取排队超时：{e}") from e
             except ask_concurrency.JobBusyError as e:
                 raise RuntimeError(f"抽取排队超时：{e}") from e
 
-        # 预热并行 LLM：结果暂存；真正 try_unit/落库仍按序，避免 ResilienceReport 竞态
+        # 预热并行 LLM：每源带上轮 items 做段级 reuse；try_unit/落库仍按序
         llm_cache: dict[int, object] = {}
+        prior_by_i: dict[int, list] = {}
+        for i, s, skip_split, unit in pending:
+            prior_by_i[i] = [
+                dict(x)
+                for x in con.execute(
+                    "SELECT zone, level, kind, text, entities, roles, signals, source_label, pointer, "
+                    "blocked, owner_team, channel, source_labels, owner_provenance, llm_owner_team_hint, "
+                    "stype, team FROM items WHERE source_id=?",
+                    (s["id"],),
+                )
+            ]
+
         if len(pending) > 1:
             _mark(slug, "extract", f"并行抽取 {len(pending)}/{total} 个来源…")
             workers = min(len(pending), max(2, int(getattr(ask_concurrency, "_JOB_GLOBAL", 2) or 2)))
@@ -215,7 +228,7 @@ def _run(slug: str, token: int = 0) -> None:
             def _preheat(item: tuple[int, dict, bool, str]):
                 i, s, skip_split, _unit = item
                 try:
-                    return i, _llm_extract(s, skip_split), None
+                    return i, _llm_extract(s, skip_split, prior_by_i.get(i)), None
                 except Exception as e:
                     return i, None, e
 
@@ -237,15 +250,16 @@ def _run(slug: str, token: int = 0) -> None:
             _mark(slug, "extract", f"抽取中 {i}/{total} · {title}")
 
             cached_box = [llm_cache.get(i)] if llm_cache else [None]
+            prior = prior_by_i.get(i) or []
 
-            def _extract_one(_s=s, _skip=skip_split, _box=cached_box):
+            def _extract_one(_s=s, _skip=skip_split, _box=cached_box, _prior=prior):
                 if _box[0] is not None:
                     val, err = _box[0]
-                    _box[0] = None  # 只消费一次；try_unit 重试走真 LLM
+                    _box[0] = None
                     if err is not None:
                         raise err
                     return val
-                return _llm_extract(_s, _skip)
+                return _llm_extract(_s, _skip, _prior)
 
             extracted = try_unit(
                 _extract_one,
@@ -310,6 +324,8 @@ def _run(slug: str, token: int = 0) -> None:
             if isinstance(split_meta, dict) and split_meta.get("segment_digests"):
                 sp = dict(meta_obj.get("split") or {})
                 sp["segment_digests"] = list(split_meta.get("segment_digests") or [])
+                if split_meta.get("segment_reuse"):
+                    sp["segment_reuse"] = split_meta["segment_reuse"]
                 meta_obj["split"] = sp
             if llm.split_needs_review(
                 split_meta,
@@ -330,7 +346,11 @@ def _run(slug: str, token: int = 0) -> None:
             con.execute("UPDATE sources SET extracted=1, meta=? WHERE id=?", (meta, s["id"]))
             con.commit()
             ok_sources += 1
-            _mark(slug, "extract", f"已完成 {i}/{total} · 候选 {got}")
+            reuse_note = ""
+            if isinstance(split_meta, dict) and (split_meta.get("segment_reuse") or {}).get("reused"):
+                ru = split_meta["segment_reuse"]
+                reuse_note = f" · 段复用 {ru.get('reused')}/{ru.get('total')}"
+            _mark(slug, "extract", f"已完成 {i}/{total} · 候选 {got}{reuse_note}")
         if not _is_current(slug, token):
             return
         extract_note = f"候选 {got}"

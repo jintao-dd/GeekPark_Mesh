@@ -148,7 +148,7 @@ def preview_content_fingerprint(
     card_fps: list[str],
     teams: list[str],
 ) -> str:
-    """条目+要点卡指纹：未变则可跳过周报壳与关系 LLM。"""
+    """条目+要点卡指纹（仅用于卡复用对照；周报/关系复用见 relation_input_fingerprint）。"""
     blob = "\n".join(
         [
             "teams:" + ",".join(teams or []),
@@ -159,9 +159,121 @@ def preview_content_fingerprint(
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:24]
 
 
+def relation_prompt_version() -> str:
+    """关系 Decision/Writer + 周报壳相关 prompt 的内容指纹；prompt 一变即失效缓存。"""
+    from .llm import PROMPT_DIR
+
+    names = (
+        "00_base_rules",
+        "issue_relation_decisions",
+        "issue_relation_writer",
+        "issue_draft",
+        "card_team",
+    )
+    parts: list[str] = []
+    for name in names:
+        p = PROMPT_DIR / f"{name}.md"
+        try:
+            parts.append(f"{name}:{hashlib.sha256(p.read_bytes()).hexdigest()[:12]}")
+        except OSError:
+            parts.append(f"{name}:missing")
+    return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()[:16]
+
+
+def _evidence_ids(ev) -> str:
+    if not isinstance(ev, list):
+        return ""
+    bits: list[str] = []
+    for e in ev:
+        if isinstance(e, dict):
+            bits.append(str(e.get("item_id") or e.get("id") or e.get("source") or e))
+        else:
+            bits.append(str(e))
+    return ",".join(sorted(bits))
+
+
+def relation_input_fingerprint(
+    *,
+    candidates: list[dict],
+    team_cards: dict | list | None,
+    item_rows: list[dict] | None = None,
+    prompt_version: str | None = None,
+) -> str:
+    """周报壳+关系 LLM 的输入指纹。
+
+    任一影响论证的输入变了即 invalidate：
+    - candidate: teams / item_ids / evidence / 相关正文 hash
+    - team_cards 结构指纹
+    - prompt/version
+    """
+    pv = (prompt_version or relation_prompt_version()).strip()
+    cand_parts: list[str] = []
+    for c in candidates or []:
+        if not isinstance(c, dict):
+            continue
+        teams = c.get("teams") or []
+        if isinstance(teams, str):
+            teams = [teams]
+        item_ids = c.get("item_ids") or c.get("items") or []
+        if item_ids and isinstance(item_ids[0], dict):
+            item_ids = [x.get("id") for x in item_ids]
+        snippets = []
+        for sn in (c.get("snippets") or c.get("evidence_snippets") or [])[:5]:
+            if isinstance(sn, dict):
+                snippets.append(str(sn.get("text") or sn.get("snippet") or "")[:80])
+            else:
+                snippets.append(str(sn)[:80])
+        title = str(c.get("title") or c.get("entity") or c.get("label") or "")
+        cand_parts.append(
+            "|".join(
+                [
+                    str(c.get("candidate_id") or c.get("id") or title),
+                    ",".join(sorted(str(t) for t in teams)),
+                    ",".join(str(i) for i in sorted(item_ids, key=lambda x: str(x))),
+                    _evidence_ids(c.get("evidence")),
+                    title[:60],
+                    hashlib.sha256("\n".join(snippets).encode("utf-8")).hexdigest()[:10],
+                ]
+            )
+        )
+    cand_parts.sort()
+
+    card_blob = ""
+    if isinstance(team_cards, dict):
+        card_blob = json.dumps(team_cards, ensure_ascii=False, sort_keys=True, default=str)[:8000]
+    elif isinstance(team_cards, list):
+        card_blob = json.dumps(team_cards, ensure_ascii=False, sort_keys=True, default=str)[:8000]
+
+    item_bits = []
+    for it in item_rows or []:
+        if not isinstance(it, dict):
+            continue
+        item_bits.append(
+            f"{it.get('id')}|{it.get('owner_team')}|{(it.get('text') or '')[:60]}"
+        )
+    item_bits.sort()
+
+    blob = "\n".join(
+        [
+            "pv:" + pv,
+            "cands:" + "\n".join(cand_parts),
+            "cards:" + hashlib.sha256(card_blob.encode("utf-8")).hexdigest()[:16],
+            "items:" + hashlib.sha256("\n".join(item_bits).encode("utf-8")).hexdigest()[:16],
+        ]
+    )
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:28]
+
+
 def attach_content_fingerprint(data: dict, fp: str) -> dict:
     out = dict(data) if isinstance(data, dict) else {}
     out["_preview_content_fp"] = fp
+    return out
+
+
+def attach_relation_input_fingerprint(data: dict, fp: str) -> dict:
+    out = dict(data) if isinstance(data, dict) else {}
+    out["_relation_input_fp"] = fp
+    out["_relation_prompt_version"] = relation_prompt_version()
     return out
 
 
@@ -169,3 +281,15 @@ def content_fingerprint_matches(data: dict | None, fp: str) -> bool:
     if not fp or not isinstance(data, dict):
         return False
     return str(data.get("_preview_content_fp") or "").strip() == fp
+
+
+def relation_input_fingerprint_matches(data: dict | None, fp: str) -> bool:
+    if not fp or not isinstance(data, dict):
+        return False
+    if str(data.get("_relation_input_fp") or "").strip() != fp:
+        return False
+    # prompt 文件变更即使 fp 算法漏了也挡一道
+    stored_pv = str(data.get("_relation_prompt_version") or "").strip()
+    if stored_pv and stored_pv != relation_prompt_version():
+        return False
+    return True

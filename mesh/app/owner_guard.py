@@ -52,7 +52,10 @@ def resolve_item_owner(
 
 
 def normalize_pointer(pointer: str | None) -> str:
-    return re.sub(r"\s+", " ", (pointer or "").strip())
+    from .segment_cache import strip_segment_digest_prefix
+
+    bare = strip_segment_digest_prefix(pointer)
+    return re.sub(r"\s+", " ", (bare or "").strip())
 
 
 def provenance_key(it: dict) -> str:

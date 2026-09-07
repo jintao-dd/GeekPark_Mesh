@@ -375,14 +375,24 @@ def extract_source(
     channel: str = "manual",
     skip_split: bool = False,
     source_id: int | None = None,
+    prior_items: list[dict] | None = None,
 ) -> tuple[list[dict], dict | None]:
     """单个来源抽取：聚合包自动拆段并按段调用 extract_T*.md。
 
     返回 (items, split_meta)。split_meta 仅混合包有值，供 sources.meta 落库与 UI 展示。
     上传已预拆（skip_split=True）时按单段抽取，避免二次拆分。
+
+    prior_items：上轮同 source 的条目（含 §sd:digest| pointer）。段 digest 未变则复用，不调 LLM。
     """
     from .aggregator import should_split, split_bundle_ex
     from .owner_guard import apply_item_owner_guards
+    from .segment_cache import (
+        build_segment_digests_meta,
+        clone_item_for_reuse,
+        group_items_by_segment_digest,
+        segment_digest,
+        stamp_segment_digest,
+    )
 
     def _stamp(items: list[dict]) -> list[dict]:
         if source_id is None:
@@ -400,8 +410,20 @@ def extract_source(
             msg = "；".join(split.warnings) if split.warnings else "正文为空或无可抽取段落"
             raise ValueError(f"无法抽取：{msg}")
         ch = (channel or "aggregator").strip() or "aggregator"
+        prior_by = group_items_by_segment_digest(prior_items or [])
         out: list[dict] = []
+        reused = 0
+        extracted_n = 0
         for seg in split.segments:
+            dig = segment_digest(stype=seg.stype, title=seg.title, text=seg.text or "")
+            if dig in prior_by and prior_by[dig]:
+                for old in prior_by[dig]:
+                    it = clone_item_for_reuse(old, digest=dig)
+                    it["item_stype"] = seg.stype
+                    it["_segment_team"] = seg.owner_hint or seg.team
+                    out.append(it)
+                reused += 1
+                continue
             seg_title = f"{title or '数据聚合'} · {seg.title}"[:200]
             items = extract_items(
                 seg.stype, seg.team, seg_title, seg.text,
@@ -411,16 +433,11 @@ def extract_source(
             for it in items:
                 it["item_stype"] = seg.stype
                 it["_segment_team"] = seg.owner_hint or seg.team
-                out.append(it)
+                out.append(stamp_segment_digest(it, dig))
+            extracted_n += 1
         meta = split.to_meta()
-        # 段内容指纹：供下次对照；整源 extracted=1 时仍整包跳过
-        import hashlib
-        meta["segment_digests"] = [
-            hashlib.sha256(
-                f"{seg.stype}|{seg.title}|{len(seg.text or '')}".encode("utf-8")
-            ).hexdigest()[:16]
-            for seg in split.segments
-        ]
+        meta["segment_digests"] = build_segment_digests_meta(split.segments)
+        meta["segment_reuse"] = {"reused": reused, "extracted": extracted_n, "total": len(split.segments)}
         return apply_item_owner_guards(_stamp(out)), meta
     items = extract_items(
         stype, team, title, text,

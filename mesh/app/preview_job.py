@@ -386,77 +386,12 @@ def _run(slug: str, username: str, token: int = 0) -> None:
             )
             return
 
-        # 内容指纹：force=False 且条目/卡未变且已有完整草稿 → 跳过周报壳+关系 LLM
         st_now = job_store.get(KIND, slug, _defaults(slug))
         force_run = bool(st_now.get("_force"))
-        item_fps: list[str] = []
-        card_fps: list[str] = []
-        with db.write_lock():
-            con = db.connect()
-            try:
-                for team in teams:
-                    items = [
-                        dict(x)
-                        for x in con.execute(
-                            "SELECT zone, level, kind, text, entities, roles, signals, source_label, "
-                            "source_labels, channel FROM items WHERE issue_id=? AND owner_team=? "
-                            "AND blocked=0 AND merged_into IS NULL",
-                            (issue_id, team),
-                        )
-                    ]
-                    item_fps.append(prog.items_fingerprint(items))
-                    card_fps.append(prog.card_fingerprint(prog.load_existing_card(con, issue_id, team)))
-                row_fp = con.execute(
-                    "SELECT draft_json FROM issues WHERE id=?", (issue_id,)
-                ).fetchone()
-                try:
-                    draft_fp = json.loads(row_fp["draft_json"] or "{}") if row_fp else {}
-                except (json.JSONDecodeError, TypeError):
-                    draft_fp = {}
-            finally:
-                con.close()
-        content_fp = prog.preview_content_fingerprint(
-            item_fps=item_fps, card_fps=card_fps, teams=teams,
-        )
-        if (
-            not force_run
-            and prog.content_fingerprint_matches(draft_fp, content_fp)
-            and draft_fp.get("_preview_gate_ok")
-            and isinstance(draft_fp.get("relations"), list)
-            and draft_fp.get("relations")
-            and not draft_fp.get("_preview_building")
-        ):
-            stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-            data = prog.attach_content_fingerprint(draft_fp, content_fp)
-            data = prog.finalize_preview_flags(data, stamp=stamp)
-            with db.write_lock():
-                con = db.connect()
-                try:
-                    _write_partial_draft(con, issue_id, data, stamp)
-                    con.commit()
-                finally:
-                    con.close()
-            _set(
-                slug,
-                running=False,
-                done=True,
-                error=None,
-                phase="done",
-                message="内容未变，复用上次预览草稿",
-                preview_url=f"/{slug}?preview=1&edit=1",
-                preview_ready=True,
-                cards_done=ok_cards,
-                cards_total=cards_total,
-                final_status="ok",
-                resilience=resilience.to_dict(),
-            )
-            return
 
         with db.write_lock():
             con = db.connect()
             try:
-                db.mark_draft_stale(con, issue_id)
-                con.commit()
                 from .relation_candidates import merge_relations_from_candidates, prepare_draft_bundle
 
                 merge.apply_merge(con, issue_id)
@@ -488,6 +423,44 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                         version=issue_row.get("version"),
                         teams=teams,
                     )
+                # candidate 级指纹：未变且非 force → 复用周报壳+关系（须在 mark_draft_stale 之前）
+                rel_fp = prog.relation_input_fingerprint(
+                    candidates=bundle.get("relation_candidates") or [],
+                    team_cards=bundle.get("team_cards"),
+                    item_rows=bundle.get("item_rows") or [],
+                )
+                if (
+                    not force_run
+                    and prog.relation_input_fingerprint_matches(data_mid, rel_fp)
+                    and data_mid.get("_preview_gate_ok")
+                    and isinstance(data_mid.get("relations"), list)
+                    and data_mid.get("relations")
+                    and not data_mid.get("_preview_building")
+                    and not data_mid.get("_preview_gate_stale")
+                    and not data_mid.get("_stale")
+                ):
+                    stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                    data = prog.attach_relation_input_fingerprint(data_mid, rel_fp)
+                    data = prog.finalize_preview_flags(data, stamp=stamp)
+                    _write_partial_draft(con, issue_id, data, stamp)
+                    con.commit()
+                    _set(
+                        slug,
+                        running=False,
+                        done=True,
+                        error=None,
+                        phase="done",
+                        message="候选与要点卡未变，复用上次关系与周报壳",
+                        preview_url=f"/{slug}?preview=1&edit=1",
+                        preview_ready=True,
+                        cards_done=ok_cards,
+                        cards_total=cards_total,
+                        final_status="ok",
+                        resilience=resilience.to_dict(),
+                    )
+                    return
+
+                db.mark_draft_stale(con, issue_id)
                 data_mid = prog.mark_phase(
                     data_mid, prog.PHASE_DRAFT, cards_done=cards_done_teams
                 )
@@ -622,7 +595,7 @@ def _run(slug: str, username: str, token: int = 0) -> None:
             return
 
         data = prog.finalize_preview_flags(data, stamp=stamp)
-        data = prog.attach_content_fingerprint(data, content_fp)
+        data = prog.attach_relation_input_fingerprint(data, rel_fp)
         if resilience.skipped or dropped_rels:
             data["_preview_degraded"] = True
         if dropped_rels:
