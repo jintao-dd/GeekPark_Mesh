@@ -502,9 +502,21 @@ def build_relations_two_phase(
     audit["n_narrative_skipped"] = len(write_skipped)
     audit["narrative_skipped"] = write_skipped
 
-    # Claim Check：必须吃 Writer 原文，再进入会改写 body 的 narrative verify
+    # Claim Check：必须吃 Writer 原文，再进入会改写 body 的 narrative verify。
+    # 契约：Evidence Gate 未通过 / 无 evidence 的卡不得进入 Claim Check
+    # （Gate 已保证 approved 有 evidence；此处再防错接与 legacy 注入）。
     rels = _strip_external_weak_duplicates(rels)
-    rels, claim_audit = apply_claim_checks(rels, items)
+    gated_for_claim: list[dict] = []
+    n_empty_ev = 0
+    for r in rels:
+        if not isinstance(r, dict):
+            continue
+        if not (r.get("evidence") or []):
+            n_empty_ev += 1
+            continue
+        gated_for_claim.append(r)
+    audit["n_skipped_empty_evidence_before_claim"] = n_empty_ev
+    rels, claim_audit = apply_claim_checks(gated_for_claim, items)
     audit["claim_check"] = claim_audit
     data["_relation_claim_audit"] = claim_audit
 

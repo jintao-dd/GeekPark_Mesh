@@ -47,9 +47,15 @@ g09/g12/g13/g14 仍 invalid；g06–g08/g15 仍 valid；新增 xAI parallel「�
 | published 8-17 invalid=0 | ✅ |
 | 第二期 shadow | ✅ 已跑；无效卡均为 evidence 空 |
 
-## Enforce
+## 流水线边界（enforce 前已锁）
 
-**仍为候选，本步不开闸。**
+正式路径：`Evidence Gate → Writer → Claim Check`（`build_relations_two_phase`）。  
+Gate `keep` 的卡必有非空 `evidence`；orchestrator 在 Claim Check 前再次丢弃 `evidence:[]`（`n_skipped_empty_evidence_before_claim`）。
+
+集成测试：`tests/test_relation_claim_gate_boundary.py`  
+（源码顺序 Gate&lt;Writer&lt;Claim；空 refs 不进 approved；缺 refs 时 `claim n_checked=0`）
+
+说明：离线 shadow 扫 `published_json` 仍可能看到 legacy 空 evidence 卡——那是历史稿，不是现网 Gate 放行结果。
 
 建议开闸条件（沿用你的最终标准）：
 
