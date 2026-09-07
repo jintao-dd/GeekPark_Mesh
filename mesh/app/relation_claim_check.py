@@ -2,6 +2,10 @@
 
 检查 title + body + details；与 Evidence Gate / line_grounded 独立。
 默认 shadow（只写 audit），MESH_CLAIM_CHECK_MODE=enforce 才藏卡。
+
+rule_v1.1（A1.1）：
+- watch/one_sided 的 CONTACT 不因 evidence 缺同词误杀（缺词 ≠ 否定）
+- blocker 不按整卡全局下压；仅在完成态论断与未完成证据冲突时生效
 """
 from __future__ import annotations
 
@@ -17,6 +21,8 @@ STRENGTH_PLAN = 5
 STRENGTH_PUSH = 6
 STRENGTH_DEAL = 7
 STRENGTH_SIGNED = 8
+
+_MODEL = "rule_v1.1"
 
 # (level, patterns) — 长词优先靠列表顺序 + 扫描时取 max
 _STRENGTH_PATTERNS: list[tuple[int, tuple[str, ...]]] = [
@@ -108,6 +114,7 @@ _STRENGTH_PATTERNS: list[tuple[int, tuple[str, ...]]] = [
             "接触",
             "跟进",
             "沟通",
+            "建联",
         ),
     ),
     (
@@ -135,17 +142,28 @@ _STRENGTH_PATTERNS: list[tuple[int, tuple[str, ...]]] = [
     ),
 ]
 
-# Evidence 侧「未完成 / 阻塞」标记：压低有效强度上限
-_BLOCKERS: tuple[tuple[str, int], ...] = (
-    ("尚无反馈", STRENGTH_CONTACT),
-    ("尚未排期", STRENGTH_PLAN),
-    ("尚未", STRENGTH_PLAN),
-    ("仍在商量", STRENGTH_PLAN),
-    ("待明确", STRENGTH_PLAN),
-    ("商量中", STRENGTH_PLAN),
-    ("未直接", STRENGTH_WATCH),
-    ("计划两周后", STRENGTH_PLAN),
-    ("内部讨论是否", STRENGTH_DISCUSS),
+# 仅「未完成 / 否定」类；作用于对应完成态 claim，不做整卡全局下压
+_COMPLETION_BLOCKERS: tuple[str, ...] = (
+    "尚无反馈",
+    "尚未排期",
+    "尚未接触",
+    "未接触",
+    "没有接触",
+    "未建联",
+    "尚未建联",
+    "仍在商量",
+    "待明确",
+    "商量中",
+    "未直接",
+)
+
+_CONTACT_DENIALS: tuple[str, ...] = (
+    "尚未接触",
+    "未接触",
+    "没有接触",
+    "未建联",
+    "尚未建联",
+    "尚未跟进",
 )
 
 _REASON_OVERCLAIM = "status_upgrade"
@@ -182,27 +200,19 @@ def max_strength(text: str) -> int:
 
 
 def evidence_effective_strength(blob: str) -> tuple[int, int | None]:
-    """返回 (effective_strength, blocker_cap)。blocker 把上限压到「未完成态」。"""
-    raw = max_strength(blob)
-    cap: int | None = None
-    for phrase, level in _BLOCKERS:
-        if phrase in (blob or ""):
-            cap = level if cap is None else min(cap, level)
-    if cap is not None:
-        # 有 blocker 时：有效强度不超过 blocker 所在阶；且至少反映「卡在该阶」
-        return min(raw, cap) if raw else cap, cap
-    return raw, None
+    """兼容旧调用：返回 (raw_max_strength, None)。
+
+    A1.1 起不再用 blocker 全局下压；blocker 在 check_relation_claim 内按 claim 应用。
+    """
+    return max_strength(blob), None
 
 
 def evidence_blob(rel: dict, items: list[dict] | None = None) -> str:
+    return "\n".join(_evidence_pieces(rel, items))
+
+
+def _evidence_pieces(rel: dict, items: list[dict] | None = None) -> list[str]:
     parts: list[str] = []
-    for e in rel.get("evidence") or []:
-        if not isinstance(e, dict):
-            continue
-        for k in ("snippet", "quote", "team", "pointer"):
-            v = e.get(k)
-            if v:
-                parts.append(str(v))
     by_id: dict[Any, dict] = {}
     for it in items or []:
         if isinstance(it, dict) and it.get("id") is not None:
@@ -210,11 +220,47 @@ def evidence_blob(rel: dict, items: list[dict] | None = None) -> str:
     for e in rel.get("evidence") or []:
         if not isinstance(e, dict):
             continue
+        chunk: list[str] = []
+        for k in ("snippet", "quote", "team", "pointer"):
+            v = e.get(k)
+            if v:
+                chunk.append(str(v))
         iid = e.get("item_id")
         row = by_id.get(iid)
         if row and row.get("text"):
-            parts.append(str(row["text"]))
-    return "\n".join(parts)
+            chunk.append(str(row["text"]))
+        if chunk:
+            parts.append("\n".join(chunk))
+    return parts
+
+
+def _has_evidence(rel: dict) -> bool:
+    return any(isinstance(e, dict) for e in (rel.get("evidence") or []))
+
+
+def _watchish(rel: dict) -> bool:
+    if rel.get("weak") or rel.get("decision_tier") == "watch":
+        return True
+    rt = (rel.get("relation_type") or "").strip()
+    if rt in ("one_sided", "overseas_link"):
+        return True
+    for t in rel.get("teams") or []:
+        if str(t).strip().startswith("→"):
+            return True
+    return False
+
+
+def _any_piece_supports_level(rel: dict, items: list[dict] | None, level: int) -> bool:
+    if level <= 0:
+        return True
+    for piece in _evidence_pieces(rel, items):
+        if max_strength(piece) >= level:
+            return True
+    return False
+
+
+def _blob_has_any(blob: str, phrases: tuple[str, ...]) -> bool:
+    return any(p in (blob or "") for p in phrases)
 
 
 def _spans(rel: dict) -> list[tuple[str, str]]:
@@ -244,12 +290,13 @@ def check_relation_claim(
     rel: dict,
     items: list[dict] | None = None,
     *,
-    model: str = "rule_v1",
+    model: str | None = None,
 ) -> dict[str, Any]:
     """对单张 Writer 原文卡做 Claim Check。不改写 title/body/details。"""
+    model = model or _MODEL
     spans = _spans(rel)
     blob = evidence_blob(rel, items)
-    ev_strength, blocker_cap = evidence_effective_strength(blob)
+    ev_strength = max_strength(blob)
 
     result: dict[str, Any] = {
         "claim_verdict": "valid",
@@ -258,7 +305,7 @@ def check_relation_claim(
         "checked_span": [s[0] for s in spans],
         "claim_strength": 0,
         "evidence_strength": ev_strength,
-        "blocker_cap": blocker_cap,
+        "blocker_cap": None,
         "model": model,
         "prompt_version": None,
     }
@@ -276,20 +323,33 @@ def check_relation_claim(
         cs = max_strength(text)
         if cs > max_claim:
             max_claim = cs
+
+        # 任一条 evidence 已支撑该强度 → OK（计划不被另一条「尚无反馈」全局压掉）
+        if _any_piece_supports_level(rel, items, cs):
+            continue
+
+        # A1.1：watch/one_sided + 有效 evidence + 仅 CONTACT/建联
+        # 「缺接触字面」≠「接触不成立」；有明确否定才拦
+        if (
+            cs <= STRENGTH_CONTACT
+            and _watchish(rel)
+            and _has_evidence(rel)
+            and not _blob_has_any(blob, _CONTACT_DENIALS)
+        ):
+            continue
+
         if cs <= ev_strength:
             continue
-        # 论断强于证据
+
+        # 论断强于整卡 max，且无单条 evidence 支撑
         code = _REASON_OVERCLAIM
-        reason = (
-            f"{span_name} 论断强度 {cs} > 证据有效强度 {ev_strength}"
-        )
-        if blocker_cap is not None and cs > blocker_cap:
+        reason = f"{span_name} 论断强度 {cs} > 证据有效强度 {ev_strength}"
+        # 完成态论断 + 未完成/否定证据 → blocker（只打完成态，不打「计划」）
+        if cs >= STRENGTH_PUSH and _blob_has_any(blob, _COMPLETION_BLOCKERS):
             code = _REASON_NEGATION
             reason = (
-                f"{span_name} 完成态强度 {cs}，但证据含未完成/计划标记"
-                f"（上限 {blocker_cap}）"
+                f"{span_name} 完成态强度 {cs}，但证据含未完成/否定标记"
             )
-        # 平行/各知一半语境下，合作级以上一律越界
         if _looks_parallel_context(rel) and cs >= STRENGTH_DEAL:
             code = _REASON_COOCCUR
             reason = f"{span_name} 在平行/各知一半语境下升级为合作级论断"
@@ -301,7 +361,7 @@ def check_relation_claim(
             "checked_span": [span_name],
             "claim_strength": cs,
             "evidence_strength": ev_strength,
-            "blocker_cap": blocker_cap,
+            "blocker_cap": None,
             "model": model,
             "prompt_version": None,
         }
@@ -322,7 +382,7 @@ def check_relation_claim(
             "checked_span": [s[0] for s in spans],
             "claim_strength": max_claim,
             "evidence_strength": ev_strength,
-            "blocker_cap": blocker_cap,
+            "blocker_cap": None,
             "model": model,
             "prompt_version": None,
         }
@@ -353,7 +413,7 @@ def apply_claim_checks(
     m = claim_check_mode(mode)
     audit: dict[str, Any] = {
         "mode": m,
-        "model": "rule_v1",
+        "model": _MODEL,
         "n_checked": 0,
         "n_valid": 0,
         "n_invalid": 0,
@@ -374,7 +434,6 @@ def apply_claim_checks(
         if not isinstance(raw, dict):
             raw = snapshot_writer_raw(row)
             row["_writer_raw"] = raw
-        # 必须基于 Writer 原文，不用后续改写后的字段
         probe = dict(row)
         probe["title"] = raw.get("title")
         probe["body"] = raw.get("body")

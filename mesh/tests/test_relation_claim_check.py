@@ -85,6 +85,100 @@ def test_checks_writer_raw_not_mutated_body():
     assert kept[0]["body"] == skeleton
 
 
+def test_a11_watch_contact_without_word_not_upgrade():
+    """Helloboss 类：evidence 无「接触」字面，但 watch+有 evidence → 不因缺词判 upgrade。"""
+    rel = {
+        "title": "Helloboss CEO：编辑部接触",
+        "body": "编辑部接触 Helloboss CEO，Helloboss 为日本 AI 求职招聘匹配应用。",
+        "details": ["编辑部记录人物档案"],
+        "decision_tier": "watch",
+        "relation_type": "one_sided",
+        "weak": True,
+        "evidence": [
+            {
+                "item_id": 1,
+                "team": "编辑部",
+                "snippet": "Alex Wang（Helloboss CEO）：日本 AI 求职招聘匹配应用",
+            }
+        ],
+    }
+    items = [
+        {
+            "id": 1,
+            "owner_team": "编辑部",
+            "text": "Alex Wang（Helloboss CEO）：日本 AI 求职招聘匹配应用",
+        }
+    ]
+    assert check_relation_claim(rel, items)["claim_verdict"] == "valid"
+
+
+def test_a11_watch_still_blocks_deal_overclaim():
+    """watch + 关注证据 + body 已达成合作 → 仍 invalid。"""
+    rel = {
+        "title": "已达成合作",
+        "body": "编辑部与对方已达成合作协议。",
+        "details": [],
+        "decision_tier": "watch",
+        "relation_type": "one_sided",
+        "weak": True,
+        "evidence": [{"item_id": 1, "snippet": "编辑部关注该公司产品进展"}],
+    }
+    items = [{"id": 1, "text": "编辑部关注该公司产品进展", "owner_team": "编辑部"}]
+    out = check_relation_claim(rel, items)
+    assert out["claim_verdict"] == "invalid"
+
+
+def test_a11_plan_not_crushed_by_sibling_blocker():
+    """Evidence A 计划 + Evidence B 尚无反馈 → 「计划参加」仍 valid。"""
+    rel = {
+        "title": "秒动科技：两侧联系",
+        "body": "联系时尚无反馈。编辑部同事计划两周后参加视频号选题会。",
+        "details": [
+            "联系杨硕时，编辑部也通过 PR 联系同一人，尚无反馈",
+            "编辑部同事计划两周后参加视频号选题会，探讨海外信源",
+        ],
+        "decision_tier": "strong",
+        "relation_type": "event_chain",
+        "weak": True,
+        "evidence": [
+            {
+                "item_id": 1,
+                "team": "Global Partnership 团队",
+                "snippet": "联系杨硕时，编辑部也通过 PR 联系同一人，尚无反馈",
+            },
+            {
+                "item_id": 2,
+                "team": "视频号团队",
+                "snippet": "编辑部同事计划两周后参加视频号选题会，探讨海外信源",
+            },
+        ],
+    }
+    items = [
+        {"id": 1, "owner_team": "Global Partnership 团队", "text": "联系杨硕时尚无反馈"},
+        {
+            "id": 2,
+            "owner_team": "视频号团队",
+            "text": "编辑部同事计划两周后参加视频号选题会，探讨海外信源",
+        },
+    ]
+    assert check_relation_claim(rel, items)["claim_verdict"] == "valid"
+
+
+def test_a11_plan_to_deal_still_blocked():
+    """计划证据 + 已完成合作论断 → invalid。"""
+    rel = {
+        "title": "已完成合作",
+        "body": "双方已完成联合合作推进。",
+        "details": [],
+        "evidence": [
+            {"item_id": 1, "snippet": "计划两周后参加选题会，尚无反馈"},
+        ],
+    }
+    items = [{"id": 1, "text": "计划两周后参加选题会，尚无反馈"}]
+    out = check_relation_claim(rel, items)
+    assert out["claim_verdict"] == "invalid"
+
+
 def test_shadow_keeps_invalid_enforce_drops():
     rel = {
         "title": "已落地联合活动",

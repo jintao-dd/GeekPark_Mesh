@@ -11,12 +11,12 @@
 - 测试通过：`pytest tests/test_relation_gold_schema.py tests/test_relation_gold_smoke.py`  
 - **未修改** Decision / Evidence Gate / Writer 语义  
 
-**① Claim Check：🟡 A1 shadow 对账（No-Go enforce）**
+**① Claim Check：🟡 A1.1 shadow（rule_v1.1）— 已知 4 误报已清，暂不 enforce**
 
-- A0：Writer 原文后、lexical 前；`rule_v1`；默认 shadow  
-- A1：tmesh `2026-8-17` draft 10 卡 / published 17 卡已对账 → 报告 `eval/reports/CLAIM_CHECK_A1_SHADOW_2026-8-17.md`  
-- **不 enforce**：本期 invalid 多为「接触」字面差 / blocker 误伤计划表述，非稳定过头合作漏网  
-- **不扩规则**：先按报告两处极小修复再复验 shadow，通过后再 enforce  
+- A0/A1：见前；A1 No-Go 后做 A1.1 两处最小修复（CONTACT 缺词≠否定；blocker 非整卡下压）  
+- 同 slug 复验：draft **0/10** invalid；published **1/17**（xAI parallel「建联」边界，非原 4 张）  
+- Gold 10/10 仍绿；报告 `eval/reports/CLAIM_CHECK_A1_1_SHADOW_2026-8-17.md`  
+- 下一刀：可选 A1.2（parallel 同构 CONTACT）→ 再谈 enforce  
 
 ## Gold 文件
 
