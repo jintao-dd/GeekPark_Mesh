@@ -1779,7 +1779,7 @@ async def upload(
         use_channel = (channel or "").strip() or guessed["channel"]
         use_title = (title or "").strip() or guessed["title"] or filename
         meta["inferred"] = guessed
-        from .aggregator import is_mixed_source, split_bundle_ex, sources_from_split
+        from .aggregator import is_mixed_source, should_pre_explode, split_bundle_ex, sources_from_split
         rows = [{
             "stype": use_stype,
             "team": use_team,
@@ -1792,7 +1792,7 @@ async def upload(
         }]
         if is_mixed_source(stype=use_stype, team=use_team, channel=use_channel, title=use_title, text=text):
             split = split_bundle_ex(text, source_title=use_title)
-            if split.mode == "multi" and len(split.segments) > 1:
+            if should_pre_explode(split):
                 rows = sources_from_split(
                     split,
                     parent_title=use_title,
@@ -1801,6 +1801,14 @@ async def upload(
                     base_meta={"inferred": guessed},
                     upload_team=use_team,
                 )
+            else:
+                # 置信不足：整包入库，抽取时再拆；低置信才 needs_review
+                keep_meta = dict(meta)
+                keep_meta["split"] = {**split.to_meta(), "pre_explode": False}
+                rows[0]["meta"] = keep_meta
+                rows[0]["stype"] = "T13"
+                rows[0]["team"] = "内容中心·数据聚合"
+                rows[0]["channel"] = "aggregator"
         for row in rows:
             sid = db.insert_id(
                 con,
@@ -1839,7 +1847,7 @@ def paste(request: Request, slug: str, title: str = Form(""), text: str = Form(.
     use_team = ingest.canonical_team((team or "").strip() or guessed["team"])
     use_channel = (channel or "").strip() or guessed["channel"]
     use_title = (title or "").strip() or "粘贴文本"
-    from .aggregator import is_mixed_source, split_bundle_ex, sources_from_split
+    from .aggregator import is_mixed_source, should_pre_explode, split_bundle_ex, sources_from_split
     rows = [{
         "stype": use_stype,
         "team": use_team,
@@ -1852,7 +1860,7 @@ def paste(request: Request, slug: str, title: str = Form(""), text: str = Form(.
     }]
     if is_mixed_source(stype=use_stype, team=use_team, channel=use_channel, title=use_title, text=text):
         split = split_bundle_ex(text, source_title=use_title)
-        if split.mode == "multi" and len(split.segments) > 1:
+        if should_pre_explode(split):
             rows = sources_from_split(
                 split,
                 parent_title=use_title,
@@ -1860,6 +1868,12 @@ def paste(request: Request, slug: str, title: str = Form(""), text: str = Form(.
                 base_meta={"inferred": guessed},
                 upload_team=use_team,
             )
+        else:
+            keep_meta = {"inferred": guessed, "split": {**split.to_meta(), "pre_explode": False}}
+            rows[0]["meta"] = keep_meta
+            rows[0]["stype"] = "T13"
+            rows[0]["team"] = "内容中心·数据聚合"
+            rows[0]["channel"] = "aggregator"
     for row in rows:
         con.execute(
             "INSERT INTO sources(issue_id,stype,team,title,filename,text,meta,channel) VALUES(?,?,?,?,?,?,?,?)",

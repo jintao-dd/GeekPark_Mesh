@@ -66,13 +66,15 @@ _TOC_SUB = re.compile(
 
 
 def parse_content_stats_toc(text: str) -> list[dict]:
-    """解析 ## 📊 内容统计 下的目录项（用于校验 / 元数据）。"""
-    m = re.search(r"^##\s*📊\s*内容统计\s*$", text, re.M)
+    """解析 📊 内容统计 下的目录项（用于校验 / 元数据 / 补边界）。"""
+    m = re.search(r"^##?\s*📊\s*内容统计\s*$", text, re.M)
+    if not m:
+        m = re.search(r"^📊\s*内容统计\s*$", text, re.M)
     if not m:
         return []
     rest = text[m.end():]
     end = re.search(r"^##\s+", rest, re.M)
-    block = rest[: end.start()] if end else rest[:2000]
+    block = rest[: end.start()] if end else rest[:2500]
     out: list[dict] = []
     for line in block.splitlines():
         sub = _TOC_SUB.match(line)
@@ -83,6 +85,13 @@ def parse_content_stats_toc(text: str) -> list[dict]:
         if bul:
             out.append({"name": bul.group("name").strip(), "count": int(bul.group("count"))})
     return out
+
+
+def _strip_heading_noise(line: str) -> str:
+    s = line.strip()
+    s = re.sub(r"^#+\s*", "", s)
+    s = re.sub(r"^[\U0001F300-\U0001FAFF📆📊🏢🗂📓🌐📰📱🎙🔬🚀🎓💻📡]+\s*", "", s)
+    return s.strip()
 
 
 def _raw_data_start_line(lines: list[str]) -> int:
@@ -103,14 +112,14 @@ def _is_md_section_boundary(line: str) -> bool:
     s = line.strip()
     if not s.startswith("### "):
         return False
-    body = s[4:].strip()
-    if re.match(r"📆\s*会议日程", body):
+    body = _strip_heading_noise(s)
+    if re.match(r"会议日程", body):
         return True
-    if body.startswith("📊 飞书多维表格") or body == "飞书多维表格":
+    if body.startswith("飞书多维表格") or body == "飞书多维表格":
         return True
     if re.match(r"编辑部\s*·\s*(选题|沟通记录)", body):
         return True
-    if body == "视频号数据":
+    if body == "视频号数据" or ("视频号" in body and "数据" in body and len(body) <= 16):
         return True
     if "Notion CRM" in body:
         return True
@@ -121,7 +130,7 @@ def _is_md_section_boundary(line: str) -> bool:
     if body.startswith("记录 "):
         return False
     for name in _EXTERNAL_FEED_NAMES:
-        if name in body and len(body) <= len(name) + 8:
+        if body == name or (name in body and len(body) <= len(name) + 12):
             return True
     return False
 
@@ -145,15 +154,67 @@ class SplitResult:
     toc_count: int = 0
 
     def to_meta(self) -> dict:
+        conf = split_confidence(self)
         return {
             "segments": len(self.segments),
             "mode": self.mode,
             "boundaries": self.boundaries,
             "skipped": self.skipped,
             "toc_count": self.toc_count,
+            "confidence": conf,
             "warnings": self.warnings,
             "types": _stype_counts(self.segments),
         }
+
+
+def split_confidence(split: "SplitResult | dict") -> str:
+    """拆段置信度：high / medium / low。
+
+    high → 可上传预拆、一般不需人审
+    medium → 不预拆炸子源，抽取时再拆；通常不拦人
+    low → 需人工确认（仅聚合源）
+    """
+    if isinstance(split, dict):
+        mode = (split.get("mode") or "").strip()
+        n = int(split.get("segments") or 0)
+        toc = int(split.get("toc_count") or 0)
+        boundaries = int(split.get("boundaries") or 0)
+        warnings = split.get("warnings") or []
+    else:
+        mode = (split.mode or "").strip()
+        n = len(split.segments or [])
+        toc = int(split.toc_count or 0)
+        boundaries = int(split.boundaries or 0)
+        warnings = split.warnings or []
+
+    if mode in ("fallback", "empty"):
+        return "low"
+    if mode == "single":
+        if boundaries > 1 and n <= 1:
+            return "low"
+        if warnings and n <= 1:
+            return "low"
+        return "low"
+    # multi
+    if n >= 4 and (toc <= 0 or n * 2 >= toc):
+        return "high"
+    if n >= 3 and (toc <= 0 or n * 3 >= toc):
+        return "medium"
+    if toc >= 6 and n > 0 and n * 3 < toc:
+        return "low"
+    if n >= 2:
+        return "medium"
+    return "low"
+
+
+def should_pre_explode(split: "SplitResult") -> bool:
+    """仅高置信 multi 才在上传时炸成子来源（减少错切绕过确认）。"""
+    return (
+        split.mode == "multi"
+        and len(split.segments) > 1
+        and split_confidence(split) == "high"
+    )
+
 
 
 def should_split(*, stype: str = "", team: str = "", channel: str = "", title: str = "", text: str = "") -> bool:
@@ -261,6 +322,8 @@ def sources_from_split(
             "segment_index": i,
             "segments": len(split.segments),
             "boundaries": split.boundaries,
+            "toc_count": split.toc_count,
+            "confidence": split_confidence(split),
             "warnings": split.warnings,
         }
         if manual_upload:
@@ -453,6 +516,82 @@ def _fallback_segment(source_title: str, text: str) -> Segment:
     return Segment(title=title[:120], text=text.strip(), stype=st, team=tm, owner_hint=tm)
 
 
+def _toc_name_boundary_indexes(lines: list[str], start: int, toc: list[dict]) -> list[int]:
+    """用内容统计目录名在正文中补边界（欠拆时自动加刀）。"""
+    names = []
+    for item in toc or []:
+        name = re.sub(r"\s+", " ", (item.get("name") or "").strip())
+        # 去掉「(ICS)」等后缀便于匹配
+        name = re.sub(r"\s*\([^)]*\)\s*$", "", name).strip()
+        if name and name not in ("飞书多维表格",) and len(name) >= 2:
+            names.append(name)
+    if not names:
+        return []
+    hits: list[int] = []
+    for i in range(start, len(lines)):
+        plain = _strip_heading_noise(lines[i])
+        if not plain or len(plain) > 80:
+            continue
+        for name in names:
+            if plain == name or plain.startswith(name) or name in plain:
+                # 避免正文长句误命中：标题行要短且名字占比高
+                if len(plain) <= len(name) + 20:
+                    hits.append(i)
+                    break
+    return hits
+
+
+def _collect_segments(
+    lines: list[str], start: int, extra_bounds: list[int] | None = None,
+) -> tuple[list[Segment], int, int]:
+    """返回 (segments, boundary_count, skipped_n)。"""
+    pairs, boundary_count = _split_lines(lines, start)
+    if extra_bounds:
+        bounds = sorted(set([pairs[0][0]] + [a for a, _ in pairs] + list(extra_bounds) + [len(lines)]))
+        # rebuild pairs from merged bounds that fall in range
+        bounds = [b for b in bounds if start <= b <= len(lines)]
+        if bounds and bounds[0] > start:
+            bounds.insert(0, start)
+        if not bounds or bounds[-1] != len(lines):
+            bounds.append(len(lines))
+        bounds = sorted(set(bounds))
+        pairs = list(zip(bounds, bounds[1:]))
+        boundary_count = max(boundary_count, len(bounds) - 1)
+
+    section_at = _build_section_map(lines)
+    skipped: list[int] = []
+    segments: list[Segment] = []
+    for a, b in pairs:
+        segments.extend(_segments_from_range(lines, a, b, skipped=skipped, section_at=section_at))
+    return segments, boundary_count, sum(skipped)
+
+
+def _merge_adjacent_same_owner(segments: list[Segment]) -> list[Segment]:
+    """合并相邻且同 stype+team 的短碎片，减少噪声段。"""
+    if len(segments) < 2:
+        return segments
+    out: list[Segment] = []
+    for seg in segments:
+        if (
+            out
+            and out[-1].stype == seg.stype
+            and (out[-1].owner_hint or out[-1].team) == (seg.owner_hint or seg.team)
+            and len(seg.text) < 400
+            and len(out[-1].text) < 1200
+        ):
+            prev = out[-1]
+            out[-1] = Segment(
+                title=prev.title,
+                text=(prev.text + "\n\n" + seg.text).strip(),
+                stype=prev.stype,
+                team=prev.team,
+                owner_hint=prev.owner_hint or prev.team,
+            )
+        else:
+            out.append(seg)
+    return out
+
+
 def split_bundle_ex(text: str, *, source_title: str = "") -> SplitResult:
     """把聚合包正文切成多段；保证有正文时至少返回 1 段，并附带可追溯的拆段信息。"""
     raw = (text or "").replace("\r\n", "\n").strip()
@@ -460,30 +599,33 @@ def split_bundle_ex(text: str, *, source_title: str = "") -> SplitResult:
         return SplitResult(segments=[], mode="empty", warnings=["正文为空"])
 
     lines = raw.split("\n")
-    section_at = _build_section_map(lines)
     start = _raw_data_start_line(lines)
     for i in range(start, len(lines)):
         if _is_boundary(lines[i]):
             start = i
             break
 
-    pairs, boundary_count = _split_lines(lines, start)
-    skipped_n = 0
-    segments: list[Segment] = []
-    skipped: list[int] = []
-    for a, b in pairs:
-        segments.extend(_segments_from_range(lines, a, b, skipped=skipped, section_at=section_at))
-    skipped_n = sum(skipped)
-
     toc = parse_content_stats_toc(raw)
     toc_n = len(toc) if toc else 0
+    segments, boundary_count, skipped_n = _collect_segments(lines, start)
+
+    # 欠拆：用目录名补边界再拆一次
+    if toc_n >= 3 and (not segments or len(segments) * 2 < toc_n):
+        extra = _toc_name_boundary_indexes(lines, start, toc)
+        if extra:
+            seg2, bc2, sk2 = _collect_segments(lines, start, extra_bounds=extra)
+            if len(seg2) > len(segments):
+                segments, boundary_count, skipped_n = seg2, bc2, sk2
+
+    segments = _merge_adjacent_same_owner(segments)
     warnings: list[str] = []
     if toc and segments:
         warnings.append(f"内容统计目录 {len(toc)} 项；正文拆出 {len(segments)} 段")
-        if toc_n >= 3 and len(segments) * 2 < toc_n:
+        if toc_n >= 6 and len(segments) * 3 < toc_n:
             warnings.append(
-                f"目录项远多于正文段落（{toc_n} vs {len(segments)}），可能拆段不足，请核对归属"
+                f"目录项远多于正文段落（{toc_n} vs {len(segments)}），可能拆段不足"
             )
+
     if not segments and len(raw) >= _MIN_SEGMENT:
         seg = _fallback_segment(source_title, raw)
         warnings.append(

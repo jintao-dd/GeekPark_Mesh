@@ -4,7 +4,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.aggregator import parse_content_stats_toc, split_bundle_ex
+from app.aggregator import (
+    parse_content_stats_toc,
+    should_pre_explode,
+    split_bundle_ex,
+    split_confidence,
+)
 
 
 PAD = "详细内容补充行。\n" * 12
@@ -134,6 +139,16 @@ def test_md_report_skips_ai_and_splits_by_toc_sections():
     assert "飞书多维表格" in names
     assert "编辑部 · 选题" in names
     assert "视频号数据" in names
+    assert split_confidence(r) in ("high", "medium")
+    assert should_pre_explode(r) is (split_confidence(r) == "high")
+
+
+def test_fallback_is_low_confidence_no_pre_explode():
+    plain = "📊 内容统计\n" + ("说明行无章节边界。\n" * 20)
+    r = split_bundle_ex(plain, source_title="误标聚合.txt")
+    assert r.mode == "fallback"
+    assert split_confidence(r) == "low"
+    assert not should_pre_explode(r)
 
 
 if __name__ == "__main__":
@@ -141,4 +156,6 @@ if __name__ == "__main__":
     test_skip_shell_with_inner_boundaries()
     test_fallback_never_empty_on_long_text()
     test_gp_internal_boundary()
+    test_md_report_skips_ai_and_splits_by_toc_sections()
+    test_fallback_is_low_confidence_no_pre_explode()
     print("ok")

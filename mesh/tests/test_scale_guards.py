@@ -81,37 +81,32 @@ def test_job_store_try_claim_exclusive():
 
 
 def test_split_needs_review_fallback():
+    # low → 拦；healthy multi → 不拦
     assert llm.split_needs_review(
-        {"mode": "fallback", "warnings": ["x"]},
+        {"mode": "fallback", "segments": 1, "confidence": "low"},
         stype="T13",
         team="内容中心·数据聚合",
     )
-    # 健康 multi 不拦
     assert not llm.split_needs_review(
-        {"mode": "multi", "segments": 8, "toc_count": 8, "boundaries": 10},
+        {"mode": "multi", "segments": 8, "toc_count": 8, "boundaries": 10, "confidence": "high"},
         stype="T13",
     )
-    # 目录远多于段落 → 拦
-    assert llm.split_needs_review(
-        {"mode": "multi", "segments": 2, "toc_count": 12, "warnings": ["目录项远多于正文段落"]},
-        stype="T13",
-        team="内容中心·数据聚合",
-    )
-    # single + 多边界仅 1 段 → 拦
-    assert llm.split_needs_review(
-        {"mode": "single", "segments": 1, "boundaries": 5, "warnings": ["有效段落仅 1 段"]},
-        stype="T13",
-        team="内容中心·数据聚合",
-    )
-    # 单团队来源：选了谁就是谁，长文单段也不拦
+    # medium 不拦（少打扰）
     assert not llm.split_needs_review(
-        {"mode": "single", "boundaries": 0, "warnings": ["长文仅拆出 1 段"]},
+        {"mode": "multi", "segments": 3, "toc_count": 8, "confidence": "medium"},
+        stype="T13",
+        team="内容中心·数据聚合",
+    )
+    # 目录远多于段落 → low → 拦
+    assert llm.split_needs_review(
+        {"mode": "multi", "segments": 2, "toc_count": 12, "confidence": "low"},
+        stype="T13",
+        team="内容中心·数据聚合",
+    )
+    # 单团队来源不拦
+    assert not llm.split_needs_review(
+        {"mode": "single", "boundaries": 0, "warnings": ["长文仅拆出 1 段"], "confidence": "low"},
         stype="T6",
         team="品牌创意团队",
         channel="aggregator",
-    )
-    assert not llm.split_needs_review(
-        {"mode": "fallback", "warnings": ["x"]},
-        stype="T6",
-        team="品牌创意团队",
     )
