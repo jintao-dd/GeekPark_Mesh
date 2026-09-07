@@ -1,0 +1,122 @@
+[mesh] pg pool min=2 max=20
+{
+  "slug": "2026-8-17",
+  "lane": "published_json",
+  "mode": "shadow",
+  "n_relations": 17,
+  "n_valid": 17,
+  "n_invalid": 0,
+  "n_uncertain": 0,
+  "invalid_ratio": 0.0,
+  "by_reason": {
+    "ok": 17
+  },
+  "invalid_rows": [],
+  "invalid_details": [],
+  "uncertain_rows": [],
+  "valid_watch_parallel_sample": [
+    {
+      "title": "Founder Park 账号运营：传播涨粉与下半年规划两侧各知一半",
+      "tier": "strong",
+      "type": "info_complement",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    },
+    {
+      "title": "AGI 2026 现场内容分栏：品牌创意与视频号各知一半",
+      "tier": "strong",
+      "type": "info_complement",
+      "claim_strength": 5,
+      "evidence_strength": 5
+    },
+    {
+      "title": "豆包：商业化、编辑部、视频号各自碰到的三个触点",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    },
+    {
+      "title": "Agent 治理与 AI 安全伦理：编辑部与视频号同赛道各自记录",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 0,
+      "evidence_strength": 2
+    },
+    {
+      "title": "百度：社群智能硬件 Workshop 与视频号内容分账选题",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    },
+    {
+      "title": "Google：社群 I/O 专场与视频号打法对比选题",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    },
+    {
+      "title": "字节跳动：编辑部豆包战役报道与视频号火山引擎/工具触点",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 3,
+      "evidence_strength": 3
+    },
+    {
+      "title": "xAI：编辑部技术成员建联与视频号财报选题",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 3,
+      "evidence_strength": 2
+    },
+    {
+      "title": "Anthropic 与 OpenAI：编辑部早报与视频号御三家选题各自记录",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    },
+    {
+      "title": "Helloboss CEO 王沁：编辑部接触",
+      "tier": "watch",
+      "type": "one_sided",
+      "claim_strength": 3,
+      "evidence_strength": 0
+    },
+    {
+      "title": "视频号栏目封面：由品牌创意团队设计资源承接",
+      "tier": "watch",
+      "type": "one_sided",
+      "claim_strength": 0,
+      "evidence_strength": 0
+    },
+    {
+      "title": "视频号选题会：拟对接编辑部海外内容信源",
+      "tier": "watch",
+      "type": "one_sided",
+      "claim_strength": 5,
+      "evidence_strength": 5
+    },
+    {
+      "title": "柔性具身早期赛道信号：编辑部记录",
+      "tier": "watch",
+      "type": "one_sided",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    },
+    {
+      "title": "韩国아산나눔재단 Byungkook Kim：编辑部海外接触",
+      "tier": "watch",
+      "type": "overseas_link",
+      "claim_strength": 3,
+      "evidence_strength": 0
+    }
+  ],
+  "lexical_pass_but_claim_invalid": [],
+  "go_nogo_hints": {
+    "invalid_ratio_warn_if_gt": 0.25,
+    "note": "A1 shadow only; do not enforce until human review of invalid_details"
+  }
+}

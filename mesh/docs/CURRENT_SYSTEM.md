@@ -349,7 +349,7 @@ SSE 会发 step 事件；简单路径会先收完全文再校验，再按块吐�
 | # | 项 | 状态 |
 |---|----|------|
 | ④ | Relation Gold v2 | ✅ 完成：16 条；统一 schema；valid/invalid Claim 对抗；lexical/gate baseline；测试通过。见 `RELATION_EDITOR_RUBRIC.md` |
-| ① | Claim Check | 🟡 **A1.2 rule_v1.2**：CONTACT 缺词豁免扩到 parallel/info_complement；`2026-8-17` pub **0 invalid**；第二期 `2026-08-21` 全为 empty evidence（结构应藏，非缺词 FP）。**候选 enforce，未开闸**。`CLAIM_CHECK_A1_2_SHADOW.md` |
+| ① | Claim Check | ✅ **Final Shadow 通过**（tmesh `2026-8-17` pub 0 invalid）。**可开 enforce**；本步未改环境变量。报告 `CLAIM_CHECK_FINAL_SHADOW_2026-8-17.md` |
 | ② | Ask structured intent | 🟡 e08/e10/e21 |
 | ③ | T13 拆分质量 | 🟡 段级 cache 已有；盯章节识别/归属 |
 
