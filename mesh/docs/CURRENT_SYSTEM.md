@@ -125,49 +125,19 @@ T13 混合包：`aggregator.split_bundle_ex` 按章节切开再分别抽取。
 
 #### C. 预览主流程（`preview_job._run`）——核心
 
-进度文案大致：`跨通道合并…` → `要点卡 i/N · 团队` → `正在生成周报草稿…` → `完成，读者页已更新`。
+**渐进式（2026-09）**：结构性闸门 + merge 后立刻写骨架 `draft_json`（`_preview_partial_ready`），Job 置 `preview_ready` + `preview_url`，**可先进入预览页**；后台继续出卡 / 周报壳 / 关系。全部完成才 `_preview_gate_ok`。上线仍只认 gate_ok；生成中 `_preview_building` 禁止发布。
+
+进度文案大致：`跨通道合并…` → `已可进入预览，正在生成要点卡…` → `要点卡 i/N` → `周报草稿与关系…` → `完成`。
 
 ```
-1) 闸门
-   - 必须有 items
-   - 有正文的 source 必须都 extracted=1
-   - 否则直接 error，不进 LLM
-
-2) merge.apply_merge（再合一次）
-
-3) 要点卡（每团队 1 次 LLM）
-   - 团队 = DISTINCT owner_team（排除「外部媒体」、blocked、已 merged）
-   - llm.build_team_card(team, items, period_label)
-   - 写入 cards，status='approved'，reviewer=mesh-auto
-   - UI：要点卡 1/N · 编辑部 …
-
-4) mark_draft_stale → prepare_draft_bundle
-   - 再 merge 一次
-   - 读出：team_cards、relation_candidates、item_rows、
-     first_names、external_items（T7）
-   - 上一期 published lead + 关系标题 → prev_summary
-
-5) 周报壳（1 次大 LLM）← 易 524 超时处
-   - llm.build_issue_draft(...)
-   - 提示词要求 relations 必须为 []
-   - 产出 question/lead/kpis/contacts/keywords/plans/views/gaps…
-
-6) 关系两阶段（见 4.4）
-   - merge_relations_from_candidates
-     → build_relations_two_phase
-   - Decision → Gate → Writer → Verify / reader 切分
-
-7) 落库
-   - draft_json = 全量草稿（含 relations + audit + _relations_reader/backlog）
-   - published_json = 同结构，但 relations 换成读者可见切片（预览同步）
-   - register_entities、reindex_issue
-   - 记 edits：prepare_preview
-   - status 仍是 draft（未上线）
-
-8) Job done → 前端跳 /{slug}（预览编辑）
+1) 闸门（同前：items / 未挖掘 / 聚合拆段 / 归属）
+2) merge.apply_merge
+3) 写骨架稿 → preview_ready（先进预览）
+4) 要点卡（每团队 1 次 LLM；条目指纹未变则复用旧卡）
+5) 周报壳 LLM + 关系两阶段
+6) filter_ungrounded → publish_blockers 结构性检查 → finalize gate_ok
+7) 落库 / 预览页自动刷新
 ```
-
-Modelink/Cloudflare **524** 时：多半死在步骤 5 的 `build_issue_draft`；provider 已把 524 当可重试。关系两阶段在 5 成功之后才跑。
 
 ---
 

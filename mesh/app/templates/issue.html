@@ -37,6 +37,9 @@
     </div>
     <div class="kpis">{% for k in d.kpis %}<div class="kpi"><b data-path="kpis.{{ loop.index0 }}.n">{{ k.n }}</b><span data-path="kpis.{{ loop.index0 }}.label">{{ k.label }}</span></div>{% endfor %}</div>
     {% if preview %}<p class="note preview-note" id="previewNote" style="color:#B45309" hidden>预览模式：显示的是草稿，读者仍看到上一版上线内容。{% if perms.publish %} 改完后点下方「{% if issue.status == 'published' %}重新上线{% else %}确认上线{% endif %}」。{% else %} 上线需管理员确认。{% endif %}</p>{% endif %}
+    {% if preview and preview_building %}
+    <p class="note" id="buildingNote" style="color:#B45309;margin-top:8px">后台仍在生成要点卡 / 草稿 / 关系。可先浏览；完成后将自动刷新。生成完成前请暂缓大改（可能被覆盖）。确认上线需等生成完成。</p>
+    {% endif %}
     {% if preview and preview_gate_stale %}
     <p class="note" id="gateStaleNote" style="color:#B45309;margin-top:8px">稿面已改动，进预览检查已失效。请回素材页重新点「生成预览」后再上线。</p>
     {% endif %}

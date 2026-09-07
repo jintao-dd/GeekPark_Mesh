@@ -1218,6 +1218,8 @@ def prune_old_logs(con, *, ask_days: int = 180, push_days: int = 90) -> dict:
     return out
 
 
+# 挖掘或重生成卡片后，强制要求重新「生成周报草稿」。
+# 渐进预览骨架期间：若仍在 building，不打 _stale，避免进页瞬间被 draft_is_ready 判死。
 def mark_draft_stale(con, issue_id: int) -> None:
     """挖掘或重生成卡片后，强制要求重新「生成周报草稿」。"""
     row = con.execute("SELECT draft_json FROM issues WHERE id=?", (issue_id,)).fetchone()
@@ -1226,6 +1228,8 @@ def mark_draft_stale(con, issue_id: int) -> None:
     try:
         data = json.loads(row["draft_json"])
     except Exception:
+        return
+    if data.get("_preview_building") or data.get("_preview_partial_ready"):
         return
     if data.get("_stale"):
         return

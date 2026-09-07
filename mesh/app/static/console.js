@@ -30,7 +30,8 @@ async function startPreparePreview(opts) {
   const force = !!(opts && opts.force);
   const t2 = $('#to2');
   if (t2) t2.disabled = true;
-  showBusy('正在生成要点卡与草稿…', '按团队出卡后生成草稿，可刷新后续跑');
+  S.enteredPreview = false;
+  showBusy('正在准备预览…', '闸门通过后即可进页，后台继续出卡与草稿');
   try {
     const r = await fetch(`/admin/issue/${A.slug}/preview/start?force=${force ? 1 : 0}`, {
       method: 'POST',
@@ -56,6 +57,18 @@ async function pollPreview() {
       hideBusy();
       toast(st.error);
       const t2 = $('#to2'); if (t2) t2.disabled = false;
+      // 已开门仍可进页看部分结果
+      if (st.preview_ready && st.preview_url && !S.enteredPreview) {
+        S.enteredPreview = true;
+        location.href = st.preview_url;
+      }
+      return;
+    }
+    // 渐进：骨架就绪即可进预览，任务继续在后台跑
+    if (st.preview_ready && st.preview_url && !S.enteredPreview && (st.running || st.done)) {
+      S.enteredPreview = true;
+      showBusy(st.message || '已可进入预览…', '后台继续生成，进页后可看进度');
+      location.href = st.preview_url;
       return;
     }
     if (st.done && st.preview_url) {
@@ -78,13 +91,15 @@ async function pollPreview() {
         } catch (_) {}
         toast(bits.join('；'), 5000);
       }
-      showBusy(st.message || '完成，正在进入预览…', bits.length ? bits.join('；') : '请稍候');
-      location.href = st.preview_url;
+      if (!S.enteredPreview) {
+        showBusy(st.message || '完成，正在进入预览…', bits.length ? bits.join('；') : '请稍候');
+        location.href = st.preview_url;
+      }
       return;
     }
-    const hint = (st.total > 0 && st.cur > 0)
-      ? `进度 ${st.cur}/${st.total}`
-      : '大文件可能需要几分钟，请勿关闭页面';
+    const hint = (st.cards_total > 0)
+      ? `要点卡 ${st.cards_done || 0}/${st.cards_total}` + (st.message ? ' · ' + st.message : '')
+      : ((st.total > 0 && st.cur > 0) ? `进度 ${st.cur}/${st.total}` : '闸门通过后即可进页');
     showBusy(st.message || '正在生成要点卡与草稿…', hint);
     if (st.running) setTimeout(pollPreview, 900);
     else {
@@ -729,8 +744,10 @@ if (A.canWrite) {
   fetch(`/admin/issue/${A.slug}/preview/status`, { headers: JSON_HDR }).then(r => r.json()).then(st => {
     if (st.running) {
       go(0, { scroll: true });
-      showBusy(st.message || '正在生成要点卡与草稿…', '刷新后续跑中');
+      showBusy(st.message || '正在生成要点卡与草稿…', '刷新后续跑中；骨架就绪后可进预览');
       pollPreview();
+    } else if (st.preview_ready && st.preview_url && /preview_job=1/.test(location.search)) {
+      location.href = st.preview_url;
     } else if (st.done && st.preview_url && /preview_job=1/.test(location.search)) {
       location.href = st.preview_url;
     }

@@ -47,9 +47,10 @@ foreach ($rel in $Files) {
   $relUnix = ($rel -replace "\\", "/").TrimStart("./")
   $local = Join-Path $MeshRoot $rel
   if (-not (Test-Path $local)) { throw "missing local file: $local" }
-  $remoteParent = Split-Path -Parent "$RemoteTmp/$relUnix"
+  $remoteDest = ("$RemoteTmp/$relUnix") -replace '\\', '/'
+  $remoteParent = $remoteDest -replace '/[^/]+$', ''
   & ssh @sshBase "mkdir -p '$remoteParent'"
-  & scp -P $DeployPort -o StrictHostKeyChecking=no $local "root@${DeployHost}:$RemoteTmp/$relUnix"
+  & scp -P $DeployPort -o StrictHostKeyChecking=no $local "root@${DeployHost}:$remoteDest"
   $unixFiles += $relUnix
   Write-Host "  uploaded $relUnix"
 }

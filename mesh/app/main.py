@@ -2658,6 +2658,9 @@ def publish(request: Request, slug: str, confirm: str = Form("")):
         draft_obj = json.loads(r["draft_json"] or "{}")
     except (json.JSONDecodeError, TypeError):
         draft_obj = {}
+    if draft_obj.get("_preview_building"):
+        con.close()
+        return fail("预览仍在后台生成中（要点卡/草稿/关系未齐），请等待完成后再上线")
     if not draft_obj.get("_preview_gate_ok"):
         blockers = publish_blockers(con, r["id"], r["draft_json"] or "")
         hint = (
@@ -3238,16 +3241,19 @@ def issue_page(request: Request, slug: str, preview: int = 0, edit: int = 0, syn
             f"/admin/issue/{slug}?err=" + quote("尚未生成预览，请先在素材页点「生成预览」"),
             status_code=302,
         )
+    from .preview_progressive import allows_preview_entry, is_building
+
     gate_ok = bool(isinstance(data, dict) and data.get("_preview_gate_ok"))
     gate_stale = bool(isinstance(data, dict) and data.get("_preview_gate_stale"))
-    if preview and not gate_ok and not gate_stale:
+    preview_building = preview and is_building(data if isinstance(data, dict) else None)
+    if preview and not allows_preview_entry(data if isinstance(data, dict) else None):
         from urllib.parse import quote
         return RedirectResponse(
             f"/admin/issue/{slug}?err="
             + quote("草稿尚未通过进预览检查，请重新点「生成预览」（检查通过后才会进入预览页）"),
             status_code=302,
         )
-    preview_gate_stale = preview and gate_stale and not gate_ok
+    preview_gate_stale = preview and gate_stale and not gate_ok and not preview_building
     dropped_ungrounded = []
     if isinstance(data, dict):
         dropped_ungrounded = list(data.get("_relations_dropped_ungrounded") or [])[:20]
@@ -3298,6 +3304,7 @@ def issue_page(request: Request, slug: str, preview: int = 0, edit: int = 0, syn
             archive_list=arch,
             relations_view=relations_view,
             preview_gate_stale=bool(preview_gate_stale),
+            preview_building=bool(preview_building),
             dropped_ungrounded=dropped_ungrounded,
         ),
     )

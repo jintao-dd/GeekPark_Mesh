@@ -1,5 +1,10 @@
 """一键生成预览：要点卡 + 草稿的后台任务（可轮询进度，避免长请求超时）。
 
+渐进式约定（见 preview_progressive）：
+- 闸门 + merge 后立刻写骨架稿并给出 preview_url（可先进预览页）
+- 后台继续出卡 / 周报壳 / 关系；全部完成后才 _preview_gate_ok
+- 上线仍只认 gate_ok，生成中不可发布
+
 状态经 job_store 落库，多 uvicorn worker 可共享进度。
 LLM 调用不持有 write_lock / 长连接，并走全局 llm_slot。
 """
@@ -9,6 +14,7 @@ import json
 import traceback
 
 from . import ask_concurrency, db, llm, merge, job_store
+from . import preview_progressive as prog
 
 KIND = "preview"
 
@@ -24,11 +30,14 @@ def _defaults(slug: str) -> dict:
         "cur": 0,
         "total": 0,
         "preview_url": None,
+        "preview_ready": False,
         "log": [],
         "token": 0,
         "resilience": None,
         "final_status": None,
         "dropped_relations": None,
+        "cards_done": 0,
+        "cards_total": 0,
     }
 
 
@@ -74,6 +83,21 @@ def _upsert_team_card(con, issue_id: int, team: str, card: dict) -> None:
             "VALUES(?,?,?,'approved','mesh-auto',datetime('now'))",
             (issue_id, team, payload),
         )
+
+
+def _preview_url(slug: str) -> str:
+    return f"/{slug}?preview=1&edit=1&building=1"
+
+
+def _write_partial_draft(con, issue_id: int, data: dict, stamp: str) -> None:
+    from .relation_display import build_published_projection
+
+    payload = json.dumps(data, ensure_ascii=False)
+    reader_payload = json.dumps(build_published_projection(data), ensure_ascii=False)
+    con.execute(
+        "UPDATE issues SET draft_json=?, published_json=?, updated_at=? WHERE id=?",
+        (payload, reader_payload, stamp, issue_id),
+    )
 
 
 def start(slug: str, username: str, *, force: bool = False) -> dict:
@@ -160,7 +184,6 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                         error=f"还有 {unextracted} 个来源未挖掘，请先完成挖掘",
                     )
                     return
-                # 进预览前：仅内容聚合包的拆段待确认 + 归属/provenance
                 from .ingest import is_aggregation_source
 
                 n_review = 0
@@ -231,16 +254,41 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                     )
                     if (x["owner_team"] or "") not in ("外部媒体",)
                 ]
+
+                # —— 渐进开门：骨架稿可渲染后即可进预览页 ——
+                stamp0 = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                skeleton = prog.build_skeleton_draft(
+                    slug=slug,
+                    period_label=period_label or "",
+                    version=r["version"],
+                    teams=teams,
+                )
+                _write_partial_draft(con, issue_id, skeleton, stamp0)
+                con.commit()
             finally:
                 con.close()
 
-        total = max(1, len(teams)) + 1
-        _set(slug, total=total, cur=0, phase="cards", message=f"准备生成 {len(teams)} 张要点卡…")
+        total = max(1, len(teams)) + 2  # cards + draft(+relations)
+        cards_total = len(teams)
+        _set(
+            slug,
+            total=total,
+            cur=0,
+            phase="cards",
+            message="已可进入预览，正在生成要点卡…",
+            preview_url=_preview_url(slug),
+            preview_ready=True,
+            cards_done=0,
+            cards_total=cards_total,
+            running=True,
+            done=False,
+        )
 
         from .job_resilience import ResilienceReport, run_with_retries, try_unit
 
         resilience = ResilienceReport()
         ok_cards = 0
+        cards_done_teams: list[str] = []
         for i, team in enumerate(teams):
             if not _is_current(slug, token):
                 return
@@ -250,6 +298,10 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                 cur=i + 1,
                 total=total,
                 message=f"要点卡 {i + 1}/{len(teams)} · {team}",
+                preview_ready=True,
+                preview_url=_preview_url(slug),
+                cards_done=ok_cards,
+                cards_total=cards_total,
                 resilience=resilience.to_dict(),
             )
             with db.write_lock():
@@ -264,37 +316,84 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                             (issue_id, team),
                         )
                     ]
+                    fp = prog.items_fingerprint(items)
+                    existing = prog.load_existing_card(con, issue_id, team)
+                    reuse = (
+                        existing is not None
+                        and prog.card_fingerprint(existing) == fp
+                        and fp
+                    )
                 finally:
                     con.close()
 
-            def _build_card(_team=team, _items=items):
-                with ask_concurrency.llm_slot(pool="job"):
-                    return llm.build_team_card(_team, _items, period_label)
-
-            card = try_unit(
-                _build_card,
-                unit=_team_label(team),
-                kind="card",
-                report=resilience,
-            )
-            if card is None:
+            if reuse:
+                card = existing
+                ok_cards += 1
+                cards_done_teams.append(team)
                 _set(
                     slug,
-                    message=f"要点卡跳过 · {team}（已重试仍失败）",
+                    message=f"要点卡复用 · {team}",
+                    cards_done=ok_cards,
                     resilience=resilience.to_dict(),
                 )
-                continue
+            else:
+                def _build_card(_team=team, _items=items):
+                    with ask_concurrency.llm_slot(pool="job"):
+                        return llm.build_team_card(_team, _items, period_label)
+
+                card = try_unit(
+                    _build_card,
+                    unit=_team_label(team),
+                    kind="card",
+                    report=resilience,
+                )
+                if card is None:
+                    _set(
+                        slug,
+                        message=f"要点卡跳过 · {team}（已重试仍失败）",
+                        resilience=resilience.to_dict(),
+                    )
+                    continue
+                card = prog.attach_card_fingerprint(card, fp)
+                if not _is_current(slug, token):
+                    return
+                with db.write_lock():
+                    con = db.connect()
+                    try:
+                        _upsert_team_card(con, issue_id, team, card)
+                        con.commit()
+                    finally:
+                        con.close()
+                ok_cards += 1
+                cards_done_teams.append(team)
 
             if not _is_current(slug, token):
                 return
             with db.write_lock():
                 con = db.connect()
                 try:
-                    _upsert_team_card(con, issue_id, team, card)
+                    row = con.execute(
+                        "SELECT draft_json FROM issues WHERE id=?", (issue_id,)
+                    ).fetchone()
+                    try:
+                        data = json.loads(row["draft_json"] or "{}") if row else {}
+                    except (json.JSONDecodeError, TypeError):
+                        data = {}
+                    if not isinstance(data, dict):
+                        data = {}
+                    data = prog.mark_phase(
+                        data, prog.PHASE_CARDS, cards_done=cards_done_teams
+                    )
+                    data["lead"] = (
+                        f"要点卡进度 {ok_cards}/{cards_total}"
+                        + ("：" + "、".join(cards_done_teams[-3:]) if cards_done_teams else "")
+                        + "。关系与周报壳仍在生成，完成后自动刷新。"
+                    )
+                    stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                    _write_partial_draft(con, issue_id, data, stamp)
                     con.commit()
                 finally:
                     con.close()
-            ok_cards += 1
 
         if not _is_current(slug, token):
             return
@@ -303,11 +402,14 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                 slug,
                 running=False,
                 done=False,
-                error="全部要点卡生成失败：" + resilience.summary_message(ok_units=0, unit_label="卡"),
+                error="全部要点卡生成失败："
+                + resilience.summary_message(ok_units=0, unit_label="卡"),
                 error_code="preview_cards_failed",
                 final_status="failed",
                 resilience=resilience.to_dict(),
                 phase="cards",
+                preview_ready=True,
+                preview_url=_preview_url(slug),
             )
             return
 
@@ -336,15 +438,37 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                     except Exception:
                         prev_summary = ""
                 issue_row = dict(r)
+                try:
+                    data_mid = json.loads(r["draft_json"] or "{}")
+                except (json.JSONDecodeError, TypeError):
+                    data_mid = {}
+                if not isinstance(data_mid, dict) or not data_mid:
+                    data_mid = prog.build_skeleton_draft(
+                        slug=slug,
+                        period_label=period_label or "",
+                        version=issue_row.get("version"),
+                        teams=teams,
+                    )
+                data_mid = prog.mark_phase(
+                    data_mid, prog.PHASE_DRAFT, cards_done=cards_done_teams
+                )
+                data_mid.pop("_stale", None)
+                stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+                _write_partial_draft(con, issue_id, data_mid, stamp)
+                con.commit()
             finally:
                 con.close()
 
         _set(
             slug,
             phase="draft",
-            cur=total,
+            cur=cards_total + 1,
             total=total,
-            message="正在生成周报草稿…",
+            message="要点卡已齐，正在生成周报草稿与关系…",
+            preview_ready=True,
+            preview_url=_preview_url(slug),
+            cards_done=ok_cards,
+            cards_total=cards_total,
             resilience=resilience.to_dict(),
         )
         if not _is_current(slug, token):
@@ -378,9 +502,19 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                 final_status="failed",
                 resilience=resilience.to_dict(),
                 phase="draft",
+                preview_ready=True,
+                preview_url=_preview_url(slug),
             )
             return
 
+        _set(
+            slug,
+            phase="relations",
+            message="正在整理关系卡…",
+            preview_ready=True,
+            preview_url=_preview_url(slug),
+            resilience=resilience.to_dict(),
+        )
         data = merge_relations_from_candidates(
             data,
             bundle["relation_candidates"],
@@ -391,8 +525,8 @@ def _run(slug: str, username: str, token: int = 0) -> None:
         data["period_label"] = period_label
         data["version"] = issue_row.get("version")
         data.pop("_stale", None)
+        data = prog.mark_phase(data, prog.PHASE_RELATIONS, cards_done=cards_done_teams)
 
-        # 论证不过关的关系卡：直接不展示，不拦整期进预览
         from . import relation_gate as _rg
         from .relation_display import _sync_relation_kpi, build_published_projection, reader_visible
 
@@ -407,7 +541,6 @@ def _run(slug: str, username: str, token: int = 0) -> None:
         if not _is_current(slug, token):
             return
 
-        # 结构性闸门（无素材/无卡/待归属等）。关系论证失败已在上方滤掉，不再整期拦截。
         with db.write_lock():
             con = db.connect()
             try:
@@ -423,6 +556,17 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                 con.close()
 
         if blockers:
+            with db.write_lock():
+                con = db.connect()
+                try:
+                    data_fail = prog.mark_phase(
+                        data, prog.PHASE_RELATIONS, cards_done=cards_done_teams
+                    )
+                    data_fail["_preview_gate_error"] = blockers[:10]
+                    _write_partial_draft(con, issue_id, data_fail, stamp)
+                    con.commit()
+                finally:
+                    con.close()
             _set(
                 slug,
                 running=False,
@@ -430,15 +574,15 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                 error="进预览前检查未通过：" + "；".join(blockers[:10]),
                 error_code="preview_gate_blocked",
                 phase="gate",
-                message="草稿未通过论证检查",
+                message="草稿未通过论证检查（预览页仍可查看已生成内容）",
                 final_status="failed",
                 resilience=resilience.to_dict(),
+                preview_ready=True,
+                preview_url=_preview_url(slug),
             )
             return
 
-        data["_preview_gate_ok"] = True
-        data["_preview_gate_at"] = stamp
-        data.pop("_preview_gate_stale", None)
+        data = prog.finalize_preview_flags(data, stamp=stamp)
         if resilience.skipped or dropped_rels:
             data["_preview_degraded"] = True
         if dropped_rels:
@@ -458,7 +602,7 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                 )
                 db.register_entities(con, data, slug)
                 db.reindex_issue(con, issue_id)
-                note = "生成要点卡与草稿，已通过进预览检查"
+                note = "渐进预览完成：要点卡与草稿已通过进预览检查"
                 if dropped_rels:
                     note += f"；已隐藏 {len(dropped_rels)} 张论证不足的关系卡"
                 if resilience.skipped:
@@ -474,7 +618,7 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                 con.close()
 
         final = "degraded" if (resilience.skipped or dropped_rels) else "ok"
-        msg = "完成，已通过检查，可进入预览"
+        msg = "完成，已通过检查"
         bits = []
         if dropped_rels:
             bits.append(f"已隐藏 {len(dropped_rels)} 张论证不足的关系卡")
@@ -483,7 +627,7 @@ def _run(slug: str, username: str, token: int = 0) -> None:
         if resilience.retry_total:
             bits.append(f"自动重试 {resilience.retry_total} 次")
         if bits:
-            msg = "完成（" + "；".join(bits) + "），可进入预览"
+            msg = "完成（" + "；".join(bits) + "）"
         _set(
             slug,
             running=False,
@@ -492,16 +636,20 @@ def _run(slug: str, username: str, token: int = 0) -> None:
             phase="done",
             message=msg,
             preview_url=f"/{slug}?preview=1&edit=1",
+            preview_ready=True,
             dropped_relations=dropped_rels[:20],
             final_status=final,
             resilience=resilience.to_dict(),
+            cards_done=ok_cards,
+            cards_total=cards_total,
+            cur=total,
+            total=total,
         )
     except Exception as e:
         traceback.print_exc()
         if not _is_current(slug, token):
             return
         msg = str(e).replace("\n", " ")[:200]
-        # 闸门失败或异常：绝不带未通过检查的草稿进预览页
         _set(
             slug,
             running=False,

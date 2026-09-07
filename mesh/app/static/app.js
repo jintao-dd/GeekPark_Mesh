@@ -937,6 +937,48 @@
     }
   })();
 
+  // ===== 渐进预览：后台仍在生成时轮询，完成后刷新 ——
+  (function(){
+    const building=CFG.previewBuilding||/building=1/.test(location.search);
+    if(!CFG.isPreview||!CFG.slug||!building)return;
+    const note=document.getElementById('buildingNote');
+    let lastPhase='';
+    let fails=0;
+    async function tick(){
+      try{
+        const r=await fetch('/admin/issue/'+encodeURIComponent(CFG.slug)+'/preview/status',{headers:{Accept:'application/json'},credentials:'same-origin'});
+        if(!r.ok)throw new Error('status '+r.status);
+        const st=await r.json();
+        fails=0;
+        const msg=st.message||'';
+        if(note&&msg) note.textContent='后台生成中：'+msg+'（完成后自动刷新；完成前请暂缓大改）';
+        if(st.phase&&st.phase!==lastPhase){
+          lastPhase=st.phase;
+          // 阶段切换时刷新 lead/关系（骨架→成稿）
+          if(st.phase==='draft'||st.phase==='relations'||st.phase==='done'){
+            /* keep polling; reload only on done/fail terminal */
+          }
+        }
+        if(st.done){
+          const u=new URL(location.href);
+          u.searchParams.delete('building');
+          location.replace(u.pathname+u.search+(u.search?'&':'?')+'edit=1');
+          return;
+        }
+        if(st.error&&!st.running){
+          if(note) note.textContent='生成未完全成功：'+st.error+'（可回素材页重试；本页仍保留已生成内容）';
+          return;
+        }
+        if(st.running) setTimeout(tick,2000);
+      }catch(e){
+        fails+=1;
+        if(fails<8) setTimeout(tick,3000);
+        else if(note) note.textContent='无法获取生成进度，请刷新页面。';
+      }
+    }
+    setTimeout(tick,1200);
+  })();
+
   // ===== 菜单高亮 =====
   const links=[...document.querySelectorAll('#menu a')];
   const secs=links.map(a=>document.querySelector(a.getAttribute('href'))).filter(Boolean);
