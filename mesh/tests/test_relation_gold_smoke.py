@@ -96,7 +96,9 @@ def test_claim_baseline_records_lexical_not_as_validity():
         assert "current_gate_result" in row
         assert row["gold_claim_valid"] is not row["gold_claim_invalid"]
         # 禁止把字段混成同一布尔
-        assert "line_grounded≠claim_valid" in (row.get("note") or "")
+        assert "line_grounded≠claim_valid" in (row.get("note") or "") or "claim_verdict" in (
+            row.get("note") or ""
+        )
 
     path = write_baseline()
     assert path == BASELINE_PATH

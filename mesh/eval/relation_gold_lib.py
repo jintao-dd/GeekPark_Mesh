@@ -132,6 +132,8 @@ def gate_snapshot(rel: dict, items: list[dict]) -> dict[str, Any]:
 
 def build_baseline(cases: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     cases = cases if cases is not None else load_gold()
+    from app.relation_claim_check import check_relation_claim
+
     rows = []
     for c in cases:
         if c.get("expect") not in CLAIM_EXPECTS:
@@ -140,6 +142,7 @@ def build_baseline(cases: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         items = c.get("items") or []
         lg = lexical_body_grounded(rel)
         gate = gate_snapshot(rel, items)
+        claim = check_relation_claim(rel, items)
         rows.append(
             {
                 "id": c["id"],
@@ -149,7 +152,14 @@ def build_baseline(cases: list[dict[str, Any]] | None = None) -> dict[str, Any]:
                 "gold_claim_invalid": not bool((c.get("claim") or {}).get("valid")),
                 "current_line_grounded": lg,
                 "current_gate_result": gate,
-                "note": "line_grounded≠claim_valid; baseline before Claim Check",
+                "current_claim_check": {
+                    "claim_verdict": claim.get("claim_verdict"),
+                    "claim_reason_code": claim.get("claim_reason_code"),
+                    "claim_strength": claim.get("claim_strength"),
+                    "evidence_strength": claim.get("evidence_strength"),
+                    "model": claim.get("model"),
+                },
+                "note": "line_grounded≠claim_verdict; claim_check=rule_v1",
             }
         )
     return {

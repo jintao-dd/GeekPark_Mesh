@@ -46,6 +46,7 @@ from .relation_decision_consistency import (
 from .relation_display import attach_reader_flags, display_summary, split_relations_for_publish
 from .relation_writer import fact_snapshot, write_relations
 from .relation_verify import editorial_weak, verify_relations_narratives
+from .relation_claim_check import apply_claim_checks
 
 VALID_LABELS = frozenset(FLAG_COLORS.keys())
 
@@ -448,7 +449,7 @@ def build_relations_two_phase(
     writings: list[dict] | None = None,
     narratives: list[dict] | None = None,
 ) -> dict:
-    """Orchestrator：Decision → Gate → RelationObject → Writer → Verify。"""
+    """Orchestrator：Decision → Gate → RelationObject → Writer → Claim Check → Verify。"""
     from . import llm
     from .issue_verify import verify_issue_draft
 
@@ -501,7 +502,12 @@ def build_relations_two_phase(
     audit["n_narrative_skipped"] = len(write_skipped)
     audit["narrative_skipped"] = write_skipped
 
+    # Claim Check：必须吃 Writer 原文，再进入会改写 body 的 narrative verify
     rels = _strip_external_weak_duplicates(rels)
+    rels, claim_audit = apply_claim_checks(rels, items)
+    audit["claim_check"] = claim_audit
+    data["_relation_claim_audit"] = claim_audit
+
     rels = verify_relations_narratives(rels)
     rels = attach_reader_flags(_restore_gate_facts(rels, gate_snapshots))
     reader_rels, backlog_rels = split_relations_for_publish(rels)
@@ -539,11 +545,18 @@ def build_relations_two_phase(
     if data["_relation_decision_audit"].get("outcome_summary") is not None:
         data["_relation_decision_audit"]["outcome_summary"]["n_candidates_raw"] = stats["raw"]
         data["_relation_decision_audit"]["outcome_summary"]["n_candidates_for_decision"] = stats["for_llm"]
+        data["_relation_decision_audit"]["outcome_summary"]["claim_check"] = {
+            "mode": claim_audit.get("mode"),
+            "n_invalid": claim_audit.get("n_invalid"),
+            "n_dropped_enforce": claim_audit.get("n_dropped_enforce"),
+        }
     out = verify_issue_draft(data, items, team_cards=team_cards)
     if out.get("_relation_decision_audit"):
         out["_relation_decision_audit"] = finalize_decision_audit(
             out["_relation_decision_audit"], out.get("relations") or [],
         )
+    if out.get("_relation_claim_audit") is None and claim_audit:
+        out["_relation_claim_audit"] = claim_audit
     if coverage_error is not None:
         raise coverage_error
     return out

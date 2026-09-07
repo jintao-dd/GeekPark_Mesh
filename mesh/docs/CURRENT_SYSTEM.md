@@ -176,6 +176,10 @@ items（未拦截、未合并）
        只写 title / body / details
        LOCKED_FIELDS 含 decision_tier、relation_type、label、evidence…
        提示词：issue_relation_writer.md
+  → Claim Check（rule_v1）             [relation_claim_check.apply_claim_checks]
+       检查 Writer 原文 title+body+details（强度等级 vs 证据）
+       默认 shadow：写 `_claim_check` / `_relation_claim_audit`，不藏卡
+       MESH_CLAIM_CHECK_MODE=enforce 时 drop invalid
   → 后处理
        去弱重复、narrative verify、attach_reader_flags
        filter_draft_relations、无 evidence 丢弃
@@ -323,13 +327,14 @@ SSE 会发 step 事件；简单路径会先收完全文再校验，再按块吐�
 - 已上线语料的 FTS / 结构化差集交集 / 可选向量  
 - 乱码拒答、无命中拒答、句级归属过滤  
 - 禁用词字段改写、弱关系必须人确认  
-- **Relation Gold v2**（`eval/relation_gold_v2.jsonl`）：统一 schema + `claim_valid` / `claim_invalid` 对抗样例 + lexical/gate baseline
+- **Relation Gold v2**（`eval/relation_gold_v2.jsonl`）：统一 schema + `claim_valid` / `claim_invalid` 对抗样例 + lexical/gate/claim baseline  
+- **Claim Check A0 shadow**（`relation_claim_check`）：Writer 原文 title/body/details 强度守卫；默认不藏卡
 
 **没有**
 
 - 周报自动周更  
 - Agent / ReAct / LLM Planner  
-- **Relation Claim Check**（Gate 后「论断是否成立」；Gold 已就绪，待开发）  
+- **Relation Claim Check**（Gate 后「论断是否成立」）：A0 **shadow** 已上；默认不藏卡。`enforce` 待 tmesh 对账后开启  
 - 公司别名合并、人名归一、entity resolution  
 - 关系价值排序（有 tier，但无独立打分模型）  
 - 人工改稿回流到下一期规则  
@@ -343,8 +348,8 @@ SSE 会发 step 事件；简单路径会先收完全文再校验，再按块吐�
 
 | # | 项 | 状态 |
 |---|----|------|
-| ④ | Relation Gold v2 | ✅ 完成：16 条；统一 schema；valid/invalid Claim 对抗；lexical/gate baseline；测试通过。**未改** Decision / Gate / Writer。已具备进入 Claim Check 的前置条件。见 `RELATION_EDITOR_RUBRIC.md` |
-| ① | Claim Check | ⏸ 下一刀（消费 Gold v2） |
+| ④ | Relation Gold v2 | ✅ 完成：16 条；统一 schema；valid/invalid Claim 对抗；lexical/gate baseline；测试通过。见 `RELATION_EDITOR_RUBRIC.md` |
+| ① | Claim Check | 🟡 **A0 shadow**：`rule_v1` 强度阶梯；Writer 原文后、lexical 前；`MESH_CLAIM_CHECK_MODE=shadow`（默认）/ `enforce` / `off`。Gold 10/10 claim 案回归绿。下一刀：tmesh 一期对账后 A1 enforce |
 | ② | Ask structured intent | 🟡 e08/e10/e21 |
 | ③ | T13 拆分质量 | 🟡 段级 cache 已有；盯章节识别/归属 |
 
@@ -386,6 +391,7 @@ SSE 会发 step 事件；简单路径会先收完全文再校验，再按块吐�
 | `app/relation_display.py`               | tier 归一、`reader_visible`、reader/backlog 切分                |
 | `app/relation_decision_audit.py`        | 决策审计 / human report                                       |
 | `app/relation_gate.py`                  | 上线前关系检查                                                   |
+| `app/relation_claim_check.py`           | Claim Check rule_v1（Writer 原文强度守卫；shadow/enforce）       |
 | `app/embed_job.py`                      | 上线后异步向量                                                   |
 | `app/llm.py`                            | 抽取 / 要点卡 / 周报壳 / relation decisions / writer / 问答         |
 | `app/ask_engine.py`                     | 检索编排                                                      |
