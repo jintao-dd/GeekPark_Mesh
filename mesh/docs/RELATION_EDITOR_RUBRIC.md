@@ -11,15 +11,12 @@
 - 测试通过：`pytest tests/test_relation_gold_schema.py tests/test_relation_gold_smoke.py`  
 - **未修改** Decision / Evidence Gate / Writer 语义  
 
-**① Claim Check：🟡 A0 shadow（rule_v1）**
+**① Claim Check：🟡 A1 shadow 对账（No-Go enforce）**
 
-- 位置：Writer 原文之后、narrative/`line_grounded` 改写之前  
-- 检查：`title` + `body` + `details`（强度等级比较，非同词匹配）  
-- 输出：`claim_verdict` ∈ `valid|invalid|uncertain`（无歧义 `claim_valid` bool）  
-- 默认 `MESH_CLAIM_CHECK_MODE=shadow`（只写 `_claim_check` / `_relation_claim_audit`，不藏卡）  
-- `enforce` 才 drop `invalid`；Gold claim_* 回归见 `tests/test_relation_claim_check.py`  
-
-已具备进入 **A1 enforce**（tmesh 对账后）的条件。
+- A0：Writer 原文后、lexical 前；`rule_v1`；默认 shadow  
+- A1：tmesh `2026-8-17` draft 10 卡 / published 17 卡已对账 → 报告 `eval/reports/CLAIM_CHECK_A1_SHADOW_2026-8-17.md`  
+- **不 enforce**：本期 invalid 多为「接触」字面差 / blocker 误伤计划表述，非稳定过头合作漏网  
+- **不扩规则**：先按报告两处极小修复再复验 shadow，通过后再 enforce  
 
 ## Gold 文件
 

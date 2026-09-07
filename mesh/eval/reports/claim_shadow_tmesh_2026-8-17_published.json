@@ -1,0 +1,222 @@
+[mesh] pg pool min=2 max=20
+{
+  "slug": "2026-8-17",
+  "lane": "published_json",
+  "mode": "shadow",
+  "n_relations": 17,
+  "n_valid": 14,
+  "n_invalid": 3,
+  "n_uncertain": 0,
+  "invalid_ratio": 0.176,
+  "by_reason": {
+    "ok": 14,
+    "evidence_blocker": 1,
+    "status_upgrade": 2
+  },
+  "invalid_rows": [
+    {
+      "candidate_id": "c11",
+      "title": "秒动科技杨硕：Global Partnership 与编辑部各经一条线联系",
+      "claim_verdict": "invalid",
+      "claim_reason_code": "evidence_blocker",
+      "claim_reason": "detail:1 完成态强度 5，但证据含未完成/计划标记（上限 3）",
+      "claim_strength": 5,
+      "evidence_strength": 3
+    },
+    {
+      "candidate_id": "c22",
+      "title": "Helloboss CEO 王沁：编辑部接触",
+      "claim_verdict": "invalid",
+      "claim_reason_code": "status_upgrade",
+      "claim_reason": "body 论断强度 3 > 证据有效强度 0",
+      "claim_strength": 3,
+      "evidence_strength": 0
+    },
+    {
+      "candidate_id": "c30",
+      "title": "韩国아산나눔재단 Byungkook Kim：编辑部海外接触",
+      "claim_verdict": "invalid",
+      "claim_reason_code": "status_upgrade",
+      "claim_reason": "body 论断强度 3 > 证据有效强度 0",
+      "claim_strength": 3,
+      "evidence_strength": 0
+    }
+  ],
+  "invalid_details": [
+    {
+      "title": "秒动科技杨硕：Global Partnership 与编辑部各经一条线联系",
+      "body": "Global Partnership 团队记录：联系杨硕（妙动/秒动科技）时，编辑部也通过 PR 这条线在联系同一人，尚无反馈；视频号团队记录：编辑部同事将带一摊海外内容工作，计划两周后参加视频号选题会，探讨其在海外接触到的一手人和公司能否成为视频选题信源；用得上：编辑部、Global Partnership 团队可对照海外信源",
+      "details": [
+        "Global Partnership 团队记录：联系杨硕（妙动/秒动科技）时，编辑部也通过 PR 这条线在联系同一人，尚无反馈",
+        "视频号团队记录：编辑部同事将带一摊海外内容工作，计划两周后参加视频号选题会，探讨其在海外接触到的一手人和公司能否成为视频选题信源；用得上：编辑部、Global Partnership 团队可对照海外信源"
+      ],
+      "tier": "strong",
+      "type": "event_chain",
+      "weak": true,
+      "evidence": [
+        {
+          "team": "Global Partnership 团队",
+          "snippet": "联系杨硕（妙动/秒动科技）时，编辑部也通过 PR 这条线在联系同一人，尚无反馈"
+        },
+        {
+          "team": "视频号团队",
+          "snippet": "编辑部同事将带一摊海外内容工作，计划两周后参加视频号选题会，探讨其在海外接触到的一手人和公司能否成为视频选题信源；用得上：编辑部、Global Partnership 团队可对照海外信源"
+        }
+      ],
+      "reason_code": "evidence_blocker",
+      "reason": "detail:1 完成态强度 5，但证据含未完成/计划标记（上限 3）",
+      "claim_strength": 5,
+      "evidence_strength": 3,
+      "lexical_body_pass": false
+    },
+    {
+      "title": "Helloboss CEO 王沁：编辑部接触",
+      "body": "编辑部接触 Helloboss CEO 王沁，Helloboss 为日本 AI 求职招聘匹配应用。",
+      "details": [
+        "编辑部记录：Alex Wang（王沁，Helloboss CEO，东京）：Helloboss 为日本 AI 求职招聘匹配应用，连接求职者与企业。Global Partnership 团队做日本生态连接可用得上"
+      ],
+      "tier": "watch",
+      "type": "one_sided",
+      "weak": true,
+      "evidence": [
+        {
+          "team": "编辑部",
+          "snippet": "Alex Wang（王沁，Helloboss CEO，东京）：Helloboss 为日本 AI 求职招聘匹配应用，连接求职者与企业。Global Partnership 团队做日本生态连接可用得上"
+        }
+      ],
+      "reason_code": "status_upgrade",
+      "reason": "body 论断强度 3 > 证据有效强度 0",
+      "claim_strength": 3,
+      "evidence_strength": 0,
+      "lexical_body_pass": true
+    },
+    {
+      "title": "韩国아산나눔재단 Byungkook Kim：编辑部海外接触",
+      "body": "编辑部接触韩国创业支持公益基金会아산나눔재단的 Senior Manager Byungkook Kim。",
+      "details": [
+        "编辑部记录：Byungkook Kim（Kim Byungkook，아산나눔재단 Senior Manager，首尔）：该基金会为韩国创业支持公益基金会（现代集团背景），运营 MARU180。Global Partnership 团队做韩国生态连接可用"
+      ],
+      "tier": "watch",
+      "type": "overseas_link",
+      "weak": true,
+      "evidence": [
+        {
+          "team": "编辑部",
+          "snippet": "Byungkook Kim（Kim Byungkook，아산나눔재단 Senior Manager，首尔）：该基金会为韩国创业支持公益基金会（现代集团背景），运营 MARU180。Global Partnership 团队做韩国生态连接可用"
+        }
+      ],
+      "reason_code": "status_upgrade",
+      "reason": "body 论断强度 3 > 证据有效强度 0",
+      "claim_strength": 3,
+      "evidence_strength": 0,
+      "lexical_body_pass": true
+    }
+  ],
+  "uncertain_rows": [],
+  "valid_watch_parallel_sample": [
+    {
+      "title": "Founder Park 账号运营：传播涨粉与下半年规划两侧各知一半",
+      "tier": "strong",
+      "type": "info_complement",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    },
+    {
+      "title": "AGI 2026 现场内容分栏：品牌创意与视频号各知一半",
+      "tier": "strong",
+      "type": "info_complement",
+      "claim_strength": 5,
+      "evidence_strength": 5
+    },
+    {
+      "title": "豆包：商业化、编辑部、视频号各自碰到的三个触点",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    },
+    {
+      "title": "Agent 治理与 AI 安全伦理：编辑部与视频号同赛道各自记录",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 0,
+      "evidence_strength": 2
+    },
+    {
+      "title": "百度：社群智能硬件 Workshop 与视频号内容分账选题",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    },
+    {
+      "title": "Google：社群 I/O 专场与视频号打法对比选题",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    },
+    {
+      "title": "字节跳动：编辑部豆包战役报道与视频号火山引擎/工具触点",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 3,
+      "evidence_strength": 3
+    },
+    {
+      "title": "xAI：编辑部技术成员建联与视频号财报选题",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    },
+    {
+      "title": "Anthropic 与 OpenAI：编辑部早报与视频号御三家选题各自记录",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    },
+    {
+      "title": "视频号栏目封面：由品牌创意团队设计资源承接",
+      "tier": "watch",
+      "type": "one_sided",
+      "claim_strength": 0,
+      "evidence_strength": 0
+    },
+    {
+      "title": "视频号选题会：拟对接编辑部海外内容信源",
+      "tier": "watch",
+      "type": "one_sided",
+      "claim_strength": 5,
+      "evidence_strength": 5
+    },
+    {
+      "title": "柔性具身早期赛道信号：编辑部记录",
+      "tier": "watch",
+      "type": "one_sided",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    }
+  ],
+  "lexical_pass_but_claim_invalid": [
+    {
+      "title": "Helloboss CEO 王沁：编辑部接触",
+      "reason_code": "status_upgrade",
+      "reason": "body 论断强度 3 > 证据有效强度 0",
+      "claim_strength": 3,
+      "evidence_strength": 0
+    },
+    {
+      "title": "韩国아산나눔재단 Byungkook Kim：编辑部海外接触",
+      "reason_code": "status_upgrade",
+      "reason": "body 论断强度 3 > 证据有效强度 0",
+      "claim_strength": 3,
+      "evidence_strength": 0
+    }
+  ],
+  "go_nogo_hints": {
+    "invalid_ratio_warn_if_gt": 0.25,
+    "note": "A1 shadow only; do not enforce until human review of invalid_details"
+  }
+}

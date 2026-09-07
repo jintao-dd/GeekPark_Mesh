@@ -349,7 +349,7 @@ SSE 会发 step 事件；简单路径会先收完全文再校验，再按块吐�
 | # | 项 | 状态 |
 |---|----|------|
 | ④ | Relation Gold v2 | ✅ 完成：16 条；统一 schema；valid/invalid Claim 对抗；lexical/gate baseline；测试通过。见 `RELATION_EDITOR_RUBRIC.md` |
-| ① | Claim Check | 🟡 **A0 shadow**：`rule_v1` 强度阶梯；Writer 原文后、lexical 前；`MESH_CLAIM_CHECK_MODE=shadow`（默认）/ `enforce` / `off`。Gold 10/10 claim 案回归绿。下一刀：tmesh 一期对账后 A1 enforce |
+| ① | Claim Check | 🟡 **A1 shadow 对账完成 / No-Go enforce**：tmesh `2026-8-17` draft 1/10、published 3/17 invalid，人审多为误报（接触字面差、blocker 压计划）。报告 `eval/reports/CLAIM_CHECK_A1_SHADOW_2026-8-17.md`。保持 shadow；极小修 rule 后再复验，勿扩规则库 |
 | ② | Ask structured intent | 🟡 e08/e10/e21 |
 | ③ | T13 拆分质量 | 🟡 段级 cache 已有；盯章节识别/归属 |
 
