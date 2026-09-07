@@ -121,11 +121,15 @@ def _is_current(slug: str, token: int) -> bool:
     return job_store.is_current(KIND, slug, token, _defaults(slug))
 
 
-def start(slug: str, force: bool = False) -> None:
-    """启动一次完整管线。force=True 时取消卡住/旧任务并重新开跑。"""
+def start(slug: str, force: bool = False, *, reextract: bool = False) -> None:
+    """启动一次完整管线。force=True 时取消卡住/旧任务并重新开跑。
+    reextract=True 时对已 extracted 的来源也重抽；默认跳过已抽取来源（避免大聚合文档反复卡死）。
+    """
     from . import job_runtime
 
-    claimed = job_store.try_claim(KIND, slug, _defaults(slug), _new_state(slug), force=force)
+    st0 = _new_state(slug)
+    st0["reextract"] = bool(reextract)
+    claimed = job_store.try_claim(KIND, slug, _defaults(slug), st0, force=force)
     if not claimed:
         return
     token = int(claimed.get("token") or 0)
@@ -137,10 +141,13 @@ def _run(slug: str, token: int = 0) -> None:
     try:
         if not _is_current(slug, token):
             return
+        st0 = job_store.get(KIND, slug, _defaults(slug))
+        reextract = bool(st0.get("reextract"))
         r = con.execute("SELECT * FROM issues WHERE slug=?", (slug,)).fetchone()
         iid = r["id"]
         srcs = [dict(x) for x in con.execute(
-            "SELECT id, stype, team, title, text, channel, meta FROM sources WHERE issue_id=? AND length(text)>0", (iid,))]
+            "SELECT id, stype, team, title, text, channel, meta, extracted FROM sources "
+            "WHERE issue_id=? AND length(text)>0", (iid,))]
 
         _mark(slug, "intake", f"{len(srcs)} 文件")
         n_aud = sum(1 for s in srcs if (s["stype"] or "") in ("T6",) and "录音" in (s["title"] or ""))
@@ -155,12 +162,22 @@ def _run(slug: str, token: int = 0) -> None:
         resilience = ResilienceReport()
         got = 0
         ok_sources = 0
+        skipped_done = 0
         total = len(srcs)
         for i, s in enumerate(srcs, 1):
             if not _is_current(slug, token):
                 return
             title = (s["title"] or f"来源 {s['id']}")[:36]
             unit = f"#{s['id']} {title}"
+            if int(s.get("extracted") or 0) == 1 and not reextract:
+                n_exist = con.execute(
+                    "SELECT COUNT(*) AS c FROM items WHERE source_id=?", (s["id"],)
+                ).fetchone()["c"]
+                got += int(n_exist or 0)
+                ok_sources += 1
+                skipped_done += 1
+                _mark(slug, "extract", f"已抽取跳过 {i}/{total} · {title}（{n_exist} 条）")
+                continue
             _mark(slug, "extract", f"抽取中 {i}/{total} · {title}")
             skip_split = False
             try:
@@ -270,6 +287,8 @@ def _run(slug: str, token: int = 0) -> None:
         if not _is_current(slug, token):
             return
         extract_note = f"候选 {got}"
+        if skipped_done:
+            extract_note += f" · 复用已抽取 {skipped_done}"
         if resilience.skipped:
             extract_note += f" · 跳过来源 {len(resilience.skipped)}"
         if resilience.retry_total:

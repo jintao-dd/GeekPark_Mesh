@@ -528,10 +528,12 @@ async function poll() {
 async function runMining(opts = {}) {
   if (S.running) return;
   const force = !!opts.force;
-  if (A.hasItems && !force) {
+  // reextract：显式重抽已完成来源；默认 false，避免大聚合文档反复卡在 1/7
+  const reextract = opts.reextract !== undefined ? !!opts.reextract : !!(A.hasItems && force);
+  if (A.hasItems && reextract) {
     const ok = await MeshDialog.confirm({
       title: '重新挖掘',
-      body: '当前已经有挖掘结果，再次执行会重跑所有来源，可能很慢。确定继续吗？',
+      body: '当前已经有挖掘结果，再次执行会重跑所有来源（含大文档），可能很慢。确定继续吗？',
       okText: '重新挖掘',
       cancelText: '取消',
     });
@@ -548,10 +550,10 @@ async function runMining(opts = {}) {
   $('#pnow').textContent = '启动中…';
   if (S.autoPreviewAfterMining) showBusy('正在挖掘与脱敏…', '大文件可能需要几分钟，请勿关闭页面');
   try {
-    const r = await fetch(`/admin/issue/${A.slug}/pipeline/start?force=${force ? 1 : 0}`, {
-      method: 'POST',
-      headers: JSON_HDR,
-    });
+    const r = await fetch(
+      `/admin/issue/${A.slug}/pipeline/start?force=${force ? 1 : 0}&reextract=${reextract ? 1 : 0}`,
+      { method: 'POST', headers: JSON_HDR },
+    );
     if (!r.ok) {
       const j = await r.json().catch(() => ({}));
       throw new Error(j.detail || j.error || ('HTTP ' + r.status));
@@ -578,21 +580,29 @@ if (to2) to2.onclick = () => {
     toast('请先放入素材');
     return;
   }
-  // 忙态下再点：强制从头重跑（挖掘 → 预览）
-  if (document.body.classList.contains('ai-busy')) {
-    to2.disabled = true;
-    setAutoPreview(true);
-    showBusy('正在挖掘与脱敏…', '大文件可能需要几分钟，请勿关闭页面');
-    runMining({ force: true });
+  // 忙态下再点：不要强制重挖（否则大文档会再次卡死）
+  if (document.body.classList.contains('ai-busy') || S.running) {
+    toast('任务进行中，请稍候。若长时间不动：Ctrl+F5 后直接点「生成预览」。');
     return;
   }
-  // 每次「生成预览」都先重新挖掘，再自动出卡+草稿（避免跳过挖掘导致 provenance 等字段陈旧）
   to2.disabled = true;
+  // 已有抽取结果且素材未变更：直接出预览，勿重跑 56 万字聚合文档
+  if (A.hasItems && !A.sourcesDirty) {
+    setAutoPreview(false);
+    showBusy('正在生成要点卡与草稿…', '闸门通过后即可进页，请勿关闭页面');
+    submitPreparePreview();
+    return;
+  }
   setAutoPreview(true);
   showBusy('正在挖掘与脱敏…', '完成后将自动生成要点卡与草稿');
-  runMining({ force: true });
+  // force 仅用于抢占卡住任务；不重抽已 extracted 来源
+  runMining({ force: true, reextract: false });
 };
-const gen = $('#gen'); if (gen) gen.onclick = () => runMining({ force: document.body.classList.contains('ai-busy') || S.running });
+const gen = $('#gen');
+if (gen) gen.onclick = () => runMining({
+  force: document.body.classList.contains('ai-busy') || S.running,
+  reextract: true,
+});
 const to3 = $('#to3'); if (to3) to3.onclick = () => { if (guardStep(2)) go(2, { scroll: true }); };
 const to4 = $('#to4'); if (to4) to4.onclick = () => { if (guardStep(3)) go(3, { scroll: true }); };
 
@@ -754,8 +764,15 @@ if (A.canWrite) {
       go(1, { scroll: true });
       if (S.autoPreviewAfterMining) showBusy('正在挖掘与脱敏…', '大文件可能需要几分钟，请勿关闭页面');
       poll();
+    } else {
+      // 中断/失败后刷新：清掉粘性 auto-preview，避免空弹窗
+      if (st.error || st.final_status === 'interrupted') {
+        setAutoPreview(false);
+        hideBusy();
+        if (st.error) toast(String(st.error).slice(0, 160), 8000);
+      }
+      if (st.cur >= 0) paint(st);
     }
-    else if (st.cur >= 0) paint(st);
   }).catch(() => {});
   fetch(`/admin/issue/${A.slug}/preview/status`, { headers: JSON_HDR }).then(r => r.json()).then(st => {
     if (st.running) {

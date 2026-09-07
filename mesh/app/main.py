@@ -1717,9 +1717,9 @@ def issue_admin(request: Request, slug: str, step: int | None = None, err: str =
 
 
 @app.post("/admin/issue/{slug}/pipeline/start")
-def pipeline_start(request: Request, slug: str, force: int = 0):
+def pipeline_start(request: Request, slug: str, force: int = 0, reextract: int = 0):
     auth.require(request, "editor")
-    pipeline.start(slug, force=bool(force))
+    pipeline.start(slug, force=bool(force), reextract=bool(reextract))
     return {"ok": True}
 
 
