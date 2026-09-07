@@ -113,8 +113,8 @@ def test_publish_projection_all_keep_tiers_sorted():
     assert "_relations_backlog" not in pub
 
 
-def test_published_preview_forbidden_and_no_overwrite():
-    """Test C: published 期 Preview 拒绝，且不改 published_json。"""
+def test_published_preview_writes_draft_only():
+    """published 期可 Preview：只改 draft_json，不动 published_json / FTS。"""
     with _temp_db():
         from app import db, preview_job
 
@@ -123,6 +123,7 @@ def test_published_preview_forbidden_and_no_overwrite():
             "relations": [
                 {"decision_tier": "strong", "title": "KEEP", "body": "b", "evidence": [{}]},
             ],
+            "lead": "live",
         }
         payload = json.dumps(original, ensure_ascii=False)
         con.execute(
@@ -130,50 +131,98 @@ def test_published_preview_forbidden_and_no_overwrite():
             "VALUES(?,?,?,?,?,?,?)",
             ("bound-pub", "2026-01-01", "2026-01-07", "边界测", "published", payload, payload),
         )
+        iid = con.execute("SELECT id FROM issues WHERE slug='bound-pub'").fetchone()["id"]
+        db.reindex_issue(con, iid)
         con.commit()
-        con.close()
+        n_fts_before = con.execute(
+            "SELECT COUNT(*) c FROM search_fts WHERE issue_slug=?", ("bound-pub",),
+        ).fetchone()["c"]
+        assert n_fts_before > 0
 
-        st = preview_job.start("bound-pub", "tester")
-        assert st.get("error_code") == "published_preview_forbidden"
-        assert st.get("running") is False
-
-        con = db.connect()
+        stamp = "2026-01-08 12:00"
+        draft_new = {
+            "relations": [
+                {"decision_tier": "strong", "title": "DRAFT_ONLY", "body": "x", "evidence": [{}]},
+            ],
+            "lead": "draft",
+            "_preview_building": True,
+        }
+        preview_job._write_partial_draft(con, iid, draft_new, stamp)
+        con.commit()
         row = con.execute(
-            "SELECT status, published_json FROM issues WHERE slug=?",
+            "SELECT status, draft_json, published_json FROM issues WHERE slug=?",
             ("bound-pub",),
         ).fetchone()
         assert row["status"] == "published"
+        assert json.loads(row["draft_json"])["relations"][0]["title"] == "DRAFT_ONLY"
         assert json.loads(row["published_json"])["relations"][0]["title"] == "KEEP"
+        n_fts_after = con.execute(
+            "SELECT COUNT(*) c FROM search_fts WHERE issue_slug=?", ("bound-pub",),
+        ).fetchone()["c"]
+        assert n_fts_after == n_fts_before
         con.close()
 
 
-def test_create_revision_then_preview_allowed():
+def test_create_revision_keeps_published_and_ask():
+    """create_revision 铺底保持 published，不清 Ask。"""
     with _temp_db():
-        from app import db, preview_job
+        from app import db
 
         con = db.connect()
-        pub = json.dumps({
+        pub = {
             "relations": [
-                {"decision_tier": "strong", "title": "S", "body": "b", "evidence": [{}]},
+                {"decision_tier": "strong", "title": "LIVE", "body": "b", "evidence": [{}]},
             ],
-        }, ensure_ascii=False)
+            "lead": "online",
+        }
+        dirty = {
+            "relations": [
+                {"decision_tier": "strong", "title": "DIRTY", "body": "b", "evidence": [{}]},
+            ],
+            "lead": "local",
+        }
         con.execute(
             "INSERT INTO issues(slug,date_start,date_end,period_label,status,draft_json,published_json) "
             "VALUES(?,?,?,?,?,?,?)",
-            ("bound-rev", "2026-01-01", "2026-01-07", "边界测", "published", pub, pub),
+            (
+                "bound-rev", "2026-01-01", "2026-01-07", "边界测", "published",
+                json.dumps(dirty, ensure_ascii=False),
+                json.dumps(pub, ensure_ascii=False),
+            ),
         )
-        row = con.execute("SELECT id FROM issues WHERE slug='bound-rev'").fetchone()
-        con.execute("UPDATE issues SET status='draft' WHERE id=?", (row["id"],))
+        row = con.execute("SELECT * FROM issues WHERE slug='bound-rev'").fetchone()
         db.reindex_issue(con, row["id"])
         con.commit()
         n_fts = con.execute(
             "SELECT COUNT(*) c FROM search_fts WHERE issue_slug=?", ("bound-rev",),
         ).fetchone()["c"]
-        assert n_fts == 0
-        con.close()
+        assert n_fts > 0
 
-        st = preview_job.start("bound-rev", "tester")
+        # 模拟 create_revision：force 用线上稿铺底，不改 status、不清索引
+        con.execute(
+            "UPDATE issues SET draft_json=?, updated_at=? WHERE id=?",
+            (row["published_json"], "2026-01-08 12:00", row["id"]),
+        )
+        con.commit()
+        row2 = con.execute(
+            "SELECT status, draft_json, published_json FROM issues WHERE slug='bound-rev'"
+        ).fetchone()
+        assert row2["status"] == "published"
+        assert json.loads(row2["draft_json"])["relations"][0]["title"] == "LIVE"
+        assert json.loads(row2["published_json"])["relations"][0]["title"] == "LIVE"
+        n_fts2 = con.execute(
+            "SELECT COUNT(*) c FROM search_fts WHERE issue_slug=?", ("bound-rev",),
+        ).fetchone()["c"]
+        assert n_fts2 == n_fts
+
+        # published 期 start 不再拒绝（不 spawn 跑完，只看 claim 前闸门）
+        from app import preview_job
+        from unittest import mock
+        with mock.patch("app.job_runtime.spawn_after_claim"):
+            st = preview_job.start("bound-rev", "tester")
         assert st.get("error_code") != "published_preview_forbidden"
+        assert st.get("running") is True
+        con.close()
 
 
 def test_rollback_restores_published_and_refresh_embed_status():

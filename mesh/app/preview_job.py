@@ -90,40 +90,21 @@ def _preview_url(slug: str) -> str:
 
 
 def _write_partial_draft(con, issue_id: int, data: dict, stamp: str) -> None:
-    from .relation_display import build_published_projection
-
+    """预览只写 draft_json，绝不改 published_json（已上线读者/Ask 不受影响）。"""
     payload = json.dumps(data, ensure_ascii=False)
-    reader_payload = json.dumps(build_published_projection(data), ensure_ascii=False)
     con.execute(
-        "UPDATE issues SET draft_json=?, published_json=?, updated_at=? WHERE id=?",
-        (payload, reader_payload, stamp, issue_id),
+        "UPDATE issues SET draft_json=?, updated_at=? WHERE id=?",
+        (payload, stamp, issue_id),
     )
 
 
 def start(slug: str, username: str, *, force: bool = False) -> dict:
     """启动预览生成。force=True 时取消卡住任务并重新开跑。
 
-    status=published 时拒绝：禁止 Preview 覆盖 published_json / 正式 Ask 索引。
-    需继续编辑时先走 create_revision（回到 draft）再 Preview。
+    已上线期也可 Preview：只写 draft_json，不改 published_json / 正式 Ask 索引；
+    读者仍看线上版，Owner「确认上线」后才替换。
     """
     from . import job_runtime
-
-    con = db.connect()
-    try:
-        row = con.execute("SELECT status FROM issues WHERE slug=?", (slug,)).fetchone()
-    finally:
-        con.close()
-    if row and (row["status"] or "") == "published":
-        st = _defaults(slug)
-        st["running"] = False
-        st["done"] = False
-        st["error"] = (
-            "本期已上线，不能直接「生成预览」。"
-            "请先「创建修订草稿」（回到 draft），改完后再 Preview，最后由 Owner 确认上线。"
-        )
-        st["error_code"] = "published_preview_forbidden"
-        job_store.put(KIND, slug, st)
-        return st
 
     st0 = _new_state(slug)
     st0["_username"] = username
@@ -150,18 +131,6 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                 r = con.execute("SELECT * FROM issues WHERE slug=?", (slug,)).fetchone()
                 if not r:
                     _set(slug, running=False, done=False, error="没有这一期")
-                    return
-                if (r["status"] or "") == "published":
-                    _set(
-                        slug,
-                        running=False,
-                        done=False,
-                        error=(
-                            "本期已上线，不能直接「生成预览」。"
-                            "请先「创建修订草稿」再 Preview。"
-                        ),
-                        error_code="published_preview_forbidden",
-                    )
                     return
                 issue_id = r["id"]
                 period_label = r["period_label"]
@@ -528,7 +497,7 @@ def _run(slug: str, username: str, token: int = 0) -> None:
         data = prog.mark_phase(data, prog.PHASE_RELATIONS, cards_done=cards_done_teams)
 
         from . import relation_gate as _rg
-        from .relation_display import _sync_relation_kpi, build_published_projection, reader_visible
+        from .relation_display import _sync_relation_kpi, reader_visible
 
         data, dropped_rels = _rg.filter_ungrounded_relations(data, bundle["item_rows"])
         n_reader = sum(
@@ -595,13 +564,12 @@ def _run(slug: str, username: str, token: int = 0) -> None:
             con = db.connect()
             try:
                 payload = json.dumps(data, ensure_ascii=False)
-                reader_payload = json.dumps(build_published_projection(data), ensure_ascii=False)
+                # 只写草稿；published_json / Ask 索引仅由「确认上线」更新
                 con.execute(
-                    "UPDATE issues SET draft_json=?, published_json=?, updated_at=? WHERE id=?",
-                    (payload, reader_payload, stamp, issue_id),
+                    "UPDATE issues SET draft_json=?, updated_at=? WHERE id=?",
+                    (payload, stamp, issue_id),
                 )
                 db.register_entities(con, data, slug)
-                db.reindex_issue(con, issue_id)
                 note = "渐进预览完成：要点卡与草稿已通过进预览检查"
                 if dropped_rels:
                     note += f"；已隐藏 {len(dropped_rels)} 张论证不足的关系卡"

@@ -144,14 +144,14 @@
 
   <div class="actions pushed">
     {% if perms.write %}
-    {% if issue.status == 'published' %}
-    <form method="post" action="/admin/issue/{{ issue.slug }}/create_revision" id="createRevision" style="display:inline">
-      <button class="cta" type="submit" id="to2rev">创建修订草稿 <span class="arw">→</span></button>
-    </form>
-    <span class="hint" style="font-size:13px;color:var(--ink3);margin-left:12px">已上线不能直接 Preview；创建修订后 Ask 暂下线该期，改完再预览并重新上线</span>
-    {% else %}
     <button class="cta" id="to2" {% if not sources %}disabled{% endif %}>生成预览 <span class="arw">→</span></button>
-    <span class="hint" style="font-size:13px;color:var(--ink3);margin-left:12px">将先重新挖掘，再生成要点卡与草稿；全部检查通过后才进入预览</span>
+    {% if issue.status == 'published' %}
+    <form method="post" action="/admin/issue/{{ issue.slug }}/create_revision" id="createRevision" style="display:inline;margin-left:10px">
+      <button class="ghost" type="submit" id="to2rev">用线上稿铺底草稿</button>
+    </form>
+    <span class="hint" style="font-size:13px;color:var(--ink3);margin-left:12px">已上线也可预览改稿；读者与 Ask 仍看线上版，确认上线后才替换</span>
+    {% else %}
+    <span class="hint" style="font-size:13px;color:var(--ink3);margin-left:12px">有挖掘结果时直接出预览；素材变更后会先补挖再出卡</span>
     {% endif %}
     {% else %}
     <button class="cta" data-go="2" disabled title="需要编辑权限">生成预览 <span class="arw">→</span></button>
@@ -379,6 +379,6 @@ window.MESHADMIN = {
 };
 </script>
 <script src="/static/dialog.js?v=mesh-dlg-2"></script>
-<script src="/static/console.js?v=skip-remine-1"></script>
+<script src="/static/console.js?v=rev-live-1"></script>
 </body>
 </html>

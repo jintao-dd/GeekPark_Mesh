@@ -175,7 +175,7 @@ items（未拦截、未合并）
 投影入口：`build_published_projection(draft)` → `published_json`（Publish / Preview reader 切片共用）。  
 论证不足的卡在生成预览时 **直接隐藏**（`filter_ungrounded_relations`），不拦整期进预览。
 
-**Preview 闸门：** `status=published` 时禁止普通 Preview（不改 `published_json`、不 reindex）。继续编辑须先 `POST .../create_revision` → `status=draft` → Preview → Publish v2。
+**Preview：** 可在 `status=published` 上直接跑；只写 `draft_json`，不改 `published_json`、不 reindex Ask。读者/Ask 仍看线上版。可选 `POST .../create_revision` 用线上稿铺底草稿（保持 published）。Owner Publish 才替换 `published_json` 并重建索引。
 
 关系卡上常见字段：
 

@@ -409,12 +409,14 @@ def healthz():
         return JSONResponse(info, status_code=503)
     return info
 
-def ensure_draft_for_edit(con, issue_row, *, sync_from_published: bool = False) -> str:
-    """编辑只写草稿。无可用草稿时用线上稿铺底；已有可渲染草稿时不因 sync 覆盖，避免丢改。"""
+def ensure_draft_for_edit(
+    con, issue_row, *, sync_from_published: bool = False, force: bool = False
+) -> str:
+    """编辑只写草稿。无可用草稿时用线上稿铺底；force 时用线上稿覆盖草稿。"""
     pub = issue_row["published_json"] or ""
     draft = issue_row["draft_json"] or ""
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    if sync_from_published and pub.strip() and not db.issue_json_renderable(draft):
+    if sync_from_published and pub.strip() and (force or not db.issue_json_renderable(draft)):
         con.execute(
             "UPDATE issues SET draft_json=?, updated_at=? WHERE id=?",
             (pub, now, issue_row["id"]),
@@ -2332,8 +2334,6 @@ def build_draft(request: Request, slug: str):
 def preview_start(request: Request, slug: str, force: int = 0):
     u = auth.require(request, "editor")
     st = preview_job.start(slug, u["u"], force=bool(force))
-    if st.get("error_code") == "published_preview_forbidden":
-        return JSONResponse({"ok": False, **st}, status_code=409)
     return {"ok": True, **st}
 
 
@@ -2345,9 +2345,9 @@ def preview_status(request: Request, slug: str):
 
 @app.post("/admin/issue/{slug}/create_revision")
 def create_revision(request: Request, slug: str):
-    """已上线期 → 修订草稿：status=draft，保留 published_json 快照，清 Ask 索引。
+    """已上线期：用线上稿重新铺底草稿。保持 published，不清 Ask。
 
-    之后可 Preview；再由 Owner Publish 生成 v2。禁止在 published 上直接 Preview。
+    读者/Ask 仍看 published_json；改完 Preview 后由 Owner 确认上线才替换。
     """
     u = auth.require(request, "editor")
     wants_json = "application/json" in (request.headers.get("accept") or "")
@@ -2358,30 +2358,25 @@ def create_revision(request: Request, slug: str):
         raise HTTPException(404, "没有这一期")
     if (r["status"] or "") != "published":
         con.close()
-        msg = "仅已上线期需要「创建修订草稿」；当前已是草稿，可直接生成预览。"
+        msg = "仅已上线期需要从线上稿铺底；当前已是草稿，可直接生成预览。"
         if wants_json:
             return JSONResponse({"ok": False, "error": msg, "status": r["status"]}, status_code=400)
         return _flash_redirect(f"/admin/issue/{slug}", msg)
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    ensure_draft_for_edit(con, r, sync_from_published=True)
-    con.execute(
-        "UPDATE issues SET status='draft', updated_at=? WHERE id=?",
-        (now, r["id"]),
-    )
-    db.reindex_issue(con, r["id"])  # 清正式 Ask 索引；published_json 仍保留至再次 Publish
+    ensure_draft_for_edit(con, r, sync_from_published=True, force=True)
+    con.execute("UPDATE issues SET updated_at=? WHERE id=?", (now, r["id"]))
     con.execute(
         "INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)",
-        (r["id"], u["u"], "create_revision", "published", "draft revision from published"),
+        (r["id"], u["u"], "create_revision", "published", "draft reset from published (still live)"),
     )
     con.commit()
     con.close()
-    _ASK_CACHE.clear()
     if wants_json:
         return JSONResponse({
             "ok": True,
             "slug": slug,
-            "status": "draft",
-            "message": "已创建修订草稿。正式读者/Ask 暂下线该期，改完后请生成预览再确认上线。",
+            "status": "published",
+            "message": "已用线上稿铺底草稿。读者与 Ask 仍看线上版；改完后生成预览，再由 Owner 确认上线。",
         })
     return RedirectResponse(f"/admin/issue/{slug}?revision=1", status_code=302)
 
