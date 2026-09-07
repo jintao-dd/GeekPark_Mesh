@@ -322,18 +322,31 @@ SSE 会发 step 事件；简单路径会先收完全文再校验，再按块吐�
 - 上线与 Embedding **解耦**（异步 `embed_job`，管理台可见进度）  
 - 已上线语料的 FTS / 结构化差集交集 / 可选向量  
 - 乱码拒答、无命中拒答、句级归属过滤  
-- 禁用词字段改写、弱关系必须人确认
+- 禁用词字段改写、弱关系必须人确认  
+- **Relation Gold v2**（`eval/relation_gold_v2.jsonl`）：统一 schema + `claim_valid` / `claim_invalid` 对抗样例 + lexical/gate baseline
 
 **没有**
 
 - 周报自动周更  
 - Agent / ReAct / LLM Planner  
+- **Relation Claim Check**（Gate 后「论断是否成立」；Gold 已就绪，待开发）  
 - 公司别名合并、人名归一、entity resolution  
 - 关系价值排序（有 tier，但无独立打分模型）  
 - 人工改稿回流到下一期规则  
 - 跨期关系 id（只有 `first_issue` 和上一期 lead 进 prompt）  
 - 点回原文的统一 Evidence 层  
 - 飞书群问答、录音转写
+
+### 7.1 质量打磨轨道（2026-09-07）
+
+优先顺序：④ Relation Gold → ① Claim Check → ② structured intent → ③ T13 章节质量。Agent 化暂缓。
+
+| # | 项 | 状态 |
+|---|----|------|
+| ④ | Relation Gold v2 | ✅ 完成：16 条；统一 schema；valid/invalid Claim 对抗；lexical/gate baseline；测试通过。**未改** Decision / Gate / Writer。已具备进入 Claim Check 的前置条件。见 `RELATION_EDITOR_RUBRIC.md` |
+| ① | Claim Check | ⏸ 下一刀（消费 Gold v2） |
+| ② | Ask structured intent | 🟡 e08/e10/e21 |
+| ③ | T13 拆分质量 | 🟡 段级 cache 已有；盯章节识别/归属 |
 
 ---
 
@@ -404,5 +417,6 @@ LLM 提示词在 `app/prompts/`：`extract_T*.md`、`card_team.md`、`issue_draf
 | `ASK_ANALYSIS_CONTRACT.md`  | Ask SSE / context_refs 契约                                         |
 | `KNOWLEDGE_GRAPH_DESIGN.md` | 关系资产层的设计（未当主链路用）                                                  |
 | `AGENT_EVOLUTION.md`        | Agent 化讨论（未实现）                                                    |
+| `RELATION_EDITOR_RUBRIC.md` | 关系人审 rubric + **Gold v2** 契约 / baseline                             |
 
 

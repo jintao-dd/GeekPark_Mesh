@@ -2,6 +2,17 @@
 
 用于审校关系卡与维护 Relation Gold。**不是** Ask gold recall。
 
+## 项目状态（2026-09-07）
+
+**④ Relation Gold v2：✅ 完成**
+
+- 16 条 Gold；统一 schema；已有 valid/invalid Claim 对抗样例  
+- 已建 lexical/gate baseline（`line_grounded` ≠ `claim_valid`）  
+- 测试通过：`pytest tests/test_relation_gold_schema.py tests/test_relation_gold_smoke.py`  
+- **未修改** Decision / Gate / Writer  
+
+已具备进入 **① Claim Check** 开发的前置条件。
+
 ## Gold 文件
 
 | 文件 | 用途 |
