@@ -140,3 +140,32 @@ def load_existing_card(con, issue_id: int, team: str) -> dict | None:
     except (json.JSONDecodeError, TypeError):
         return None
     return card if isinstance(card, dict) else None
+
+
+def preview_content_fingerprint(
+    *,
+    item_fps: list[str],
+    card_fps: list[str],
+    teams: list[str],
+) -> str:
+    """条目+要点卡指纹：未变则可跳过周报壳与关系 LLM。"""
+    blob = "\n".join(
+        [
+            "teams:" + ",".join(teams or []),
+            "items:" + "|".join(item_fps or []),
+            "cards:" + "|".join(card_fps or []),
+        ]
+    )
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:24]
+
+
+def attach_content_fingerprint(data: dict, fp: str) -> dict:
+    out = dict(data) if isinstance(data, dict) else {}
+    out["_preview_content_fp"] = fp
+    return out
+
+
+def content_fingerprint_matches(data: dict | None, fp: str) -> bool:
+    if not fp or not isinstance(data, dict):
+        return False
+    return str(data.get("_preview_content_fp") or "").strip() == fp

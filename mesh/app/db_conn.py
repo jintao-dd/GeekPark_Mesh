@@ -120,6 +120,9 @@ class MeshConnection:
         self._closed = False
 
     def execute(self, sql: str, params=()):
+        from .publish_lane import guard_sql_against_published_write
+
+        guard_sql_against_published_write(sql)
         sql = adapt_sql(sql, self.dialect)
         if self.dialect == "postgresql":
             cur = self._raw.cursor(cursor_factory=psycopg2.extras.RealDictCursor)

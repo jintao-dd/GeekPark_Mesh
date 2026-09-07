@@ -177,6 +177,8 @@ items（未拦截、未合并）
 
 **Preview：** 可在 `status=published` 上直接跑；只写 `draft_json`，不改 `published_json`、不 reindex Ask。读者/Ask 仍看线上版。可选 `POST .../create_revision` 用线上稿铺底草稿（保持 published）。Owner Publish 才替换 `published_json` 并重建索引。
 
+**写入硬边界（`publish_lane`）：** 任何 `UPDATE issues SET … published_json` 须在 `allow_published_write` 内；`MeshConnection.execute` 运行时拦截。静态扫描见 `tests/test_published_write_boundary.py`。Publish 是唯一业务入口（`write_publish_projection`）。
+
 关系卡上常见字段：
 
 | 字段 | 谁写 |

@@ -412,7 +412,16 @@ def extract_source(
                 it["item_stype"] = seg.stype
                 it["_segment_team"] = seg.owner_hint or seg.team
                 out.append(it)
-        return apply_item_owner_guards(_stamp(out)), split.to_meta()
+        meta = split.to_meta()
+        # 段内容指纹：供下次对照；整源 extracted=1 时仍整包跳过
+        import hashlib
+        meta["segment_digests"] = [
+            hashlib.sha256(
+                f"{seg.stype}|{seg.title}|{len(seg.text or '')}".encode("utf-8")
+            ).hexdigest()[:16]
+            for seg in split.segments
+        ]
+        return apply_item_owner_guards(_stamp(out)), meta
     items = extract_items(
         stype, team, title, text,
         period_start=period_start, period_end=period_end,

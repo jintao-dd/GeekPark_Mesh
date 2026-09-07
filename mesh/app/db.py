@@ -900,9 +900,11 @@ def reindex_all_entity_facts(con) -> int:
     return len(ids)
 
 
-def reindex_issue(con, issue_id: int, *, items: bool = True):
+def reindex_issue(con, issue_id: int, *, items: bool = True, rebuild_chunks: bool = True):
     """仅已上线期进入搜索语料；草稿/未上线先清索引，避免问答/搜索泄露。
-    items=False 时只重建 published_json 层（FTS/entity），不写 live items 到 item_facts。"""
+    items=False 时只重建 published_json 层（FTS/entity），不写 live items 到 item_facts。
+    rebuild_chunks=False 时跳过 chunk_index（Publish 可异步补建）。
+    """
     from . import tokenize as tok
     row = con.execute(
         "SELECT slug, status, date_end, published_json FROM issues WHERE id=?",
@@ -916,7 +918,8 @@ def reindex_issue(con, issue_id: int, *, items: bool = True):
         from . import item_facts, chunk_index
         item_facts.reindex_item_facts(con, issue_id)
         reindex_entity_facts(con, issue_id)
-        chunk_index.rebuild_issue(con, issue_id, items=False)
+        if rebuild_chunks:
+            chunk_index.rebuild_issue(con, issue_id, items=False)
         return
     date_end = row["date_end"] or ""
     try:
@@ -956,8 +959,9 @@ def reindex_issue(con, issue_id: int, *, items: bool = True):
         con.execute("DELETE FROM item_entity_facts WHERE issue_slug=?", (slug,))
         item_facts.sync_fts(con)
     reindex_entity_facts(con, issue_id)
-    chunk_index.rebuild_issue(con, issue_id, items=items)
-    refresh_issue_embedding_status(con, issue_id)
+    if rebuild_chunks:
+        chunk_index.rebuild_issue(con, issue_id, items=items)
+        refresh_issue_embedding_status(con, issue_id)
 
 
 def refresh_issue_embedding_status(

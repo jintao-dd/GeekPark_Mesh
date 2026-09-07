@@ -108,6 +108,7 @@ def start(slug: str, username: str, *, force: bool = False) -> dict:
 
     st0 = _new_state(slug)
     st0["_username"] = username
+    st0["_force"] = bool(force)
     claimed = job_store.try_claim(
         KIND, slug, _defaults(slug), st0, force=force,
     )
@@ -338,6 +339,9 @@ def _run(slug: str, username: str, token: int = 0) -> None:
 
             if not _is_current(slug, token):
                 return
+
+        # 卡片全部落库后统一刷一次骨架 lead（减少 write_lock）
+        if cards_done_teams:
             with db.write_lock():
                 con = db.connect()
                 try:
@@ -379,6 +383,72 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                 phase="cards",
                 preview_ready=True,
                 preview_url=_preview_url(slug),
+            )
+            return
+
+        # 内容指纹：force=False 且条目/卡未变且已有完整草稿 → 跳过周报壳+关系 LLM
+        st_now = job_store.get(KIND, slug, _defaults(slug))
+        force_run = bool(st_now.get("_force"))
+        item_fps: list[str] = []
+        card_fps: list[str] = []
+        with db.write_lock():
+            con = db.connect()
+            try:
+                for team in teams:
+                    items = [
+                        dict(x)
+                        for x in con.execute(
+                            "SELECT zone, level, kind, text, entities, roles, signals, source_label, "
+                            "source_labels, channel FROM items WHERE issue_id=? AND owner_team=? "
+                            "AND blocked=0 AND merged_into IS NULL",
+                            (issue_id, team),
+                        )
+                    ]
+                    item_fps.append(prog.items_fingerprint(items))
+                    card_fps.append(prog.card_fingerprint(prog.load_existing_card(con, issue_id, team)))
+                row_fp = con.execute(
+                    "SELECT draft_json FROM issues WHERE id=?", (issue_id,)
+                ).fetchone()
+                try:
+                    draft_fp = json.loads(row_fp["draft_json"] or "{}") if row_fp else {}
+                except (json.JSONDecodeError, TypeError):
+                    draft_fp = {}
+            finally:
+                con.close()
+        content_fp = prog.preview_content_fingerprint(
+            item_fps=item_fps, card_fps=card_fps, teams=teams,
+        )
+        if (
+            not force_run
+            and prog.content_fingerprint_matches(draft_fp, content_fp)
+            and draft_fp.get("_preview_gate_ok")
+            and isinstance(draft_fp.get("relations"), list)
+            and draft_fp.get("relations")
+            and not draft_fp.get("_preview_building")
+        ):
+            stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+            data = prog.attach_content_fingerprint(draft_fp, content_fp)
+            data = prog.finalize_preview_flags(data, stamp=stamp)
+            with db.write_lock():
+                con = db.connect()
+                try:
+                    _write_partial_draft(con, issue_id, data, stamp)
+                    con.commit()
+                finally:
+                    con.close()
+            _set(
+                slug,
+                running=False,
+                done=True,
+                error=None,
+                phase="done",
+                message="内容未变，复用上次预览草稿",
+                preview_url=f"/{slug}?preview=1&edit=1",
+                preview_ready=True,
+                cards_done=ok_cards,
+                cards_total=cards_total,
+                final_status="ok",
+                resilience=resilience.to_dict(),
             )
             return
 
@@ -552,6 +622,7 @@ def _run(slug: str, username: str, token: int = 0) -> None:
             return
 
         data = prog.finalize_preview_flags(data, stamp=stamp)
+        data = prog.attach_content_fingerprint(data, content_fp)
         if resilience.skipped or dropped_rels:
             data["_preview_degraded"] = True
         if dropped_rels:

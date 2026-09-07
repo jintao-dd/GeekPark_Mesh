@@ -7,6 +7,7 @@ UI 不得把它们显示成「本轮已完成」。
 from __future__ import annotations
 import json
 import traceback
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from . import db, llm, merge, job_store, ask_concurrency
 
@@ -154,7 +155,7 @@ def _run(slug: str, token: int = 0) -> None:
         _mark(slug, "transcribe", f"{n_aud or '—'} 段")
         _mark(slug, "normalize", "已整理")
 
-        # ---- 抽取：按来源隔离；可重试错误自动重试 ≤2；失败则跳过该来源 ----
+        # ---- 抽取：LLM 可并行（受 job llm_slot 限流）；写库与 resilience 记账仍串行 ----
         from .aggregator import merge_source_meta
         from .attribution import apply_attribution_to_item
         from .job_resilience import ResilienceReport, try_unit
@@ -164,6 +165,8 @@ def _run(slug: str, token: int = 0) -> None:
         ok_sources = 0
         skipped_done = 0
         total = len(srcs)
+
+        pending: list[tuple[int, dict, bool, str]] = []
         for i, s in enumerate(srcs, 1):
             if not _is_current(slug, token):
                 return
@@ -178,30 +181,71 @@ def _run(slug: str, token: int = 0) -> None:
                 skipped_done += 1
                 _mark(slug, "extract", f"已抽取跳过 {i}/{total} · {title}（{n_exist} 条）")
                 continue
-            _mark(slug, "extract", f"抽取中 {i}/{total} · {title}")
             skip_split = False
             try:
                 meta_obj = json.loads(s["meta"] or "{}") if isinstance(s.get("meta"), str) else (s.get("meta") or {})
                 skip_split = (meta_obj.get("split") or {}).get("mode") == "pre_split"
             except (json.JSONDecodeError, TypeError, AttributeError):
                 skip_split = False
+            pending.append((i, s, skip_split, unit))
 
-            def _extract_one(_s=s, _skip=skip_split):
+        def _llm_extract(_s: dict, _skip: bool):
+            try:
+                with ask_concurrency.llm_slot(pool="job"):
+                    return llm.extract_source(
+                        _s["stype"], _s["team"], _s["title"], _s["text"] or "",
+                        period_start=r["date_start"] or "",
+                        period_end=r["date_end"] or "",
+                        period_label=r["period_label"] or "",
+                        channel=_s.get("channel") or "manual",
+                        skip_split=_skip,
+                        source_id=_s["id"],
+                    )
+            except ask_concurrency.AskBusyError as e:
+                raise RuntimeError(f"抽取排队超时：{e}") from e
+            except ask_concurrency.JobBusyError as e:
+                raise RuntimeError(f"抽取排队超时：{e}") from e
+
+        # 预热并行 LLM：结果暂存；真正 try_unit/落库仍按序，避免 ResilienceReport 竞态
+        llm_cache: dict[int, object] = {}
+        if len(pending) > 1:
+            _mark(slug, "extract", f"并行抽取 {len(pending)}/{total} 个来源…")
+            workers = min(len(pending), max(2, int(getattr(ask_concurrency, "_JOB_GLOBAL", 2) or 2)))
+
+            def _preheat(item: tuple[int, dict, bool, str]):
+                i, s, skip_split, _unit = item
                 try:
-                    with ask_concurrency.llm_slot(pool="job"):
-                        return llm.extract_source(
-                            _s["stype"], _s["team"], _s["title"], _s["text"] or "",
-                            period_start=r["date_start"] or "",
-                            period_end=r["date_end"] or "",
-                            period_label=r["period_label"] or "",
-                            channel=_s.get("channel") or "manual",
-                            skip_split=_skip,
-                            source_id=_s["id"],
-                        )
-                except ask_concurrency.AskBusyError as e:
-                    raise RuntimeError(f"抽取排队超时：{e}") from e
-                except ask_concurrency.JobBusyError as e:
-                    raise RuntimeError(f"抽取排队超时：{e}") from e
+                    return i, _llm_extract(s, skip_split), None
+                except Exception as e:
+                    return i, None, e
+
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                futs = [pool.submit(_preheat, item) for item in pending]
+                for fut in as_completed(futs):
+                    if not _is_current(slug, token):
+                        return
+                    i, val, err = fut.result()
+                    llm_cache[i] = (val, err)
+                    s = next(x[1] for x in pending if x[0] == i)
+                    title = (s["title"] or f"来源 {s['id']}")[:36]
+                    _mark(slug, "extract", f"抽取返回 {i}/{total} · {title}")
+
+        for i, s, skip_split, unit in pending:
+            if not _is_current(slug, token):
+                return
+            title = (s["title"] or f"来源 {s['id']}")[:36]
+            _mark(slug, "extract", f"抽取中 {i}/{total} · {title}")
+
+            cached_box = [llm_cache.get(i)] if llm_cache else [None]
+
+            def _extract_one(_s=s, _skip=skip_split, _box=cached_box):
+                if _box[0] is not None:
+                    val, err = _box[0]
+                    _box[0] = None  # 只消费一次；try_unit 重试走真 LLM
+                    if err is not None:
+                        raise err
+                    return val
+                return _llm_extract(_s, _skip)
 
             extracted = try_unit(
                 _extract_one,
@@ -213,7 +257,6 @@ def _run(slug: str, token: int = 0) -> None:
                 ),
             )
             if extracted is None:
-                # 局部降级：记下原因，不阻断其他来源
                 try:
                     meta_obj = json.loads(s.get("meta") or "{}") if isinstance(s.get("meta"), str) else dict(s.get("meta") or {})
                 except (json.JSONDecodeError, TypeError):
@@ -264,6 +307,10 @@ def _run(slug: str, token: int = 0) -> None:
             except (json.JSONDecodeError, TypeError):
                 meta_obj = {}
             meta_obj.pop("extract_error", None)
+            if isinstance(split_meta, dict) and split_meta.get("segment_digests"):
+                sp = dict(meta_obj.get("split") or {})
+                sp["segment_digests"] = list(split_meta.get("segment_digests") or [])
+                meta_obj["split"] = sp
             if llm.split_needs_review(
                 split_meta,
                 stype=s.get("stype") or "",

@@ -1400,7 +1400,7 @@ def issue_weak_relations_resolve(request: Request, slug: str, payload: dict):
     from .issue_verify import sync_kpis_from_data
     draft = sync_kpis_from_data(draft)
     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    from .relation_display import attach_reader_flags, build_published_projection, split_relations_for_publish
+    from .relation_display import attach_reader_flags, split_relations_for_publish
     draft["relations"] = attach_reader_flags(
         [r for r in (draft.get("relations") or []) if isinstance(r, dict)]
     )
@@ -1408,12 +1408,9 @@ def issue_weak_relations_resolve(request: Request, slug: str, payload: dict):
     draft["_relations_reader"] = reader
     draft["_relations_backlog"] = backlog
     draft_payload = json.dumps(draft, ensure_ascii=False)
-    # 已上线期：published 只写投影；草稿期可与 draft 同写（仍投影，避免误漏）
-    pub_payload = json.dumps(build_published_projection(draft), ensure_ascii=False)
-    con.execute(
-        "UPDATE issues SET draft_json=?, published_json=?, updated_at=? WHERE id=?",
-        (draft_payload, pub_payload, stamp, r["id"]),
-    )
+    # 只写草稿；published_json / Ask 仅由 Publish 更新（publish_lane 硬边界）
+    from .publish_lane import write_draft_json
+    write_draft_json(con, r["id"], draft_payload, stamp)
     con.execute(
         "INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)",
         (r["id"], u.get("u") or "", "weak_relations", action, f"{changed} cards"),
@@ -2471,7 +2468,7 @@ def api_edit(request: Request, payload: dict):
 def api_add_card(request: Request, payload: dict):
     u = auth.require(request, "editor")
     slug = payload.get("slug")
-    target = payload.get("target", "published")
+    # target 已废弃：编辑永远写 draft_json（publish_lane）
     section = (payload.get("section") or "relations").strip()
     con = db.connect()
     r = con.execute("SELECT * FROM issues WHERE slug=?", (slug,)).fetchone()
@@ -2552,7 +2549,7 @@ def api_add_item(request: Request, payload: dict):
     u = auth.require(request, "editor")
     slug = payload.get("slug")
     path = payload.get("path") or ""
-    target = payload.get("target", "published")
+    # target 已废弃：编辑永远写 draft_json（publish_lane）
     kind = payload.get("kind") or "tag"
     con = db.connect()
     r = con.execute("SELECT * FROM issues WHERE slug=?", (slug,)).fetchone()
@@ -2703,14 +2700,23 @@ def publish(request: Request, slug: str, confirm: str = Form("")):
     pub_iso = pub_day.isoformat()
     draft_payload = json.dumps(data, ensure_ascii=False)
     pub_payload = json.dumps(published, ensure_ascii=False)
-    con.execute(
-        "UPDATE issues SET published_json=?, draft_json=?, status='published', published_at=?, "
-        "updated_at=?, period_label=?, date_end=?, date_start=? WHERE id=?",
-        (pub_payload, draft_payload, now, now, pub_label, pub_iso, pub_iso, r["id"]),
-    )
+    from .publish_lane import allow_published_write, write_publish_projection
+    with allow_published_write("publish"):
+        write_publish_projection(
+            con,
+            r["id"],
+            pub_payload=pub_payload,
+            draft_payload=draft_payload,
+            published_at=now,
+            updated_at=now,
+            period_label=pub_label,
+            date_end=pub_iso,
+            date_start=pub_iso,
+        )
     db.register_entities(con, published, slug)
     db.snapshot_published_items(con, r["id"])
-    db.reindex_issue(con, r["id"])
+    # FTS + item_facts 同步（Ask 立即可用）；chunk 索引异步重建（P2）
+    db.reindex_issue(con, r["id"], items=True, rebuild_chunks=False)
     _ASK_CACHE.clear()
     seq = con.execute("SELECT COUNT(*) c FROM versions WHERE issue_id=?", (r["id"],)).fetchone()["c"] + 1
     cards_out = len(published.get("relations", [])) + sum(
@@ -2727,6 +2733,26 @@ def publish(request: Request, slug: str, confirm: str = Form("")):
         (r["id"], u["u"], "publish", "", f"v{seq} reader_relations={len(published.get('relations') or [])}"),
     )
     con.commit()
+    issue_id_pub = r["id"]
+    con.close()
+
+    def _async_chunks():
+        try:
+            with db.write_lock():
+                c2 = db.connect()
+                try:
+                    from . import chunk_index
+                    chunk_index.rebuild_issue(c2, issue_id_pub, items=True)
+                    db.refresh_issue_embedding_status(c2, issue_id_pub)
+                    c2.commit()
+                finally:
+                    c2.close()
+        except Exception as e:
+            print(f"[mesh] async chunk reindex failed for {slug}: {e}", flush=True)
+
+    import threading
+    threading.Thread(target=_async_chunks, name=f"chunk-reindex-{slug}", daemon=True).start()
+
     embed_info: dict = {"persisted": True, "queued": False, "skipped": True}
     if embeddings.is_configured():
         try:
@@ -2740,7 +2766,6 @@ def publish(request: Request, slug: str, confirm: str = Form("")):
                 "error": str(e)[:200],
                 "hint": "issues.embedding_status=pending 已落库，启动 maintenance 会重试",
             }
-    con.close()
     _ASK_CACHE.clear()
     edm_job.enqueue_auto_send(slug, by=u.get("u") or "publish")
     if wants_json:

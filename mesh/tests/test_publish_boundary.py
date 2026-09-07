@@ -271,11 +271,13 @@ def test_rollback_restores_published_and_refresh_embed_status():
         con.commit()
 
         payload = json.dumps(v1, ensure_ascii=False)
-        con.execute(
-            "UPDATE issues SET published_json=?, draft_json=?, status='published', "
-            "published_at=?, updated_at=? WHERE id=?",
-            (payload, payload, "2026-01-01 10:00", "2026-01-02 12:00", iid),
-        )
+        from app.publish_lane import allow_published_write
+        with allow_published_write("test_rollback"):
+            con.execute(
+                "UPDATE issues SET published_json=?, draft_json=?, status='published', "
+                "published_at=?, updated_at=? WHERE id=?",
+                (payload, payload, "2026-01-01 10:00", "2026-01-02 12:00", iid),
+            )
         db.reindex_issue(con, iid)
         info = db.refresh_issue_embedding_status(con, iid, status="pending")
         con.commit()
