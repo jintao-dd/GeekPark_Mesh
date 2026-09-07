@@ -86,7 +86,23 @@ def test_split_needs_review_fallback():
         stype="T13",
         team="内容中心·数据聚合",
     )
-    assert not llm.split_needs_review({"mode": "multi", "segments": 3}, stype="T13")
+    # 健康 multi 不拦
+    assert not llm.split_needs_review(
+        {"mode": "multi", "segments": 8, "toc_count": 8, "boundaries": 10},
+        stype="T13",
+    )
+    # 目录远多于段落 → 拦
+    assert llm.split_needs_review(
+        {"mode": "multi", "segments": 2, "toc_count": 12, "warnings": ["目录项远多于正文段落"]},
+        stype="T13",
+        team="内容中心·数据聚合",
+    )
+    # single + 多边界仅 1 段 → 拦
+    assert llm.split_needs_review(
+        {"mode": "single", "segments": 1, "boundaries": 5, "warnings": ["有效段落仅 1 段"]},
+        stype="T13",
+        team="内容中心·数据聚合",
+    )
     # 单团队来源：选了谁就是谁，长文单段也不拦
     assert not llm.split_needs_review(
         {"mode": "single", "boundaries": 0, "warnings": ["长文仅拆出 1 段"]},

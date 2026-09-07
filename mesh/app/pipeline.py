@@ -1,12 +1,8 @@
 """GeekPark Mesh · 管线定义与执行器
 
-**这是 25 步的唯一事实源。** 后台界面显示的步骤、后端真正执行的动作，都读这一份，
-不允许两边各写一份——那正是"UI 上写了、后端没做"的来源。
-
-每步的 `by` 字段标明它由谁执行：
-  - "code"  : 后端代码离散执行，跑完能给出真实数字（可验收）
-  - "model" : 在抽取的提示词内部执行，随抽取阶段整体完成
-UI 会把两者区分显示。**不许给 model 步伪造独立进度条。**
+挖掘阶段真正执行的步骤以本文件 `_run` 为准。
+`PROC` / `DESIGN` 供控制台展示；`by=defer` 表示**不在挖掘阶段执行**（生成预览时做），
+UI 不得把它们显示成「本轮已完成」。
 """
 from __future__ import annotations
 import json
@@ -20,8 +16,8 @@ KIND = "pipeline"
 PROC = [
     dict(sk="intake", k="接收 · 隔离入库", by="code",
          h="原样写入原始层，与网站物理隔离"),
-    dict(sk="transcribe", k="转写与识别", by="code",
-         h="录音转文字、录屏抽帧拼接、按说话人分段；说话人归属可能不准，转写稿只进原始层"),
+    dict(sk="transcribe", k="转写统计", by="code",
+         h="统计标题含「录音」的 T6 条数（当前不做真实 ASR）"),
     dict(sk="normalize", k="清洗 · 去重", by="code",
          h="去掉寒暄与重复，统一格式"),
 ]
@@ -39,33 +35,33 @@ DESIGN = [
          h="对照信息池近 12 期，识别谁首次进入记录、谁与往期同名。没有这一步，周报只是一次性摘要"),
     dict(sk="cross-channel-merge", k="跨通道合并 · 同一件事只算一次", by="code",
          h="同一场会可能同时出现在日历、录音和聚合文档里。按实体加事件合并，合并后保留全部来源行。不做这一步，同团队的数据到达两次会被误判成跨部门关系"),
-    # 以下随「生成预览/草稿」执行，挖掘阶段只占位说明，避免 UI 假完成
+    # 以下不在挖掘阶段执行——控制台应标「生成预览时」，禁止假完成
     dict(sk="relation-link", k="关系匹配", by="defer",
-         h="在生成周报草稿时由关系候选 + 模型完成，挖掘阶段不单独跑"),
+         h="在「生成预览」时由关系候选 + 模型完成，挖掘阶段不跑"),
     dict(sk="sync-pick", k="可同步性判断", by="defer",
-         h="在生成周报草稿时执行（跨团队 provenance 校验）"),
+         h="在「生成预览」时执行（跨团队 provenance 校验）"),
     dict(sk="compose", k="五块合成", by="defer",
-         h="在生成周报草稿时合成五块结构"),
+         h="在「生成预览」时合成五块结构"),
     dict(sk="cite", k="来源行生成", by="defer",
-         h="在生成周报草稿时写入来源行"),
+         h="在「生成预览」时写入来源行"),
     dict(sk="lint", k="术语与标签检查", by="code",
          h="禁用词、日程确定度、「不代表承诺」提示、只列本期提交团队"),
     dict(sk="name-verify", k="姓名与职级核对", by="defer",
-         h="随抽取提示词约束；挖掘阶段不做二次模型核对"),
+         h="随抽取提示词约束；挖掘阶段不做独立二次核对"),
     dict(sk="zone-sort", k="六区分拣", by="defer",
-         h="随抽取写入 zone；代码硬拦⑤区/L3"),
+         h="随抽取写入 zone；代码硬拦⑤区/L3（本步非独立运行）"),
     dict(sk="decision-split", k="决定与想法分离", by="defer",
-         h="随 T6 等抽取提示词执行"),
+         h="随 T6 等抽取提示词执行，非独立步骤"),
     dict(sk="speaker-doubt", k="说话人存疑标记", by="defer",
-         h="随转写类抽取提示词执行"),
+         h="随转写类抽取提示词执行，非独立步骤"),
     dict(sk="value-extract", k="价值提取 · 有没有下一步", by="defer",
-         h="随抽取提示词执行"),
+         h="随抽取提示词执行，非独立步骤"),
     dict(sk="certainty-tag", k="确定度标注", by="defer",
-         h="随抽取提示词执行"),
+         h="随抽取提示词执行，非独立步骤"),
     dict(sk="first-seen", k="首次进入判定", by="code",
          h="对照信息池，确认哪些人和公司是本期第一次进入记录。本周导语从这里取角度"),
     dict(sk="invest-guard", k="投资侧合规二次过滤", by="defer",
-         h="随 listed / zone 规则与草稿生成"),
+         h="随 listed / zone 规则与草稿生成，挖掘阶段不单独跑"),
     dict(sk="contrib-list", k="贡献团队清点", by="code",
          h="按归属团队计，不按采集通道计。只列本期有材料进来的团队，不写谁没交"),
     dict(sk="trace-keep", k="可追溯留痕", by="code",
@@ -312,19 +308,13 @@ def _run(slug: str, token: int = 0) -> None:
         st = merge.apply_merge(con, iid)
         _mark(slug, "cross-channel-merge", f"合并 {st['groups']} 组 · 来源 {st['source_lines']} 行")
 
-        for sk in ("relation-link", "sync-pick", "compose", "cite"):
-            _mark(slug, sk, "待预览/草稿阶段")
+        # defer 步不写假完成结果；UI 按 by=defer 显示「生成预览时」
 
         hits = llm.forbidden_hits(" ".join(
             (x["text"] or "") for x in con.execute("SELECT text FROM items WHERE issue_id=? AND blocked=0 AND merged_into IS NULL", (iid,))))
         _mark(slug, "lint", f"问题 {len(hits)}" + ("：" + "、".join(hits[:4]) if hits else ""))
 
-        for sk in ("name-verify", "zone-sort", "decision-split", "speaker-doubt",
-                   "value-extract", "certainty-tag"):
-            _mark(slug, sk, "随抽取提示词")
-
         _mark(slug, "first-seen", f"首次 {len(first)}")
-        _mark(slug, "invest-guard", "随草稿/规则")
 
         teams = [x["owner_team"] for x in con.execute(
             "SELECT DISTINCT owner_team FROM items WHERE issue_id=? AND blocked=0 AND merged_into IS NULL AND owner_team IS NOT NULL AND owner_team<>''", (iid,))]

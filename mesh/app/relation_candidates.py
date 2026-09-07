@@ -734,10 +734,16 @@ def prepare_draft_bundle(con, issue_id: int, slug: str) -> dict:
             if not e or e["first_issue"] == slug:
                 names.append(n)
     names = list(dict.fromkeys(names))[:40]
+    from .relation_continue import annotate_candidates_with_continuity, load_recent_relation_fingerprints
+
+    candidates = build_relation_candidates(item_rows)
+    prior = load_recent_relation_fingerprints(con, before_slug=slug, limit_issues=8)
+    annotate_candidates_with_continuity(candidates, prior)
     return {
         "team_cards": team_cards,
-        "relation_candidates": build_relation_candidates(item_rows),
+        "relation_candidates": candidates,
         "item_rows": item_rows,
         "external_items": external,
         "first_names": names,
+        "continued_relations": sum(1 for c in candidates if isinstance(c, dict) and c.get("continued_from")),
     }

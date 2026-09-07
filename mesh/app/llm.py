@@ -433,19 +433,47 @@ def split_needs_review(
     team: str = "",
     channel: str = "",
 ) -> bool:
-    """仅内容聚合包在拆段置信度低时要求人工确认；单团队来源不拦。"""
+    """仅内容聚合包在拆段置信度低时要求人工确认；单团队来源不拦。
+
+    触发（须同时是聚合源）：
+    - mode fallback / empty
+    - single + 少边界 + 有 warnings（长文 1 段）
+    - single + 多边界但仅 1 有效段（壳跳过）
+    - 目录项远多于段落（toc_count vs segments）
+    - warnings 含「拆段不足 / 仅 1 段」类文案
+    """
     from .ingest import is_aggregation_source
 
     if not is_aggregation_source(stype=stype, team=team, channel=channel):
         return False
     if not split_meta:
         return False
-    mode = split_meta.get("mode") or ""
+    mode = (split_meta.get("mode") or "").strip()
     if mode in ("fallback", "empty"):
         return True
-    if mode == "single" and int(split_meta.get("boundaries") or 0) <= 1:
-        # 长文仅 1 段且几乎无边界
-        return bool(split_meta.get("warnings"))
+    if mode == "pre_split":
+        # 上传已炸成子来源：子源本身通常不是聚合 stype，不会走到这里
+        return False
+
+    segments = int(split_meta.get("segments") or 0)
+    boundaries = int(split_meta.get("boundaries") or 0)
+    toc_count = int(split_meta.get("toc_count") or 0)
+    warnings = [str(w) for w in (split_meta.get("warnings") or []) if w]
+    warn_blob = "；".join(warnings)
+
+    if mode == "single":
+        if boundaries <= 1 and warnings:
+            return True
+        if boundaries > 1 and segments <= 1:
+            return True
+
+    if toc_count >= 3 and segments > 0 and segments * 2 < toc_count:
+        return True
+
+    for needle in ("长文仅拆出 1 段", "有效段落仅 1 段", "拆段不足", "目录项远多于"):
+        if needle in warn_blob:
+            return True
+
     return False
 
 # ---------- 2. 团队要点卡 ----------

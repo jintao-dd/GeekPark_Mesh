@@ -142,6 +142,7 @@ class SplitResult:
     warnings: list[str] = field(default_factory=list)
     boundaries: int = 0
     skipped: int = 0
+    toc_count: int = 0
 
     def to_meta(self) -> dict:
         return {
@@ -149,6 +150,7 @@ class SplitResult:
             "mode": self.mode,
             "boundaries": self.boundaries,
             "skipped": self.skipped,
+            "toc_count": self.toc_count,
             "warnings": self.warnings,
             "types": _stype_counts(self.segments),
         }
@@ -474,9 +476,14 @@ def split_bundle_ex(text: str, *, source_title: str = "") -> SplitResult:
     skipped_n = sum(skipped)
 
     toc = parse_content_stats_toc(raw)
+    toc_n = len(toc) if toc else 0
     warnings: list[str] = []
     if toc and segments:
         warnings.append(f"内容统计目录 {len(toc)} 项；正文拆出 {len(segments)} 段")
+        if toc_n >= 3 and len(segments) * 2 < toc_n:
+            warnings.append(
+                f"目录项远多于正文段落（{toc_n} vs {len(segments)}），可能拆段不足，请核对归属"
+            )
     if not segments and len(raw) >= _MIN_SEGMENT:
         seg = _fallback_segment(source_title, raw)
         warnings.append(
@@ -489,6 +496,7 @@ def split_bundle_ex(text: str, *, source_title: str = "") -> SplitResult:
             warnings=warnings,
             boundaries=boundary_count,
             skipped=skipped_n,
+            toc_count=toc_n,
         )
 
     if not segments:
@@ -498,6 +506,7 @@ def split_bundle_ex(text: str, *, source_title: str = "") -> SplitResult:
             warnings=["正文过短或无可抽取段落"],
             boundaries=boundary_count,
             skipped=skipped_n,
+            toc_count=toc_n,
         )
 
     mode = "multi" if len(segments) > 1 else "single"
@@ -515,6 +524,7 @@ def split_bundle_ex(text: str, *, source_title: str = "") -> SplitResult:
         warnings=warnings,
         boundaries=boundary_count,
         skipped=skipped_n,
+        toc_count=toc_n,
     )
 
 

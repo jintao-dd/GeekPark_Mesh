@@ -170,6 +170,8 @@ h1 .thin{font-weight:300;color:var(--ink2)}
 
 .rule:first-child{border-top:0}
 .rule.run,.rule.ok{opacity:1}
+.rule.defer{opacity:.35}
+.rule.defer .r{color:var(--ink4);font-size:11px}
 .rule .mk{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--line);margin-top:5px;transition:.3s}
 .rule.run .mk{border-color:var(--mesh);border-top-color:transparent;animation:spin .7s linear infinite;width:14px;height:14px}
 .rule.ok .mk{background:var(--mesh);border-color:var(--mesh)}

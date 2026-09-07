@@ -90,7 +90,7 @@ FastAPI  mesh/app/main.py
 - 禁用词扫描：`llm.forbidden_hits`
 - 旧草稿作废：`db.mark_draft_stale`
 
-`pipeline.py` 里列了 25 步给 UI 看。真正干活的是抽取和上面这些代码步。  
+`pipeline.py` 里列了约 25 步给 UI 看；`by=defer` 的不在挖掘阶段执行。真正干活的是抽取和上面这些代码步。  
 **`transcribe` 没有 ASR**，只统计标题含「录音」的 T6。  
 `relation-link` / `compose` / `cite` 等标成 `defer`，挖掘阶段只打「待预览」。
 

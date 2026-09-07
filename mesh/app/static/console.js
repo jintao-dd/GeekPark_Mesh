@@ -401,33 +401,49 @@ if (safebar) {
 
 /* ---------- 第二步：真实管线 ---------- */
 function ruleLi(x, i) {
-  const by = x.by === 'code' ? '代码执行' : '模型内执行';
-  return `<li class="rule ${x.tier}" data-i="${i}"><span class="mk"></span><span><span class="k">${x.k}<span class="sk">${x.sk}</span><span class="sk" style="opacity:.6">${by}</span></span><span class="h">${x.h}</span></span><span class="r"></span></li>`;
+  const byMap = { code: '代码执行', model: '抽取时随模型', defer: '生成预览时' };
+  const by = byMap[x.by] || x.by || '';
+  return `<li class="rule ${x.tier}${x.by === 'defer' ? ' defer' : ''}" data-i="${i}" data-by="${x.by || ''}"><span class="mk"></span><span><span class="k">${x.k}<span class="sk">${x.sk}</span><span class="sk" style="opacity:.6">${by}</span></span><span class="h">${x.h}</span></span><span class="r"></span></li>`;
 }
 function renderRules() {
   const proc = A.steps.filter(x => x.tier === 'proc'), design = A.steps.filter(x => x.tier === 'design');
+  const deferN = design.filter(x => x.by === 'defer').length;
   $('#rules').innerHTML =
-    `<details class="proc" id="procWrap" open><summary><span class="pk">文件处理</span><span class="ph">转写 · 清洗 · 去重，共 ${proc.length} 项</span><span class="pr" id="procR"></span></summary><ul class="plist">${proc.map((x, i) => ruleLi(x, i)).join('')}</ul></details>`
-    + `<ul class="dlist">${design.map((x, i) => ruleLi(x, proc.length + i)).join('')}</ul>`;
+    `<details class="proc" id="procWrap" open><summary><span class="pk">文件处理</span><span class="ph">转写统计 · 清洗 · 去重，共 ${proc.length} 项</span><span class="pr" id="procR"></span></summary><ul class="plist">${proc.map((x, i) => ruleLi(x, i)).join('')}</ul></details>`
+    + `<ul class="dlist">${design.map((x, i) => ruleLi(x, proc.length + i)).join('')}</ul>`
+    + (deferN ? `<p class="muted" style="margin:8px 0 0;font-size:12px">灰色「生成预览时」步骤本轮挖掘不执行，不算完成。</p>` : '');
 }
 function paint(state) {
   const lis = $$('#rules .rule');
-  const total = A.steps.length;
+  const total = A.steps.filter(x => x.by !== 'defer').length || A.steps.length;
   const cur = state.cur;
+  let doneActive = 0;
   lis.forEach((li, i) => {
-    li.classList.remove('run');
-    if (i < cur) li.classList.add('done');
-    else if (i === cur) { li.classList.add(state.done ? 'done' : 'run'); }
-    const sk = A.steps[i].sk;
+    const step = A.steps[i] || {};
+    const isDefer = step.by === 'defer';
+    li.classList.remove('run', 'done', 'ok');
+    const sk = step.sk;
     const r = state.results[sk];
-    if (r) li.querySelector('.r').textContent = r;
+    const rr = li.querySelector('.r');
+    if (isDefer) {
+      li.classList.add('defer');
+      if (rr) rr.textContent = r || '生成预览时';
+      return;
+    }
+    if (i < cur) { li.classList.add('ok'); doneActive += 1; }
+    else if (i === cur) {
+      if (state.done) { li.classList.add('ok'); doneActive += 1; }
+      else li.classList.add('run');
+    }
+    if (r && rr) rr.textContent = r;
     if (i === cur && !state.done) li.scrollIntoView({ block: 'center', behavior: 'smooth' });
   });
-  const pct = Math.min(100, Math.round(((cur + 1) / total) * 100));
+  const pct = state.done ? 100 : Math.min(99, Math.round(((doneActive + (state.running ? 1 : 0)) / Math.max(1, total)) * 100));
   $('#pf').style.width = pct + '%';
   $('#ppct').textContent = pct + '%';
+  const curStep = A.steps[cur];
   $('#pnow').textContent = state.error ? ('出错：' + state.error)
-    : (state.done ? '全部完成' : (cur >= 0 ? A.steps[cur].k : '准备就绪'));
+    : (state.done ? '挖掘完成（关系/五块合成在生成预览时）' : (curStep ? curStep.k : '准备就绪'));
 }
 function showBusy(msg, hint) {
   const el = $('#busy');
