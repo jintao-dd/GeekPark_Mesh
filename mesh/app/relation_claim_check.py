@@ -3,9 +3,11 @@
 检查 title + body + details；与 Evidence Gate / line_grounded 独立。
 默认 shadow（只写 audit），MESH_CLAIM_CHECK_MODE=enforce 才藏卡。
 
-rule_v1.1（A1.1）：
-- watch/one_sided 的 CONTACT 不因 evidence 缺同词误杀（缺词 ≠ 否定）
+rule_v1.1 / v1.2（A1.1–A1.2）：
+- watch/one_sided/parallel_tracks/info_complement 的 CONTACT：
+  evidence 有效但缺同词 ≠ status upgrade（缺词 ≠ 否定）
 - blocker 不按整卡全局下压；仅在完成态论断与未完成证据冲突时生效
+- 平行语境下 DEAL+ 过头合作仍 invalid（不放宽）
 """
 from __future__ import annotations
 
@@ -22,7 +24,7 @@ STRENGTH_PUSH = 6
 STRENGTH_DEAL = 7
 STRENGTH_SIGNED = 8
 
-_MODEL = "rule_v1.1"
+_MODEL = "rule_v1.2"
 
 # (level, patterns) — 长词优先靠列表顺序 + 扫描时取 max
 _STRENGTH_PATTERNS: list[tuple[int, tuple[str, ...]]] = [
@@ -239,6 +241,7 @@ def _has_evidence(rel: dict) -> bool:
 
 
 def _watchish(rel: dict) -> bool:
+    """单侧/观察语境：允许 CONTACT 缺词豁免。"""
     if rel.get("weak") or rel.get("decision_tier") == "watch":
         return True
     rt = (rel.get("relation_type") or "").strip()
@@ -248,6 +251,17 @@ def _watchish(rel: dict) -> bool:
         if str(t).strip().startswith("→"):
             return True
     return False
+
+
+def _contact_soft_context(rel: dict) -> bool:
+    """A1.2：CONTACT 缺词豁免语境 = watch/one_sided + parallel/info_complement。
+
+    不放宽 DEAL+ 过头合作（仍由强度比较 / cooccur 规则拦截）。
+    """
+    if _watchish(rel):
+        return True
+    rt = (rel.get("relation_type") or "").strip()
+    return rt in ("parallel_tracks", "info_complement")
 
 
 def _any_piece_supports_level(rel: dict, items: list[dict] | None, level: int) -> bool:
@@ -328,11 +342,11 @@ def check_relation_claim(
         if _any_piece_supports_level(rel, items, cs):
             continue
 
-        # A1.1：watch/one_sided + 有效 evidence + 仅 CONTACT/建联
-        # 「缺接触字面」≠「接触不成立」；有明确否定才拦
+        # A1.2：watch/one_sided/parallel/info_complement + 有效 evidence + 仅 CONTACT/建联
+        # 「缺接触字面」≠「接触不成立」；有明确否定才拦。DEAL+ 过头仍走下方规则。
         if (
             cs <= STRENGTH_CONTACT
-            and _watchish(rel)
+            and _contact_soft_context(rel)
             and _has_evidence(rel)
             and not _blob_has_any(blob, _CONTACT_DENIALS)
         ):

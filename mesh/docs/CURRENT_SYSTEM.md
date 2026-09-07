@@ -349,7 +349,7 @@ SSE 会发 step 事件；简单路径会先收完全文再校验，再按块吐�
 | # | 项 | 状态 |
 |---|----|------|
 | ④ | Relation Gold v2 | ✅ 完成：16 条；统一 schema；valid/invalid Claim 对抗；lexical/gate baseline；测试通过。见 `RELATION_EDITOR_RUBRIC.md` |
-| ① | Claim Check | 🟡 **A1.1**：rule_v1.1 已修 watch CONTACT 缺词 + blocker 非整卡下压；已知 4 误报清零。published 剩 1 张 parallel/建联边界（A1.2 候选）。**保持 shadow，不 enforce**。报告 `CLAIM_CHECK_A1_1_SHADOW_2026-8-17.md` |
+| ① | Claim Check | 🟡 **A1.2 rule_v1.2**：CONTACT 缺词豁免扩到 parallel/info_complement；`2026-8-17` pub **0 invalid**；第二期 `2026-08-21` 全为 empty evidence（结构应藏，非缺词 FP）。**候选 enforce，未开闸**。`CLAIM_CHECK_A1_2_SHADOW.md` |
 | ② | Ask structured intent | 🟡 e08/e10/e21 |
 | ③ | T13 拆分质量 | 🟡 段级 cache 已有；盯章节识别/归属 |
 

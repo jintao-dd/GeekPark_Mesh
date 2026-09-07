@@ -179,6 +179,53 @@ def test_a11_plan_to_deal_still_blocked():
     assert out["claim_verdict"] == "invalid"
 
 
+def test_a12_parallel_contact_jianlian_not_upgrade():
+    """xAI 类：parallel + body「建联」+ evidence 无同词 → valid（A1.2）。"""
+    rel = {
+        "title": "xAI：编辑部技术成员建联与视频号财报选题",
+        "body": "编辑部有 xAI 技术成员建联，视频号做 xAI 财报选题，同一公司不同触点。",
+        "details": ["视频号团队：周数据含 SpaceX/xAI 合并财报选题"],
+        "decision_tier": "parallel",
+        "relation_type": "parallel_tracks",
+        "evidence": [
+            {
+                "item_id": 1,
+                "team": "编辑部",
+                "snippet": "Shuyang Gao（xAI 技术成员）：xAI 为 Elon Musk 创立的 AI 公司",
+            },
+            {
+                "item_id": 2,
+                "team": "视频号团队",
+                "snippet": "多条视频聚焦马斯克身家与 SpaceX/xAI 合并财报",
+            },
+        ],
+    }
+    items = [
+        {"id": 1, "owner_team": "编辑部", "text": "Shuyang Gao（xAI 技术成员）"},
+        {"id": 2, "owner_team": "视频号团队", "text": "SpaceX/xAI 合并财报选题"},
+    ]
+    assert check_relation_claim(rel, items)["claim_verdict"] == "valid"
+
+
+def test_a12_parallel_deal_still_invalid():
+    """parallel + 统一合作推进 → 仍 invalid（不因 A1.2 放宽）。"""
+    rel = {
+        "title": "豆包：三团队统一商务合作推进",
+        "body": "三团队已就豆包形成统一商务合作推进。",
+        "details": [],
+        "relation_type": "parallel_tracks",
+        "evidence": [
+            {"item_id": 1, "snippet": "会议判断：豆包手机行业路线"},
+            {"item_id": 2, "snippet": "多条视频聚焦豆包交易入口"},
+        ],
+    }
+    items = [
+        {"id": 1, "text": "会议判断：豆包手机行业路线"},
+        {"id": 2, "text": "多条视频聚焦豆包交易入口"},
+    ]
+    assert check_relation_claim(rel, items)["claim_verdict"] == "invalid"
+
+
 def test_shadow_keeps_invalid_enforce_drops():
     rel = {
         "title": "已落地联合活动",

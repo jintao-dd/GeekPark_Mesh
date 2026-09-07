@@ -11,12 +11,12 @@
 - 测试通过：`pytest tests/test_relation_gold_schema.py tests/test_relation_gold_smoke.py`  
 - **未修改** Decision / Evidence Gate / Writer 语义  
 
-**① Claim Check：🟡 A1.1 shadow（rule_v1.1）— 已知 4 误报已清，暂不 enforce**
+**① Claim Check：🟡 A1.2 rule_v1.2 — 候选 enforce，本步不开闸**
 
-- A0/A1：见前；A1 No-Go 后做 A1.1 两处最小修复（CONTACT 缺词≠否定；blocker 非整卡下压）  
-- 同 slug 复验：draft **0/10** invalid；published **1/17**（xAI parallel「建联」边界，非原 4 张）  
-- Gold 10/10 仍绿；报告 `eval/reports/CLAIM_CHECK_A1_1_SHADOW_2026-8-17.md`  
-- 下一刀：可选 A1.2（parallel 同构 CONTACT）→ 再谈 enforce  
+- CONTACT 缺词豁免：watch/one_sided **+ parallel_tracks/info_complement**（不扩词表；DEAL+ 过头仍拦）  
+- `2026-8-17` published：**0/17** invalid  
+- 第二期 `2026-08-21`：5/5 invalid，但均为 `evidence:[]` 空证据结构（非缺词误杀）  
+- 报告：`eval/reports/CLAIM_CHECK_A1_2_SHADOW.md`；仍 **shadow**  
 
 ## Gold 文件
 

@@ -19,7 +19,7 @@
         "claim_reason_code": "ok",
         "claim_strength": 2,
         "evidence_strength": 2,
-        "model": "rule_v1.1"
+        "model": "rule_v1.2"
       },
       "note": "line_grounded≠claim_verdict; claim_check=rule_v1"
     },
@@ -40,7 +40,7 @@
         "claim_reason_code": "ok",
         "claim_strength": 3,
         "evidence_strength": 3,
-        "model": "rule_v1.1"
+        "model": "rule_v1.2"
       },
       "note": "line_grounded≠claim_verdict; claim_check=rule_v1"
     },
@@ -61,7 +61,7 @@
         "claim_reason_code": "ok",
         "claim_strength": 3,
         "evidence_strength": 3,
-        "model": "rule_v1.1"
+        "model": "rule_v1.2"
       },
       "note": "line_grounded≠claim_verdict; claim_check=rule_v1"
     },
@@ -82,7 +82,7 @@
         "claim_reason_code": "cooccurrence_not_relation",
         "claim_strength": 7,
         "evidence_strength": 2,
-        "model": "rule_v1.1"
+        "model": "rule_v1.2"
       },
       "note": "line_grounded≠claim_verdict; claim_check=rule_v1"
     },
@@ -108,7 +108,7 @@
         "claim_reason_code": "cooccurrence_not_relation",
         "claim_strength": 8,
         "evidence_strength": 5,
-        "model": "rule_v1.1"
+        "model": "rule_v1.2"
       },
       "note": "line_grounded≠claim_verdict; claim_check=rule_v1"
     },
@@ -134,7 +134,7 @@
         "claim_reason_code": "evidence_blocker",
         "claim_strength": 7,
         "evidence_strength": 5,
-        "model": "rule_v1.1"
+        "model": "rule_v1.2"
       },
       "note": "line_grounded≠claim_verdict; claim_check=rule_v1"
     },
@@ -155,7 +155,7 @@
         "claim_reason_code": "status_upgrade",
         "claim_strength": 7,
         "evidence_strength": 2,
-        "model": "rule_v1.1"
+        "model": "rule_v1.2"
       },
       "note": "line_grounded≠claim_verdict; claim_check=rule_v1"
     },
@@ -176,7 +176,7 @@
         "claim_reason_code": "status_upgrade",
         "claim_strength": 8,
         "evidence_strength": 2,
-        "model": "rule_v1.1"
+        "model": "rule_v1.2"
       },
       "note": "line_grounded≠claim_verdict; claim_check=rule_v1"
     },
@@ -197,7 +197,7 @@
         "claim_reason_code": "evidence_blocker",
         "claim_strength": 8,
         "evidence_strength": 5,
-        "model": "rule_v1.1"
+        "model": "rule_v1.2"
       },
       "note": "line_grounded≠claim_verdict; claim_check=rule_v1"
     },
@@ -218,7 +218,7 @@
         "claim_reason_code": "ok",
         "claim_strength": 2,
         "evidence_strength": 2,
-        "model": "rule_v1.1"
+        "model": "rule_v1.2"
       },
       "note": "line_grounded≠claim_verdict; claim_check=rule_v1"
     }
