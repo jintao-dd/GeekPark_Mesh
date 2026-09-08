@@ -180,10 +180,11 @@ Gold：每题 relevant items。
 
 ---
 
-## Code 立刻执行清单（Phase 0）
+## Code 立刻执行清单（Phase 0→1）
 
 1. ✅ `eval/temporal_gold_v1.jsonl`（24 题 · A–F）  
-2. ✅ `eval/run_temporal_baseline.py`（只测现状）  
-3. ✅ tmesh baseline → `TEMPORAL_BASELINE_latest.json` / `.md`（22/24 启发式；真失败 T06/T14）  
-4. ⬜ **审失败分布后** → 最小 Temporal 实现（仍不改 RAG）  
-5. ⑧ 飞书接线可并行  
+2. ✅ `eval/run_temporal_baseline.py`  
+3. ✅ Phase 0 baseline（22/24）→ 失败边界清楚  
+4. ✅ Phase 1 最小实现 + 重跑 **24/24**（见 `TEMPORAL_PHASE1.md`）  
+5. ⬜ ② Retrieval Recall Gold  
+6. ⑧ 飞书接线可并行  
