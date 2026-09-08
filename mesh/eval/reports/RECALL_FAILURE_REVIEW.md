@@ -33,7 +33,7 @@
 | R12 | partial | **混合：FTS miss(4125) + Ranking(4120@6,4128@9)** | 4125→Recall；4120/4128→③ |
 | R18 | partial | **FTS / Query**（4271 未进 Top20） | Recall 候选 |
 | R13 | total_miss | **FTS / Query**（问句与条目措辞漂移） | Recall 候选 |
-| R14 | total_miss | **Index / Data 先核**（播数据条） | 先核查索引 |
+| R14 | total_miss | **Index 已核 → A** | 已进 item_facts；原句未召回 → **FTS/Query 候选** |
 
 **防误区：** Top20 已含 relevant、仅 Top5 没有 → **算 Ranking，不算 Recall 优化。**  
 本轮纯 Ranking 分量主要在 **R12 的 4120/4128**；其余 missed 多数 **根本不在 Top20**。
@@ -159,8 +159,8 @@ Vector：本基线 `used_vector=False`，**无法把失败归因到 Vector**；�
 | Issue scope | explicit:2026-09-08 |
 | Path | hybrid · no vector · 7 hits |
 | Failure class | `total_miss` |
-| Likely layer | **FTS / Query 或 Index**（「播放/片子」可能未命中「播放 N、点赞」类短句条目；需确认 item_facts/FTS 是否收录这些 T11 条） |
-| Recommended action | Recall 候选：先 **Data/Index 核查** 4408 是否在 search 语料；再谈 FTS。不是 Ranking。 |
+| Likely layer | **Index 核查后 = A（已进索引）** → 下一刀归 **FTS / Query** |
+| Recommended action | ✅ Data/Index 已证：见 `R14_INDEX_CHECK.md`。**不是 B/C。** 开 ③ 时查「片子/较好」类 query 为何合并不进 Top20。禁止 Rerank。 |
 
 ---
 

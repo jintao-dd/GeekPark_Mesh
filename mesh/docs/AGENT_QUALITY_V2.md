@@ -6,9 +6,7 @@
 > **② Retrieval Recall**  
 > · Phase 0 = **PASS**（Gold n=30 · Baseline 74/79/79 · Embed=False）  
 > · Failure Review = **PASS**（四线分层完成）  
-> · **Phase 1 = 🟢 GO** · ① Scope **已落地**（IssueRef ⊥ TimeWindow · recent 可跨已发布）  
-> · 下一步：② R14 Index 核查 → ③ FTS/Query（7 miss）  
-> **③ Ranking / ④ Evidence / ⑤ Answer / ⑥ Data Domain = 🔒 LOCKED**  
+> · **Phase 1 = 🟢 GO** · ① Scope ✅ · ② R14 Index ✅（归因 **A**）· ③ FTS/Query ⬜ NEXT  
 > **原则：先可测量，再优化；先证明问题，再改架构。**
 
 相关：`MESH_AGENT_FULL_ACCEPTANCE.md` · `TEMPORAL_PHASE1.md` · `RECALL_FAILURE_REVIEW.md`  
@@ -32,9 +30,9 @@ v1                         ✅ GO
   Failure Review             ✅ PASS
 
   Phase 1                   🟢 GO
-  ① Scope                   ✅ DONE（可跨已发布 · published-only）
-  ② Index 核查              ⬜ NEXT（R14）
-  ③ FTS/Query               ⬜（仅 7 miss）
+  ① Scope                   ✅ DONE（勿再动）
+  ② Index 核查（R14）       ✅ DONE → 归因 **A**（已进索引，原句未召回 → FTS/Query）
+  ③ FTS/Query               ⬜ NEXT（7 miss + R14）
   Vector 对照实验（可选）
 
 ③ Ranking                   🔒 LOCKED
@@ -52,7 +50,7 @@ v1                         ✅ GO
 | **Scope / Product** | R02 / R23 / R24 | **✅ 语义已落地** | 从 Recall 缺陷名单移除；现为 Scope 产品验证样本 |
 | **Retrieval Recall 候选** | R11→4106 · R12→4125 · R13→4154–4156 · R18→4271 | Phase 1 FTS/Query | 共 7 个 missed relevant |
 | **Ranking** | R12 → 4120@6 / 4128@9 | **③** | **不能拿来抬 Recall** |
-| **Data / Index** | R14 → 4408–4412 | 先核查索引 | 确认没进索引后才决定是否进 Recall |
+| **Data / Index** | R14 → 4408–4412 | ✅ 核查完 → **A** | 已进 item_facts/chunk；原句 miss → 归 FTS/Query |
 
 ---
 
@@ -61,9 +59,9 @@ v1                         ✅ GO
 ```
 ① Scope：落实 recent 可跨已发布 Issue     ✅
         ↓
-② R14：先核查 Index/Data                  ← NEXT
+② R14：先核查 Index/Data                  ✅ → 归因 A（进索引，原句未召回）
         ↓
-③ FTS/Query：只处理确认的 7 个 miss
+③ FTS/Query：R11/R12(4125)/R13/R18 + R14  ← NEXT
         ↓
 ④ 重跑 Retrieval Gold
         ↓
@@ -112,11 +110,15 @@ TimeWindow = recent             # 要找的时间范围
 - `explicit` / `pinned` / `本周|上周` → 仍 `issue_anchor`
 - R02 / R23 / R24 **不再计入 Recall 缺陷**
 
-### ② R14 Index / Data（下一步）
+### ② R14 Index / Data — ✅ DONE
+
+详见 `eval/reports/R14_INDEX_CHECK.md`。
 
 ```
-4408–4412 → 到底有没有进入当前索引？
-没进索引 → 不是 Recall 算法问题
+4408–4412 → 全部在 items + item_facts + chunk_index（published · 2026-09-08）
+search_fts 正文轨未收录（仍属 item 轨可检索）
+「视频号 播放」可命中；R14 原句 hybrid 只见 4445
+→ 结论 A：已进索引，但检索没召回 → 正式进入 ③ FTS/Query
 ```
 
 ### ③ FTS / Query（真正的 Recall 改动面）
@@ -127,6 +129,7 @@ TimeWindow = recent             # 要找的时间范围
 | R12 | 4125（仅此；4120/4128 属 Ranking） |
 | R13 | 4154–4156 |
 | R18 | 4271 |
+| **R14** | **4408–4412**（Index 已证 A，可进） |
 
 ### Vector（可选对照 · 不叫「优化」）
 
