@@ -29,8 +29,8 @@ Mesh 是极客公园内部用的两件事：
 
 飞书目前只有 **OAuth 登录** 和 **群→团队绑定**。没有飞书 Bot 收消息答问。
 
-Agent v1：①～⑦ 架构冻结；Harness + **真实 Ask/Relation adapter** 契约 **20/20**（见 `eval/reports/AGENT_V1_CONTRACT_20260908.md`）。  
-**下一步：Mesh + Agent 全量验收 → 通过后再 ⑧ 飞书接线（不扩大脑）。**
+Agent v1：①～⑥ 冻结；⑦ **实现 + 真实 Adapter 20/20 已通过**（不再改 ⑦ 架构）。  
+**当前主任务：Mesh + Agent 全量验收**（`docs/MESH_AGENT_FULL_ACCEPTANCE.md`）→ 通过后才 ⑧ 飞书接线（不扩大脑）。
 
 后台四步：放入素材 → 挖掘 → 审校（要点卡 + 草稿）→ 确认上线。
 
@@ -354,7 +354,8 @@ SSE 会发 step 事件；简单路径会先收完全文再校验，再按块吐�
 | ① | Claim Check | ✅ **enforce**（tmesh+prod，`rule_v1.2`） |
 | ② | Ask structured intent | ✅ **正式关闭**（Golden/Prod 检索 25/25） |
 | ③ | T13 Segment / Attribution Quality | 🟡 **基本通过**（5/5 cases）；`### 商业化团队 · …` 边界为 Known limitation，不阻塞 |
-| — | **Agent Readiness** | 🟢 Arch ①–⑦ ✅冻结；实现按 §9.3 七类场景验收；⑧ 待测通后接线 |
+| — | **Agent Readiness** | 🟢 ⑦ 20/20✅；全量验收进行中；⑧ 暂缓 |
+
 
 **非阻塞留档：** Ask E2E/Follow-up/SSE 本轮未重跑；统一 Evidence/Entity 图留给 Agent 架构，不在 Mesh v1 硬补。
 
@@ -390,7 +391,8 @@ Ask 评测：2026-08-30 曾 22/25；Planner-lite 后 2026-08-31 全链路 25/25�
 | 路径                                      | 职责                                                        |
 | --------------------------------------- | --------------------------------------------------------- |
 | `docs/MESH_V1_AGENT_GO_NOGO.md`         | Mesh v1 → Agent 候选 Go 总验收（五层 + 非阻塞项）              |
-| `docs/AGENT_ARCHITECTURE_V1.md`         | Agent：①～⑦ 架构冻结；⑦ Harness/契约测试中；⑧ 待测通后接线 |
+| `docs/AGENT_ARCHITECTURE_V1.md`         | Agent：①～⑥ 冻结；⑦ 20/20；全量验收中；⑧ 暂缓 |
+| `docs/MESH_AGENT_FULL_ACCEPTANCE.md`    | Mesh+Agent 全量验收清单（当前主任务） |
 | `app/pipeline.py`                       | 挖掘                                                        |
 | `app/preview_job.py`                    | 要点卡 + 周报壳 + 触发关系两阶段                                       |
 | `app/relation_candidates.py`            | 候选构建；`merge_relations_from_candidates` 入口                 |

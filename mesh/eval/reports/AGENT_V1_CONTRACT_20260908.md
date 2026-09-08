@@ -6,13 +6,12 @@
 
 ## 结论
 
-**契约 + 真实冒烟 20/20 PASS。**
+**契约 + 真实 Mesh 数据：20/20 PASS → ⑦ 本层验收通过。**
 
 - 编排契约（原 18）保持  
-- 新增 2 条真实 Evidence 冒烟：published 检索 / relations 摘要  
+- 真实 Evidence 冒烟 ×2  
 
-当前可证明：**Agent 接真实 Mesh Published 数据后契约成立**。  
-下一步闸门：**Mesh + Agent 全量验收** → 通过后才开 ⑧ 飞书 MVP。
+**不再改 ⑦ 架构。** 下一闸门：**Mesh + Agent 全量验收**（`docs/MESH_AGENT_FULL_ACCEPTANCE.md`）→ 通过后才 ⑧。
 
 ## 命令
 
