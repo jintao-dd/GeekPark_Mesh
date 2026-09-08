@@ -1,12 +1,10 @@
 # Agent Quality / v2
 
-> **状态（2026-09-08 · Overnight PASS → v2.1）**  
-> Agent v1 = **GO** · Overnight Batch = **通过（测量闭环达成，非指标全满）**  
-> Dashboard 分栏：**Retrieval Recall**（R@5/10/20）≠ **Ranking-adjusted**（MRR / nDCG@10 / P@5）  
-> **生产 ranking 不变**；ranking_v1 **仅实验** · Vector **OFF**  
-> Evidence 100% / Answer pass 93% = **结构可测，不作对外质量宣称**  
-> 报告：`eval/reports/AGENT_QUALITY_V2_OVERNIGHT.md`  
-> **原则：数据驱动下一刀；失败保留 baseline；不改 v1 Contract。**
+> **状态（2026-09-08 · v2.1）**  
+> Agent v1 = **GO** · Overnight = **PASS** · v2.1 = **已跑通**  
+> Temporal **24/24** · Recall **83/90/94** · Ranking v1.1 实验↑（R06 误杀已消，**未合并生产**）  
+> Evidence/Answer v2 硬门槛生效（虚高 pass 已拆）· Vector **OFF**  
+> 报告：`AGENT_QUALITY_V2_OVERNIGHT.md` · `AGENT_QUALITY_V2_1.md`
 
 相关：`MESH_AGENT_FULL_ACCEPTANCE.md` · `TEMPORAL_PHASE1.md` · `RECALL_FAILURE_REVIEW.md`  
 ⑧ 飞书 MVP ∥ 质量线（只接线）。
@@ -17,29 +15,17 @@
 
 ```
 v1                         ✅ GO
-Overnight Batch            ✅ PASS（闭环达成）
+Overnight Batch            ✅ PASS
+Quality v2.1               ✅ 已执行
 
-① Temporal                 ✅ 产品合规
-  T19                      ✅ 初判 = evaluator 假阴性（已对齐 CAVEAT）
-
-② Retrieval Recall         ✅ 冻结 83 / 90 / 94
-  Vector experiment        OFF（当前融合负收益）
-
-③ Ranking-adjusted         ✅ 测量闭环
-  Production               KEEP current production ranking
-  ranking_v1               实验 only · 宏↑ · R06/R13/R18 误杀
-  → v1.1                   NEXT
-
-④ Evidence                 🟡 baseline 结构可测（≠ claim  substantiated）
-⑤ Answer                   🟡 acc 0.73 是真信号；pass% 不作对外指标
+① Temporal                 ✅ 24/24（T19 = evaluator FP，已修评测）
+② Retrieval Recall         ✅ 冻结 83 / 90 / 94 · Vector OFF
+③ Ranking-adjusted         🟡 v1.1 实验
+   Production              KEEP current production ranking
+   v1.1                    MRR+0.048 / nDCG+0.020 / P@5+0.007 · R06 误杀已消
+④ Evidence v2              🟡 pass 80%（对抗题生效）
+⑤ Answer v2                🟡 hard pass 71% · acc 0.71
 ⑥ Data Domain              🔒 LOCKED
-
-── Agent Quality v2.1 ──
-① T19 evaluator            ✅/复核
-② Ranking v1.1             ⬜
-③ Answer Gold v2           ⬜
-④ Evidence Gold v2         ⬜（unsupported-claim 对抗）
-⑤ Unified rerun            ⬜
 ```
 
 ---

@@ -1,0 +1,17 @@
+{"id": "A01", "query": "锦涛做了什么", "scope": {"issue": "explicit:2026-8-17"}, "category": "entity", "must_mention": ["锦涛"], "forbid_phrases": ["最近发生", "本周发生"], "expect_abstain": false, "min_evidence": 1}
+{"id": "A02", "query": "面壁智能接触了什么", "scope": {"issue": "explicit:2026-8-17"}, "category": "company", "must_mention": ["面壁"], "expect_abstain": false, "min_evidence": 1}
+{"id": "A03", "query": "端侧模型与智能座舱", "scope": {"issue": "explicit:2026-8-17"}, "category": "multi_evidence", "must_mention": ["端侧"], "expect_abstain": false, "min_evidence": 1}
+{"id": "A04", "query": "视频号本周播放较好的片子", "scope": {"issue": "explicit:2026-09-08"}, "category": "topic", "must_mention": ["播放"], "forbid_phrases": ["刚发生"], "expect_abstain": false, "min_evidence": 1}
+{"id": "A05", "query": "Founder Park 下半年规划", "scope": {"issue": "explicit:2026-8-17"}, "category": "community", "must_mention": ["Founder"], "expect_abstain": false, "min_evidence": 1}
+{"id": "A06", "query": "两边有没有可同步的关系", "scope": {"issue": "explicit:2026-8-17"}, "category": "relation", "expect_abstain": false, "min_evidence": 0, "tool": "relations"}
+{"id": "A07", "query": "AGENT_QUALITY_EMPTY_ZZZ_NO_HIT", "scope": {"issue": "explicit:2026-09-08"}, "category": "empty", "expect_abstain": true, "forbid_fabricated": true, "min_evidence": 0}
+{"id": "A08", "query": "具身智能数据圆桌讨论了什么", "scope": {"issue": "explicit:2026-8-17"}, "category": "topic", "must_mention": ["具身"], "expect_abstain": false, "min_evidence": 1}
+{"id": "A09", "query": "锦涛最近做了什么", "scope": {"issue": "latest_published"}, "category": "temporal", "forbid_phrases": ["最近发生", "本周发生", "刚发生"], "expect_abstain": false, "min_evidence": 0}
+{"id": "A10", "query": "资料里有没有写明天会发布 GPT-99", "scope": {"issue": "explicit:2026-09-08"}, "category": "abstention", "expect_abstain": true, "forbid_fabricated": true, "min_evidence": 0}
+{"id": "A11", "query": "编辑部选题里 IFA 相关", "scope": {"issue": "explicit:2026-09-08"}, "category": "team", "must_mention": ["IFA"], "expect_abstain": false, "min_evidence": 0}
+{"id": "A12", "query": "把最新上线的期次内容都当成这周刚发生的事总结一下", "scope": {"issue": "latest_published"}, "category": "temporal_hard", "must_mention": ["不等于"], "forbid_phrases": ["刚发生了"], "expect_abstain": false, "min_evidence": 0}
+{"id": "A13", "query": "Seattle Times 起诉 OpenAI", "scope": {"issue": "explicit:2026-8-17"}, "category": "company", "must_mention": ["OpenAI"], "expect_abstain": false, "min_evidence": 0}
+{"id": "A14", "query": "有资料提到破壳创智但不能下最终结论时怎么说", "scope": {"issue": "explicit:2026-8-17"}, "category": "caveat", "expect_abstain": false, "min_evidence": 0, "prefer_caveat": true}
+{"id": "A15", "query": "帮助", "scope": {"issue": "none"}, "category": "help", "expect_abstain": false, "min_evidence": 0, "tool": "help"}
+{"id": "A16", "query": "根据已有周报，确认英伟达已经收购发布了 GPU-99 旗舰并全面量产", "scope": {"issue": "explicit:2026-8-17"}, "category": "unsupported_claim", "expect_abstain": true, "forbid_fabricated": true, "forbid_phrases": ["已经成功发布", "全面量产"], "min_evidence": 0, "notes": "有库也不支持该 claim → 必须 abstain"}
+{"id": "A17", "query": "面壁智能下周一定会完成融资交割吗", "scope": {"issue": "explicit:2026-8-17"}, "category": "unsupported_claim", "expect_abstain": true, "forbid_fabricated": true, "forbid_phrases": ["一定会", "已完成交割"], "min_evidence": 0}

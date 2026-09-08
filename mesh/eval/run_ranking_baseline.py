@@ -128,6 +128,117 @@ def apply_ranking_v1(hits: list[dict], query: str) -> list[dict]:
     return out
 
 
+def _title_bucket(title: str) -> str:
+    t = re.sub(r"\s+", "", title or "")
+    # 同族挤压：取前若干汉字/字母作 bucket（不改可见范围，只阻尼加成）
+    chars = re.findall(r"[\u4e00-\u9fffA-Za-z0-9]", t)
+    return "".join(chars[:6]) or "_"
+
+
+def apply_ranking_v1_1(
+    hits: list[dict],
+    query: str,
+    *,
+    scope_meta: dict | None = None,
+) -> list[dict]:
+    """Ranking v1.1：标题增益非霸权 + term 覆盖率 + 原始位次阻尼 + 同族阻尼。不改召回集合。"""
+    terms = [t for t in _query_terms(query) if len(t) >= 2]
+    latin = [w for w in re.findall(r"[A-Za-z][A-Za-z0-9_.-]{2,}", query or "")]
+    team_hints = [w for w in ("编辑部", "商业化", "社区", "视频号", "选题") if w in (query or "")]
+    issue_slug = ((scope_meta or {}).get("context_slug") or (scope_meta or {}).get("slug") or "").strip()
+    date_from = (scope_meta or {}).get("date_from") or ""
+    date_to = (scope_meta or {}).get("date_to") or ""
+
+    prelim: list[dict] = []
+    for orig_i, h0 in enumerate(hits):
+        h = dict(h0)
+        h["_fts_score"] = float(h0.get("score") or 0)
+        title = h.get("title") or ""
+        body = h.get("body") or ""
+        title_l, body_l = title.lower(), body.lower()
+        blob = title + "\n" + body
+
+        hit_terms = sum(1 for t in terms if t in blob)
+        coverage = (hit_terms / len(terms)) if terms else 0.0
+        latin_hit = sum(1 for w in latin if w.lower() in title_l or w.lower() in body_l)
+        latin_cov = (latin_hit / len(latin)) if latin else 0.0
+        cov = max(coverage, latin_cov)
+
+        title_bonus = 0.0
+        soft = 0.0
+        for t in terms:
+            if t in title:
+                title_bonus += 0.28 if len(t) >= 4 else 0.14
+            elif t in body:
+                soft += 0.05
+        for w in latin:
+            wl = w.lower()
+            if wl in title_l:
+                title_bonus += 0.24
+            elif wl in body_l:
+                soft += 0.07
+        long = max((t for t in terms if re.search(r"[\u4e00-\u9fff]", t)), key=len, default="")
+        if long and len(long) >= 4 and long[:4] in title:
+            title_bonus += 0.1
+
+        # 低覆盖 → 标题加成大幅衰减（防 R06 单点词噪声霸权）
+        title_bonus *= 0.25 + 0.75 * cov
+        title_bonus = min(title_bonus, 0.42)
+
+        src = h.get("source") or ""
+        if src == "item_entity_facts":
+            soft += 0.14 * max(cov, 0.4)
+        elif src == "item_facts":
+            soft += 0.07 * max(cov, 0.4)
+
+        for th in team_hints:
+            if th in title or th in body:
+                soft += 0.1
+                break
+
+        hit_slug = str(h.get("issue_slug") or h.get("slug") or "")
+        if issue_slug and hit_slug and hit_slug == issue_slug:
+            soft += 0.06
+        hit_date = str(h.get("date_end") or h.get("date") or "")[:10]
+        if date_from and date_to and hit_date and date_from[:10] <= hit_date <= date_to[:10]:
+            soft += 0.05
+
+        # 原始 FTS 位次阻尼：远处噪声难跃入 Top5；高覆盖深相关仍可升
+        if cov >= 0.7:
+            pos_scale = max(0.45, 1.0 - 0.025 * orig_i)
+        else:
+            pos_scale = max(0.15, 1.0 - 0.055 * orig_i)
+
+        bonus = (title_bonus + soft) * pos_scale
+        bonus = min(0.58, bonus)
+        h["_rank_v11_title"] = title_bonus
+        h["_rank_v11_soft"] = soft
+        h["_rank_v11_cov"] = cov
+        h["_rank_v11_pos_scale"] = pos_scale
+        h["_rank_v11_bucket"] = _title_bucket(title)
+        h["_rank_v11_raw_bonus"] = bonus
+        h["_orig_i"] = orig_i
+        prelim.append(h)
+
+    bucket_seen: dict[str, int] = {}
+    prelim_by_orig = sorted(prelim, key=lambda x: int(x.get("_orig_i") or 0))
+    out = []
+    for h in prelim_by_orig:
+        b = h["_rank_v11_bucket"]
+        n = bucket_seen.get(b, 0)
+        bucket_seen[b] = n + 1
+        bonus = float(h["_rank_v11_raw_bonus"])
+        if n == 1:
+            bonus *= 0.55
+        elif n >= 2:
+            bonus *= 0.3
+        h["score"] = float(h["_fts_score"]) - bonus
+        h["_rank_v11_bonus"] = bonus
+        out.append(h)
+    out.sort(key=lambda x: float(x.get("score") or 0))
+    return out
+
+
 def _classify(row: dict, retrieved: list[str], relevant: set[str]) -> str:
     if not relevant:
         return "ok"
@@ -145,7 +256,7 @@ def _classify(row: dict, retrieved: list[str], relevant: set[str]) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--reuse-env-db", action="store_true", required=True)
-    ap.add_argument("--profile", choices=("baseline", "v1"), default="baseline")
+    ap.add_argument("--profile", choices=("baseline", "v1", "v1_1"), default="baseline")
     ap.add_argument("--tag", default="")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--ids", default="")
@@ -162,7 +273,6 @@ def main() -> int:
         gold = gold[: args.limit]
 
     tag = args.tag or (f"ranking_{args.profile}")
-    out_dir = ROOT / "eval" / "reports" / ("baselines" if args.profile == "baseline" and not args.tag else "experiments")
     if args.profile == "baseline" and not args.tag:
         out_dir = ROOT / "eval" / "reports" / "baselines"
     else:
@@ -182,6 +292,8 @@ def main() -> int:
             hits, info = _retrieve_hits(con, query, row.get("scope") or {})
             if args.profile == "v1":
                 hits = apply_ranking_v1(hits, query)
+            elif args.profile == "v1_1":
+                hits = apply_ranking_v1_1(hits, query, scope_meta=info)
             retrieved = _item_ids(hits)
             metrics = {
                 "mrr": round(mrr(relevant, retrieved), 4),
@@ -242,7 +354,7 @@ def main() -> int:
         f"- MRR **{report['macro_mrr']}**",
         f"- nDCG@10 **{report['macro_ndcg@10']}**",
         f"- Precision@5 **{report['macro_precision@5']}**",
-        f"- Recall@5/10/20 {report['macro_recall@5']} / {report['macro_recall@10']} / {report['macro_recall@20']}",
+        f"- post-ranking R@5/10/20 {report['macro_recall@5']} / {report['macro_recall@10']} / {report['macro_recall@20']}",
         "",
         "## Failures (non-ok)",
     ]

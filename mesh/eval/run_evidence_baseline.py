@@ -20,12 +20,14 @@ from eval.quality_metrics import mean  # noqa: E402
 from eval.run_recall_baseline import _disable_embed, _parse_issue_scope  # noqa: E402
 
 GOLD = ROOT / "eval" / "evidence_gold_v1.jsonl"
+GOLD_V2 = ROOT / "eval" / "evidence_gold_v2.jsonl"
 
 
-def _load() -> list[dict]:
+def _load(path: Path | None = None) -> list[dict]:
+    p = path or GOLD
     return [
         json.loads(l)
-        for l in GOLD.read_text(encoding="utf-8").splitlines()
+        for l in p.read_text(encoding="utf-8").splitlines()
         if l.strip() and not l.startswith("#")
     ]
 
@@ -89,20 +91,39 @@ def grade(row: dict, out: dict) -> dict:
     if row.get("forbid_unsupported") and unsupported:
         correct = False
     abstain_ok = True
+    text = out.get("answer") or ""
     if row.get("must_abstain_or_caveat"):
-        text = out.get("answer") or ""
         abstain_ok = bool(
-            re.search(r"未找到|没有|未提供|不能|无法|资料未|未见", text)
+            re.search(r"未找到|没有|未提供|不能|无法|资料未|未见|不能确认|无法确认|不能下结论", text)
             or out.get("n_hits", 0) == 0
         )
         correct = correct and abstain_ok
+
+    # 对抗：有 evidence ≠ 支持 claim；答案不得断言 forbid_claim_phrases
+    claim_leak = False
+    if row.get("claim_must_not_be_supported"):
+        for p in row.get("forbid_claim_phrases") or []:
+            if p and p in text:
+                claim_leak = True
+                break
+        if claim_leak:
+            correct = False
+        # 对抗题：若有命中证据但仍断言 claim → unsupported_claim=1
+        if claim_leak:
+            unsupported = True
+        elif not abstain_ok and (out.get("n_hits", 0) or 0) > 0:
+            # 有证据却无 caveat、也未泄漏短语：仍算未正确处理对抗
+            correct = False
+            unsupported = True
+
     return {
         "evidence_coverage": round(cov if must else (1.0 if coverage_ok else 0.0), 4),
         "evidence_correctness": 1.0 if correct else 0.0,
         "unsupported_claim": 1.0 if unsupported else 0.0,
         "citation_correctness": 1.0 if citation_ok else 0.0,
         "abstention_ok": 1.0 if abstain_ok else 0.0,
-        "pass": bool(correct and coverage_ok and abstain_ok),
+        "claim_support_leak": 1.0 if claim_leak else 0.0,
+        "pass": bool(correct and coverage_ok and abstain_ok and not claim_leak),
     }
 
 
@@ -110,11 +131,18 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--reuse-env-db", action="store_true", required=True)
     ap.add_argument("--tag", default="baseline")
+    ap.add_argument("--gold", default="", help="path to gold jsonl; default v1 or v2 by tag")
     args = ap.parse_args()
     _disable_embed()
     from app import db
 
-    gold = _load()
+    if args.gold:
+        gold_path = Path(args.gold)
+    elif args.tag in ("v2", "evidence_v2") and GOLD_V2.exists():
+        gold_path = GOLD_V2
+    else:
+        gold_path = GOLD
+    gold = _load(gold_path)
     con = db.connect()
     results = []
     t0 = time.time()
@@ -154,13 +182,18 @@ def main() -> int:
         "macro_evidence_correctness": round(mean(r["metrics"]["evidence_correctness"] for r in results), 4),
         "macro_unsupported_claim_rate": round(mean(r["metrics"]["unsupported_claim"] for r in results), 4),
         "macro_citation_correctness": round(mean(r["metrics"]["citation_correctness"] for r in results), 4),
+        "gold": gold_path.name,
         "elapsed_s": round(time.time() - t0, 2),
         "results": results,
     }
     out_dir = ROOT / "eval" / "reports" / ("baselines" if args.tag == "baseline" else f"experiments/{args.tag}")
     out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / ("EVIDENCE_BASELINE_v1.json" if args.tag == "baseline" else f"EVIDENCE_{args.tag}.json")
-    latest = ROOT / "eval" / "reports" / "EVIDENCE_BASELINE_latest.json"
+    if args.tag == "baseline":
+        path = out_dir / "EVIDENCE_BASELINE_v1.json"
+        latest = ROOT / "eval" / "reports" / "EVIDENCE_BASELINE_latest.json"
+    else:
+        path = out_dir / f"EVIDENCE_{args.tag}.json"
+        latest = ROOT / "eval" / "reports" / f"EVIDENCE_{args.tag}_latest.json"
     path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     latest.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({k: report[k] for k in report if k != "results"}, ensure_ascii=False, indent=2))
