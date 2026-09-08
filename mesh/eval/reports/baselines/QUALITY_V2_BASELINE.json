@@ -29,9 +29,10 @@
   ],
   "Temporal": {
     "baseline": "24/24 historical",
-    "current": "23/24",
-    "delta": "-1 (T19 unknown_basis_but_claimed_recent)",
-    "n": 24
+    "current": "23/24 runner (T19 FP)",
+    "delta": "evaluator false positive — product answer compliant; CAVEAT aligned",
+    "n": 24,
+    "t19": "evaluator_false_positive"
   },
   "Recall": {
     "baseline": {
@@ -68,12 +69,13 @@
       "ndcg@10": 0.0365,
       "precision@5": 0.0133
     },
-    "decision": "CANDIDATE ranking_v1 (macro↑) — KEEP production baseline until per-qid regressions (esp. ok→top5_miss) are zero; no auto-merge",
+    "decision": "KEEP current production ranking; ranking_v1 remains experiment-only",
     "regressions": [
       "R06",
       "R13",
       "R18"
-    ]
+    ],
+    "production": "KEEP current production ranking; ranking_v1 remains experiment-only"
   },
   "Evidence": {
     "baseline": {
@@ -160,5 +162,11 @@
       }
     ]
   },
-  "report": "eval/reports/AGENT_QUALITY_V2_OVERNIGHT.md"
+  "report": "eval/reports/AGENT_QUALITY_V2_OVERNIGHT.md",
+  "metrics_policy": {
+    "retrieval": "R@5/R@10/R@20",
+    "ranking": "MRR / nDCG@10 / P@5 (+ optional post_rank_R@k)",
+    "do_not_mix": "Retrieval Recall vs post-ranking Top-K"
+  },
+  "next": "Agent Quality v2.1"
 }

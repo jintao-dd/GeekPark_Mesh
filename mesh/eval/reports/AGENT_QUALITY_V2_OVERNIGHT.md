@@ -11,15 +11,24 @@
 
 | 层 | Baseline | Current / Best | Delta | 决策 |
 |----|----------|----------------|-------|------|
-| **Temporal** | 24/24（历史 Phase1） | **23/24**（T19） | −1 题回归 | **保留** Temporal 实现；T19 记 failure，不今晚改架构 |
-| **Recall** | **83 / 90 / 94** | 83 / 90 / 94 | 0 | **冻结** `baselines/RECALL_BASELINE_v1.json` |
-| **Ranking** | MRR 0.807 · nDCG@10 0.825 · P@5 0.511 | **v1** 0.863 / 0.862 / 0.524 | +0.056 / +0.037 / +0.013 | **候选有效，但今晚不合并生产**（见误杀） |
-| **Evidence** | cov/corr/cite = 1.0 · unsupported=0 · pass=100% | = baseline（首 freeze） | n/a | **冻结** Evidence baseline |
-| **Answer** | pass 93% · acc 0.73 · faith 0.91 · cite 1.0 · abstain 0.93 | = baseline | n/a | **冻结** Answer baseline；acc 是下一步 |
-| **Vector A/B** | FTS 83/90/94 | FTS+Vec **76/83/88** | **−6.7 / −6.7 / −6.7** | **不接主线**；noise↑ relevant 新增=0 |
+| **Temporal** | 24/24（历史 Phase1） | 本晚 runner **23/24**（T19） | 见下 | **产品未推翻**；T19 优先核查真回归 vs evaluator |
+| **Retrieval Recall** | **83 / 90 / 94** | 83 / 90 / 94 | 0 | **冻结**（候选集合指标） |
+| **Ranking** | MRR 0.807 · nDCG@10 0.825 · P@5 0.511 | **v1** 0.863 / 0.862 / 0.524 | +0.056 / +0.037 / +0.013 | **KEEP current production ranking；ranking_v1 仅实验** |
+| **Evidence** | cov/corr/cite=1.0 · pass=100% | = baseline | n/a | **结构/引用可测**；≠ claim 已 substantiated |
+| **Answer** | pass 93% · acc 0.73 · faith 0.91 | = baseline | n/a | **93% 不对外部讲**；评分偏松，acc 才是信号 |
+| **Vector A/B** | FTS 83/90/94 | FTS+Vec **76/83/88** | **−6.7pp** | **Vector experiment = OFF**（当前融合方案负收益 ≠ 向量永远无用） |
 
-**当前生产主线：** FTS-only + 现有 `retriever.rerank_hits`（Ranking baseline 路径）。  
-**当前实验最佳（未上线）：** `experiments/ranking_v1`（宏指标胜，3 题误杀）。
+**指标口径（锁定）：**
+
+| Dashboard 栏 | 含义 | 主指标 |
+|--------------|------|--------|
+| **Retrieval Recall** | 召回候选集合 | R@5 / R@10 / R@20 |
+| **Ranking-adjusted Top-K** | 同一候选上改序后的 Top-K | MRR / nDCG@10 / P@5；（可选）post-ranking R@5/@10 |
+
+Ranking 实验里 R@5 从 82.6%→85.4% 应称 **post-ranking Top-K Recall**，证明 R12 类问题已进入 Ranking，**不要**与 Retrieval Recall 混报。
+
+**当前生产主线：** FTS-only + 现有 `retriever.rerank_hits`。  
+**实验版本（未上线）：** `experiments/ranking_v1`。
 
 ---
 
@@ -40,12 +49,13 @@
 
 ## 实验清单与 Delta
 
-### E0 · Temporal regression（只读）
+### E0 · Temporal（只读）→ T19 初判
 
-- 跑：`run_temporal_baseline.py`
-- 结果：n=24 · **n_pass=23** · fail **T19** `unknown_basis_but_claimed_recent`
-- Delta vs 历史 24/24：−1
-- **动作：** 不回改 Temporal 架构；记入 failure pattern；下一轮单独修 T19 措辞/basis 判定
+- 跑：`run_temporal_baseline.py` → n=24 · runner **23/24** · fail **T19** `unknown_basis_but_claimed_recent`
+- **答案实际：** 明确写「不能推断为昨天/最近发生」「资料未提供 event_time」——产品 hard rule 方向正确
+- **失败原因：** evaluator 对 `最近发生` 子串命中（否定句里的「昨天/最近发生」），且 `unknown_basis_but_claimed_recent` **未做 CAVEAT 豁免**（与 `forbid_recent_event_claim` 不一致）
+- **归因：评测启发式误报（false positive），不是 Temporal 架构回归**
+- **动作：** 修评测规则对齐 CAVEAT；不改产品 Temporal
 
 ### E1 · Ranking Phase 0（baseline）
 
@@ -54,7 +64,7 @@
 | MRR | **0.8071** |
 | nDCG@10 | **0.8250** |
 | Precision@5 | **0.5106** |
-| R@5/10/20 | 0.826 / 0.896 / 0.943（与 Recall 一致） |
+| post-ranking R@5/@10/@20（同候选、现网序） | 0.826 / 0.896 / 0.943 |
 
 重点案例 **R12**（baseline ranks）：4116@3 · 4120@5 · 4125@7 · 4128@14 → `top5_miss:4125,4128`
 
@@ -67,7 +77,7 @@
 | MRR | 0.8071 | **0.8632** | **+0.0561** |
 | nDCG@10 | 0.8250 | **0.8615** | **+0.0365** |
 | P@5 | 0.5106 | **0.5239** | **+0.0133** |
-| R@5 | 0.8261 | 0.8544 | +0.0283 |
+| post-ranking R@5（非 Retrieval） | 0.8261 | 0.8544 | +0.0283 |
 
 **提升题（示例）：** R11（4106 23→4）、R12（MRR↑，4116→@1；4120 仍@5；4128 仍差）、R16、R21。
 
@@ -79,7 +89,7 @@
 | **R13** | **−0.25** | −0.094 | 4156 2→4；4154/4155 仍远 |
 | **R18** | −0.032 | −0.020 | 4358 7→9 |
 
-**决策：KEEP 生产 ranking；v1 保留为 experiment-best。**  
+**决策：KEEP current production ranking；ranking_v1 保留为实验版本（未上线）。**  
 理由：宏指标正向，但 R06 从合格变不合格 = 不可接受的误杀；不符合「失败自动保留 baseline」。  
 **不上独立 LLM Rerank**（本轮规则分已够说明方向；先消误杀再谈 rerank）。
 
@@ -125,7 +135,7 @@
 | Ranking v1 规则加权（评测） | **宏有效 / 有误杀** · **不合并** |
 | FTS+Vector | **回退** · 保留 FTS-only |
 | Evidence/Answer runners | **有效（建立测量）** · 无生产逻辑变更 |
-| Temporal 本晚重跑 | **发现 T19 回归** · 不改代码 |
+| Temporal 本晚重跑 | **T19 = evaluator 假阴性** · 产品答案合规 · 已修评测 CAVEAT 对齐 |
 
 **Best 配置（生产）：** Temporal 现网 + Recall FTS-only Phase1 + 现网 rerank。  
 **Best 配置（实验架）：** Ranking profile=`v1` 仅用于对比，直到误杀清零。
@@ -137,18 +147,23 @@
 1. **Ranking 误杀：** 标题加权过猛 → 同族多 item（R06）挤出 Top5  
 2. **R12 未闭环：** 4120 已在 Top5 边缘；4125/4128 仍非 Top5（Ranking 仍开放）  
 3. **Vector 稀释：** 向量 lane 拉低 Recall、抬高 top5 noise  
-4. **Temporal T19：** `unknown_basis_but_claimed_recent`  
-5. **Answer 空答 + 宽松 pass：** 测量框架在，但对「可读答案质量」仍偏乐观  
+4. **Temporal T19：** runner 误报（否定句命中「最近发生」）；产品未违 hard rule  
+5. **Answer 空答 + 宽松 pass：** 测量框架在，但对「可读答案质量」仍偏乐观；**93% pass 不对外部讲**  
 
 ---
 
-## 下一步建议（按 ROI）
+## 下一步 · Agent Quality v2.1（数据驱动，不重开大规划）
 
-1. **Ranking v1.1：** 限制同 query 下多 hit 的标题加成；加 team/issue/time match；专测 R06 不回归后再谈合并 `rerank_hits`  
-2. **Answer：** 收紧评分；固定非空摘要生成；修 A07 abstention；可选 5 题接真实 LLM（仍不改 Contract）  
-3. **Temporal T19** 单点修复 + 回归 24/24  
-4. **Vector：** 本轮关闭；仅当 hybrid 能证明 R@k↑ 且 noise 可控时再开实验档  
-5. **不做：** Planner / ReAct / CRM / 改 Gold 刷分 / 覆盖 baseline  
+```
+① T19          确认假阴性 → 修 evaluator（本轮已对齐 CAVEAT）· 不改 Temporal 产品
+② Ranking v1.1 消 R06/R13/R18；标题增益非霸权；team/issue/time 仅 soft；先验证同族挤压
+③ Answer Gold  收紧评分；去掉「证据数量=正确」假通过；盯 A07 / A03/A04/A08
+④ Evidence Gold 加「有 evidence 但不支持 claim」对抗题
+⑤ Unified rerun
+Vector         OFF（当前融合方案）
+```
+
+**不做：** 覆盖 baseline · 改 Gold 刷分 · 合并 ranking_v1 进生产 · 接 Vector 主线 · Planner/ReAct/CRM
 
 ---
 

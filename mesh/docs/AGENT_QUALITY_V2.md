@@ -1,13 +1,12 @@
 # Agent Quality / v2
 
-> **状态（2026-09-08 Overnight）**  
-> Agent v1 = **GO**  
-> **① Temporal** = 历史 24/24；本晚重跑 **23/24**（T19）— 不改架构  
-> **② Recall** = **冻结 83/90/94**；Vector A/B **回退**（−6.7pp，不接主线）  
-> **③ Ranking** = Phase0/1 闭环；v1 宏↑但 R06/R13 误杀 → **不合并生产**  
-> **④ Evidence / ⑤ Answer** = baseline 已冻结（见 Overnight 报告）  
+> **状态（2026-09-08 · Overnight PASS → v2.1）**  
+> Agent v1 = **GO** · Overnight Batch = **通过（测量闭环达成，非指标全满）**  
+> Dashboard 分栏：**Retrieval Recall**（R@5/10/20）≠ **Ranking-adjusted**（MRR / nDCG@10 / P@5）  
+> **生产 ranking 不变**；ranking_v1 **仅实验** · Vector **OFF**  
+> Evidence 100% / Answer pass 93% = **结构可测，不作对外质量宣称**  
 > 报告：`eval/reports/AGENT_QUALITY_V2_OVERNIGHT.md`  
-> **原则：先可测量，再优化；失败保留 baseline；不改 v1 Contract。**
+> **原则：数据驱动下一刀；失败保留 baseline；不改 v1 Contract。**
 
 相关：`MESH_AGENT_FULL_ACCEPTANCE.md` · `TEMPORAL_PHASE1.md` · `RECALL_FAILURE_REVIEW.md`  
 ⑧ 飞书 MVP ∥ 质量线（只接线）。
@@ -18,26 +17,29 @@
 
 ```
 v1                         ✅ GO
+Overnight Batch            ✅ PASS（闭环达成）
 
-① Temporal                 ✅ 24/24 历史 / ⚠️ 本晚 23/24 (T19)
-  Hard Rules 已通过
+① Temporal                 ✅ 产品合规
+  T19                      ✅ 初判 = evaluator 假阴性（已对齐 CAVEAT）
 
-② Retrieval Recall
-  Phase 0                   ✅ PASS · 74/79/79
-  Failure Review             ✅ PASS
-  Phase 1                   ✅ 冻结 83/90/94
-  Vector A/B                ❌ 不接（FTS+Vec 76/83/88）
+② Retrieval Recall         ✅ 冻结 83 / 90 / 94
+  Vector experiment        OFF（当前融合负收益）
 
-③ Ranking                   ✅ 测量闭环
-  Baseline                  MRR 0.807 / nDCG@10 0.825 / P@5 0.511
-  Exp v1                    +0.056 / +0.037 / +0.013 · 有误杀 → 不合并
+③ Ranking-adjusted         ✅ 测量闭环
+  Production               KEEP current production ranking
+  ranking_v1               实验 only · 宏↑ · R06/R13/R18 误杀
+  → v1.1                   NEXT
 
-④ Evidence                  ✅ baseline 冻结（cov/corr/cite=1.0）
-⑤ Answer                    ✅ baseline 冻结（pass 93% · acc 0.73）
-⑥ Data Domain               🔒 LOCKED
+④ Evidence                 🟡 baseline 结构可测（≠ claim  substantiated）
+⑤ Answer                   🟡 acc 0.73 是真信号；pass% 不作对外指标
+⑥ Data Domain              🔒 LOCKED
 
-统一 Runner                 ✅ eval/run_quality_v2.py
-Overnight                   ✅ AGENT_QUALITY_V2_OVERNIGHT.md
+── Agent Quality v2.1 ──
+① T19 evaluator            ✅/复核
+② Ranking v1.1             ⬜
+③ Answer Gold v2           ⬜
+④ Evidence Gold v2         ⬜（unsupported-claim 对抗）
+⑤ Unified rerun            ⬜
 ```
 
 ---

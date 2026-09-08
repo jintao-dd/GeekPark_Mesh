@@ -150,9 +150,11 @@ def _grade(row: dict, *, answer: str, issue_slug: str, issue_mode: str) -> tuple
         ):
             reasons.append("require_issue_or_period_mention")
 
-    # unknown basis：确定性「最近/本周发生」一律失败
+    # unknown basis：确定性「最近/本周发生」失败；有 caveat/否定则不算宣称
+    # （T19：答案写「不能推断为昨天/最近发生」会命中子串「最近发生」→ 需 CAVEAT 豁免）
     if (row.get("time_semantics") or {}).get("basis") == "unknown":
-        if RECENT_EVENT.search(text) or THIS_WEEK_EVENT.search(text):
+        claimed = bool(RECENT_EVENT.search(text) or THIS_WEEK_EVENT.search(text))
+        if claimed and not CAVEAT.search(text):
             if "forbid_recent_event_claim" not in reasons:
                 reasons.append("unknown_basis_but_claimed_recent")
 

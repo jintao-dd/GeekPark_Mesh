@@ -97,11 +97,13 @@ def main() -> int:
     recall_frozen = _load(frozen) if frozen.exists() else recall
 
     def _rk(d: dict) -> dict:
+        """Ranking 主指标；post_rank_R@k 仅作排序后 Top-K，勿与 Retrieval Recall 混用。"""
         return {
             "mrr": d.get("macro_mrr"),
             "ndcg@10": d.get("macro_ndcg@10"),
             "precision@5": d.get("macro_precision@5"),
-            "recall@5": d.get("macro_recall@5"),
+            "post_rank_R@5": d.get("macro_recall@5"),
+            "post_rank_R@10": d.get("macro_recall@10"),
         }
 
     summary = {
@@ -147,6 +149,7 @@ def main() -> int:
             if ranking_v1 and ranking_b
             else None,
             "decision": None,
+            "production": "KEEP current production ranking; ranking_v1 remains experiment-only",
         },
         "Evidence": {
             "baseline": {
@@ -181,12 +184,14 @@ def main() -> int:
             dlt.get("precision@5") or 0
         ) >= -0.01
         if improved and ((dlt.get("ndcg@10") or 0) > 0.005 or (dlt.get("mrr") or 0) > 0.005):
-            summary["Ranking"]["decision"] = (
-                "CANDIDATE ranking_v1 (macro↑) — KEEP production baseline until "
-                "per-qid regressions (esp. ok→top5_miss) are zero; no auto-merge"
+                summary["Ranking"]["decision"] = (
+                "KEEP current production ranking; ranking_v1 remains experiment-only "
+                "until per-qid regressions (esp. ok→top5_miss) are zero; no auto-merge"
             )
         else:
-            summary["Ranking"]["decision"] = "KEEP baseline ranking (no merge)"
+            summary["Ranking"]["decision"] = (
+                "KEEP current production ranking; ranking_v1 remains experiment-only (no merge)"
+            )
 
     out = REPORTS / "QUALITY_V2_OVERNIGHT_SUMMARY.json"
     out.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
