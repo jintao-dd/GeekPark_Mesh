@@ -386,6 +386,56 @@ def search(
                     continue
                 hits.append(_row_to_hit(d, q, score=-0.5))
 
+    # MATCH 已饱和时仍用 query_terms 补召回（并列主题/专名常被宽 OR 噪声挤出）
+    terms_extra = tok.query_terms(q, limit=4)
+    if terms_extra and len(hits) >= min(3, limit):
+        wh_params = []
+        wh = []
+        for t in terms_extra:
+            if len(t) < 2:
+                continue
+            wh.append("(primary_name LIKE ? OR text_snippet LIKE ? OR toks LIKE ?)")
+            pat = f"%{t}%"
+            wh_params.extend([pat, pat, pat])
+        if wh:
+            sql2 = (
+                "SELECT issue_slug, date_end, item_id, source_id, owner_team, stype, "
+                "primary_name, text_snippet, source_label, level, kind, zone "
+                f"FROM item_facts WHERE ({' OR '.join(wh)})"
+            )
+            if slug:
+                sql2 += " AND issue_slug = ?"
+                wh_params.append(slug)
+            if team:
+                sql2 += " AND owner_team = ?"
+                wh_params.append(ingest.canonical_team(team) or team)
+            if stype:
+                sql2 += " AND stype = ?"
+                wh_params.append(stype)
+            sql2 += _date_clause(date_from, date_to, wh_params)
+            sql2 += " LIMIT ?"
+            wh_params.append(max(limit, 24))
+            seen = {(h["issue_slug"], h.get("item_id")) for h in hits}
+            extras: list[dict] = []
+            for r in con.execute(sql2, wh_params):
+                d = dict(r)
+                key = (d["issue_slug"], d.get("item_id"))
+                if key in seen:
+                    continue
+                # 分数优于噪声 MATCH，保证截断前能进 TopN
+                extras.append(_row_to_hit(d, q, score=-50.0))
+                seen.add(key)
+            # 短词命中优先（端侧/座舱），避免被「模型/智能」宽匹配占满 LIMIT
+            def _extra_key(h: dict) -> tuple:
+                body = (h.get("body") or "") + (h.get("title") or "")
+                short_hit = any(
+                    len(t) <= 2 and t in body for t in terms_extra
+                )
+                return (0 if short_hit else 1, str(h.get("item_id") or ""))
+
+            extras.sort(key=_extra_key)
+            hits = extras + hits
+
     ent_hits = search_entities(con, q, slug=slug, team=team, date_from=date_from, date_to=date_to, limit=limit)
     seen = {(h["issue_slug"], h.get("item_id"), h.get("title")) for h in hits}
     for h in ent_hits:

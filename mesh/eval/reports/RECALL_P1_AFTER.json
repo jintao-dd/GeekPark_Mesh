@@ -1,0 +1,322 @@
+{
+  "phase": "Retrieval Recall Phase 0 Baseline",
+  "gold": "retrieval_gold_v1.jsonl",
+  "n": 5,
+  "embed": false,
+  "macro_recall@5": 0.4767,
+  "macro_recall@10": 0.66,
+  "macro_recall@20": 0.76,
+  "failure_pattern_hist": {
+    "ok": 3,
+    "partial_miss_rank_or_fts": 2
+  },
+  "elapsed_s": 0.1,
+  "completion_criteria": {
+    "gold_built": true,
+    "baseline_ran": true,
+    "all_pass_required": false,
+    "forbidden": [
+      "no RAG change",
+      "no Chunk/FTS/Vector/Rewrite",
+      "no Rerank/Ranking"
+    ],
+    "next": "review failure patterns before any retrieval change"
+  },
+  "results": [
+    {
+      "id": "R11",
+      "category": "topic",
+      "query": "Agent 治理与合规 7 月 15 日",
+      "scope": {
+        "issue": "explicit:2026-8-17",
+        "time_basis": "event_time",
+        "window": "explicit"
+      },
+      "relevant_items": [
+        "4105",
+        "4106"
+      ],
+      "retrieved_items": [
+        "4105",
+        "4340",
+        "4371",
+        "4382",
+        "4228",
+        "4131",
+        "4122",
+        "4146",
+        "4344",
+        "4167",
+        "4128",
+        "4130",
+        "4200",
+        "4205",
+        "4206",
+        "4214",
+        "4220",
+        "4221",
+        "4232",
+        "4241"
+      ],
+      "hit_items": [
+        "4105",
+        "4106"
+      ],
+      "missed_items": [],
+      "metrics": {
+        "recall@5": 0.5,
+        "recall@10": 0.5,
+        "recall@20": 0.5
+      },
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-8-17",
+        "date_from": "2026-09-07",
+        "date_to": "2026-09-07",
+        "n_hits_raw": 31,
+        "used_vector": false,
+        "context_slug": "2026-8-17",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "explicit"
+      },
+      "elapsed_ms": 79,
+      "notes": null
+    },
+    {
+      "id": "R12",
+      "category": "topic",
+      "query": "端侧模型与智能座舱",
+      "scope": {
+        "issue": "explicit:2026-8-17",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4116",
+        "4120",
+        "4125",
+        "4128"
+      ],
+      "retrieved_items": [
+        "4123",
+        "4116",
+        "4118",
+        "4112",
+        "4127",
+        "4124",
+        "4128",
+        "4129",
+        "4130",
+        "4115",
+        "4167",
+        "4131",
+        "4117"
+      ],
+      "hit_items": [
+        "4116",
+        "4128"
+      ],
+      "missed_items": [
+        "4120",
+        "4125"
+      ],
+      "metrics": {
+        "recall@5": 0.25,
+        "recall@10": 0.5,
+        "recall@20": 0.5
+      },
+      "first_relevant_rank": 2,
+      "failure_pattern": "partial_miss_rank_or_fts",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-8-17",
+        "date_from": "2026-09-07",
+        "date_to": "2026-09-07",
+        "n_hits_raw": 19,
+        "used_vector": false,
+        "context_slug": "2026-8-17",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 17,
+      "notes": null
+    },
+    {
+      "id": "R13",
+      "category": "topic",
+      "query": "具身智能数据圆桌讨论了什么",
+      "scope": {
+        "issue": "explicit:2026-8-17",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4154",
+        "4155",
+        "4156"
+      ],
+      "retrieved_items": [
+        "4154",
+        "4379",
+        "4380",
+        "4250",
+        "4153",
+        "4155",
+        "4156",
+        "4158",
+        "4160",
+        "4174",
+        "4175",
+        "4182",
+        "4237"
+      ],
+      "hit_items": [
+        "4154",
+        "4155",
+        "4156"
+      ],
+      "missed_items": [],
+      "metrics": {
+        "recall@5": 0.3333,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-8-17",
+        "date_from": "2026-09-07",
+        "date_to": "2026-09-07",
+        "n_hits_raw": 16,
+        "used_vector": false,
+        "context_slug": "2026-8-17",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 21,
+      "notes": null
+    },
+    {
+      "id": "R14",
+      "category": "topic",
+      "query": "视频号本周播放较好的片子",
+      "scope": {
+        "issue": "explicit:2026-09-08",
+        "time_basis": "issue_time",
+        "window": "this_week"
+      },
+      "relevant_items": [
+        "4408",
+        "4409",
+        "4410",
+        "4411",
+        "4412"
+      ],
+      "retrieved_items": [
+        "4409",
+        "4408",
+        "4410",
+        "4411",
+        "4445"
+      ],
+      "hit_items": [
+        "4408",
+        "4409",
+        "4410",
+        "4411"
+      ],
+      "missed_items": [
+        "4412"
+      ],
+      "metrics": {
+        "recall@5": 0.8,
+        "recall@10": 0.8,
+        "recall@20": 0.8
+      },
+      "first_relevant_rank": 1,
+      "failure_pattern": "partial_miss_rank_or_fts",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-09-08",
+        "date_from": "2026-09-08",
+        "date_to": "2026-09-08",
+        "n_hits_raw": 10,
+        "used_vector": false,
+        "context_slug": "2026-09-08",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "this_week"
+      },
+      "elapsed_ms": 9,
+      "notes": null
+    },
+    {
+      "id": "R18",
+      "category": "community",
+      "query": "Founder Park 下半年规划",
+      "scope": {
+        "issue": "explicit:2026-8-17",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4358",
+        "4271"
+      ],
+      "retrieved_items": [
+        "4358",
+        "4378",
+        "4385",
+        "4386",
+        "4246",
+        "4247",
+        "4387",
+        "4376",
+        "4377",
+        "4369",
+        "4271",
+        "4241",
+        "4370",
+        "4371",
+        "4372",
+        "4364",
+        "4303",
+        "4243",
+        "4230",
+        "4231"
+      ],
+      "hit_items": [
+        "4358",
+        "4271"
+      ],
+      "missed_items": [],
+      "metrics": {
+        "recall@5": 0.5,
+        "recall@10": 0.5,
+        "recall@20": 1.0
+      },
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-8-17",
+        "date_from": "2026-09-07",
+        "date_to": "2026-09-07",
+        "n_hits_raw": 27,
+        "used_vector": false,
+        "context_slug": "2026-8-17",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 9,
+      "notes": null
+    }
+  ]
+}

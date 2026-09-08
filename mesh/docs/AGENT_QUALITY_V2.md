@@ -6,8 +6,9 @@
 > **② Retrieval Recall**  
 > · Phase 0 = **PASS**（Gold n=30 · Baseline 74/79/79 · Embed=False）  
 > · Failure Review = **PASS**（四线分层完成）  
-> · **Phase 1 = 🟢 GO** · ① Scope ✅ · ② R14 Index ✅（归因 **A**）· ③ FTS/Query ⬜ NEXT  
+> · **Phase 1 = 🟢 GO** · ① Scope ✅ · ② R14 Index ✅(A) · ③ FTS/Query ✅（Gold 74/79/79 → **83/90/94**）  
 > **原则：先可测量，再优化；先证明问题，再改架构。**
+> **③ Ranking / ④ Evidence / ⑤ Answer / ⑥ Data Domain = 🔒**（Ranking 可评估是否解锁）
 
 相关：`MESH_AGENT_FULL_ACCEPTANCE.md` · `TEMPORAL_PHASE1.md` · `RECALL_FAILURE_REVIEW.md`  
 ⑧ 飞书 MVP ∥ 质量线（只接线）。
@@ -30,12 +31,12 @@ v1                         ✅ GO
   Failure Review             ✅ PASS
 
   Phase 1                   🟢 GO
-  ① Scope                   ✅ DONE（勿再动）
-  ② Index 核查（R14）       ✅ DONE → 归因 **A**（已进索引，原句未召回 → FTS/Query）
-  ③ FTS/Query               ⬜ NEXT（7 miss + R14）
+  ① Scope                   ✅ DONE
+  ② Index 核查（R14）       ✅ DONE → A
+  ③ FTS/Query               ✅ DONE（Δ R@5/10/20 = +9/+11/+15）
   Vector 对照实验（可选）
 
-③ Ranking                   🔒 LOCKED
+③ Ranking                   🟡 可评估解锁（R12 Top5 等）
 ④ Evidence                  🔒 LOCKED
 ⑤ Answer                    🔒 LOCKED
 ⑥ Data Domain               🔒 LOCKED
