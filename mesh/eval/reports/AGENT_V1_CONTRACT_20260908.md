@@ -1,13 +1,18 @@
-# Agent v1 契约测试报告（⑦ Harness）
+# Agent v1 契约测试报告（⑦ + 真实 Adapter）
 
 > 日期：2026-09-08  
-> 范围：本地/HTTP Agent Harness（**不依赖飞书**）  
-> 架构：`docs/AGENT_ARCHITECTURE_V1.md` ①～⑦ 冻结
+> 范围：本地/HTTP Agent Harness + **真实** `ask.published` / `ask.relations_summary`  
+> **不依赖飞书**；⑧ 仍关闭
 
 ## 结论
 
-**契约测试 18/18 PASS。**  
-⑦ 实现可进入「修边 / 接真实 ask_engine 适配器」收口；**尚未**开 ⑧ 飞书接线。
+**契约 + 真实冒烟 20/20 PASS。**
+
+- 编排契约（原 18）保持  
+- 新增 2 条真实 Evidence 冒烟：published 检索 / relations 摘要  
+
+当前可证明：**Agent 接真实 Mesh Published 数据后契约成立**。  
+下一步闸门：**Mesh + Agent 全量验收** → 通过后才开 ⑧ 飞书 MVP。
 
 ## 命令
 
@@ -16,39 +21,30 @@ cd mesh
 python -m pytest tests/test_agent_v1_contract.py -v
 ```
 
-## 覆盖矩阵
+## Adapter
+
+| Tool | 实现 |
+|------|------|
+| `ask.published` | `ask_engine.prepare` + EvidenceRef（chunk/item/ctx）；IssueRef 钉期日期，避免「本周」滚窗漏期 |
+| `ask.relations_summary` | `published_json.relations` + `relation_display` reader 口径 + `ev:item:` / `ev:rel:` |
+
+可选：`MESH_AGENT_USE_LLM=1` 时 published 走 LLM 成文；默认用可追溯上下文摘要（验收不绑死 LLM）。
+
+## 覆盖
 
 | 场景 | 结果 |
 |------|------|
-| help（无数据 Tool） | PASS |
-| list_issues（仅 published） | PASS |
-| ask.published（恰好 1 次） | PASS |
-| ask.relations_summary（恰好 1 次） | PASS |
-| 未绑定 unlinked | PASS（无数据 Tool） |
-| bound_team_conflict | PASS（无数据 Tool） |
-| draft/raw 越权 | PASS（拒绝且无泄漏） |
-| bound_team_missing → unfocused | PASS |
-| DM vs 群 scope_key | PASS |
-| chat team ≠ primary_team | PASS（不改 Person） |
-| explicit team + explicit issue | PASS（locked） |
-| latest_published fallback | PASS |
-| explicit draft issue | PASS（IssueRef=none） |
-| 空结果不二次数据 Tool | PASS |
-| Tool 自防御 ACL/conflict | PASS |
-| Tool 自防御 draft / issue bypass / team bypass | PASS |
-| 未注册 Tool | PASS |
-| fingerprint ≠ trace | PASS |
+| 原 18 契约矩阵 | PASS |
+| 真实 published → Evidence | PASS |
+| 真实 relation → Evidence | PASS |
 
-## 实现要点
+## 下一闸门（不做飞书）
 
-- 包：`mesh/app/agent/`（identity / permission / context / intent / tools / runtime / harness）
-- HTTP：`POST /api/agent/v1/message`（登录 viewer+；与飞书无关）
-- `ask.published` / `ask.relations_summary` 当前为 **Harness stub**（可注入适配器接 `ask_engine`）；契约层已锁死 ≤1 Tool、Published-only、自防御
-
-## ⑧ 门禁
-
-在下列完成前 **不开飞书 MVP**：
-
-1. （可选）把 stub 换成真实 published 检索适配器并加 1～2 条冒烟  
-2. 本报告场景持续绿  
-3. 再按「只接线不扩大脑」接飞书消息 → open_id → `handle_message` → 回复
+```
+⑦ 20/20（含真实 adapter）
+        ↓
+⭐ Mesh + Agent 全量验收
+  （流程 / 逻辑 / 速度 / 容错 / 并发 / Ask25·Gold·Claim·T13·发布边界）
+        ↓
+通过 → ⑧ 飞书 MVP（只接线）
+```

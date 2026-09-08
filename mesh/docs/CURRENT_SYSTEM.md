@@ -29,7 +29,8 @@ Mesh 是极客公园内部用的两件事：
 
 飞书目前只有 **OAuth 登录** 和 **群→团队绑定**。没有飞书 Bot 收消息答问。
 
-Agent v1：**架构 ①～⑦ 已冻结**；正在实现本地/HTTP Harness（`/api/agent/v1/message`）与契约测试，**通过后再接 ⑧ 飞书接线**。详见 `docs/AGENT_ARCHITECTURE_V1.md`。
+Agent v1：①～⑦ 架构冻结；Harness + **真实 Ask/Relation adapter** 契约 **20/20**（见 `eval/reports/AGENT_V1_CONTRACT_20260908.md`）。  
+**下一步：Mesh + Agent 全量验收 → 通过后再 ⑧ 飞书接线（不扩大脑）。**
 
 后台四步：放入素材 → 挖掘 → 审校（要点卡 + 草稿）→ 确认上线。
 

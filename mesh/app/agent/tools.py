@@ -147,115 +147,35 @@ def tool_list_issues(
     )
 
 
-def _default_ask_published(con, context: AgentContext, args: dict[str, Any]) -> ToolResult:
-    """无 LLM 的 Harness 桩：只证明契约；真实部署可注入 ask_engine 适配器。"""
-    slug = context.issue_ref.slug or ""
-    q = str(args.get("q") or context.text or "").strip()
-    if not slug:
-        return ToolResult(
-            ok=True,
-            tool_id="ask.published",
-            payload={"answer": "当前没有可引用的已上线期次。", "mode": "none"},
-            evidence_refs=[],
-            claim_bindings=[
-                ClaimBinding(
-                    claim="无可用 IssueRef",
-                    evidence_refs=[],
-                    status="unsupported",
-                    reason="no_issue_ref",
-                )
-            ],
-        )
-    # 确认期次仍 published
-    row = con.execute(
-        "SELECT status, published_json FROM issues WHERE slug=?", (slug,)
-    ).fetchone()
-    if not row or row["status"] != "published" or not (row["published_json"] or "").strip():
-        return _deny("ask.published", "issue_not_published")
+def _call_published(
+    con,
+    identity: IdentityResult,
+    permission: PermissionDecision,
+    context: AgentContext,
+    args: dict[str, Any],
+) -> ToolResult:
+    from . import adapters
 
-    ev = [f"ev:published:{slug}:stub"]
-    answer = f"[harness] 已在已上线期次 {slug} 范围内检索：{q[:120]}"
-    focus = (context.query_scope or {}).get("team_focus")
-    if focus:
-        answer += f"（视角：{focus}）"
-    return ToolResult(
-        ok=True,
-        tool_id="ask.published",
-        payload={"answer": answer, "mode": "harness_stub", "issue": slug},
-        evidence_refs=ev,
-        claim_bindings=[
-            ClaimBinding(
-                claim=answer,
-                evidence_refs=ev,
-                status="weak",
-                reason="harness_stub_not_llm",
-            )
-        ],
-    )
+    return adapters.ask_published(con, identity, permission, context, args)
 
 
-def _default_ask_relations(con, context: AgentContext, args: dict[str, Any]) -> ToolResult:
-    slug = context.issue_ref.slug or ""
-    if not slug:
-        return ToolResult(
-            ok=True,
-            tool_id="ask.relations_summary",
-            payload={"answer": "没有可引用的已上线期次，无法汇总关系。", "relations": []},
-            evidence_refs=[],
-            claim_bindings=[
-                ClaimBinding(
-                    claim="无 IssueRef",
-                    evidence_refs=[],
-                    status="unsupported",
-                    reason="no_issue_ref",
-                )
-            ],
-        )
-    row = con.execute(
-        "SELECT status, published_json FROM issues WHERE slug=?", (slug,)
-    ).fetchone()
-    if not row or row["status"] != "published":
-        return _deny("ask.relations_summary", "issue_not_published")
+def _call_relations(
+    con,
+    identity: IdentityResult,
+    permission: PermissionDecision,
+    context: AgentContext,
+    args: dict[str, Any],
+) -> ToolResult:
+    from . import adapters
 
-    # 只读 published_json 内 relation 段（若有）；失败则空摘要
-    import json
-
-    relations: list[dict] = []
-    try:
-        data = json.loads(row["published_json"] or "{}")
-        for key in ("relations", "关系", "relation_cards"):
-            if isinstance(data.get(key), list):
-                relations = data[key][:20]
-                break
-        if not relations and isinstance(data.get("sections"), dict):
-            rel = data["sections"].get("relations") or data["sections"].get("关系")
-            if isinstance(rel, list):
-                relations = rel[:20]
-    except Exception:
-        relations = []
-
-    ev = [f"ev:relation:{slug}:{i}" for i in range(min(3, len(relations)))] or [
-        f"ev:relation:{slug}:empty"
-    ]
-    answer = f"[harness] 期次 {slug} 关系摘要：{len(relations)} 条（Published）。"
-    return ToolResult(
-        ok=True,
-        tool_id="ask.relations_summary",
-        payload={"answer": answer, "relations": relations, "issue": slug},
-        evidence_refs=ev,
-        claim_bindings=[
-            ClaimBinding(
-                claim=answer,
-                evidence_refs=ev,
-                status="grounded" if relations else "weak",
-                reason="published_relations_summary",
-            )
-        ],
-    )
+    return adapters.ask_relations_summary(con, identity, permission, context, args)
 
 
-# 可注入适配器（生产接 ask_engine；测试可替换）
-AskAdapter = Callable[[Any, AgentContext, dict[str, Any]], ToolResult]
+# 可注入适配器（契约测试可替换；默认走真实 Mesh）
+AskAdapter = Callable[
+    [Any, IdentityResult, PermissionDecision, AgentContext, dict[str, Any]],
+    ToolResult,
+]
 _ask_published_adapter: AskAdapter | None = None
 _ask_relations_adapter: AskAdapter | None = None
 
@@ -280,8 +200,8 @@ def tool_ask_published(
     blocked = _guard_common("ask.published", identity, permission, context, args=args)
     if blocked:
         return blocked
-    adapter = _ask_published_adapter or _default_ask_published
-    return adapter(con, context, args)
+    adapter = _ask_published_adapter or _call_published
+    return adapter(con, identity, permission, context, args)
 
 
 def tool_ask_relations(
@@ -297,8 +217,8 @@ def tool_ask_relations(
     )
     if blocked:
         return blocked
-    adapter = _ask_relations_adapter or _default_ask_relations
-    return adapter(con, context, args)
+    adapter = _ask_relations_adapter or _call_relations
+    return adapter(con, identity, permission, context, args)
 
 
 _REGISTRY: dict[str, Callable[..., ToolResult]] = {

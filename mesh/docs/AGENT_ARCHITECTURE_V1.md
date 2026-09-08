@@ -745,13 +745,13 @@ handle(message, envelope):
 ```
 实现 ⑦ Agent v1（本地 / HTTP Harness，不依赖飞书）
         ↓
-跑契约测试（§9.3 + 扩展身份/场景矩阵）
+真实 ask.published / ask.relations_summary adapter
         ↓
-出测试报告
+跑契约测试（含真实 Evidence 冒烟）
         ↓
-判断是否进入 ⑧
+⭐ Mesh + Agent 全量验收
         ↓
-⑧ 飞书 MVP：只接线，不扩大脑
+通过 → ⑧ 飞书 MVP：只接线，不扩大脑
 ```
 
 **禁止在接飞书时加入：** Planner、ReAct、多 Tool 循环、长期 Memory、Multi-Agent、新权限逻辑。
