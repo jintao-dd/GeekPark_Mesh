@@ -2,8 +2,9 @@
 
 > **状态（2026-09-08）**  
 > Agent v1 = **GO**  
-> **① Temporal = PASS**（Phase 0 Gold+Baseline → Phase 1 · 24/24）  
-> **② Retrieval Recall = GO（Phase 0：只建 Gold + baseline，禁止改 RAG）**  
+> **① Temporal = PASS**  
+> **② Retrieval Recall Phase 0 = 完成** · **Failure Pattern Review = 完成**（见 `RECALL_FAILURE_REVIEW.md`）  
+> **下一刀：** 按 Review 分层决定 Recall Phase 1（Scope / Index / FTS）vs 移交 Ranking；**仍 NO-GO 盲目改 RAG**  
 > **原则：先可测量，再优化；先证明问题，再改架构。**
 
 相关：`MESH_AGENT_FULL_ACCEPTANCE.md` · `TEMPORAL_PHASE1.md`  
@@ -137,7 +138,8 @@ Recall@5 / @10 / @20
 ## Code 清单
 
 1. ✅ Temporal PASS  
-2. ⬜ `eval/retrieval_gold_v1.jsonl`（~30）  
-3. ⬜ `eval/run_recall_baseline.py`  
-4. ⬜ tmesh baseline → failure pattern  
-5. ⑧ 飞书可并行  
+2. ✅ `eval/retrieval_gold_v1.jsonl`（30）  
+3. ✅ `eval/run_recall_baseline.py` → macro R@5/10/20  
+4. ✅ **Failure Pattern Review** → `eval/reports/RECALL_FAILURE_REVIEW.md`  
+5. ⬜ 按 Review 分层决策 Recall Phase 1（禁止未分类改 RAG）  
+6. ⑧ 飞书可并行  
