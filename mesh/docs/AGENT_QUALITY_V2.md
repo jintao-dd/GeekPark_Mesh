@@ -1,14 +1,13 @@
 # Agent Quality / v2
 
-> **状态（2026-09-08）**  
+> **状态（2026-09-08 Overnight）**  
 > Agent v1 = **GO**  
-> **① Temporal = PASS**（Gold 24/24 · Hard Rules 已通过）  
-> **② Retrieval Recall**  
-> · Phase 0 = **PASS**（Gold n=30 · Baseline 74/79/79 · Embed=False）  
-> · Failure Review = **PASS**（四线分层完成）  
-> · **Phase 1 = 🟢 GO** · ① Scope ✅ · ② R14 Index ✅(A) · ③ FTS/Query ✅（Gold 74/79/79 → **83/90/94**）  
-> **原则：先可测量，再优化；先证明问题，再改架构。**
-> **③ Ranking / ④ Evidence / ⑤ Answer / ⑥ Data Domain = 🔒**（Ranking 可评估是否解锁）
+> **① Temporal** = 历史 24/24；本晚重跑 **23/24**（T19）— 不改架构  
+> **② Recall** = **冻结 83/90/94**；Vector A/B **回退**（−6.7pp，不接主线）  
+> **③ Ranking** = Phase0/1 闭环；v1 宏↑但 R06/R13 误杀 → **不合并生产**  
+> **④ Evidence / ⑤ Answer** = baseline 已冻结（见 Overnight 报告）  
+> 报告：`eval/reports/AGENT_QUALITY_V2_OVERNIGHT.md`  
+> **原则：先可测量，再优化；失败保留 baseline；不改 v1 Contract。**
 
 相关：`MESH_AGENT_FULL_ACCEPTANCE.md` · `TEMPORAL_PHASE1.md` · `RECALL_FAILURE_REVIEW.md`  
 ⑧ 飞书 MVP ∥ 质量线（只接线）。
@@ -20,26 +19,25 @@
 ```
 v1                         ✅ GO
 
-① Temporal                 ✅ PASS
-  Gold 24/24
+① Temporal                 ✅ 24/24 历史 / ⚠️ 本晚 23/24 (T19)
   Hard Rules 已通过
 
 ② Retrieval Recall
-  Phase 0                   ✅ PASS
-  Gold n=30
-  Baseline 74/79/79
+  Phase 0                   ✅ PASS · 74/79/79
   Failure Review             ✅ PASS
+  Phase 1                   ✅ 冻结 83/90/94
+  Vector A/B                ❌ 不接（FTS+Vec 76/83/88）
 
-  Phase 1                   🟢 GO
-  ① Scope                   ✅ DONE
-  ② Index 核查（R14）       ✅ DONE → A
-  ③ FTS/Query               ✅ DONE（Δ R@5/10/20 = +9/+11/+15）
-  Vector 对照实验（可选）
+③ Ranking                   ✅ 测量闭环
+  Baseline                  MRR 0.807 / nDCG@10 0.825 / P@5 0.511
+  Exp v1                    +0.056 / +0.037 / +0.013 · 有误杀 → 不合并
 
-③ Ranking                   🟡 可评估解锁（R12 Top5 等）
-④ Evidence                  🔒 LOCKED
-⑤ Answer                    🔒 LOCKED
+④ Evidence                  ✅ baseline 冻结（cov/corr/cite=1.0）
+⑤ Answer                    ✅ baseline 冻结（pass 93% · acc 0.73）
 ⑥ Data Domain               🔒 LOCKED
+
+统一 Runner                 ✅ eval/run_quality_v2.py
+Overnight                   ✅ AGENT_QUALITY_V2_OVERNIGHT.md
 ```
 
 ---

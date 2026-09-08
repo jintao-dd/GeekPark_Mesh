@@ -375,7 +375,7 @@
         "filter_mode": "issue_anchor",
         "window": "explicit"
       },
-      "elapsed_ms": 13,
+      "elapsed_ms": 14,
       "notes": null
     },
     {
@@ -423,7 +423,7 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 19,
+      "elapsed_ms": 20,
       "notes": null
     },
     {
@@ -573,7 +573,7 @@
         "filter_mode": "issue_anchor",
         "window": "explicit"
       },
-      "elapsed_ms": 29,
+      "elapsed_ms": 28,
       "notes": null
     },
     {
@@ -816,7 +816,7 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 24,
+      "elapsed_ms": 23,
       "notes": null
     },
     {
@@ -1352,7 +1352,7 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 26,
+      "elapsed_ms": 27,
       "notes": null
     },
     {

@@ -1,37 +1,19 @@
 {
-  "phase": "Retrieval Recall Phase 0 Baseline",
-  "gold": "retrieval_gold_v1.jsonl",
+  "phase": "ranking",
+  "profile": "baseline",
+  "tag": "ranking_baseline",
   "n": 30,
-  "embed": false,
+  "macro_mrr": 0.8071,
+  "macro_ndcg@10": 0.825,
+  "macro_precision@5": 0.5106,
   "macro_recall@5": 0.8261,
   "macro_recall@10": 0.8961,
   "macro_recall@20": 0.9433,
-  "failure_pattern_hist": {
-    "ok": 29,
-    "partial_miss_rank_or_fts": 1
-  },
-  "elapsed_s": 0.6,
-  "completion_criteria": {
-    "gold_built": true,
-    "baseline_ran": true,
-    "all_pass_required": false,
-    "forbidden": [
-      "no RAG change",
-      "no Chunk/FTS/Vector/Rewrite",
-      "no Rerank/Ranking"
-    ],
-    "next": "review failure patterns before any retrieval change"
-  },
+  "elapsed_s": 0.66,
   "results": [
     {
       "id": "R01",
-      "category": "name",
       "query": "锦涛做了什么",
-      "scope": {
-        "issue": "explicit:2026-8-17",
-        "time_basis": "unknown",
-        "window": "none"
-      },
       "relevant_items": [
         "4251",
         "4259",
@@ -42,18 +24,19 @@
         "4259",
         "4260"
       ],
-      "hit_items": [
-        "4251",
-        "4259",
-        "4260"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4251": 1,
+        "4260": 3,
+        "4259": 2
+      },
       "metrics": {
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "precision@5": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 1,
       "failure_pattern": "ok",
       "retrieval": {
         "mode": "hybrid",
@@ -67,18 +50,11 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 63,
-      "notes": "人名召回；内容在品牌创意"
+      "profile": "baseline"
     },
     {
       "id": "R02",
-      "category": "name_recent",
       "query": "锦涛最近做了什么",
-      "scope": {
-        "issue": "latest_published",
-        "time_basis": "unknown",
-        "window": "recent"
-      },
       "relevant_items": [
         "4251",
         "4259",
@@ -89,18 +65,19 @@
         "4259",
         "4260"
       ],
-      "hit_items": [
-        "4251",
-        "4259",
-        "4260"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4251": 1,
+        "4260": 3,
+        "4259": 2
+      },
       "metrics": {
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "precision@5": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 1,
       "failure_pattern": "ok",
       "retrieval": {
         "mode": "hybrid",
@@ -114,34 +91,28 @@
         "filter_mode": "time_window",
         "window": "recent"
       },
-      "elapsed_ms": 10,
-      "notes": "Scope 验证样本：latest+recent 可跨已发布（非 Recall 缺陷）"
+      "profile": "baseline"
     },
     {
       "id": "R03",
-      "category": "company",
       "query": "破壳创智有什么进展",
-      "scope": {
-        "issue": "explicit:2026-8-17",
-        "time_basis": "issue_time",
-        "window": "none"
-      },
       "relevant_items": [
         "4356"
       ],
       "retrieved_items": [
         "4356"
       ],
-      "hit_items": [
-        "4356"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4356": 1
+      },
       "metrics": {
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "precision@5": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 1,
       "failure_pattern": "ok",
       "retrieval": {
         "mode": "hybrid",
@@ -155,18 +126,11 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 18,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R04",
-      "category": "company",
       "query": "面壁智能接触了什么",
-      "scope": {
-        "issue": "explicit:2026-8-17",
-        "time_basis": "issue_time",
-        "window": "none"
-      },
       "relevant_items": [
         "4112",
         "4115",
@@ -196,21 +160,22 @@
         "4111",
         "4182"
       ],
-      "hit_items": [
-        "4112",
-        "4115",
-        "4116",
-        "4118",
-        "4120"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4115": 5,
+        "4112": 3,
+        "4120": 1,
+        "4118": 8,
+        "4116": 6
+      },
       "metrics": {
+        "mrr": 1.0,
+        "ndcg@10": 0.8677,
+        "precision@5": 0.6,
         "recall@5": 0.6,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 1,
-      "failure_pattern": "ok",
+      "failure_pattern": "top5_miss:4116,4118",
       "retrieval": {
         "mode": "hybrid",
         "slug": "2026-8-17",
@@ -223,18 +188,11 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 24,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R05",
-      "category": "company",
       "query": "PPIO 姚欣说了什么",
-      "scope": {
-        "issue": "explicit:2026-8-17",
-        "time_basis": "issue_time",
-        "window": "none"
-      },
       "relevant_items": [
         "4141",
         "4142",
@@ -250,21 +208,22 @@
         "4144",
         "4145"
       ],
-      "hit_items": [
-        "4141",
-        "4142",
-        "4143",
-        "4144",
-        "4145"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4142": 3,
+        "4143": 4,
+        "4145": 6,
+        "4144": 5,
+        "4141": 2
+      },
       "metrics": {
+        "mrr": 0.5,
+        "ndcg@10": 0.7817,
+        "precision@5": 0.8,
         "recall@5": 0.8,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 2,
-      "failure_pattern": "ok",
+      "failure_pattern": "top5_miss:4145",
       "retrieval": {
         "mode": "hybrid",
         "slug": "2026-8-17",
@@ -277,18 +236,11 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 11,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R06",
-      "category": "company",
       "query": "英伟达 EDC 培训讲了什么",
-      "scope": {
-        "issue": "explicit:2026-8-17",
-        "time_basis": "issue_time",
-        "window": "none"
-      },
       "relevant_items": [
         "4147",
         "4148",
@@ -307,20 +259,21 @@
         "4118",
         "4123"
       ],
-      "hit_items": [
-        "4147",
-        "4148",
-        "4149",
-        "4150",
-        "4151"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4149": 3,
+        "4147": 1,
+        "4150": 4,
+        "4148": 2,
+        "4151": 5
+      },
       "metrics": {
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "precision@5": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 1,
       "failure_pattern": "ok",
       "retrieval": {
         "mode": "hybrid",
@@ -334,34 +287,28 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 21,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R07",
-      "category": "company",
       "query": "OdyssLife 众筹节奏",
-      "scope": {
-        "issue": "explicit:2026-09-08",
-        "time_basis": "issue_time",
-        "window": "explicit"
-      },
       "relevant_items": [
         "4429"
       ],
       "retrieved_items": [
         "4429"
       ],
-      "hit_items": [
-        "4429"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4429": 1
+      },
       "metrics": {
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "precision@5": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 1,
       "failure_pattern": "ok",
       "retrieval": {
         "mode": "hybrid",
@@ -375,18 +322,11 @@
         "filter_mode": "issue_anchor",
         "window": "explicit"
       },
-      "elapsed_ms": 13,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R08",
-      "category": "company",
       "query": "FREELANDER 神行者怎么定义产品",
-      "scope": {
-        "issue": "explicit:2026-09-08",
-        "time_basis": "issue_time",
-        "window": "none"
-      },
       "relevant_items": [
         "4423",
         "4424",
@@ -398,18 +338,19 @@
         "4424",
         "4426"
       ],
-      "hit_items": [
-        "4423",
-        "4424",
-        "4425"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4425": 1,
+        "4424": 3,
+        "4423": 2
+      },
       "metrics": {
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "precision@5": 0.75,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 1,
       "failure_pattern": "ok",
       "retrieval": {
         "mode": "hybrid",
@@ -423,18 +364,11 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 19,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R09",
-      "category": "company",
       "query": "未来脑律 ZenoWell 是什么",
-      "scope": {
-        "issue": "explicit:2026-09-08",
-        "time_basis": "issue_time",
-        "window": "none"
-      },
       "relevant_items": [
         "4428"
       ],
@@ -443,16 +377,17 @@
         "4427",
         "4472"
       ],
-      "hit_items": [
-        "4428"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4428": 1
+      },
       "metrics": {
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "precision@5": 0.3333,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 1,
       "failure_pattern": "ok",
       "retrieval": {
         "mode": "hybrid",
@@ -466,18 +401,11 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 13,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R10",
-      "category": "company",
       "query": "程天科技外骨骼",
-      "scope": {
-        "issue": "explicit:2026-09-08",
-        "time_basis": "issue_time",
-        "window": "none"
-      },
       "relevant_items": [
         "4431"
       ],
@@ -488,16 +416,17 @@
         "4484",
         "4511"
       ],
-      "hit_items": [
-        "4431"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4431": 1
+      },
       "metrics": {
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "precision@5": 0.2,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 1,
       "failure_pattern": "ok",
       "retrieval": {
         "mode": "hybrid",
@@ -511,18 +440,11 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 16,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R11",
-      "category": "topic",
       "query": "Agent 治理与合规 7 月 15 日",
-      "scope": {
-        "issue": "explicit:2026-8-17",
-        "time_basis": "event_time",
-        "window": "explicit"
-      },
       "relevant_items": [
         "4105",
         "4106"
@@ -549,18 +471,19 @@
         "4221",
         "4232"
       ],
-      "hit_items": [
-        "4105",
-        "4106"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4106": 23,
+        "4105": 1
+      },
       "metrics": {
+        "mrr": 1.0,
+        "ndcg@10": 0.6131,
+        "precision@5": 0.2,
         "recall@5": 0.5,
         "recall@10": 0.5,
         "recall@20": 0.5
       },
-      "first_relevant_rank": 1,
-      "failure_pattern": "ok",
+      "failure_pattern": "top5_miss:4106",
       "retrieval": {
         "mode": "hybrid",
         "slug": "2026-8-17",
@@ -573,18 +496,11 @@
         "filter_mode": "issue_anchor",
         "window": "explicit"
       },
-      "elapsed_ms": 29,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R12",
-      "category": "topic",
       "query": "端侧模型与智能座舱",
-      "scope": {
-        "issue": "explicit:2026-8-17",
-        "time_basis": "issue_time",
-        "window": "none"
-      },
       "relevant_items": [
         "4116",
         "4120",
@@ -613,20 +529,21 @@
         "4106",
         "4110"
       ],
-      "hit_items": [
-        "4116",
-        "4120",
-        "4125",
-        "4128"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4125": 7,
+        "4128": 14,
+        "4116": 3,
+        "4120": 5
+      },
       "metrics": {
+        "mrr": 0.3333,
+        "ndcg@10": 0.4763,
+        "precision@5": 0.4,
         "recall@5": 0.5,
         "recall@10": 0.75,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 3,
-      "failure_pattern": "ok",
+      "failure_pattern": "top5_miss:4125,4128",
       "retrieval": {
         "mode": "hybrid",
         "slug": "2026-8-17",
@@ -639,18 +556,11 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 29,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R13",
-      "category": "topic",
       "query": "具身智能数据圆桌讨论了什么",
-      "scope": {
-        "issue": "explicit:2026-8-17",
-        "time_basis": "issue_time",
-        "window": "none"
-      },
       "relevant_items": [
         "4154",
         "4155",
@@ -675,19 +585,20 @@
         "4155",
         "4334"
       ],
-      "hit_items": [
-        "4154",
-        "4155",
-        "4156"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4155": 16,
+        "4156": 2,
+        "4154": 15
+      },
       "metrics": {
+        "mrr": 0.5,
+        "ndcg@10": 0.2961,
+        "precision@5": 0.2,
         "recall@5": 0.3333,
         "recall@10": 0.3333,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 2,
-      "failure_pattern": "ok",
+      "failure_pattern": "top5_miss:4154,4155",
       "retrieval": {
         "mode": "hybrid",
         "slug": "2026-8-17",
@@ -700,18 +611,11 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 22,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R14",
-      "category": "topic",
       "query": "视频号本周播放较好的片子",
-      "scope": {
-        "issue": "explicit:2026-09-08",
-        "time_basis": "issue_time",
-        "window": "this_week"
-      },
       "relevant_items": [
         "4408",
         "4409",
@@ -726,22 +630,21 @@
         "4410",
         "4411"
       ],
-      "hit_items": [
-        "4408",
-        "4409",
-        "4410",
-        "4411"
-      ],
-      "missed_items": [
-        "4412"
-      ],
+      "ranks": {
+        "4409": 2,
+        "4411": 5,
+        "4410": 4,
+        "4408": 3
+      },
       "metrics": {
+        "mrr": 0.5,
+        "ndcg@10": 0.6608,
+        "precision@5": 0.8,
         "recall@5": 0.8,
         "recall@10": 0.8,
         "recall@20": 0.8
       },
-      "first_relevant_rank": 2,
-      "failure_pattern": "partial_miss_rank_or_fts",
+      "failure_pattern": "top5_miss:4412",
       "retrieval": {
         "mode": "hybrid",
         "slug": "2026-09-08",
@@ -754,18 +657,11 @@
         "filter_mode": "issue_anchor",
         "window": "this_week"
       },
-      "elapsed_ms": 11,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R15",
-      "category": "topic",
       "query": "编辑部选题里 IFA 相关",
-      "scope": {
-        "issue": "explicit:2026-09-08",
-        "time_basis": "issue_time",
-        "window": "none"
-      },
       "relevant_items": [
         "4416",
         "4417"
@@ -792,17 +688,18 @@
         "4429",
         "4430"
       ],
-      "hit_items": [
-        "4416",
-        "4417"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4417": 3,
+        "4416": 2
+      },
       "metrics": {
+        "mrr": 0.5,
+        "ndcg@10": 0.6934,
+        "precision@5": 0.4,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 2,
       "failure_pattern": "ok",
       "retrieval": {
         "mode": "hybrid",
@@ -816,18 +713,11 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 24,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R16",
-      "category": "person",
       "query": "詹杨帆怎么看端侧和云端",
-      "scope": {
-        "issue": "explicit:2026-8-17",
-        "time_basis": "issue_time",
-        "window": "none"
-      },
       "relevant_items": [
         "4125",
         "4126",
@@ -856,20 +746,21 @@
         "4302",
         "4241"
       ],
-      "hit_items": [
-        "4125",
-        "4126",
-        "4127",
-        "4131"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4131": 5,
+        "4125": 8,
+        "4126": 9,
+        "4127": 10
+      },
       "metrics": {
+        "mrr": 0.2,
+        "ndcg@10": 0.5045,
+        "precision@5": 0.2,
         "recall@5": 0.25,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 5,
-      "failure_pattern": "ok",
+      "failure_pattern": "top5_miss:4125,4126,4127",
       "retrieval": {
         "mode": "hybrid",
         "slug": "2026-8-17",
@@ -882,18 +773,11 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 16,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R17",
-      "category": "person",
       "query": "滴滴战投牛一鸣怎么看智能硬件",
-      "scope": {
-        "issue": "explicit:2026-09-08",
-        "time_basis": "issue_time",
-        "window": "none"
-      },
       "relevant_items": [
         "4426",
         "4427"
@@ -902,17 +786,18 @@
         "4426",
         "4427"
       ],
-      "hit_items": [
-        "4426",
-        "4427"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4426": 1,
+        "4427": 2
+      },
       "metrics": {
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "precision@5": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 1,
       "failure_pattern": "ok",
       "retrieval": {
         "mode": "hybrid",
@@ -926,21 +811,14 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 19,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R18",
-      "category": "community",
       "query": "Founder Park 下半年规划",
-      "scope": {
-        "issue": "explicit:2026-8-17",
-        "time_basis": "issue_time",
-        "window": "none"
-      },
       "relevant_items": [
-        "4358",
-        "4271"
+        "4271",
+        "4358"
       ],
       "retrieved_items": [
         "4368",
@@ -964,18 +842,19 @@
         "4370",
         "4371"
       ],
-      "hit_items": [
-        "4358",
-        "4271"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4271": 17,
+        "4358": 7
+      },
       "metrics": {
+        "mrr": 0.1429,
+        "ndcg@10": 0.2044,
+        "precision@5": 0.0,
         "recall@5": 0.0,
         "recall@10": 0.5,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 7,
-      "failure_pattern": "ok",
+      "failure_pattern": "top5_miss:4271,4358",
       "retrieval": {
         "mode": "hybrid",
         "slug": "2026-8-17",
@@ -988,18 +867,11 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 14,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R19",
-      "category": "community",
       "query": "社群小红书本周计划发什么",
-      "scope": {
-        "issue": "explicit:2026-8-17",
-        "time_basis": "issue_time",
-        "window": "this_week"
-      },
       "relevant_items": [
         "4368"
       ],
@@ -1025,17 +897,18 @@
         "4378",
         "4379"
       ],
-      "hit_items": [
-        "4368"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4368": 28
+      },
       "metrics": {
+        "mrr": 0.0357,
+        "ndcg@10": 0.0,
+        "precision@5": 0.0,
         "recall@5": 0.0,
         "recall@10": 0.0,
         "recall@20": 0.0
       },
-      "first_relevant_rank": 28,
-      "failure_pattern": "ok",
+      "failure_pattern": "not_in_top20",
       "retrieval": {
         "mode": "hybrid",
         "slug": "2026-8-17",
@@ -1048,18 +921,11 @@
         "filter_mode": "issue_anchor",
         "window": "this_week"
       },
-      "elapsed_ms": 19,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R20",
-      "category": "gp",
       "query": "张鹏去深圳拜访吴伟",
-      "scope": {
-        "issue": "explicit:2026-8-17",
-        "time_basis": "unknown",
-        "window": "none"
-      },
       "relevant_items": [
         "4356"
       ],
@@ -1071,16 +937,17 @@
         "4241",
         "4243"
       ],
-      "hit_items": [
-        "4356"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4356": 1
+      },
       "metrics": {
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "precision@5": 0.2,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 1,
       "failure_pattern": "ok",
       "retrieval": {
         "mode": "hybrid",
@@ -1094,18 +961,11 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 26,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R21",
-      "category": "media",
       "query": "The Verge 写了哪些手机或隐私相关",
-      "scope": {
-        "issue": "explicit:2026-09-08",
-        "time_basis": "issue_time",
-        "window": "none"
-      },
       "relevant_items": [
         "4402",
         "4404"
@@ -1132,17 +992,18 @@
         "4503",
         "4504"
       ],
-      "hit_items": [
-        "4402",
-        "4404"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4402": 2,
+        "4404": 4
+      },
       "metrics": {
+        "mrr": 0.5,
+        "ndcg@10": 0.6509,
+        "precision@5": 0.4,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 2,
       "failure_pattern": "ok",
       "retrieval": {
         "mode": "hybrid",
@@ -1156,18 +1017,11 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 16,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R22",
-      "category": "media",
       "query": "Seattle Times 起诉 OpenAI",
-      "scope": {
-        "issue": "explicit:2026-09-08",
-        "time_basis": "issue_time",
-        "window": "none"
-      },
       "relevant_items": [
         "4405"
       ],
@@ -1184,16 +1038,17 @@
         "4486",
         "4490"
       ],
-      "hit_items": [
-        "4405"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4405": 1
+      },
       "metrics": {
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "precision@5": 0.2,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 1,
       "failure_pattern": "ok",
       "retrieval": {
         "mode": "hybrid",
@@ -1207,18 +1062,11 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 16,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R23",
-      "category": "cross_issue",
       "query": "锦涛提供的建站风格参考",
-      "scope": {
-        "issue": "latest_published",
-        "time_basis": "unknown",
-        "window": "recent"
-      },
       "relevant_items": [
         "4251"
       ],
@@ -1236,16 +1084,17 @@
         "4219",
         "4222"
       ],
-      "hit_items": [
-        "4251"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4251": 1
+      },
       "metrics": {
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "precision@5": 0.2,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 1,
       "failure_pattern": "ok",
       "retrieval": {
         "mode": "hybrid",
@@ -1259,18 +1108,11 @@
         "filter_mode": "time_window",
         "window": "recent"
       },
-      "elapsed_ms": 32,
-      "notes": "Scope 验证样本：latest+recent 可跨已发布（非 Recall 缺陷）"
+      "profile": "baseline"
     },
     {
       "id": "R24",
-      "category": "cross_issue",
       "query": "破壳创智吴伟拜访计划",
-      "scope": {
-        "issue": "latest_published",
-        "time_basis": "unknown",
-        "window": "recent"
-      },
       "relevant_items": [
         "4356"
       ],
@@ -1279,16 +1121,17 @@
         "32",
         "33"
       ],
-      "hit_items": [
-        "4356"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4356": 1
+      },
       "metrics": {
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "precision@5": 0.3333,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 1,
       "failure_pattern": "ok",
       "retrieval": {
         "mode": "hybrid",
@@ -1302,18 +1145,11 @@
         "filter_mode": "time_window",
         "window": "recent"
       },
-      "elapsed_ms": 32,
-      "notes": "Scope 验证样本：latest+recent 可跨已发布（非 Recall 缺陷）"
+      "profile": "baseline"
     },
     {
       "id": "R25",
-      "category": "explicit_ok",
       "query": "锦涛提供的建站风格参考",
-      "scope": {
-        "issue": "explicit:2026-8-17",
-        "time_basis": "issue_time",
-        "window": "none"
-      },
       "relevant_items": [
         "4251"
       ],
@@ -1329,16 +1165,17 @@
         "4219",
         "4222"
       ],
-      "hit_items": [
-        "4251"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4251": 1
+      },
       "metrics": {
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "precision@5": 0.2,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 1,
       "failure_pattern": "ok",
       "retrieval": {
         "mode": "hybrid",
@@ -1352,34 +1189,28 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 26,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R26",
-      "category": "hardware",
       "query": "灵瑙科技助眠头带",
-      "scope": {
-        "issue": "explicit:2026-8-17",
-        "time_basis": "issue_time",
-        "window": "none"
-      },
       "relevant_items": [
         "4110"
       ],
       "retrieved_items": [
         "4110"
       ],
-      "hit_items": [
-        "4110"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4110": 1
+      },
       "metrics": {
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "precision@5": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 1,
       "failure_pattern": "ok",
       "retrieval": {
         "mode": "hybrid",
@@ -1393,18 +1224,11 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 19,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R27",
-      "category": "hardware",
       "query": "BMC 瑞迈特呼吸机差异化",
-      "scope": {
-        "issue": "explicit:2026-8-17",
-        "time_basis": "issue_time",
-        "window": "none"
-      },
       "relevant_items": [
         "4135",
         "4136"
@@ -1413,17 +1237,18 @@
         "4135",
         "4136"
       ],
-      "hit_items": [
-        "4135",
-        "4136"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4135": 1,
+        "4136": 2
+      },
       "metrics": {
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "precision@5": 1.0,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 1,
       "failure_pattern": "ok",
       "retrieval": {
         "mode": "hybrid",
@@ -1437,18 +1262,11 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 18,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R28",
-      "category": "hardware",
       "query": "云迹科技酒店机器人",
-      "scope": {
-        "issue": "explicit:2026-8-17",
-        "time_basis": "issue_time",
-        "window": "none"
-      },
       "relevant_items": [
         "4140"
       ],
@@ -1460,16 +1278,17 @@
         "4190",
         "4244"
       ],
-      "hit_items": [
-        "4140"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4140": 1
+      },
       "metrics": {
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "precision@5": 0.2,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 1,
       "failure_pattern": "ok",
       "retrieval": {
         "mode": "hybrid",
@@ -1483,18 +1302,11 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 20,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R29",
-      "category": "contact",
       "query": "腾讯 wb 生态应用接触",
-      "scope": {
-        "issue": "explicit:2026-09-08",
-        "time_basis": "issue_time",
-        "window": "none"
-      },
       "relevant_items": [
         "4421"
       ],
@@ -1502,16 +1314,17 @@
         "4421",
         "4488"
       ],
-      "hit_items": [
-        "4421"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4421": 1
+      },
       "metrics": {
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "precision@5": 0.5,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 1,
       "failure_pattern": "ok",
       "retrieval": {
         "mode": "hybrid",
@@ -1525,18 +1338,11 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 17,
-      "notes": null
+      "profile": "baseline"
     },
     {
       "id": "R30",
-      "category": "contact",
       "query": "floatboat 少卿接触记录",
-      "scope": {
-        "issue": "explicit:2026-09-08",
-        "time_basis": "issue_time",
-        "window": "none"
-      },
       "relevant_items": [
         "4420"
       ],
@@ -1557,16 +1363,17 @@
         "4435",
         "4437"
       ],
-      "hit_items": [
-        "4420"
-      ],
-      "missed_items": [],
+      "ranks": {
+        "4420": 1
+      },
       "metrics": {
+        "mrr": 1.0,
+        "ndcg@10": 1.0,
+        "precision@5": 0.2,
         "recall@5": 1.0,
         "recall@10": 1.0,
         "recall@20": 1.0
       },
-      "first_relevant_rank": 1,
       "failure_pattern": "ok",
       "retrieval": {
         "mode": "hybrid",
@@ -1580,8 +1387,7 @@
         "filter_mode": "issue_anchor",
         "window": "none"
       },
-      "elapsed_ms": 19,
-      "notes": null
+      "profile": "baseline"
     }
   ]
 }

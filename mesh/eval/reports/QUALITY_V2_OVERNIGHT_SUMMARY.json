@@ -1,0 +1,164 @@
+{
+  "generated_at": "2026-09-08 21:25:56",
+  "elapsed_s": 151.8,
+  "steps": [
+    {
+      "step": "temporal",
+      "rc": 0
+    },
+    {
+      "step": "recall_fts",
+      "rc": 0
+    },
+    {
+      "step": "ranking_baseline",
+      "rc": 0
+    },
+    {
+      "step": "ranking_v1",
+      "rc": 0
+    },
+    {
+      "step": "evidence",
+      "rc": 0
+    },
+    {
+      "step": "answer",
+      "rc": 0
+    }
+  ],
+  "Temporal": {
+    "baseline": "24/24 historical",
+    "current": "23/24",
+    "delta": "-1 (T19 unknown_basis_but_claimed_recent)",
+    "n": 24
+  },
+  "Recall": {
+    "baseline": {
+      "R@5": 0.8261,
+      "R@10": 0.8961,
+      "R@20": 0.9433
+    },
+    "current": {
+      "R@5": 0.8261,
+      "R@10": 0.8961,
+      "R@20": 0.9433
+    },
+    "delta": {
+      "R@5": 0.0,
+      "R@10": 0.0,
+      "R@20": 0.0
+    }
+  },
+  "Ranking": {
+    "baseline": {
+      "mrr": 0.8071,
+      "ndcg@10": 0.825,
+      "precision@5": 0.5106,
+      "recall@5": 0.8261
+    },
+    "experiment_v1": {
+      "mrr": 0.8632,
+      "ndcg@10": 0.8615,
+      "precision@5": 0.5239,
+      "recall@5": 0.8544
+    },
+    "delta_v1_minus_baseline": {
+      "mrr": 0.0561,
+      "ndcg@10": 0.0365,
+      "precision@5": 0.0133
+    },
+    "decision": "CANDIDATE ranking_v1 (macro↑) — KEEP production baseline until per-qid regressions (esp. ok→top5_miss) are zero; no auto-merge",
+    "regressions": [
+      "R06",
+      "R13",
+      "R18"
+    ]
+  },
+  "Evidence": {
+    "baseline": {
+      "pass_rate": 1.0,
+      "coverage": 1.0,
+      "correctness": 1.0,
+      "unsupported_rate": 0.0,
+      "citation": 1.0
+    },
+    "current": "same as baseline (first freeze)",
+    "delta": "n/a first baseline"
+  },
+  "Answer": {
+    "baseline": {
+      "pass_rate": 0.9333,
+      "accuracy": 0.7333,
+      "completeness": 0.9067,
+      "faithfulness": 0.9133,
+      "citation": 1.0,
+      "abstention": 0.9333
+    },
+    "current": "same as baseline (first freeze)",
+    "delta": "n/a first baseline"
+  },
+  "Vector_AB": {
+    "status": "ok",
+    "fts_only": {
+      "macro_recall@5": 0.8261,
+      "macro_recall@10": 0.8961,
+      "macro_recall@20": 0.9433
+    },
+    "fts_plus_vector": {
+      "macro_recall@5": 0.7594,
+      "macro_recall@10": 0.8294,
+      "macro_recall@20": 0.8767
+    },
+    "delta": {
+      "macro_recall@5": -0.0667,
+      "macro_recall@10": -0.0667,
+      "macro_recall@20": -0.0666
+    },
+    "recommendation": "keep FTS-only mainline",
+    "new_relevant": [],
+    "noise_increase": [
+      {
+        "id": "R01",
+        "top5_noise_delta": 2
+      },
+      {
+        "id": "R03",
+        "top5_noise_delta": 4
+      },
+      {
+        "id": "R07",
+        "top5_noise_delta": 4
+      },
+      {
+        "id": "R08",
+        "top5_noise_delta": 1
+      },
+      {
+        "id": "R09",
+        "top5_noise_delta": 2
+      },
+      {
+        "id": "R17",
+        "top5_noise_delta": 3
+      },
+      {
+        "id": "R24",
+        "top5_noise_delta": 2
+      },
+      {
+        "id": "R26",
+        "top5_noise_delta": 4
+      },
+      {
+        "id": "R27",
+        "top5_noise_delta": 3
+      },
+      {
+        "id": "R29",
+        "top5_noise_delta": 3
+      }
+    ]
+  },
+  "report": "eval/reports/AGENT_QUALITY_V2_OVERNIGHT.md"
+}
