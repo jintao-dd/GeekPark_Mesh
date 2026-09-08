@@ -104,9 +104,12 @@ h1 .thin{font-weight:300;color:var(--ink2)}
 
 /* file list */
 .files{margin-top:34px}
-.files .fh{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px}
+.files .fh{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px;gap:12px}
 .files .fh h4{font-size:15px;font-weight:600;margin:0}
+.files .fh .fh-right{display:flex;align-items:center;gap:12px;flex-shrink:0}
 .files .fh .meta{font-size:13px;color:var(--ink3)}
+.files .fh .src-clear-all{color:var(--ink4);font-size:13px;padding:4px 6px;border:none;background:transparent;cursor:pointer}
+.files .fh .src-clear-all:hover{color:var(--red)}
 .frow{display:grid;grid-template-columns:1fr auto auto;gap:18px;align-items:center;padding:16px 4px;border-top:1px solid var(--line)}
 .frow:last-child{border-bottom:1px solid var(--line)}
 .frow .nm{min-width:0}

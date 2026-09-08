@@ -1963,6 +1963,31 @@ def source_delete(request: Request, sid: int):
     return RedirectResponse(f"/admin/issue/{slug}", status_code=302)
 
 
+@app.post("/admin/issue/{slug}/sources/delete_all")
+def sources_delete_all(request: Request, slug: str):
+    """一期全部来源 + 其条目一并删除（重传聚合包前常用）。"""
+    auth.require(request, "editor")
+    wants_json = "application/json" in (request.headers.get("accept") or "")
+    con = db.connect()
+    issue = con.execute("SELECT id FROM issues WHERE slug=?", (slug,)).fetchone()
+    if not issue:
+        con.close()
+        raise HTTPException(404)
+    iid = issue["id"]
+    n_src = con.execute("SELECT COUNT(*) c FROM sources WHERE issue_id=?", (iid,)).fetchone()["c"]
+    con.execute(
+        "DELETE FROM items WHERE source_id IN (SELECT id FROM sources WHERE issue_id=?)",
+        (iid,),
+    )
+    con.execute("DELETE FROM sources WHERE issue_id=?", (iid,))
+    db.mark_draft_stale(con, iid)
+    con.commit()
+    con.close()
+    if wants_json:
+        return JSONResponse({"ok": True, "slug": slug, "deleted": int(n_src)})
+    return RedirectResponse(f"/admin/issue/{slug}", status_code=302)
+
+
 @app.post("/api/source_meta")
 def api_source_meta(request: Request, payload: dict):
     """行内修正来源的 stype / team / channel，并同步条目。"""

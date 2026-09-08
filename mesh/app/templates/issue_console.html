@@ -109,7 +109,17 @@
   {% endif %}
 
   <div class="files" id="files" style="margin-top:20px">
-    <div class="fh"><h4>已放入 <span id="fcount">{{ sources|length }}</span> 个来源</h4><span class="meta" id="fmeta">条目 {{ n_items }} · 其中硬拦 {{ n_blocked }}</span></div>
+    <div class="fh">
+      <h4>已放入 <span id="fcount">{{ sources|length }}</span> 个来源</h4>
+      <div class="fh-right">
+        <span class="meta" id="fmeta">条目 {{ n_items }} · 其中硬拦 {{ n_blocked }}</span>
+        {% if perms.write %}
+        <form method="post" action="/admin/issue/{{ issue.slug }}/sources/delete_all" class="js-confirm js-ajax js-clear-sources" data-title="全部移除来源" data-body="将删除本期全部来源及其条目，不可恢复。确认？" data-ok="全部移除" style="margin:0{% if not sources %};display:none{% endif %}">
+          <button class="x src-clear-all" type="submit" id="clearAllSources">全部移除</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
     <div id="frows">
       {% for s in sources %}
       <div class="frow" data-source-id="{{ s.id }}">
@@ -379,6 +389,6 @@ window.MESHADMIN = {
 };
 </script>
 <script src="/static/dialog.js?v=mesh-dlg-2"></script>
-<script src="/static/console.js?v=rev-live-1"></script>
+<script src="/static/console.js?v=clear-all-2"></script>
 </body>
 </html>

@@ -1,12 +1,13 @@
 # Retrieval Recall · Failure Pattern Review
 
 > **状态（2026-09-08）**  
-> Recall Phase 0 = **完成**  
+> Recall Phase 0 = **PASS** · Failure Review = **PASS**  
 > 本文件 = **Failure Pattern Review（只读分析，不改检索）**  
-> **GO：** 审失败模式 · **NO-GO：** RAG / Chunk / FTS / Vector / Hybrid / Rewrite / Rerank  
+> **下一阶段：** Retrieval Recall Phase 1 = 🟡 READY（顺序锁：Scope → R14 Index → FTS/Query → 重跑 Gold → 再开 Ranking）  
+> **GO：** 审失败模式 · **NO-GO：** 未分层就改 RAG / 因 Ranking 证据上 Rerank  
 
 基线：`RECALL_BASELINE_latest.json`（n=30，Embed=False）  
-宏观 Recall@5/@10/@20 = 74% / 79% / 79% —— **不当作立刻优化结论**，只用来定位 8 道非 ok。
+宏观 Recall@5/@10/@20 = 74% / 79% / 79% —— **不当作立刻优化结论**；四线见下表与 `AGENT_QUALITY_V2.md`。
 
 对照题（同内容、不同 scope）：
 

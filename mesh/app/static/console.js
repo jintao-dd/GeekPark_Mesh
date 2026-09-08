@@ -312,6 +312,68 @@ function refreshSourceCount() {
   const n = document.querySelectorAll('#frows .frow').length;
   const fc = $('#fcount'); if (fc) fc.textContent = String(n);
   const to2 = $('#to2'); if (to2) to2.disabled = n === 0;
+  const clearForm = document.querySelector('form.js-clear-sources');
+  if (clearForm) {
+    clearForm.style.display = n === 0 ? 'none' : '';
+    const btn = clearForm.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = false;
+  }
+  const fm = $('#fmeta');
+  if (fm && n === 0) fm.textContent = '条目 0 · 其中硬拦 0';
+  syncSourcesGate(n);
+}
+
+function syncSourcesGate(n) {
+  const chk = $('#chk');
+  if (!chk) return;
+  const items = [...chk.querySelectorAll('li')];
+  if (!items.length) return;
+  // 已放入材料
+  items[0].className = n > 0 ? 'ok' : 'bad';
+  const s0 = items[0].querySelector('small');
+  if (s0) s0.textContent = `${n} 个来源`;
+  // 已完成挖掘：清空来源时条目一并删掉
+  if (items[1] && n === 0) {
+    items[1].className = 'bad';
+    const s1 = items[1].querySelector('small');
+    if (s1) s1.textContent = '条目 0 · 硬拦 0';
+  }
+  // 草稿过期提示
+  if (items[3] && A.draftStale) {
+    items[3].className = 'bad';
+    const s3 = items[3].querySelector('small');
+    if (s3) s3.textContent = '挖掘/卡片已变更，请重新生成';
+  }
+  // 拆段确认
+  const reviewLi = items.find(x => (x.textContent || '').includes('内容聚合拆段'));
+  if (reviewLi && n === 0) {
+    reviewLi.className = 'ok';
+    const sm = reviewLi.querySelector('small');
+    if (sm) sm.textContent = '无待确认（仅聚合包需要）';
+  }
+}
+
+function clearSourceRowsUi(opts) {
+  const deleted = (opts && opts.deleted) || 0;
+  const box = $('#frows');
+  if (!box) return;
+  box.querySelectorAll('.frow').forEach(el => el.remove());
+  if (!box.querySelector('.note')) {
+    box.insertAdjacentHTML('beforeend', '<div class="note">还没有放入任何材料。</div>');
+  }
+  // 后端已删条目；同步前端状态，避免仍以为可挖掘/可上线
+  A.hasItems = false;
+  A.nItems = 0;
+  A.nBlocked = 0;
+  A.nNoOwner = 0;
+  A.sourcesDirty = false;
+  if (A.hasDraft) A.draftStale = true;
+  refreshSourceCount();
+  renderReviewSummary();
+  // 挖掘/拆段待确认列表（若有）
+  document.querySelectorAll('#weakBox').forEach(() => {});
+  const hintReview = [...document.querySelectorAll('.hint')].find(el => (el.textContent || '').includes('待确认拆段'));
+  if (hintReview) hintReview.remove();
 }
 
 function prependSources(list) {
@@ -670,10 +732,16 @@ function bindMeshConfirms(root) {
           });
           const data = await r.json().catch(() => ({}));
           if (!r.ok || data.ok === false) throw new Error((data && data.error) || (`HTTP ${r.status}`));
+          if (form.classList.contains('js-clear-sources')) {
+            clearSourceRowsUi({ deleted: data.deleted });
+            toast(data.deleted != null ? `已移除 ${data.deleted} 个来源` : '已全部移除');
+            return;
+          }
           const row = form.closest('.frow');
           if (row) row.remove();
           refreshSourceCount();
           A.sourcesDirty = true;
+          if (btn) btn.disabled = false;
           toast('已移除');
         } catch (err) {
           if (btn) btn.disabled = false;

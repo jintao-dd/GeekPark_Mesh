@@ -11,11 +11,16 @@ _HELP = re.compile(
     re.I,
 )
 _LIST = re.compile(
-    r"(有哪些期|哪些周报|列出.*期|期次列表|list\s*issues?|有哪几期)",
+    r"(有哪些期|有哪些.{0,10}期次|哪些周报|列出.*期|期次列表|list\s*issues?|有哪几期)",
     re.I,
 )
 _REL = re.compile(
-    r"(关系|接触|对接|双边|交叉|两边|交集|谁见了谁|relations?)",
+    r"(关系|对接|双边|交叉|两边|交集|谁见了谁|联动|relations?)",
+    re.I,
+)
+# 「接触」单独成词且像关系问法时再进 relations（避免「商业化接触了谁」误路由）
+_REL_CONTACT = re.compile(
+    r"(谁接触了谁|两边.*接触|接触.*交集|接触关系)",
     re.I,
 )
 _DRAFT_RAW = re.compile(
@@ -51,7 +56,7 @@ def rule_classify_intent(
             return "list_issues"
         return "refuse"
 
-    if _REL.search(q):
+    if _REL.search(q) or _REL_CONTACT.search(q):
         if tool_allowed(permission, "ask.relations_summary"):
             return "ask_relations"
         return "refuse"

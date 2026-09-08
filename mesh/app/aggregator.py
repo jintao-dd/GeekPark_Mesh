@@ -11,9 +11,18 @@ from .ingest import AGG_STYPE
 AGG_TEAM = "内容中心·数据聚合"
 _MIN_SEGMENT = 80
 
-# 主章节（emoji 标题行）
-_MAJOR = re.compile(
-    r"^[\U0001F300-\U0001FAFF📆📊🏢🗂📓🌐📰📱🎙️🔬🚀🎓💻📡]"
+# 无 ### 的旧式聚合壳：仅认「emoji + 已知章节名」，避免正文里 🎯 话题行被二次切开
+_MAJOR_KNOWN = re.compile(
+    r"^[\U0001F300-\U0001FAFF📆📊🏢🗂📓🌐📰📱🎙🔬🚀🎓💻📡🏟⚡]\s*"
+    r"(?:"
+    r"内容统计|内部飞书(?:内容|文件夹)?|外部信息源?|"
+    r"飞书多维表格|会议日程(?:\s*\(ICS\))?|Notion CRM|"
+    r"视频号数据|编辑部\s*·\s*(?:选题|沟通记录)|"
+    r"TechCrunch|Wired|The Verge|Stratechery|Platformer|"
+    r"Lex Fridman|How I Built This|Ars Technica|VentureBeat|"
+    r"MIT Technology Review|ZDNet|TechRadar|Digital Trends|极客公园|GeekPark English"
+    r")\b",
+    re.I,
 )
 # 飞书多维表格内：视频号数据： / 编辑部数据：
 _DATA_SUB = re.compile(r"^[\u4e00-\u9fffA-Za-z0-9 /·&]{2,40}数据：\s*$")
@@ -22,13 +31,12 @@ _FEED_SUB = re.compile(
     r"^(TechCrunch|Wired|The Verge|Ars Technica|Engadget|VentureBeat|CNET|ZDNet|"
     r"TechRadar|Digital Trends|MIT Technology Review|Platformer|Stratechery|Acquired)-"
 )
-# 飞书文件夹内各团队文档标题行
+# 飞书文件夹内各团队文档标题行（勿单独匹配「沟通记录」二字，否则会切开多维表沟通段正文）
 _INTERNAL = re.compile(
     r"^(?:"
     r"GP[\s·]?工作(?:进展|周报)?"
     r"|Global Partnership"
     r"|前沿社"
-    r"|沟通记录"
     r"|攻坚讨论"
     r"|飞书妙记"
     r"|(?:[\u4e00-\u9fffA-Za-z0-9 /·&]{2,20})(?:例会|周报|会议纪要|工作进展|妙记转写)"
@@ -52,7 +60,7 @@ _EXTERNAL_FEED_NAMES = (
     "TechCrunch", "Wired", "The Verge", "Stratechery", "Platformer",
     "Lex Fridman", "How I Built This", "Ars Technica", "VentureBeat",
     "MIT Technology Review", "ZDNet", "TechRadar", "Digital Trends",
-    "极客公园",
+    "极客公园", "GeekPark English",
 )
 
 _TOC_BULLET = re.compile(
@@ -109,13 +117,20 @@ def _raw_data_start_line(lines: list[str]) -> int:
 
 
 def _is_md_section_boundary(line: str) -> bool:
+    """正文切段边界：### / #### 级；##### 单条记录不算。
+
+    「飞书多维表格」只是壳，真正切点是其下 #### 选题 / 视频号 / 沟通记录。
+    """
     s = line.strip()
-    if not s.startswith("### "):
+    if s.startswith("#####"):
+        return False
+    if not (s.startswith("### ") or s.startswith("#### ")):
         return False
     body = _strip_heading_noise(s)
-    if re.match(r"会议日程", body):
-        return True
+    # 壳：不单独成段，留给子 #### 切开
     if body.startswith("飞书多维表格") or body == "飞书多维表格":
+        return False
+    if re.match(r"会议日程", body) or "会议日程" in body and "ICS" in body:
         return True
     if re.match(r"编辑部\s*·\s*(选题|沟通记录)", body):
         return True
@@ -276,9 +291,9 @@ def split_hint(meta: str | dict | None) -> str:
     mode = sp.get("mode", "")
     if mode == "pre_split":
         idx = sp.get("segment_index")
-        parent = sp.get("parent_filename") or sp.get("parent_title") or ""
+        n = sp.get("segments", 0)
         if idx is not None and n:
-            return f"上传已预拆 {idx + 1}/{n}" + (f"（来自 {parent}）" if parent else "")
+            return f"上传已预拆 {idx + 1}/{n}"
         return "上传已预拆"
     if mode == "multi" and n > 1:
         types = sp.get("types") or {}
@@ -330,12 +345,14 @@ def sources_from_split(
             split_meta["segment_inferred_team"] = seg_inferred
             split_meta["upload_team_override"] = upload_pick
         meta = {**base, "split": split_meta}
-        title = f"{parent_title} · {seg.title}" if parent_title else seg.title
+        # 展示名只用段标题（去掉 #/emoji），不拼父文件名，避免「内容聚合报告·…」盖住裁剪名
+        display = _strip_heading_noise(seg.title) or (seg.title or "").strip() or f"段落{i + 1}"
+        title = display[:200]
         team_for_source = upload_pick if manual_upload else seg_inferred
         out.append({
             "stype": seg.stype,
             "team": team_for_source,
-            "title": title[:200],
+            "title": title,
             "filename": parent_filename,
             "raw_path": raw_path,
             "text": seg.text,
@@ -362,7 +379,8 @@ def _is_boundary(line: str) -> bool:
         return False
     if _is_md_section_boundary(s):
         return True
-    if _MAJOR.match(s):
+    # 旧式无 # 标题的聚合包：仅已知章节名；正文 emoji 话题行（如 🎯 产品定义…）不算切点
+    if _MAJOR_KNOWN.match(s):
         return True
     if _DATA_SUB.match(s):
         return True
@@ -399,20 +417,35 @@ def _classify(title: str, body: str) -> tuple[str, str]:
         return "T3", "硅谷 BD 团队"
     if "Notion CRM" in title or "Interactions / Takes" in h or "People / Companies" in h:
         return "T3", "硅谷 BD 团队"
-    if "极客公园" in title and "外部" not in title:
-        return "T5", "编辑部"
+    # 自家站：
+    # - GeekPark English → 英文站（有独立团队）
+    # - 极客公园中文站 RSS → 外部媒体（公开发布文章，勿进「编辑部·沟通记录」；标题可区分自家 vs 外媒）
+    if re.search(r"GeekPark\s*English|极客公园英文|about\.geekpark", title + "\n" + h[:800], re.I):
+        return "T5", "英文站"
+    if "极客公园" in title:
+        return "T7", "外部媒体"
     if "外部信息" in title or _FEED_SUB.match(title.strip()):
         return "T7", "外部媒体"
+    # 与拆段白名单一致：外媒 feed → 外部媒体（英文站已在上方处理）
+    _OWN_EN = {"GeekPark English"}
+    for name in _EXTERNAL_FEED_NAMES:
+        if name in _OWN_EN:
+            continue
+        body_title = _strip_heading_noise(t) or t
+        if body_title == name or name in title:
+            return "T7", "外部媒体"
     if any(
         k in title
         for k in (
             "TechCrunch", "Wired", "The Verge", "Engadget", "VentureBeat",
             "Ars Technica", "CNET", "ZDNet", "TechRadar", "Digital Trends",
             "MIT Technology", "Platformer", "Stratechery", "Acquired",
+            "Lex Fridman", "How I Built This",
         )
     ):
         return "T7", "外部媒体"
-    if "作者:" in h and "链接:" in h and "发布时间:" in h:
+    # RSS 条目常见字段（聚合导出可能缺「链接」）
+    if ("作者:" in h or "作者：" in h) and ("发布时间:" in h or "发布时间：" in h):
         return "T7", "外部媒体"
     if any(k in title for k in ("GP 工作", "GP工作", "Global Partnership", "前沿社")):
         return "T10", "Global Partnership 团队"
