@@ -1219,6 +1219,27 @@ def api_ask_stream(request: Request, payload: dict):
     )
 
 
+@app.get("/admin/crm/notion/status")
+def admin_crm_notion_status(request: Request):
+    """Notion CRM 底库同步状态（admin+）。"""
+    auth.require(request, "admin")
+    from . import notion_crm
+
+    return notion_crm.sync_status()
+
+
+@app.post("/admin/crm/notion/sync")
+def admin_crm_notion_sync(request: Request, full: int = 0):
+    """Notion CRM 全量/增量同步进底库。full=1 忽略游标。不进本期周报。"""
+    auth.require(request, "admin")
+    from . import notion_crm
+
+    try:
+        return notion_crm.sync_all(full=bool(full))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)[:500]) from e
+
+
 @app.post("/admin/reindex_facts")
 def admin_reindex_facts(request: Request):
     """回填/重建全部已发布期的主体×团队事实表 + 搜索/chunk 索引。"""

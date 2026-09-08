@@ -7,7 +7,7 @@ from . import db_conn
 
 _log = logging.getLogger("mesh.db")
 DB_PATH = db_conn.DB_PATH
-SCHEMA_VERSION = "1.8.4"
+SCHEMA_VERSION = "1.9.0"
 _DB_WRITE_LOCK = threading.RLock()
 
 IntegrityError = db_conn.IntegrityError
@@ -277,6 +277,53 @@ CREATE TABLE IF NOT EXISTS preset_push_log(
   error TEXT,
   pushed_at TEXT DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS crm_sync_state(
+  kind TEXT PRIMARY KEY,
+  database_id TEXT,
+  database_title TEXT,
+  cursor_last_edited TEXT,
+  last_full_at TEXT,
+  last_incr_at TEXT,
+  row_count INTEGER DEFAULT 0,
+  status TEXT DEFAULT '',
+  error TEXT,
+  updated_at TEXT
+);
+CREATE TABLE IF NOT EXISTS crm_companies(
+  id INTEGER PRIMARY KEY,
+  notion_id TEXT UNIQUE NOT NULL,
+  name TEXT, aliases TEXT, one_liner TEXT, sector TEXT, stage TEXT, website TEXT,
+  people_ids_json TEXT, props_json TEXT, last_edited_time TEXT, synced_at TEXT
+);
+CREATE TABLE IF NOT EXISTS crm_people(
+  id INTEGER PRIMARY KEY,
+  notion_id TEXT UNIQUE NOT NULL,
+  display_name TEXT, aliases TEXT, headline TEXT,
+  company_ids_json TEXT, company_names TEXT, sector TEXT, location TEXT,
+  email TEXT, wechat TEXT, linkedin TEXT,
+  interaction_ids_json TEXT, take_ids_json TEXT,
+  interaction_count TEXT, last_touched TEXT,
+  props_json TEXT, last_edited_time TEXT, synced_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_crm_people_name ON crm_people(display_name);
+CREATE INDEX IF NOT EXISTS idx_crm_people_touched ON crm_people(last_touched);
+CREATE INDEX IF NOT EXISTS idx_crm_companies_name ON crm_companies(name);
+CREATE TABLE IF NOT EXISTS crm_interactions(
+  id INTEGER PRIMARY KEY,
+  notion_id TEXT UNIQUE NOT NULL,
+  title TEXT, date_start TEXT, interact_type TEXT,
+  people_ids_json TEXT, people_names TEXT, our_side TEXT, output_link TEXT,
+  processed INTEGER DEFAULT 0, props_json TEXT, last_edited_time TEXT, synced_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_crm_ix_date ON crm_interactions(date_start);
+CREATE TABLE IF NOT EXISTS crm_takes(
+  id INTEGER PRIMARY KEY,
+  notion_id TEXT UNIQUE NOT NULL,
+  name TEXT, person_ids_json TEXT, person_names TEXT, verdict TEXT,
+  scenario TEXT, owner TEXT, last_reviewed TEXT, is_prospect TEXT,
+  props_json TEXT, last_edited_time TEXT, synced_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_crm_takes_reviewed ON crm_takes(last_reviewed);
 """
 
 @contextmanager
@@ -374,6 +421,12 @@ def migrate(con):
                     con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
             except Exception:
                 pass
+        try:
+            from . import notion_crm
+
+            notion_crm.ensure_crm_schema(con)
+        except Exception:
+            pass
         try:
             set_setting(con, "schema_version", SCHEMA_VERSION)
         except Exception:
@@ -545,6 +598,12 @@ def migrate(con):
             con.execute(ddl)
         except Exception:
             pass
+    try:
+        from . import notion_crm
+
+        notion_crm.ensure_crm_schema(con)
+    except Exception:
+        pass
     try:
         set_setting(con, "schema_version", SCHEMA_VERSION)
     except Exception:
