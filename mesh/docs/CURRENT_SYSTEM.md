@@ -29,6 +29,8 @@ Mesh 是极客公园内部用的两件事：
 
 飞书目前只有 **OAuth 登录** 和 **群→团队绑定**。没有飞书 Bot 收消息答问。
 
+Agent v1：**架构 ①～⑦ 已冻结**；正在实现本地/HTTP Harness（`/api/agent/v1/message`）与契约测试，**通过后再接 ⑧ 飞书接线**。详见 `docs/AGENT_ARCHITECTURE_V1.md`。
+
 后台四步：放入素材 → 挖掘 → 审校（要点卡 + 草稿）→ 确认上线。
 
 ---
@@ -328,13 +330,12 @@ SSE 会发 step 事件；简单路径会先收完全文再校验，再按块吐�
 - 乱码拒答、无命中拒答、句级归属过滤  
 - 禁用词字段改写、弱关系必须人确认  
 - **Relation Gold v2**（`eval/relation_gold_v2.jsonl`）：统一 schema + `claim_valid` / `claim_invalid` 对抗样例 + lexical/gate/claim baseline  
-- **Claim Check A0 shadow**（`relation_claim_check`）：Writer 原文 title/body/details 强度守卫；默认不藏卡
+- **Claim Check**（`relation_claim_check` rule_v1.2）：Writer 原文 title/body/details 强度守卫；**tmesh/prod 已 `MESH_CLAIM_CHECK_MODE=enforce`**（invalid 藏卡）
 
 **没有**
 
 - 周报自动周更  
 - Agent / ReAct / LLM Planner  
-- **Relation Claim Check**（Gate 后「论断是否成立」）：A0 **shadow** 已上；默认不藏卡。`enforce` 待 tmesh 对账后开启  
 - 公司别名合并、人名归一、entity resolution  
 - 关系价值排序（有 tier，但无独立打分模型）  
 - 人工改稿回流到下一期规则  
@@ -342,16 +343,21 @@ SSE 会发 step 事件；简单路径会先收完全文再校验，再按块吐�
 - 点回原文的统一 Evidence 层  
 - 飞书群问答、录音转写
 
-### 7.1 质量打磨轨道（2026-09-07）
+### 7.1 质量打磨轨道 → Agent Go/No-Go（2026-09-07）
 
-优先顺序：④ Relation Gold → ① Claim Check → ② structured intent → ③ T13 章节质量。Agent 化暂缓。
+质量轨道 **已收口**。正式总验收见 `MESH_V1_AGENT_GO_NOGO.md`。
 
 | # | 项 | 状态 |
 |---|----|------|
-| ④ | Relation Gold v2 | ✅ 完成：16 条；统一 schema；valid/invalid Claim 对抗；lexical/gate baseline；测试通过。见 `RELATION_EDITOR_RUBRIC.md` |
-| ① | Claim Check | ✅ **Final Shadow 通过**（tmesh `2026-8-17` pub 0 invalid）。**可开 enforce**；本步未改环境变量。报告 `CLAIM_CHECK_FINAL_SHADOW_2026-8-17.md` |
-| ② | Ask structured intent | 🟡 e08/e10/e21 |
-| ③ | T13 拆分质量 | 🟡 段级 cache 已有；盯章节识别/归属 |
+| ④ | Relation Gold v2 | ✅ |
+| ① | Claim Check | ✅ **enforce**（tmesh+prod，`rule_v1.2`） |
+| ② | Ask structured intent | ✅ **正式关闭**（Golden/Prod 检索 25/25） |
+| ③ | T13 Segment / Attribution Quality | 🟡 **基本通过**（5/5 cases）；`### 商业化团队 · …` 边界为 Known limitation，不阻塞 |
+| — | **Agent Readiness** | 🟢 Arch ①–⑦ ✅冻结；实现按 §9.3 七类场景验收；⑧ 待测通后接线 |
+
+**非阻塞留档：** Ask E2E/Follow-up/SSE 本轮未重跑；统一 Evidence/Entity 图留给 Agent 架构，不在 Mesh v1 硬补。
+
+**停止**：继续零散加 Mesh AI 能力。**当前**：Organization → Identity → …（不问「Mesh 还缺什么模型能力」）。
 
 ---
 
@@ -371,7 +377,7 @@ SSE 会发 step 事件；简单路径会先收完全文再校验，再按块吐�
 | Schema | 代码 `1.8.4`（含 embedding_* 列）                |
 
 
-黄金评测（2026-08-30）：检索 22/25，E2E 3/3。失败题是 structured 意图漏判（e08/e10/e21），hybrid 会给出容易误导的命中。生产同口径是否已重跑：**未确认**。
+Ask 评测：2026-08-30 曾 22/25；Planner-lite 后 2026-08-31 全链路 25/25。**2026-09-07 回归保险**：Golden **25/25** + Prod PG **25/25**（检索；E2E 本轮未跑）→ ② 关闭。
 
 ---
 
@@ -382,7 +388,8 @@ SSE 会发 step 事件；简单路径会先收完全文再校验，再按块吐�
 
 | 路径                                      | 职责                                                        |
 | --------------------------------------- | --------------------------------------------------------- |
-| `app/main.py`                           | 路由、上线闸门、Ask 入口                                            |
+| `docs/MESH_V1_AGENT_GO_NOGO.md`         | Mesh v1 → Agent 候选 Go 总验收（五层 + 非阻塞项）              |
+| `docs/AGENT_ARCHITECTURE_V1.md`         | Agent：①～⑦ 架构冻结；⑦ Harness/契约测试中；⑧ 待测通后接线 |
 | `app/pipeline.py`                       | 挖掘                                                        |
 | `app/preview_job.py`                    | 要点卡 + 周报壳 + 触发关系两阶段                                       |
 | `app/relation_candidates.py`            | 候选构建；`merge_relations_from_candidates` 入口                 |

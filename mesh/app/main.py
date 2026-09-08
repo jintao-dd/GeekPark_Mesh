@@ -316,6 +316,7 @@ def healthz():
         "zone_hard": True,
         "job_inline": os.environ.get("MESH_JOB_INLINE", "1"),
         "ask_analysis": ask_analysis.analysis_enabled(),
+        "agent_v1": True,
     }
     try:
         con = db.connect()
@@ -836,6 +837,22 @@ def _run_ask(request: Request, payload: dict):
 @app.post("/api/ask")
 def api_ask(request: Request, payload: dict):
     return _run_ask(request, payload)
+
+
+@app.post("/api/agent/v1/message")
+def api_agent_v1_message(request: Request, payload: dict):
+    """Agent v1 Harness：不依赖飞书事件；契约与飞书接线共用同一 handle_message。
+
+    需登录 viewer+。正式飞书 Bot 走 ⑧，不扩本接口能力。
+    """
+    auth.require(request, "viewer")
+    from .agent.harness import run_harness
+
+    con = db.connect()
+    try:
+        return run_harness(con, payload or {})
+    finally:
+        con.close()
 
 
 @app.post("/api/ask/new_session")
