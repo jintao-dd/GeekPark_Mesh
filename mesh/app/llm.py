@@ -3,6 +3,7 @@
 本文件**不得 import 任何厂商 SDK**。所有模型调用经 providers 适配层，
 切换模型只改 .env 里的 MESH_LLM_PROVIDER，业务代码零改动。
 """
+import datetime
 import json, re, threading
 from pathlib import Path
 from .providers import get_provider, LLMError
@@ -718,8 +719,14 @@ def _qa_prompt(
             "\n\n此前对话（同一用户/群/话题线程，供指代消解；仍以本轮「可用记录」为准）：\n"
             + json.dumps(history[-6:], ensure_ascii=False)[:4000]
         )
+    today = datetime.date.today().isoformat()
+    time_anchor = (
+        f"今天（回答参照日）是 {today}。"
+        "记录里的「本周/明天/昨天/近日」相对的是该条所属期号当时，不是今天；"
+        "回答须改写为期号或绝对日期，禁止把相对时间原样当成当下。"
+    )
     user = (
-        f"问题：{question}\n\n{mode_hint}{hist_block}\n\n"
+        f"问题：{question}\n\n{time_anchor}\n\n{mode_hint}{hist_block}\n\n"
         f"可用记录（每条含 期号/章节/标题/内容）：\n"
         f"{json.dumps(contexts, ensure_ascii=False)[:budget()]}\n\n"
         "请用中文回答，每一句都要能指回上面的记录；回答末尾列出'来源'。无法回答的部分要说明缺哪类来源。"

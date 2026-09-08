@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import re
@@ -116,8 +117,12 @@ def _run_with_timeout(fn, timeout: float, fallback):
 
 
 def _analyze_one_source(q: str, group: dict) -> dict:
+    today = datetime.date.today().isoformat()
     system = (
         "你是极客公园 Mesh 的单源素材抽取器。只根据【本源】证据抽取，禁止跨源推断。\n"
+        "facts/events 的 text 必须带绝对时间或期号锚点：把原文「本周/明天/昨天」改写成"
+        f"「该期（{group.get('issue') or '未知期'}）记录中…」或具体日期；禁止保留相对今天的相对时间。\n"
+        f"今天是 {today}。\n"
         "输出 JSON：{\"facts\":[{\"text\":\"...\",\"evidence_refs\":[\"e1\"]}],"
         "\"entities\":[\"...\"],\"events\":[{\"text\":\"...\",\"evidence_refs\":[\"e1\"]}],"
         "\"evidence\":[{\"ref\":\"e1\",\"quote\":\"...\"}]}\n"
@@ -288,6 +293,8 @@ def _cross_analyze(q: str, source_reports: list[dict]) -> dict:
         "你是极客公园 Mesh 的多源交叉分析员。输入是各来源已抽取结果。\n"
         "找出：相同实体、相同事件、时间关系、因果/关联、多源印证、信息冲突、新增变化。\n"
         "禁止编造分源中没有的事实。\n"
+        "claims.text 禁止使用「本周/明天/昨天/最近正在」等相对今天的说法；"
+        "须写清期号或绝对日期（例如「2026-8-17 期记录」）。\n"
         "输出 JSON：{\"summary\":\"...\",\"same_entities\":[],\"same_events\":[],"
         "\"time_links\":[],\"causal_links\":[],"
         "\"corroborations\":[{\"text\":\"...\",\"sources\":[\"g1\",\"g2\"]}],"
@@ -543,13 +550,17 @@ def _verify_and_compose(
         "禁止新增事实；来源冲突时并列说明；文末保留「来源：」行。"
         "禁止使用 Markdown 标题（不要用 # ## ###）；用自然段落即可。"
         "禁止使用内部术语：不要写「断言」「已校验」「根据已校验断言」「交叉摘要」等字样，直接陈述事实。"
+        "时间锚定：禁止把要点里的「本周/明天/昨天」写成相对今天；须改写为期号或绝对日期。"
+        "用户问「最近」时，若材料来自较早期号，开头点明依据哪一期，勿写成仿佛正在发生。"
     )
     points = []
     for c in verified_claims + downgraded[:3]:
         if isinstance(c, dict) and c.get("text"):
             points.append({"text": c["text"]})
+    today = datetime.date.today().isoformat()
     user = (
-        f"问题：{q}\n\n"
+        f"问题：{q}\n"
+        f"今天：{today}\n\n"
         f"可用要点：\n{json.dumps(points, ensure_ascii=False)[:3500]}\n\n"
         f"补充说明：{(cross.get('summary') or '')[:400]}\n"
         f"来源行：{src_line}\n"
