@@ -702,6 +702,7 @@ def _qa_prompt(
     contexts: list[dict],
     mode: str = "lexical",
     history: list[dict] | None = None,
+    temporal_block: str = "",
 ) -> tuple[str, str]:
     system = load_prompt("00_base_rules") + "\n\n" + load_prompt("qa")
     mode_hint = (
@@ -725,8 +726,9 @@ def _qa_prompt(
         "记录里的「本周/明天/昨天/近日」相对的是该条所属期号当时，不是今天；"
         "回答须改写为期号或绝对日期，禁止把相对时间原样当成当下。"
     )
+    temporal = f"\n\n{temporal_block.strip()}\n" if (temporal_block or "").strip() else ""
     user = (
-        f"问题：{question}\n\n{time_anchor}\n\n{mode_hint}{hist_block}\n\n"
+        f"问题：{question}\n\n{time_anchor}{temporal}\n{mode_hint}{hist_block}\n\n"
         f"可用记录（每条含 期号/章节/标题/内容）：\n"
         f"{json.dumps(contexts, ensure_ascii=False)[:budget()]}\n\n"
         "请用中文回答，每一句都要能指回上面的记录；回答末尾列出'来源'。无法回答的部分要说明缺哪类来源。"
@@ -739,8 +741,11 @@ def answer_question(
     contexts: list[dict],
     mode: str = "lexical",
     history: list[dict] | None = None,
+    temporal_block: str = "",
 ) -> str:
-    system, user = _qa_prompt(question, contexts, mode, history=history)
+    system, user = _qa_prompt(
+        question, contexts, mode, history=history, temporal_block=temporal_block
+    )
     return call(system, user, max_tokens=2000, json_mode=False)
 
 
@@ -749,8 +754,11 @@ def answer_question_stream(
     contexts: list[dict],
     mode: str = "lexical",
     history: list[dict] | None = None,
+    temporal_block: str = "",
 ):
     """流式问答：yield 文本片段。"""
-    system, user = _qa_prompt(question, contexts, mode, history=history)
+    system, user = _qa_prompt(
+        question, contexts, mode, history=history, temporal_block=temporal_block
+    )
     yield from get_provider().stream(system, user, max_tokens=2000)
 

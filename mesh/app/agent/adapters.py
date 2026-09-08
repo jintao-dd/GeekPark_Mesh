@@ -33,15 +33,22 @@ def scope_from_agent(
     permission: PermissionDecision,
     context: AgentContext,
     con=None,
-) -> AskScope:
+    *,
+    query: str = "",
+) -> tuple[AskScope, dict]:
+    """构建 AskScope，并附带 Temporal Phase 1 语义（不改 RAG）。"""
+    from . import temporal as temporal_mod
+
     qs = permission.query_scope or context.query_scope or {}
     team = (qs.get("team_focus") or "") if isinstance(qs, dict) else ""
     slug = ""
     date_from = None
     date_to = None
+    issue_mode = ""
     if context.issue_ref and context.issue_ref.mode != "none":
         slug = context.issue_ref.slug or ""
-        # IssueRef 已定点次时：日期钉在该期，避免问句「本周」把检索窗滚到当期之外
+        issue_mode = context.issue_ref.mode or ""
+        # IssueRef 已定点次时：日期钉在该期（Time Filter=issue_anchor）
         if con is not None and slug:
             row = con.execute(
                 "SELECT date_start, date_end FROM issues WHERE slug=?", (slug,)
@@ -49,7 +56,16 @@ def scope_from_agent(
             if row:
                 date_from = (row["date_start"] or "").strip() or None
                 date_to = (row["date_end"] or "").strip() or None
-    return AskScope(
+    sem = temporal_mod.resolve_time_semantics(
+        query or context.text or "",
+        issue_mode=issue_mode,
+        issue_slug=slug,
+        has_event_time=False,
+    )
+    date_from, date_to = temporal_mod.apply_time_filter_to_dates(
+        sem, issue_date_from=date_from, issue_date_to=date_to
+    )
+    scope = AskScope(
         channel=context.channel or identity.channel or "web",
         slug=slug,
         team=team or "",
@@ -63,6 +79,7 @@ def scope_from_agent(
         role=identity.mesh_role or "viewer",
         user_team=identity.primary_team or "",
     )
+    return scope, sem.to_dict()
 
 
 def _evidence_from_contexts(contexts: list[dict], slug: str) -> list[str]:
@@ -114,13 +131,17 @@ def _summary_from_contexts(contexts: list[dict], q: str, *, max_items: int = 5) 
     return head + "\n" + "\n".join(lines)
 
 
-def _maybe_llm_answer(q: str, contexts: list[dict]) -> str | None:
+def _maybe_llm_answer(
+    q: str, contexts: list[dict], *, temporal_block: str = ""
+) -> str | None:
     if os.environ.get("MESH_AGENT_USE_LLM", "").strip() not in ("1", "true", "yes"):
         return None
     try:
         from .. import llm
 
-        ans = llm.answer_question(q, contexts)
+        # Agent 成文只送 Top-N，避免上下文过大导致 LLM 失败后静默回落摘要
+        ctxs = [c for c in (contexts or []) if isinstance(c, dict)][:12]
+        ans = llm.answer_question(q, ctxs, temporal_block=temporal_block)
         if isinstance(ans, dict):
             return (ans.get("answer") or ans.get("text") or "").strip() or None
         return (str(ans) if ans else None) or None
@@ -135,7 +156,10 @@ def ask_published(
     context: AgentContext,
     args: dict[str, Any],
 ) -> ToolResult:
-    """真实 Published 检索。"""
+    """真实 Published 检索 + Temporal Phase 1 成文约束。"""
+    from . import temporal as temporal_mod
+    from .temporal import TimeSemantics
+
     slug = (context.issue_ref.slug if context.issue_ref else "") or ""
     if context.issue_ref and context.issue_ref.mode != "none":
         row = con.execute(
@@ -164,17 +188,54 @@ def ask_published(
         )
 
     q = str(args.get("q") or context.text or "").strip()
-    scope = scope_from_agent(identity, permission, context, con=con)
+    scope, sem_dict = scope_from_agent(
+        identity, permission, context, con=con, query=q
+    )
+    sem = TimeSemantics(**{k: sem_dict[k] for k in TimeSemantics.__dataclass_fields__})
+
+    early = temporal_mod.maybe_direct_answer(q, sem)
+    if early:
+        return ToolResult(
+            ok=True,
+            tool_id="ask.published",
+            payload={
+                "answer": early,
+                "mode": "temporal_direct",
+                "n_hits": 0,
+                "issue": slug,
+                "llm_used": False,
+                "temporal": sem.to_dict(),
+            },
+            evidence_refs=[],
+            claim_bindings=[
+                ClaimBinding(
+                    claim=early[:500],
+                    evidence_refs=[],
+                    status="grounded",
+                    reason="temporal_hard_rule",
+                )
+            ],
+        )
+
     prepared = ask_engine.prepare(con, q, scope)
     contexts = list(prepared.get("contexts") or [])
     evidence = _evidence_from_contexts(contexts, slug)
     n_hits = int(prepared.get("n_hits") or prepared.get("n_context") or 0)
 
+    llm_used = False
+    tblock = temporal_mod.prompt_block(sem)
     answer = (prepared.get("direct_answer") or "").strip()
     if not answer and contexts:
-        answer = _maybe_llm_answer(q, contexts) or _summary_from_contexts(contexts, q)
+        llm_ans = _maybe_llm_answer(q, contexts, temporal_block=tblock)
+        if llm_ans:
+            answer = llm_ans
+            llm_used = True
+        else:
+            answer = _summary_from_contexts(contexts, q)
     if not answer:
         answer = "未在已上线周报中找到与问题直接相关的记录。"
+
+    answer = temporal_mod.apply_hard_rules(answer, sem)
 
     if n_hits > 0 and evidence:
         status = "grounded"
@@ -187,7 +248,7 @@ def ask_published(
         claim=answer[:500],
         evidence_refs=evidence[:8],
         status=status,
-        reason=f"ask_engine:{prepared.get('mode') or 'unknown'}",
+        reason=f"ask_engine:{prepared.get('mode') or 'unknown'}{'+llm' if llm_used else ''}",
     )
     return ToolResult(
         ok=True,
@@ -201,6 +262,10 @@ def ask_published(
             "search_q": prepared.get("search_q") or q,
             "latency_ms": prepared.get("latency_ms"),
             "team_scope": prepared.get("team_scope") or scope.team_filter,
+            "llm_used": llm_used,
+            "temporal": sem.to_dict(),
+            "date_from": scope.date_from,
+            "date_to": scope.date_to,
         },
         evidence_refs=evidence,
         claim_bindings=[binding] if status != "unsupported" else [

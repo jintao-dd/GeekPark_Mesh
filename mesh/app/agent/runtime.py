@@ -137,6 +137,16 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
 
     # 禁止因空/差结果再打第二个数据 Tool（硬约束：此处直接 render）
     text, bindings, evidence = _render(result, intent, identity.status)
+    trace = fp.build_trace(
+        intent=intent,
+        tool_id=tool_id,
+        context=context,
+        identity_status=identity.status,
+    )
+    if isinstance(result.payload, dict) and "llm_used" in result.payload:
+        trace["llm_used"] = bool(result.payload.get("llm_used"))
+    if isinstance(result.payload, dict) and result.payload.get("temporal"):
+        trace["temporal"] = result.payload.get("temporal")
     return AgentAnswer(
         text=text,
         intent=intent,
@@ -144,12 +154,7 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
         fingerprint=fp.build_fingerprint(
             context=context, permission=permission, tool_result=result
         ),
-        trace=fp.build_trace(
-            intent=intent,
-            tool_id=tool_id,
-            context=context,
-            identity_status=identity.status,
-        ),
+        trace=trace,
         claim_bindings=bindings,
         evidence_refs=evidence,
         refused=bool(result.denied),

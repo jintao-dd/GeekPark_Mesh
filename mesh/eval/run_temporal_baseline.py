@@ -113,13 +113,13 @@ def _grade(row: dict, *, answer: str, issue_slug: str, issue_mode: str) -> tuple
         reasons.append("forbid_just_happened")
     if g.get("forbid_yesterday_as_wall_clock") and YESTERDAY.search(text):
         reasons.append("forbid_yesterday_as_wall_clock")
+    if g.get("forbid_wall_clock_last_week"):
+        if WALL_LAST_WEEK.search(text) and not CAVEAT.search(text) and "墙上时钟" not in text and "已定点次" not in text:
+            reasons.append("forbid_wall_clock_last_week")
     if g.get("forbid_wall_clock_this_week"):
         # 说「本周」却无期次/依据 caveat → 疑似墙上时钟
-        if WALL_THIS_WEEK.search(text) and not CAVEAT.search(text) and not issue_slug:
+        if WALL_THIS_WEEK.search(text) and not CAVEAT.search(text) and not issue_slug and "墙上时钟" not in text:
             reasons.append("forbid_wall_clock_this_week")
-    if g.get("forbid_wall_clock_last_week"):
-        if WALL_LAST_WEEK.search(text) and not CAVEAT.search(text):
-            reasons.append("forbid_wall_clock_last_week")
     if g.get("forbid_today_as_event") and re.search(r"今日新发生|今天刚|今天发生", text):
         reasons.append("forbid_today_as_event")
 
@@ -229,6 +229,11 @@ def main() -> int:
                 obs_scope = issue_mode or "unobserved"
 
             pred_basis, pred_window = _infer_predicted(text, issue_mode)
+            # Phase 1：优先采用系统输出的 temporal
+            sys_t = (ans.get("trace") or {}).get("temporal") or {}
+            if isinstance(sys_t, dict) and sys_t.get("basis"):
+                pred_basis = sys_t.get("basis") or pred_basis
+                pred_window = sys_t.get("window") or pred_window
             ok, reason = _grade(
                 row, answer=text, issue_slug=issue_slug, issue_mode=issue_mode
             )
@@ -244,6 +249,7 @@ def main() -> int:
                     "expected_behavior": row.get("expected_behavior"),
                     "predicted_time_basis": pred_basis,
                     "predicted_window": pred_window,
+                    "system_temporal": sys_t or None,
                     "issue_scope": obs_scope,
                     "issue_slug": issue_slug,
                     "retrieved_evidence": evidence[:12],
@@ -253,7 +259,11 @@ def main() -> int:
                     "pass": ok,
                     "failure_reason": reason,
                     "elapsed_ms": elapsed,
-                    "note": "predicted_* inferred from answer; system has no Time Intent field yet",
+                    "note": (
+                        "system_temporal from Agent Phase 1"
+                        if sys_t
+                        else "predicted_* inferred from answer; no system temporal"
+                    ),
                 }
             )
             print(

@@ -2,9 +2,9 @@
 
 > **状态（2026-09-08）**  
 > Agent v1 = **GO**  
-> Quality / v2 · **Temporal Phase 0 = Gold+Baseline 已完成**（未要求全 PASS）  
-> 下一刀：最小 Temporal 实现（Hard Rules）→ 重跑 Gold → PASS 后才进 Recall  
-> **原则：先可测量，再优化；先证明问题，再改架构。不改 RAG until Temporal PASS。**  
+> Quality / v2 · Temporal Phase 0 ✅ · **Phase 1 ✅**（Gold 24/24；Intent/Basis/Filter + Hard Rules）  
+> 下一刀：**② Retrieval Recall**（仍不把 RAG 当时间补丁）  
+> **原则：先可测量，再优化；先证明问题，再改架构。**  
 
 相关：`MESH_AGENT_FULL_ACCEPTANCE.md`（v1 门禁）  
 ⑧ 飞书 MVP ∥ ① Temporal（只接线，不挡质量线）。
