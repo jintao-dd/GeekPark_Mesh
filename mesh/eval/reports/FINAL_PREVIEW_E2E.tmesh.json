@@ -1,0 +1,88 @@
+{
+  "slug": "2026-09-08",
+  "started_at": "2026-09-08 16:09:35",
+  "checks": {
+    "ok_gate": true,
+    "ok_before": true,
+    "ok_after": true,
+    "ok_issue_ref": true,
+    "ok_no_cross_issue": true,
+    "ok_no_draft_leak": true,
+    "ok_no_blockers": true
+  },
+  "issue_id": 14,
+  "status_before": "published",
+  "counts_before": {
+    "sources": 15,
+    "extracted": 15,
+    "items": 117,
+    "cards": 3
+  },
+  "reset_publish": true,
+  "pipeline": {
+    "skipped": true
+  },
+  "counts_after_pipeline": {
+    "sources": 15,
+    "extracted": 15,
+    "items": 117,
+    "cards": 3
+  },
+  "preview": {
+    "skipped": true
+  },
+  "gate_restored": true,
+  "gate": {
+    "ok": true,
+    "stale": false,
+    "building": false,
+    "n_rel": 0,
+    "n_kw_groups": 3
+  },
+  "publish_blockers": [],
+  "marker": "FinalE2E钉-8a4469ef",
+  "marker_injected": true,
+  "before_publish": {
+    "fts": 0,
+    "seen_marker": false,
+    "intent": "ask_published",
+    "issue_mode": "none",
+    "issue_slug": "",
+    "deny_reason": null,
+    "text_head": "当前没有可引用的已上线期次。",
+    "evidence": [],
+    "data_tools": [
+      "ask.published"
+    ]
+  },
+  "status_after": "published",
+  "fts_after": 43,
+  "after_publish": {
+    "seen_marker": true,
+    "intent": "ask_published",
+    "issue_mode": "explicit",
+    "issue_slug": "2026-09-08",
+    "text_head": "命中一条记录：编辑部关注的公司与人，摘要为 Final Preview E2E 唯一钉记，标记为 FinalE2E钉-8a4469ef。该记录属于 2026-09-08 期，章节为\"关注了什么\"。\n\n除该条外，本轮检索未返回与此标记关联的其他来源，无法补充更多细节。\n\n来源：\n- 2026-09-08 · 关注了什么 · FinalE2E钉-8a4469ef",
+    "evidence": [
+      "ev:ctx:2026-09-08:1"
+    ],
+    "fingerprint": "85607b5ff1a0cd68346e4b8d",
+    "data_tools": [
+      "ask.published"
+    ]
+  },
+  "cross_issue": {
+    "skipped": false,
+    "seen_marker": false,
+    "issue_slug": "2026-8-17",
+    "text_head": "未在已上线周报中找到与问题直接相关的记录。请尝试换关键词、缩小或扩大时间范围，或确认相关内容是否已上线。\n（本次检索时间范围：2026-09-07 至 2026-09-07）"
+  },
+  "draft_probe": {
+    "intent": "refuse",
+    "data_tools": [],
+    "text_has_marker": false,
+    "text_head": "只能查询已上线（Published）内容，不能读取草稿、原文或未上线素材。"
+  },
+  "ok": true,
+  "finished_at": "2026-09-08 16:09:39"
+}

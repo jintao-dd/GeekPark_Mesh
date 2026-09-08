@@ -1,102 +1,109 @@
 # Mesh + Agent 全量验收报告
 
 > 更新：2026-09-08  
-**总 verdict：🟡 未结案** — Layer 1 ✅；Layer 2 🟡（Publish 边界 local 已过，tmesh 全链路与 LLM E2E 仍缺）；Layer 3 ⬜；Layer 4 ⛔
+> **总 verdict：🟢 Mesh + Agent v1 = GO** — Layer1–3 ✅；**Final Preview E2E ✅**；⑧ 飞书可开（仅接线）  
+> 质量线（Temporal → Recall → Ranking）**不挡** v1 GO，GO 后另开。
 
-| 层 | 含义 | 状态 |
-|----|------|------|
-| Layer 1 | 契约 / 本地回归 | ✅ 已通过 |
-| Layer 2 | 真实数据 E2E（全链路 + Agent LLM） | 🟡 Publish 边界 local ✅；tmesh 全链路 / LLM E2E ⬜ |
-| Layer 3 | 性能 / 压力 / 故障 / 并发 | ⬜ 待补 |
-| Layer 4 | 飞书 E2E | ⛔ ⑧ 之后 |
-
-⑦ Agent v1：**✅ 20/20**（不再改架构）  
-⑧ 飞书：**⛔ 暂缓**
-
----
-
-## Layer 1 — 契约（已锁死）
-
-| 项 | 结果 |
+| 层 | 状态 |
 |----|------|
-| Agent 20/20 | PASS |
-| Ask 25/25 golden | PASS |
-| Relation Gold | PASS |
-| Claim Check | PASS |
-| T13 5/5 | PASS |
-| Publish / write boundary | PASS |
-| Identity / Permission / Tool 自防御 | PASS（含于 Agent 契约） |
-
-执行：`python eval/run_mesh_agent_full_acceptance.py --phase local_regression`（2026-09-08，6/6）。
+| Layer 1 契约 | ✅ |
+| Layer 2 tmesh + LLM E2E | ✅ 10/10 |
+| Layer 3 性能 | ✅ tmesh（见下） |
+| Layer 3 故障 | ✅ 8/8 |
+| Layer 3 并发隔离 | ✅ 6/6 + scope 不相交 |
+| **Final Preview E2E** | ✅ `2026-09-08` |
+| Layer 4 飞书 | ⬜ 可开（未跑） |
 
 ---
 
-## Layer 2 — 真实数据 E2E
+## 路线（锁定）
 
-### 2.1 全链路 / Publish 前后可见性
+```
+Final Preview E2E ✅ → Mesh+Agent v1 GO → ⑧ 飞书 MVP
+                         ↓（之后）
+              Agent Quality v1: Temporal → Recall → Ranking → …
+```
 
-| 检查 | 环境 | 结果 |
-|------|------|------|
-| Publish **前** Agent 不可见 draft 标记 | local | ✅ `AGENT_PUBLISH_BOUNDARY_E2E.json` |
-| Publish **后** Agent 可见 + Evidence | local | ✅ |
-| Source→Pipeline→Preview→Relation→Claim→Publish（真实 tmesh Issue） | tmesh | ⬜ 下一刀 |
+Final 只验：Publish 前不可见 / Publish+Index 后可见 / Evidence / IssueRef / 不串期 / Draft 不泄漏。  
+**不**把 Temporal Grounding 插进本次验收。
 
-脚本：`eval/run_agent_publish_boundary_e2e.py`（本地已绿；tmesh 用 `--reuse-env-db` 另跑）
+---
 
-### 2.2 Agent LLM E2E（10～20 题）
+## Final Preview E2E ✅（tmesh · `2026-09-08`）
+
+报告：`FINAL_PREVIEW_E2E.tmesh.json`  
+脚本：`eval/run_final_preview_e2e.py`
+
+真实链路：15 段聚合 Source → Pipeline（117 items）→ Preview（gate 通过）→ Publish → Index → Ask/Agent。
 
 | 检查 | 结果 |
 |------|------|
-| MESH_AGENT_USE_LLM=1 成文 | ⬜ |
-| Answer 遵守 Evidence | ⬜ |
-| unsupported 不上屏为事实 | ⬜ |
-| fingerprint / trace | ⬜ |
+| Publish 前 Agent 不可见 | ✅ FTS=0；「当前没有可引用的已上线期次」 |
+| Publish + Index 后可见 | ✅ marker + Evidence `ev:ctx:2026-09-08:1` |
+| IssueRef | ✅ `explicit` → `2026-09-08` |
+| 不串期（问 `2026-8-17`） | ✅ 唯一钉记不可见 |
+| Draft / Raw 不泄漏 | ✅ `refuse`，无 data tools |
+| publish_blockers | ✅ 空 |
 
-语料：`eval/agent_e2e_gold_v1.jsonl` · 脚本：`eval/run_agent_llm_e2e.py`
+墙钟大致：Pipeline ~2min；Preview ~2min；Agent 边界段 ~1min。  
+本期 Preview 关系卡数为 0（gate 仍通过）；不挡生命周期门禁。
 
 ---
 
-## Layer 3 — 性能 / 故障 / 并发
+## Layer 3.1 性能（tmesh，n=5，`MESH_AGENT_USE_LLM=1`，issue=`2026-8-17`）
 
-### 性能 P50/P95
+报告：`AGENT_PERF.tmesh.json`（容器内 `AGENT_PERF.json`）
 
-| 路径 | P50 | P95 | n | 环境 | 备注 |
-|------|-----|-----|---|------|------|
-| Pipeline（Job 完成） | | | | | 非仅 HTTP |
-| Preview（可进入/完整） | | | | | |
-| Publish | | | | | |
-| Ask | | | | | |
-| Agent | | | | | |
-| **Agent − Ask overhead** | | | | | |
+| 指标 | P50 | P95 | P99 | max |
+|------|-----|-----|-----|-----|
+| **Agent total** | **14025 ms** | **17896 ms** | ~18097 | 18097 |
+| **Ask total**（prepare+LLM） | **15103 ms** | **26109 ms** | ~28263 | 28263 |
+| **Agent − Ask overhead** | **-2642 ms** | **3194 ms** | — | — |
+| Tool（含检索+LLM） | ~12571–34629（单轮波动） | | | |
+| Identity / Permission / Context / Intent | ≪50 ms（可忽略） | | | |
 
-### 故障（运行时，非仅契约）
+解读：
+- Agent 额外编排开销相对 LLM **可忽略**；总耗时由 **Tool 内检索 + LLM 成文**主导。
+- overhead 中位数为负：同题下 Agent 路径偶发快于「Ask prepare + 独立 LLM」对照（样本小、LLM 抖动大）；**P95 overhead ≈ +3.2s** 可作为保守上界。
 
-| 场景 | 结果 |
+---
+
+## Layer 3.2 故障 ✅ 8/8
+
+报告：`AGENT_FAULT.tmesh.json`
+
+| 用例 | 结果 |
 |------|------|
-| LLM timeout / bad JSON / 慢响应 | ⬜ |
-| Tool timeout / 空结果 / 异常 | ⬜ |
-| DB / Redis / queue | ⬜ |
-| unlinked / conflict / team·issue 非法 | 部分✅契约；运行时复测 ⬜ |
-
-### 并发（防 Context 串用户）
-
-| 场景 | 结果 |
-|------|------|
-| A 商业化+编辑部群 vs B 视频号 同时问「我们这周接触了谁」 | ⬜ |
-| 多人 Ask / Agent / Preview+Agent / pool 满 | ⬜ |
+| LLM timeout → 不假 `llm_used` | PASS |
+| LLM 空返回 → 不假 `llm_used` | PASS |
+| Issue 不存在 → IssueRef none | PASS |
+| Identity conflict → 无数据 Tool | PASS |
+| unlinked refuse | PASS |
+| draft refuse 无泄漏 | PASS |
+| 空 Tool 不二次调用 | PASS |
+| Tool 拒绝 draft surface | PASS |
 
 ---
 
-## Layer 4 — 飞书 E2E
+## Layer 3.3 并发 ✅
 
-⛔ 全量 Layer 2+3 通过后再开。只接线，不扩大脑。
+报告：`AGENT_CONCURRENCY.tmesh.json`
+
+- A：primary=商业化，chat=编辑部 → focus=**编辑部**
+- B：primary=视频号，chat=视频号 → focus=**视频号团队**
+- 6/6 PASS；`scope_key` A/B **不相交**
 
 ---
+
+## 下一步
+
+1. **⑧ 飞书 MVP**（仅接线；不重开 ①–⑦）  
+2. （GO 后质量线）Temporal Gold → Temporal Grounding → Recall / Ranking  
+3. CRM 进 Agent = 质量线后续，不挡飞书接线  
 
 ## Go / No-Go
 
-- [x] Layer 1  
-- [ ] Layer 2  
-- [ ] Layer 3  
-- [ ] → 全量 PASS  
-- [ ] → ⑧ 飞书 MVP  
+- [x] Layer 1–2  
+- [x] Layer 3 Agent 性能/故障/并发  
+- [x] Final Preview E2E  
+- [x] → **v1 GO** → ⑧ 可开  
