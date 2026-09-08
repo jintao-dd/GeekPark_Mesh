@@ -2,189 +2,142 @@
 
 > **状态（2026-09-08）**  
 > Agent v1 = **GO**  
-> Quality / v2 · Temporal Phase 0 ✅ · **Phase 1 ✅**（Gold 24/24；Intent/Basis/Filter + Hard Rules）  
-> 下一刀：**② Retrieval Recall**（仍不把 RAG 当时间补丁）  
-> **原则：先可测量，再优化；先证明问题，再改架构。**  
+> **① Temporal = PASS**（Phase 0 Gold+Baseline → Phase 1 · 24/24）  
+> **② Retrieval Recall = GO（Phase 0：只建 Gold + baseline，禁止改 RAG）**  
+> **原则：先可测量，再优化；先证明问题，再改架构。**
 
-相关：`MESH_AGENT_FULL_ACCEPTANCE.md`（v1 门禁）  
-⑧ 飞书 MVP ∥ ① Temporal（只接线，不挡质量线）。
-
----
-
-## 一句话
-
-| | 解决什么 |
-|--|--|
-| **Agent v1** | Agent 能不能**安全、正确地工作** |
-| **Agent Quality / v2** | 给出的答案是不是**高质量答案** |
+相关：`MESH_AGENT_FULL_ACCEPTANCE.md` · `TEMPORAL_PHASE1.md`  
+⑧ 飞书 MVP ∥ 质量线（只接线）。
 
 ---
 
-## v2 主线（锁定）
+## 门禁链（锁定）
 
 ```
-① Temporal
+v1 GO
+ ↓
+Temporal Phase 0   Gold 24 + Baseline
+ ↓
+Temporal Phase 1   24/24 ✅
+ ↓
+Temporal PASS
+ ↓
+开放 ② Retrieval Recall   ← 当前
+```
+
+---
+
+## v2 主线
+
+```
+① Temporal ✅
    时间理解对不对
         ↓
-② Recall
+② Recall          ← 当前 Phase 0
    该找的有没有找回来          → Recall@5 / @10 / @20
         ↓
 ③ Ranking
    找回来以后有没有排对        → MRR / nDCG@10 / Precision@5
         ↓
-④ Evidence
-   每个关键事实有没有依据
-        ↓
-⑤ Answer
-   准确、完整、忠实
-        ↓
-⑥ Data Domain
-   CRM / 其他数据域
+④ Evidence → ⑤ Answer → ⑥ Data Domain
 ```
 
-**硬门：** ① Temporal Gold 验收 PASS 之前，**禁止**进 ②，更禁止「先优化 RAG」。
+---
 
-⑧ 飞书 ∥ ①（并行）。
+## ① Temporal PASS — 已解决 / 不负责
+
+**已解决：** relative time intent · time basis · time filter ·  
+`latest_published ≠ recent event` · unknown 不乱说「最近发生」
+
+**不负责（不得混进 Temporal 回改）：**
+
+| 遗留 | 归属 |
+|------|------|
+| latest 上搜不到内容 | **② Retrieval Recall** |
+| 历史内容没被召回 | **② Retrieval Recall** |
+| RAG 漏召回 | **② Retrieval Recall** |
+| `2026-8-17` date_start/end 脏 | **Data Time Integrity**（数据） |
+| 无真实 `event_time` | **诚实默认 unknown**（正确，不伪造） |
+
+---
+
+## ② Retrieval Recall Phase 0（硬门槛 · 交给 Code）
+
+> **只测现状。禁止改 RAG / Chunk / FTS / Vector / Query Rewrite / Rerank / Ranking。**
+
+### 完成条件（不是抬 Recall 分数）
+
+```
+Retrieval Gold 建完
+    ↓
+Baseline runner 跑通
+    ↓
+只跑当前 Retrieval
+    ↓
+Recall@5 / @10 / @20
+    ↓
+每题 relevant / retrieved / missed
+    ↓
+汇总 failure pattern
+    ↓
+才允许讨论改检索
+```
+
+### Gold（约 30 题）
+
+每题至少：
+
+```json
+{
+  "id": "R01",
+  "query": "...",
+  "scope": {
+    "issue": "latest_published | explicit:<slug>",
+    "time_basis": "event_time | issue_time | unknown",
+    "window": "recent | none | explicit"
+  },
+  "relevant_items": ["4105", "4112"]
+}
+```
+
+`relevant_items` = 正确答案的 **item id**（必须可核对）。
+
+### Baseline 输出
+
+- 聚合：Recall@5 / @10 / @20  
+- 逐题：expected · retrieved · missed  
+- failure pattern：人名 / 时间过滤 / Issue scope / FTS / Vector / Hybrid …
+
+报告：`eval/reports/RECALL_BASELINE_latest.json` + `.md`
 
 ---
 
 ## 质量层对照
 
-| 质量层 | v1 | v2 |
-|--------|----|----|
-| 边界 / Tool / Identity / IssueRef | ✅ | **保持** |
-| 时间语义 | ⚠️ | **① 第一刀** |
-| Recall | ⚠️ 25/25=回归 | **② Recall@K** |
-| Ranking | ⚠️ 未系统测 | **③ MRR / nDCG / P@5** |
-| Evidence / Answer / Abstain | ✅ 有基础 | ④⑤ 提高 |
-| CRM 等 | 暂不接 | **⑥ 后半段** |
+| 质量层 | 状态 |
+|--------|------|
+| 边界 / Tool / Identity / IssueRef | ✅ 保持 |
+| 时间语义 | ✅ Temporal PASS |
+| Recall | ⬜ Phase 0 |
+| Ranking | ⛔ 待 Recall 后 |
+| Evidence / Answer | 后段 |
+| CRM | ⑥ |
 
 ---
 
-## ① Temporal Grounding
+## 明确不做（Recall Phase 0）
 
-典型失败：「锦涛最近做了什么」→ 人/内容对，旧 Issue 被说成「最近发生」。
-
-**目标：回答里的时间必须有依据。**
-
-### 时间轴（禁止混用）
-
-| 轴 | 含义 |
-|----|------|
-| Issue Time | 期次窗口 |
-| Material Time | 材料进入 / 文档标注时间 |
-| Event Time | 事件真实发生时间（优先） |
-| Publish Time | 上线时间 |
-| CRM Time | CRM 互动时间（⑥） |
-
-### 推理链
-
-```
-「最近发生了什么」→ Event Time → 否则 Material Time
-                 → 仍无 →「资料未提供发生时间」
-```
-
-### 流水线（最小实现形态）
-
-```
-Query → Time Intent → Time Basis → Time Filter
-      → Retrieval → Evidence → Answer
-```
+- ❌ 改 RAG / Chunk / FTS / Vector / Hybrid / Rewrite  
+- ❌ 上 Rerank / 改 Ranking  
+- ❌ 用 Temporal 补丁假装解决召回  
+- ❌ 伪造 event_time  
 
 ---
 
-## Temporal Phase 0（硬门槛 · 正在执行）
+## Code 清单
 
-> **现在不要优化 RAG。先建 Gold，再看基线错在哪。**  
-> 完成条件：**不是** 24 题全 PASS；而是 Gold 建完 → Baseline 跑通 → 失败分布 → 确认问题边界 → 才最小实现。
-
-### 0.1 Gold：24 题（`eval/temporal_gold_v1.jsonl`）
-
-最少覆盖 6 类：
-
-| 类 | 含义 | 题号 |
-|----|------|------|
-| A | 最近 / 近期 | T01–T04（含 **「锦涛最近做了什么」**） |
-| B | 本周 / 上周 | T05–T08 |
-| C | 指定时间范围 | T09–T12 |
-| D | Issue 与事件时间冲突 | T13–T16（含脏 date / latest≠recent） |
-| E | 没有 Event Time | T17–T20 |
-| F | 明确要求按 Issue 查 | T21–T24 |
-
-每题固定字段：`query` · `time_semantics.basis|window` · `issue_scope` · `expected_behavior` · `relevant_evidence`。
-
-### 0.2 Baseline runner（`eval/run_temporal_baseline.py`）
-
-只读当前系统。每题输出：
-
-`query → predicted time basis → predicted window → issue scope → retrieved evidence → final answer → pass/fail → failure_reason`
-
-报告：`eval/reports/TEMPORAL_BASELINE_latest.json` + `.md`
-
-### 0.3 Implement（仅最小 Temporal · **Baseline 之后**）
-
-Hard Rules：
-
-1. `latest_published` **≠** recent event  
-2. `unknown` event time **≠** recent  
-3. **无时间依据** → 不得用「最近发生 / 本周发生」等确定性措辞  
-
-### 0.4 Temporal v1 验收门
-
-```
-Gold → Baseline → 最小实现 → 重跑 Gold
-    → 时间理解准确率 · 时间依据正确率 → PASS → 才进 ② Recall
-```
-
----
-
-## ② Retrieval Recall
-
-核心：**找没找到。**  
-指标：Recall@5 / @10 / @20。  
-Gold：每题 relevant items。  
-25/25 回归保留，另立 Retrieval Gold。
-
-## ③ Ranking
-
-核心：**找回来以后排得对不对。**  
-指标：MRR · nDCG@10 · Precision@5。  
-**是否上 Rerank 由数据决定，不先上。**
-
-## ④ Evidence → ⑤ Answer → ⑥ Data Domain
-
-见前表；④ 用好已有 Evidence/Claim，不新发明 confidence 分；⑥ CRM 等在 ①–⑤ 之后。
-
----
-
-## Dashboard（最终验收形态）
-
-| 块 | 指标 |
-|----|------|
-| A. Temporal | 时间理解准确率 · 时间依据正确率 |
-| B. Recall | Recall@5 / @10 / @20 |
-| C. Ranking | MRR · nDCG@10 · Precision@5 |
-| D. Evidence | correctness · coverage · unsupported rate |
-| E. Answer | Accuracy · Completeness · Faithfulness · Citation |
-| F. Safety | Abstention · Published-only · Permission（保持 v1） |
-
----
-
-## 明确不做
-
-- ❌ Temporal PASS 前优化 RAG / 上 Rerank  
-- ❌ 无 Gold 先改架构  
-- ❌ 回改 v1 边界 / Contract  
-- ❌ Planner / ReAct /「更像 Agent」  
-- ❌ CRM 抢跑  
-
----
-
-## Code 立刻执行清单（Phase 0→1）
-
-1. ✅ `eval/temporal_gold_v1.jsonl`（24 题 · A–F）  
-2. ✅ `eval/run_temporal_baseline.py`  
-3. ✅ Phase 0 baseline（22/24）→ 失败边界清楚  
-4. ✅ Phase 1 最小实现 + 重跑 **24/24**（见 `TEMPORAL_PHASE1.md`）  
-5. ⬜ ② Retrieval Recall Gold  
-6. ⑧ 飞书接线可并行  
+1. ✅ Temporal PASS  
+2. ⬜ `eval/retrieval_gold_v1.jsonl`（~30）  
+3. ⬜ `eval/run_recall_baseline.py`  
+4. ⬜ tmesh baseline → failure pattern  
+5. ⑧ 飞书可并行  
