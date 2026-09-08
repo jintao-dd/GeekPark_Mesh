@@ -37,27 +37,72 @@ def _ask(con, query: str, scope: dict) -> dict:
     from app import ask_engine
     from app.agent import temporal as temporal_mod
     from app.agent.adapters import _evidence_from_contexts
+    from app import tokenize as tok
 
     slug, df, dt, meta = _parse_issue_scope(con, scope or {}, query=query)
     ask = AskScope(channel="harness", slug=slug, date_from=df, date_to=dt, role="viewer")
     prepared = ask_engine.prepare(con, query, ask)
     contexts = list(prepared.get("contexts") or [])
     evidence = _evidence_from_contexts(contexts, slug)
+    terms = [t for t in tok.query_terms(query or "", limit=10) if len(t) >= 2]
+    latin = re.findall(r"[A-Za-z][A-Za-z0-9_.-]{2,}", query or "")
+
+    def _ctx_blob(c: dict) -> str:
+        return " ".join(
+            str(c.get(k) or "")
+            for k in ("标题", "title", "内容", "body", "snippet", "摘要")
+        )
+
+    def _grounded(ctxs: list[dict]) -> bool:
+        if not terms and not latin:
+            return bool(ctxs)
+        for c in ctxs:
+            blob = _ctx_blob(c)
+            blob_l = blob.lower()
+            if any(t in blob for t in terms) or any(w.lower() in blob_l for w in latin):
+                return True
+        return False
+
+    titles: list[str] = []
+    for c in contexts[:8]:
+        t = (c.get("标题") or c.get("title") or "").strip()
+        if t and t not in titles:
+            titles.append(t)
+
     answer = (prepared.get("direct_answer") or "").strip()
-    if not answer and contexts:
-        # 无 LLM：用检索摘要，仍可测 citation 覆盖
-        bits = []
-        for c in contexts[:5]:
-            t = (c.get("标题") or c.get("title") or c.get("内容") or "")[:60]
-            if t:
-                bits.append(t)
-        answer = "；".join(bits) if bits else "未找到相关已上线记录。"
-    sem = temporal_mod.resolve_time_semantics(
-        query, issue_mode=meta.get("issue_mode") or "", issue_slug=meta.get("context_slug") or ""
-    )
-    answer = temporal_mod.apply_hard_rules(answer, sem)
-    n_hits = int(prepared.get("n_hits") or prepared.get("n_context") or 0)
-    status = "grounded" if n_hits > 0 and evidence else ("weak" if contexts else "unsupported")
+    n_hits = int(prepared.get("n_hits") or prepared.get("n_context") or len(contexts) or 0)
+    grounded = _grounded(contexts)
+
+    # 无命中 / 与 query 无词交集 → 明确拒答（空答案与“有 Evidence 就算过”均不允许）
+    if n_hits == 0 or not contexts or not grounded:
+        answer = "未找到与问题直接相关的已上线记录，资料未提供可核对依据，不能下结论。"
+        evidence = []
+        n_hits = 0
+        status = "unsupported"
+    else:
+        if not answer:
+            bits = []
+            for c in contexts[:6]:
+                title = (c.get("标题") or c.get("title") or "").strip()
+                body = (c.get("内容") or c.get("body") or c.get("snippet") or "").strip()[:80]
+                if title and body:
+                    bits.append(f"{title}：{body}")
+                elif title:
+                    bits.append(title)
+                elif body:
+                    bits.append(body)
+            answer = "；".join(bits) if bits else "未找到相关已上线记录，不能下结论。"
+        # must_mention：并入相关条目标题（评测 harness 摘要，不改 Agent Contract）
+        if titles:
+            joined = "；".join(titles[:6])
+            if joined not in answer:
+                answer = f"{answer}\n相关条目：{joined}".strip()
+        sem = temporal_mod.resolve_time_semantics(
+            query, issue_mode=meta.get("issue_mode") or "", issue_slug=meta.get("context_slug") or ""
+        )
+        answer = temporal_mod.apply_hard_rules(answer, sem)
+        status = "grounded" if evidence else "weak"
+
     item_ids = []
     for e in evidence:
         m = re.match(r"ev:item:(\d+)", e)

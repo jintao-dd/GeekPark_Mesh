@@ -1,10 +1,10 @@
 # Agent Quality / v2
 
-> **状态（2026-09-08 · v2.1）**  
-> Agent v1 = **GO** · Overnight = **PASS** · v2.1 = **已跑通**  
-> Temporal **24/24** · Recall **83/90/94** · Ranking v1.1 实验↑（R06 误杀已消，**未合并生产**）  
-> Evidence/Answer v2 硬门槛生效（虚高 pass 已拆）· Vector **OFF**  
-> 报告：`AGENT_QUALITY_V2_OVERNIGHT.md` · `AGENT_QUALITY_V2_1.md`
+> **状态（2026-09-08 · v2.2）**  
+> Temporal **24/24** · Recall **83/90/94** 冻结 · Vector **OFF**  
+> Ranking v1.2：R18 回退已消、R06 稳、R12 nDCG↑；**R16 微退 → 不合并生产**  
+> Answer hard pass **71%→88%**（must_mention/abstention/非空硬门槛）  
+> 报告：`AGENT_QUALITY_V2_1.md` · `AGENT_QUALITY_V2_2.md`
 
 相关：`MESH_AGENT_FULL_ACCEPTANCE.md` · `TEMPORAL_PHASE1.md` · `RECALL_FAILURE_REVIEW.md`  
 ⑧ 飞书 MVP ∥ 质量线（只接线）。

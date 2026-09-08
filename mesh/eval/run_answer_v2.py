@@ -33,66 +33,79 @@ def _load(path: Path) -> list[dict]:
 
 
 def grade_v2(row: dict, out: dict) -> dict:
-    """硬门槛 pass：accuracy==1 且 faithfulness==1 且 abstention 正确；非 abstain 题答案非空。"""
+    """硬门槛：must_mention / nonempty / faithfulness / abstention；Evidence 数量不能单独过门。"""
     text = (out.get("answer") or "").strip()
     must = row.get("must_mention") or []
     forbid = row.get("forbid_phrases") or []
     expect_abstain = bool(row.get("expect_abstain"))
 
-    # --- accuracy ---
-    accuracy = 1.0
-    if not expect_abstain and not text:
-        accuracy = 0.0
+    nonempty = bool(text)
+    # 空答案一律不过（含 abstain 题）
+    if not nonempty:
+        return {
+            "accuracy": 0.0,
+            "completeness": 0.0,
+            "faithfulness": 0.0,
+            "citation_correctness": 0.0,
+            "abstention_correctness": 0.0,
+            "nonempty": 0.0,
+            "must_mention_ok": 0.0,
+            "pass": False,
+            "scoring": "v2_2_hard",
+            "fail_reason": "empty_answer",
+        }
+
+    must_ok = True
     for m in must:
         if m.lower() not in text.lower() and m not in text:
-            accuracy = 0.0
+            must_ok = False
             break
+
+    accuracy = 1.0 if must_ok else 0.0
     for f in forbid:
         if f and f in text:
             accuracy = 0.0
             break
 
-    # --- abstention ---
     abstain_phrase = bool(
-        re.search(r"未找到|没有|未提供|不能下结论|无法|资料未|未见|不等于|不能确认|无法确认", text)
+        re.search(
+            r"未找到|没有|未提供|不能下结论|无法|资料未|未见|不等于|不能确认|无法确认|不能推断",
+            text,
+        )
     )
     if expect_abstain:
-        abstain_ok = abstain_phrase or out.get("n_hits", 0) == 0
-        # 空答对 abstain 题：若无命中可算 abstain；有命中却空答 → 失败
-        if not text and out.get("n_hits", 0) > 0:
-            abstain_ok = False
-        accuracy = 1.0 if abstain_ok else 0.0
+        # 必须有明确拒答措辞；不能靠 evidence 数量 / 空壳结构过门
+        abstain_ok = abstain_phrase
+        accuracy = 1.0 if abstain_ok and accuracy >= 0.99 else 0.0
+        if not abstain_ok:
+            accuracy = 0.0
         faithfulness = (
             1.0
-            if abstain_ok and not re.search(r"已经发布|即将发布 GPT-99|确定会|成功发布", text)
+            if abstain_ok and not re.search(r"已经发布|即将发布 GPT-99|确定会|成功发布|一定会", text)
             else 0.0
         )
         completeness = 1.0 if abstain_ok else 0.0
     else:
-        abstain_ok = True  # 非 abstain 题不要求 abstain
-        completeness = 1.0 if text and (
-            out.get("n_hits", 0) >= int(row.get("min_evidence") or 0)
-            or row.get("tool") in ("help", "relations")
-            or int(row.get("min_evidence") or 0) == 0
-        ) else 0.0
-        if row.get("prefer_caveat") and text and not re.search(r"非核实|资料|依据|不能|无法", text):
-            completeness = min(completeness, 0.5)
+        abstain_ok = True
+        completeness = 1.0
+        if row.get("prefer_caveat") and not re.search(r"非核实|资料|依据|不能|无法", text):
+            completeness = 0.5
         faithfulness = 1.0
         if row.get("forbid_fabricated") and re.search(r"成功发布|已经完成|正在发生", text):
             faithfulness = 0.0
-        if not text:
-            faithfulness = 0.0
+        # 非 abstain：must_mention 是 accuracy 硬条件（已反映在 accuracy）
 
+    # citation：有 min_evidence 时需要 refs；但 citation 单独不能挽救 accuracy/abstain 失败
     citation = 1.0
     if int(row.get("min_evidence") or 0) > 0:
         citation = 1.0 if (out.get("evidence_refs") or out.get("item_ids")) else 0.0
 
-    # 硬检查：accuracy / faithfulness / abstention / 非空（非 abstain）
     hard_ok = (
-        accuracy >= 0.99
+        nonempty
+        and accuracy >= 0.99
         and faithfulness >= 0.99
+        and must_ok
         and (abstain_ok if expect_abstain else True)
-        and (bool(text) if not expect_abstain else True)
         and citation >= 0.99
     )
     return {
@@ -101,9 +114,10 @@ def grade_v2(row: dict, out: dict) -> dict:
         "faithfulness": round(faithfulness, 4),
         "citation_correctness": round(citation, 4),
         "abstention_correctness": round(1.0 if abstain_ok else 0.0, 4),
-        "nonempty": 1.0 if bool(text) else 0.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0 if must_ok else 0.0,
         "pass": bool(hard_ok),
-        "scoring": "v2_hard",
+        "scoring": "v2_2_hard",
     }
 
 

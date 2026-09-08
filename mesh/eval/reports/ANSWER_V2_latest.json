@@ -2,21 +2,21 @@
   "phase": "answer",
   "scoring": "v2_hard",
   "gold": "answer_gold_v2.jsonl",
-  "tag": "answer_v2",
+  "tag": "answer_v2_2",
   "n": 17,
-  "pass_rate": 0.7059,
-  "macro_accuracy": 0.7059,
-  "macro_completeness": 0.8529,
-  "macro_faithfulness": 0.8824,
+  "pass_rate": 0.8824,
+  "macro_accuracy": 0.8824,
+  "macro_completeness": 0.9412,
+  "macro_faithfulness": 0.9412,
   "macro_citation_correctness": 1.0,
-  "macro_abstention_correctness": 0.8824,
+  "macro_abstention_correctness": 0.9412,
   "macro_nonempty": 1.0,
-  "elapsed_s": 0.4,
+  "elapsed_s": 0.39,
   "results": [
     {
       "id": "A01",
       "category": "entity",
-      "answer_snip": "时间过滤；李源；Snowball；锦涛",
+      "answer_snip": "时间过滤：from=2026-06-10 to=…；李源：李源 · 品牌创意团队 · T6 · 李源的账号内容形式想做行业 MAP、互动 Map、互动图文等更复杂形态，计划在思琪网站下单开一个 tag，UI 与站点保持；Snowball：Snowball · 品牌创意团队 · T6 · 思琪站点用独立建站（非 WordPress），已发文章及每日日报；Snowball 相关小工具计划开源，本周锦；",
       "metrics": {
         "accuracy": 1.0,
         "completeness": 1.0,
@@ -24,8 +24,9 @@
         "citation_correctness": 1.0,
         "abstention_correctness": 1.0,
         "nonempty": 1.0,
+        "must_mention_ok": 1.0,
         "pass": true,
-        "scoring": "v2_hard"
+        "scoring": "v2_2_hard"
       },
       "n_hits": 3,
       "status": "grounded",
@@ -34,7 +35,7 @@
     {
       "id": "A02",
       "category": "company",
-      "answer_snip": "时间过滤；面壁智能；面壁智能；面壁智能；面壁智能",
+      "answer_snip": "时间过滤：from=2026-06-10 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能舱内方向：端侧跨模态视频流分析识别儿童站立探头等危险动作，数据不出车；车内物品溯源支持关键帧回溯；情境感知自动响应（；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能端侧模型芯片适配：已适配高通 8958538、8397、9075 及联发科、英特尔、英伟达、AMD 和国产平台；模型；面壁",
       "metrics": {
         "accuracy": 1.0,
         "completeness": 1.0,
@@ -42,8 +43,9 @@
         "citation_correctness": 1.0,
         "abstention_correctness": 1.0,
         "nonempty": 1.0,
+        "must_mention_ok": 1.0,
         "pass": true,
-        "scoring": "v2_hard"
+        "scoring": "v2_2_hard"
       },
       "n_hits": 40,
       "status": "grounded",
@@ -52,16 +54,17 @@
     {
       "id": "A03",
       "category": "multi_evidence",
-      "answer_snip": "时间过滤；面壁智能；安谋科技；面壁智能；面壁智能",
+      "answer_snip": "时间过滤：from=2026-06-10 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；安谋科技：安谋科技 · 编辑部 · T6 · 安谋科技（CPU产品总监徐瑞迪陈述）端侧AI判断：2025-2026年接近1B体量模型可达60分商用最低标准线并装入端侧小芯；面壁",
       "metrics": {
-        "accuracy": 0.0,
+        "accuracy": 1.0,
         "completeness": 1.0,
         "faithfulness": 1.0,
         "citation_correctness": 1.0,
         "abstention_correctness": 1.0,
         "nonempty": 1.0,
-        "pass": false,
-        "scoring": "v2_hard"
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
       },
       "n_hits": 40,
       "status": "grounded",
@@ -70,16 +73,17 @@
     {
       "id": "A04",
       "category": "topic",
-      "answer_snip": "时间过滤；Joshua X.；OpenAI 与 GPT-6 Astra；AI；OpenAI",
+      "answer_snip": "时间过滤：from=2026-09-07 to=2026-09-08；Joshua X.：Joshua X. · 硅谷 BD 团队 · T3 · HeyGen（洛杉矶，Series A）联合创始人兼 CEO 徐卓（Joshua X.），AI 应用/A；OpenAI 与 GPT-6 Astra：关注的公司与人 视频号团队 AGI 相关内容本周处于播放前列；AI：AI · 视频号团队 · T11 · ",
       "metrics": {
-        "accuracy": 0.0,
+        "accuracy": 1.0,
         "completeness": 1.0,
         "faithfulness": 1.0,
         "citation_correctness": 1.0,
         "abstention_correctness": 1.0,
         "nonempty": 1.0,
-        "pass": false,
-        "scoring": "v2_hard"
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
       },
       "n_hits": 11,
       "status": "grounded",
@@ -88,7 +92,7 @@
     {
       "id": "A05",
       "category": "community",
-      "answer_snip": "时间过滤；Founder Show；Anita Wang；AGI 2026；视频号",
+      "answer_snip": "时间过滤：from=2026-06-10 to=…；Founder Show：Founder Show · 社群 · T6 · 小红书本周计划发布：Founder Show 团队介绍、Loopit 创始人专访、Loopit 与 Tap8 ；Anita Wang：Anita Wang · 编辑部 · T3 · Anita Wang（Meta AI Agent 产品，加州 Menlo Park）：Me",
       "metrics": {
         "accuracy": 1.0,
         "completeness": 1.0,
@@ -96,8 +100,9 @@
         "citation_correctness": 1.0,
         "abstention_correctness": 1.0,
         "nonempty": 1.0,
+        "must_mention_ok": 1.0,
         "pass": true,
-        "scoring": "v2_hard"
+        "scoring": "v2_2_hard"
       },
       "n_hits": 32,
       "status": "grounded",
@@ -106,7 +111,7 @@
     {
       "id": "A06",
       "category": "relation",
-      "answer_snip": "时间过滤；AGI 2026；MiniMax",
+      "answer_snip": "时间过滤：from=2026-06-10 to=…；AGI 2026：AGI 2026 · 品牌创意团队 · T6 · AGI 复盘：场地供应商未提前给主舞台椅子等定制数据，现场自搭发现椅子高、屏幕层矮（2.9 米，往年 5 米）；MiniMax：MiniMax · 编辑部 · T7 · 《How MiniMax Builds Agents》GeekPark English 8/10 — Mini",
       "metrics": {
         "accuracy": 1.0,
         "completeness": 1.0,
@@ -114,8 +119,9 @@
         "citation_correctness": 1.0,
         "abstention_correctness": 1.0,
         "nonempty": 1.0,
+        "must_mention_ok": 1.0,
         "pass": true,
-        "scoring": "v2_hard"
+        "scoring": "v2_2_hard"
       },
       "n_hits": 2,
       "status": "grounded",
@@ -124,34 +130,36 @@
     {
       "id": "A07",
       "category": "empty",
-      "answer_snip": "时间过滤；Agent 与多智能体；FREELANDER 神行者；滴滴战投；Eigent AI",
+      "answer_snip": "未找到与问题直接相关的已上线记录，资料未提供可核对依据，不能下结论。",
       "metrics": {
-        "accuracy": 0.0,
-        "completeness": 0.0,
-        "faithfulness": 0.0,
-        "citation_correctness": 1.0,
-        "abstention_correctness": 0.0,
-        "nonempty": 1.0,
-        "pass": false,
-        "scoring": "v2_hard"
-      },
-      "n_hits": 18,
-      "status": "grounded",
-      "error": null
-    },
-    {
-      "id": "A08",
-      "category": "topic",
-      "answer_snip": "时间过滤；源策；艾欧智能；乐享科技；灵初",
-      "metrics": {
-        "accuracy": 0.0,
+        "accuracy": 1.0,
         "completeness": 1.0,
         "faithfulness": 1.0,
         "citation_correctness": 1.0,
         "abstention_correctness": 1.0,
         "nonempty": 1.0,
-        "pass": false,
-        "scoring": "v2_hard"
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 0,
+      "status": "unsupported",
+      "error": null
+    },
+    {
+      "id": "A08",
+      "category": "topic",
+      "answer_snip": "时间过滤：from=2026-06-10 to=…；源策：源策 · 编辑部 · T6 · 源策（沟通对象李天羽，CEO，短测未来相关）就新加坡具身智能活动沟通中：活动主题 go physical go action、8；艾欧智能：艾欧智能 · 编辑部 · T6 · 艾欧智能（IO-AI Tech，沟通对象 Simon）已接触，行业为具身智能 · 硅谷 BD 团队建联记录；乐享科技：乐享科技 · 编",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
       },
       "n_hits": 20,
       "status": "grounded",
@@ -160,7 +168,7 @@
     {
       "id": "A09",
       "category": "temporal",
-      "answer_snip": "时间过滤；李源；Snowball；锦涛；锦涛",
+      "answer_snip": "时间过滤：from=2026-06-10 to=…；李源：李源 · 品牌创意团队 · T6 · 李源的账号内容形式想做行业 MAP、互动 Map、互动图文等更复杂形态，计划在思琪网站下单开一个 tag，UI 与站点保持；Snowball：Snowball · 品牌创意团队 · T6 · 思琪站点用独立建站（非 WordPress），已发文章及每日日报；Snowball 相关小工具计划开源，本周锦；",
       "metrics": {
         "accuracy": 1.0,
         "completeness": 1.0,
@@ -168,8 +176,9 @@
         "citation_correctness": 1.0,
         "abstention_correctness": 1.0,
         "nonempty": 1.0,
+        "must_mention_ok": 1.0,
         "pass": true,
-        "scoring": "v2_hard"
+        "scoring": "v2_2_hard"
       },
       "n_hits": 5,
       "status": "grounded",
@@ -178,7 +187,7 @@
     {
       "id": "A10",
       "category": "abstention",
-      "answer_snip": "未在已上线周报中找到与问题直接相关的记录。请尝试换关键词、缩小或扩大时间范围，或确认相关内容是否已上线。\n（本次检索时间范围：2026-09-08 至 2026-09-08）",
+      "answer_snip": "未找到与问题直接相关的已上线记录，资料未提供可核对依据，不能下结论。",
       "metrics": {
         "accuracy": 1.0,
         "completeness": 1.0,
@@ -186,8 +195,9 @@
         "citation_correctness": 1.0,
         "abstention_correctness": 1.0,
         "nonempty": 1.0,
+        "must_mention_ok": 1.0,
         "pass": true,
-        "scoring": "v2_hard"
+        "scoring": "v2_2_hard"
       },
       "n_hits": 0,
       "status": "unsupported",
@@ -196,7 +206,7 @@
     {
       "id": "A11",
       "category": "team",
-      "answer_snip": "时间过滤；IFA 2026；IFA；IFA 2026；IFA 探展总览与 IFA 2026 现场稿",
+      "answer_snip": "时间过滤：from=2026-06-10 to=…；IFA 2026：IFA 2026 · 外部媒体 · T7 · 《The Best of IFA 2026: An Instant Pot for Cats, Camera-Eq；IFA：IFA · 编辑部 · T2 · IFA 探展总览：进行中，IFA 现场观展心得（提报 8/31，Hardwire文章）⚠️ 待补全资料/提纲 · 编辑部选题表",
       "metrics": {
         "accuracy": 1.0,
         "completeness": 1.0,
@@ -204,8 +214,9 @@
         "citation_correctness": 1.0,
         "abstention_correctness": 1.0,
         "nonempty": 1.0,
+        "must_mention_ok": 1.0,
         "pass": true,
-        "scoring": "v2_hard"
+        "scoring": "v2_2_hard"
       },
       "n_hits": 40,
       "status": "grounded",
@@ -214,16 +225,17 @@
     {
       "id": "A12",
       "category": "temporal_hard",
-      "answer_snip": "上线最新期次（latest published）不等于事件发生时刻。若没有可核对的事件时间，只能说明资料所属期次或材料时间，不能把旧材料说成当下新发生。\n\n未在已上线周报中找到与问题直接相关的记录。请尝试换关键词、缩小或扩大时间范围，或确认相关内容是否已上线。\n（本次检索时间范围：2026-09-07 至 2026-09-08）",
+      "answer_snip": "未找到与问题直接相关的已上线记录，资料未提供可核对依据，不能下结论。",
       "metrics": {
-        "accuracy": 1.0,
+        "accuracy": 0.0,
         "completeness": 1.0,
         "faithfulness": 1.0,
         "citation_correctness": 1.0,
         "abstention_correctness": 1.0,
         "nonempty": 1.0,
-        "pass": true,
-        "scoring": "v2_hard"
+        "must_mention_ok": 0.0,
+        "pass": false,
+        "scoring": "v2_2_hard"
       },
       "n_hits": 0,
       "status": "unsupported",
@@ -232,7 +244,7 @@
     {
       "id": "A13",
       "category": "company",
-      "answer_snip": "时间过滤；OpenAI；百度；豆包；张江AI创新小镇",
+      "answer_snip": "时间过滤：from=2026-06-10 to=…；OpenAI：OpenAI · 视频号团队 · T11 · 多条视频聚焦AI安全与伦理：OpenAI模型自主发起约1.76万次网络攻击引Altman反思、Anthropic的；百度：百度 · 视频号团队 · T11 · 多条视频聚焦AI与产业观察：AI冲击互联网内容分账（百度案例）、Cloudflare拦AI爬虫、豆包月活3.45亿断层第一；豆包",
       "metrics": {
         "accuracy": 1.0,
         "completeness": 1.0,
@@ -240,8 +252,9 @@
         "citation_correctness": 1.0,
         "abstention_correctness": 1.0,
         "nonempty": 1.0,
+        "must_mention_ok": 1.0,
         "pass": true,
-        "scoring": "v2_hard"
+        "scoring": "v2_2_hard"
       },
       "n_hits": 5,
       "status": "grounded",
@@ -250,16 +263,17 @@
     {
       "id": "A14",
       "category": "caveat",
-      "answer_snip": "时间过滤；英伟达",
+      "answer_snip": "时间过滤：from=2026-06-10 to=…；英伟达：英伟达 · 编辑部 · T6 · 英伟达 EDC 现场规范：培训内容可用于媒体报道但不得直接引用嘉宾发言原文，演示文稿为内部资料不得对外发布，培训后由公关团队统\n相关条目：时间过滤；英伟达",
       "metrics": {
         "accuracy": 1.0,
-        "completeness": 0.5,
+        "completeness": 1.0,
         "faithfulness": 1.0,
         "citation_correctness": 1.0,
         "abstention_correctness": 1.0,
         "nonempty": 1.0,
+        "must_mention_ok": 1.0,
         "pass": true,
-        "scoring": "v2_hard"
+        "scoring": "v2_2_hard"
       },
       "n_hits": 1,
       "status": "grounded",
@@ -276,8 +290,9 @@
         "citation_correctness": 1.0,
         "abstention_correctness": 1.0,
         "nonempty": 1.0,
+        "must_mention_ok": 1.0,
         "pass": true,
-        "scoring": "v2_hard"
+        "scoring": "v2_2_hard"
       },
       "n_hits": 0,
       "status": "grounded",
@@ -286,7 +301,7 @@
     {
       "id": "A16",
       "category": "unsupported_claim",
-      "answer_snip": "未在已上线周报中找到与问题直接相关的记录。请尝试换关键词、缩小或扩大时间范围，或确认相关内容是否已上线。\n（本次检索时间范围：2026-09-07 至 2026-09-07）",
+      "answer_snip": "未找到与问题直接相关的已上线记录，资料未提供可核对依据，不能下结论。",
       "metrics": {
         "accuracy": 1.0,
         "completeness": 1.0,
@@ -294,8 +309,9 @@
         "citation_correctness": 1.0,
         "abstention_correctness": 1.0,
         "nonempty": 1.0,
+        "must_mention_ok": 1.0,
         "pass": true,
-        "scoring": "v2_hard"
+        "scoring": "v2_2_hard"
       },
       "n_hits": 0,
       "status": "unsupported",
@@ -304,7 +320,7 @@
     {
       "id": "A17",
       "category": "unsupported_claim",
-      "answer_snip": "时间过滤；面壁智能；面壁智能；面壁智能；面壁智能",
+      "answer_snip": "时间过滤：from=2026-06-10 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能：已接触并有对话记录，其与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触） · 编辑部沟通记录 · 与面壁智；面壁",
       "metrics": {
         "accuracy": 0.0,
         "completeness": 0.0,
@@ -312,8 +328,9 @@
         "citation_correctness": 1.0,
         "abstention_correctness": 0.0,
         "nonempty": 1.0,
+        "must_mention_ok": 1.0,
         "pass": false,
-        "scoring": "v2_hard"
+        "scoring": "v2_2_hard"
       },
       "n_hits": 17,
       "status": "grounded",

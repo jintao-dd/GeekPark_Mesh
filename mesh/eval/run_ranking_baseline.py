@@ -239,6 +239,67 @@ def apply_ranking_v1_1(
     return out
 
 
+def apply_ranking_v1_2(
+    hits: list[dict],
+    query: str,
+    *,
+    scope_meta: dict | None = None,
+) -> list[dict]:
+    """Ranking v1.2：以 v1.1 为底，加强 Top8 稳定 + 低覆盖跃迁帽，收口 R18/R12。
+
+    不改召回集合。优先：不劣于 baseline（R06/R18），再争取 R12 Top5 多纳 relevant。
+    """
+    # 先跑 v1.1 得到 bonus 信号，再按原始位次做稳定混合，避免大挪位
+    v11 = apply_ranking_v1_1(hits, query, scope_meta=scope_meta)
+
+    terms = [t for t in _query_terms(query) if len(t) >= 2]
+    cjk_phrases = [p for p in re.findall(r"[\u4e00-\u9fff]{2,6}", query or "") if len(p) >= 2]
+    out = []
+    for orig_i, h0 in enumerate(hits):
+        h = dict(h0)
+        fts = float(h0.get("score") or 0)
+        vrow = None
+        iid = h0.get("item_id")
+        for cand in v11:
+            if iid is not None and cand.get("item_id") == iid:
+                vrow = cand
+                break
+            if iid is None and cand.get("chunk_id") == h0.get("chunk_id"):
+                vrow = cand
+                break
+        bonus = float((vrow or {}).get("_rank_v11_bonus") or 0)
+        cov = float((vrow or {}).get("_rank_v11_cov") or 0)
+        title = h.get("title") or ""
+        body = h.get("body") or ""
+        blob = title + "\n" + body
+        phrase_hits = sum(1 for p in cjk_phrases if len(p) >= 3 and p in blob)
+        phrase_cov = (phrase_hits / max(1, sum(1 for p in cjk_phrases if len(p) >= 3))) if cjk_phrases else 0.0
+
+        # Top8 稳定：保 R18@7 / R12 Top5 不被低覆盖噪声挤出
+        if orig_i < 5:
+            bonus += 0.12
+        elif orig_i < 8:
+            bonus += 0.09
+
+        # 端侧/座舱类：对中高 phrase 覆盖、仍在 Top10 的条目轻推（助 4125@7→Top5）
+        if phrase_cov >= 0.5 and orig_i < 10:
+            bonus += 0.08 + (0.04 if 5 <= orig_i <= 8 else 0.0)
+
+        # 低覆盖远处：硬帽，消除 R18 噪声上浮
+        if cov < 0.55 and orig_i >= 5:
+            bonus = min(bonus, 0.10)
+        if cov < 0.4 and orig_i >= 8:
+            bonus = min(bonus, 0.05)
+
+        h["score"] = fts - min(0.62, bonus)
+        h["_rank_v12_bonus"] = bonus
+        h["_rank_v12_cov"] = cov
+        h["_orig_i"] = orig_i
+        out.append(h)
+    out.sort(key=lambda x: float(x.get("score") or 0))
+    return out
+
+
 def _classify(row: dict, retrieved: list[str], relevant: set[str]) -> str:
     if not relevant:
         return "ok"
@@ -256,7 +317,7 @@ def _classify(row: dict, retrieved: list[str], relevant: set[str]) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--reuse-env-db", action="store_true", required=True)
-    ap.add_argument("--profile", choices=("baseline", "v1", "v1_1"), default="baseline")
+    ap.add_argument("--profile", choices=("baseline", "v1", "v1_1", "v1_2"), default="baseline")
     ap.add_argument("--tag", default="")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--ids", default="")
@@ -294,6 +355,8 @@ def main() -> int:
                 hits = apply_ranking_v1(hits, query)
             elif args.profile == "v1_1":
                 hits = apply_ranking_v1_1(hits, query, scope_meta=info)
+            elif args.profile == "v1_2":
+                hits = apply_ranking_v1_2(hits, query, scope_meta=info)
             retrieved = _item_ids(hits)
             metrics = {
                 "mrr": round(mrr(relevant, retrieved), 4),
