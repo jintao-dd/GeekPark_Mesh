@@ -29,8 +29,8 @@ Mesh 是极客公园内部用的两件事：
 
 飞书目前只有 **OAuth 登录** 和 **群→团队绑定**。没有飞书 Bot 收消息答问。
 
-Agent v1：①～⑥ 冻结；⑦ **实现 + 真实 Adapter 20/20 已通过**（不再改 ⑦ 架构）。  
-**当前主任务：Mesh + Agent 全量验收**（`docs/MESH_AGENT_FULL_ACCEPTANCE.md`）→ 通过后才 ⑧ 飞书接线（不扩大脑）。
+Agent v1：①～⑥ 冻结；⑦ **20/20 已通过**（不再改架构）。  
+全量验收：**🟡 未结案** — Layer1✅ / Layer2～3⬜ / Layer4⛔（`docs/MESH_AGENT_FULL_ACCEPTANCE.md`）。⑧ 飞书暂缓。
 
 后台四步：放入素材 → 挖掘 → 审校（要点卡 + 草稿）→ 确认上线。
 

@@ -2,107 +2,112 @@
 
 > **状态锁定（2026-09-08）**  
 > ①～⑥ 架构冻结 ✅  
-> ⑦ Agent v1 实现 + 真实 Adapter：**20/20 PASS** ✅（不再改 ⑦ 架构）  
-> **全量验收 ← 当前主任务**  
-> ⑧ 飞书 MVP：**暂缓 ⛔**（全量通过后只接线）
+> ⑦ Agent v1 + 真实 Adapter：**20/20** ✅（**不再改 ⑦ 架构**）  
+> 全量验收：**🟡 未结案**（功能契约层已过；Layer 2～3 待补）  
+> ⑧ 飞书 MVP：**⛔ 暂缓**
 
-报告模板见 `eval/reports/MESH_AGENT_FULL_ACCEPTANCE.md`（执行中填写）。  
-契约依据：`eval/reports/AGENT_V1_CONTRACT_20260908.md`。
-
----
-
-## 0. 原则（硬）
-
-不只测「正常能不能答」。必须大量测：
-
-- 出错时会不会**答错 / 越权 / 串期 / 串团队 / 读到 draft**
-- 会不会把**失败包装成成功**
-
-目标：证明 Organization → Identity → Permission → Context → Published → Evidence → Tool Contract  
-在**真实压力与异常**下仍然成立。
+报告：`eval/reports/MESH_AGENT_FULL_ACCEPTANCE.md`  
+⑦ 证据：`eval/reports/AGENT_V1_CONTRACT_20260908.md`
 
 ---
 
-## 1. 七块验收清单
-
-### 1. 全链路流程
+## 四层门禁（最终报告结构）
 
 ```
-Source → Pipeline → Preview → Relation → Claim → Publish
-       → Index → Ask → Agent
+Layer 1  契约 / 本地回归          ✅ 已通过
+Layer 2  真实数据 E2E             ⬜ 待补（当前最高优先级）
+Layer 3  性能 / 压力 / 故障       ⬜ 待补
+Layer 4  飞书 E2E                 ⛔ ⑧ 之后
 ```
 
-| 检查项 | 通过标准 |
-|--------|----------|
-| 各阶段可观测 | 状态机 / job / draft vs published 边界清晰 |
-| Publish 后 Index | Ask/Agent 只见 published |
-| Agent 接同一 Published | Evidence 可回溯到期次 |
-
-### 2. Agent 正确性
-
-Identity / Permission / Context / Intent / Tool / Evidence / Answer  
-
-依据：Agent 20/20 + 异常身份矩阵（conflict / unlinked / missing / 群视角）。
-
-### 3. 数据安全
-
-| 攻击面 | 期望 |
-|--------|------|
-| Draft / Raw / Unpublished | 拒绝；无内容泄漏 |
-| Issue bypass | Tool 拒绝 |
-| Team bypass | Tool 拒绝 |
-| Permission bypass | ACL deny |
-| Published-only | 恒成立 |
-
-### 4. 回归（不得退化）
-
-| 项 | 命令 / 依据 |
-|----|-------------|
-| Ask 25/25 | `eval/run_final_eval.py --corpus golden`（tmesh/prod 另跑） |
-| Relation Gold | `pytest tests/test_relation_gold_*` |
-| Claim Check | `pytest tests/test_relation_claim_*` |
-| T13 | `pytest tests/test_t13_segment_quality.py` |
-| Published write boundary | `pytest tests/test_publish_boundary.py tests/test_published_write_boundary.py` |
-| Agent 20/20 | `pytest tests/test_agent_v1_contract.py` |
-
-### 5. 性能
-
-Pipeline / Preview / Publish / Ask / Agent → **P50 / P95**；记录 Agent 相对 Ask 的额外延迟。
-
-### 6. 容错
-
-LLM timeout、Tool timeout、空结果、Issue 异常、Identity conflict、Permission failure、DB / Redis / queue 异常 → **失败可见，不越权，不伪造成功**。
-
-### 7. 并发
-
-多人 Ask、多人 Agent、Preview+Agent、LLM pool 满、同用户连续、不同用户 Context 隔离（scope_key）。
+**禁止**因 Layer 1 PASS 就开飞书。
 
 ---
 
-## 2. 通过后
+## Layer 1 — 已锁死（充分证据）
 
-```
-⑦ Agent v1          ✅ 20/20
-        ↓
-⭐ Mesh + Agent 全量验收
-        ↓
-通过
-        ↓
-⑧ 飞书 MVP（只接线，不扩大脑）
-```
+| 项 | 状态 |
+|----|------|
+| ①～⑦ 架构 | ✅ |
+| Agent 契约 20/20 | ✅ |
+| 真实 Ask / Relation adapter | ✅ |
+| Ask Golden 25/25 | ✅ |
+| Relation Gold / Claim Check / T13 / Publish boundary | ✅ |
+| Identity / Permission / Issue·Team / Tool 自防御 | ✅ |
 
-⑧ 形态：飞书事件 → open_id → Identity → … → Answer → 飞书回复。  
-禁止塞入 Planner / ReAct / 多 Tool / Memory。
-
----
-
-## 3. 执行入口
+本地执行器（**仅 Layer 1，不扩成万能脚本**）：
 
 ```bash
-cd mesh
-# 本地回归块（§4 子集，可先跑）
 python eval/run_mesh_agent_full_acceptance.py --phase local_regression
+```
 
-# 完整报告路径（人工 + 远程补齐 perf/容错/并发后更新）
-# eval/reports/MESH_AGENT_FULL_ACCEPTANCE.md
+性能 / 远程故障 / 并发用**独立脚本**，结果汇总进同一报告。
+
+---
+
+## Layer 2 — 真实数据 E2E（下一刀）
+
+### 2.1 全链路（tmesh 至少 1 次）
+
+```
+Source → Pipeline → Preview → Relation → Claim
+       → Publish → Index → Ask → Agent
+```
+
+**硬验收：** Publish **前** Agent 查不到新数据；Publish **后** 才能查到。  
+验证的是真实数据生命周期，不是单元测试。
+
+独立脚本：`eval/run_agent_publish_boundary_e2e.py`
+
+### 2.2 Agent 真实 LLM E2E
+
+契约 20/20 ≠ 最终回答质量已验。须补 **10～20 题** Agent E2E Gold：
+
+```
+问题 → Agent → 真实 Tool → Evidence → 真实 LLM → Answer
+```
+
+检查：Answer 是否守 Evidence；unsupported 是否不上屏为事实；fingerprint / trace 仍在。
+
+语料骨架：`eval/agent_e2e_gold_v1.jsonl`（逐步填满）  
+执行器：`eval/run_agent_llm_e2e.py`（`MESH_AGENT_USE_LLM=1`）
+
+---
+
+## Layer 3 — 性能 / 故障 / 并发
+
+### 性能
+
+测 Job 完成语义（点击 → Job 完成 / Preview 可进 / Preview 完整），不只 HTTP 返回。  
+记录 Pipeline / Preview / Publish / Ask / Agent 的 **P50/P95**，以及 **Agent − Ask overhead**。
+
+### 故障
+
+LLM timeout / bad JSON / 慢响应；Tool timeout / 空结果；DB·Redis·queue；身份异常。  
+期望：**失败可见、不伪造成功、不越权、不串上下文、不泄漏 draft**。
+
+### 并发
+
+重点不是 QPS，而是 **Context 不串用户**（对照 A 商业化/编辑部群 vs B 视频号）。
+
+独立脚本（后续）：`eval/run_agent_perf.py` / `eval/run_agent_fault.py` / `eval/run_agent_concurrency.py`
+
+---
+
+## 推荐执行顺序（不要乱）
+
+1. tmesh 全链路 + Publish 前后 Agent 可见性  
+2. Agent 真实 LLM E2E（10～20）  
+3. 性能 P50/P95 + overhead  
+4. 故障注入  
+5. 并发 / Context 隔离  
+6. 更新 FINAL / 本报告 → Go/No-Go  
+7. 通过 → ⑧ 飞书 MVP（只接线）
+
+---
+
+## 通过后
+
+```
+⑦ ✅ → Layer2+3 全绿 → ⑧ 飞书接线（不扩 Planner/ReAct/多 Tool/Memory）
 ```

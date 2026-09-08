@@ -1,122 +1,102 @@
 # Mesh + Agent 全量验收报告
 
-> 开始：2026-09-08  
-> 环境：本地优先；tmesh / prod 分栏填写  
-> 门禁：⑦ 已 20/20（真实 Adapter）→ 本报告全部 PASS 后才开 ⑧
+> 更新：2026-09-08  
+**总 verdict：🟡 未结案** — Layer 1 ✅；Layer 2 🟡（Publish 边界 local 已过，tmesh 全链路与 LLM E2E 仍缺）；Layer 3 ⬜；Layer 4 ⛔
 
-## 总判
+| 层 | 含义 | 状态 |
+|----|------|------|
+| Layer 1 | 契约 / 本地回归 | ✅ 已通过 |
+| Layer 2 | 真实数据 E2E（全链路 + Agent LLM） | 🟡 Publish 边界 local ✅；tmesh 全链路 / LLM E2E ⬜ |
+| Layer 3 | 性能 / 压力 / 故障 / 并发 | ⬜ 待补 |
+| Layer 4 | 飞书 E2E | ⛔ ⑧ 之后 |
 
-| 项 | 状态 |
+⑦ Agent v1：**✅ 20/20**（不再改架构）  
+⑧ 飞书：**⛔ 暂缓**
+
+---
+
+## Layer 1 — 契约（已锁死）
+
+| 项 | 结果 |
 |----|------|
-| ⑦ Agent v1 | ✅ 20/20（见 `AGENT_V1_CONTRACT_20260908.md`） |
-| 全量验收 | 🟡 **进行中** |
-| ⑧ 飞书 MVP | ⛔ 暂缓 |
+| Agent 20/20 | PASS |
+| Ask 25/25 golden | PASS |
+| Relation Gold | PASS |
+| Claim Check | PASS |
+| T13 5/5 | PASS |
+| Publish / write boundary | PASS |
+| Identity / Permission / Tool 自防御 | PASS（含于 Agent 契约） |
 
-**总 verdict：** 🟡 本地回归 6/6 PASS；全链路 / 性能 / 加压容错 / 并发仍 ⬜ → **未结案**
-
----
-
-## 1. 全链路流程
-
-| 步骤 | 本地 | tmesh | 备注 |
-|------|------|-------|------|
-| Source → Pipeline | ⬜ | ⬜ | |
-| Preview | ⬜ | ⬜ | 只读页不得误触发 |
-| Relation → Claim | ⬜ | ⬜ | |
-| Publish → Index | ⬜ | ⬜ | |
-| Ask | ⬜ | ⬜ | |
-| Agent | ✅ 契约+真实数据 | ⬜ | Harness 已过 |
-
-原则：异常路径见 §6；不得把失败包装成成功。
+执行：`python eval/run_mesh_agent_full_acceptance.py --phase local_regression`（2026-09-08，6/6）。
 
 ---
 
-## 2. Agent 正确性
+## Layer 2 — 真实数据 E2E
 
-| 层 | 结果 | 证据 |
-|----|------|------|
-| Identity | ✅ | Agent 20/20 身份矩阵 |
-| Permission | ✅ | conflict / unlinked deny |
-| Context | ✅ | IssueRef / chat≠primary |
-| Intent | ✅ | rule intent |
-| Tool | ✅ | ≤1 + 自防御 |
-| Evidence | ✅ | 真实 published/relation Evidence |
-| Answer | ✅ | fingerprint ≠ trace |
+### 2.1 全链路 / Publish 前后可见性
 
----
-
-## 3. 数据安全
-
-| 项 | 本地 | 备注 |
-|----|------|------|
-| Draft/Raw/Unpublished | ✅（契约） | 无泄漏断言 |
-| Issue bypass | ✅ | Tool deny |
-| Team bypass | ✅ | Tool deny |
-| Permission bypass | ✅ | ACL |
-| Published-only | ✅ | |
-
-远程加压 / 恶意 payload 复测：⬜
-
----
-
-## 4. 回归
-
-| 项 | 本地结果 | 时间 | 备注 |
-|----|----------|------|------|
-| Agent 20/20 | PASS (7.4s) | 2026-09-08T05:02Z | `test_agent_v1_contract.py` |
-| Ask 25/25 golden | PASS (16.3s) | 2026-09-08T05:02Z | `run_final_eval.py --corpus golden` |
-| Relation Gold | PASS (1.7s) | 2026-09-08T05:02Z | schema + smoke |
-| Claim Check tests | PASS (2.9s) | 2026-09-08T05:02Z | claim_check + gate boundary |
-| T13 | PASS (1.7s) | 2026-09-08T05:02Z | segment quality 5/5 |
-| Publish / write boundary | PASS (8.6s) | 2026-09-08T05:02Z | publish + published write |
-
-本地回归块：**6/6 PASS**（`eval/run_mesh_agent_full_acceptance.py --phase local_regression`）。  
-仍缺：全链路手测 / tmesh Ask25 / perf / 加压容错 / 并发。
-
----
-
-## 5. 性能（P50 / P95）
-
-| 路径 | P50 | P95 | n | 环境 |
-|------|-----|-----|---|------|
-| Pipeline | | | | |
-| Preview | | | | |
-| Publish | | | | |
-| Ask | | | | |
-| Agent | | | | |
-| Agent − Ask 额外延迟 | | | | |
-
-⬜ 待测
-
----
-
-## 6. 容错（重点：出错时不越权）
-
-| 场景 | 期望 | 结果 |
+| 检查 | 环境 | 结果 |
 |------|------|------|
-| LLM timeout | 可见失败 / 降级；不伪造成功 | ⬜ |
-| Tool timeout | 同上 | ⬜ |
-| 空结果 | 不二次数据 Tool；不编造 | ✅（契约） |
-| Issue 异常 / draft slug | IssueRef none / deny | ✅（契约） |
-| Identity conflict | 无数据 Tool | ✅（契约） |
-| Permission failure | deny | ✅（契约） |
-| DB / Redis / queue 异常 | 失败可见 | ⬜ |
+| Publish **前** Agent 不可见 draft 标记 | local | ✅ `AGENT_PUBLISH_BOUNDARY_E2E.json` |
+| Publish **后** Agent 可见 + Evidence | local | ✅ |
+| Source→Pipeline→Preview→Relation→Claim→Publish（真实 tmesh Issue） | tmesh | ⬜ 下一刀 |
+
+脚本：`eval/run_agent_publish_boundary_e2e.py`（本地已绿；tmesh 用 `--reuse-env-db` 另跑）
+
+### 2.2 Agent LLM E2E（10～20 题）
+
+| 检查 | 结果 |
+|------|------|
+| MESH_AGENT_USE_LLM=1 成文 | ⬜ |
+| Answer 遵守 Evidence | ⬜ |
+| unsupported 不上屏为事实 | ⬜ |
+| fingerprint / trace | ⬜ |
+
+语料：`eval/agent_e2e_gold_v1.jsonl` · 脚本：`eval/run_agent_llm_e2e.py`
 
 ---
 
-## 7. 并发
+## Layer 3 — 性能 / 故障 / 并发
+
+### 性能 P50/P95
+
+| 路径 | P50 | P95 | n | 环境 | 备注 |
+|------|-----|-----|---|------|------|
+| Pipeline（Job 完成） | | | | | 非仅 HTTP |
+| Preview（可进入/完整） | | | | | |
+| Publish | | | | | |
+| Ask | | | | | |
+| Agent | | | | | |
+| **Agent − Ask overhead** | | | | | |
+
+### 故障（运行时，非仅契约）
 
 | 场景 | 结果 |
 |------|------|
-| 多人 Ask | ⬜ |
-| 多人 Agent | ⬜ |
-| Preview + Agent | ⬜ |
-| LLM pool 满 | ⬜ |
-| 同用户连续 | ⬜ |
-| 不同用户 Context 隔离 | ✅ scope_key（契约） |
+| LLM timeout / bad JSON / 慢响应 | ⬜ |
+| Tool timeout / 空结果 / 异常 | ⬜ |
+| DB / Redis / queue | ⬜ |
+| unlinked / conflict / team·issue 非法 | 部分✅契约；运行时复测 ⬜ |
+
+### 并发（防 Context 串用户）
+
+| 场景 | 结果 |
+|------|------|
+| A 商业化+编辑部群 vs B 视频号 同时问「我们这周接触了谁」 | ⬜ |
+| 多人 Ask / Agent / Preview+Agent / pool 满 | ⬜ |
 
 ---
 
-## 结论门槛
+## Layer 4 — 飞书 E2E
 
-全部 7 块无 ⬜ 阻塞项，且回归不得退化 → **全量 PASS** → 方可进入 ⑧。
+⛔ 全量 Layer 2+3 通过后再开。只接线，不扩大脑。
+
+---
+
+## Go / No-Go
+
+- [x] Layer 1  
+- [ ] Layer 2  
+- [ ] Layer 3  
+- [ ] → 全量 PASS  
+- [ ] → ⑧ 飞书 MVP  

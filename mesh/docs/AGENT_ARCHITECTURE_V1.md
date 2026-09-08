@@ -792,8 +792,8 @@ handle(message, envelope):
 |----|------|
 | ①～⑥ 架构 | ✅ **冻结** |
 | ⑦ Agent v1 | ✅ **实现 + 真实 Adapter 20/20**（不再改架构） |
-| ⭐ Mesh + Agent 全量验收 | 🟡 **当前主任务**（见 `docs/MESH_AGENT_FULL_ACCEPTANCE.md`） |
-| ⑧ 飞书 MVP | ⛔ **暂缓**（全量通过后只接线） |
+| ⭐ Mesh + Agent 全量验收 | 🟡 **当前主任务**（四层门禁；见 `docs/MESH_AGENT_FULL_ACCEPTANCE.md`） |
+| ⑧ 飞书 MVP | ⛔ **暂缓**（Layer 2+3 通过后只接线） |
 
 ---
 
