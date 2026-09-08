@@ -1,5 +1,5 @@
 {"id": "R01", "category": "name", "query": "锦涛做了什么", "scope": {"issue": "explicit:2026-8-17", "time_basis": "unknown", "window": "none"}, "relevant_items": ["4251", "4259", "4260"], "notes": "人名召回；内容在品牌创意"}
-{"id": "R02", "category": "name_recent", "query": "锦涛最近做了什么", "scope": {"issue": "latest_published", "time_basis": "unknown", "window": "recent"}, "relevant_items": ["4251", "4259", "4260"], "notes": "典型：latest 可能 miss → Issue scope / 召回边界"}
+{"id": "R02", "category": "name_recent", "query": "锦涛最近做了什么", "scope": {"issue": "latest_published", "time_basis": "unknown", "window": "recent"}, "relevant_items": ["4251", "4259", "4260"], "notes": "Scope 验证样本：latest+recent 可跨已发布（非 Recall 缺陷）"}
 {"id": "R03", "category": "company", "query": "破壳创智有什么进展", "scope": {"issue": "explicit:2026-8-17", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4356"]}
 {"id": "R04", "category": "company", "query": "面壁智能接触了什么", "scope": {"issue": "explicit:2026-8-17", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4112", "4115", "4116", "4118", "4120"]}
 {"id": "R05", "category": "company", "query": "PPIO 姚欣说了什么", "scope": {"issue": "explicit:2026-8-17", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4141", "4142", "4143", "4144", "4145"]}
@@ -20,8 +20,8 @@
 {"id": "R20", "category": "gp", "query": "张鹏去深圳拜访吴伟", "scope": {"issue": "explicit:2026-8-17", "time_basis": "unknown", "window": "none"}, "relevant_items": ["4356"]}
 {"id": "R21", "category": "media", "query": "The Verge 写了哪些手机或隐私相关", "scope": {"issue": "explicit:2026-09-08", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4402", "4404"]}
 {"id": "R22", "category": "media", "query": "Seattle Times 起诉 OpenAI", "scope": {"issue": "explicit:2026-09-08", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4405"]}
-{"id": "R23", "category": "cross_issue", "query": "锦涛提供的建站风格参考", "scope": {"issue": "latest_published", "time_basis": "unknown", "window": "recent"}, "relevant_items": ["4251"], "notes": "内容在旧期；测 latest scope 是否漏召回"}
-{"id": "R24", "category": "cross_issue", "query": "破壳创智吴伟拜访计划", "scope": {"issue": "latest_published", "time_basis": "unknown", "window": "recent"}, "relevant_items": ["4356"]}
+{"id": "R23", "category": "cross_issue", "query": "锦涛提供的建站风格参考", "scope": {"issue": "latest_published", "time_basis": "unknown", "window": "recent"}, "relevant_items": ["4251"], "notes": "Scope 验证样本：latest+recent 可跨已发布（非 Recall 缺陷）"}
+{"id": "R24", "category": "cross_issue", "query": "破壳创智吴伟拜访计划", "scope": {"issue": "latest_published", "time_basis": "unknown", "window": "recent"}, "relevant_items": ["4356"], "notes": "Scope 验证样本：latest+recent 可跨已发布（非 Recall 缺陷）"}
 {"id": "R25", "category": "explicit_ok", "query": "锦涛提供的建站风格参考", "scope": {"issue": "explicit:2026-8-17", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4251"]}
 {"id": "R26", "category": "hardware", "query": "灵瑙科技助眠头带", "scope": {"issue": "explicit:2026-8-17", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4110"]}
 {"id": "R27", "category": "hardware", "query": "BMC 瑞迈特呼吸机差异化", "scope": {"issue": "explicit:2026-8-17", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4135", "4136"]}

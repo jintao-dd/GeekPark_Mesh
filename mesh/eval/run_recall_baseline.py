@@ -45,11 +45,18 @@ def _disable_embed() -> None:
     embeddings.is_configured = lambda: False  # type: ignore[assignment]
 
 
-def _parse_issue_scope(con, scope: dict) -> tuple[str, str | None, str | None]:
-    """Return (slug, date_from, date_to)."""
+def _parse_issue_scope(con, scope: dict, *, query: str = "") -> tuple[str, str | None, str | None, dict]:
+    """与 Agent adapters.scope_from_agent 对齐：IssueRef ⊥ TimeWindow。
+
+    Return (retrieval_slug, date_from, date_to, meta).
+    """
+    from app.agent import temporal as temporal_mod
+
     raw = (scope or {}).get("issue") or "latest_published"
+    gold_window = ((scope or {}).get("window") or "").strip()
     if raw.startswith("explicit:"):
         slug = raw.split(":", 1)[1].strip()
+        issue_mode = "explicit"
     elif raw == "latest_published":
         row = con.execute(
             "SELECT slug FROM issues WHERE status='published' "
@@ -57,24 +64,57 @@ def _parse_issue_scope(con, scope: dict) -> tuple[str, str | None, str | None]:
             "ORDER BY date_end DESC, id DESC LIMIT 1"
         ).fetchone()
         slug = (row["slug"] if row else "") or ""
+        issue_mode = "latest_published"
     else:
         slug = raw
-    date_from = date_to = None
+        issue_mode = "explicit"
+
+    issue_date_from = issue_date_to = None
     if slug:
         r = con.execute(
             "SELECT date_start, date_end FROM issues WHERE slug=?", (slug,)
         ).fetchone()
         if r:
-            date_from = (r["date_start"] or "").strip() or None
-            date_to = (r["date_end"] or "").strip() or None
-    return slug, date_from, date_to
+            issue_date_from = (r["date_start"] or "").strip() or None
+            issue_date_to = (r["date_end"] or "").strip() or None
+
+    # Gold 可标注 window=recent；无标注时按 query 解析
+    q = query or ""
+    if gold_window == "recent" and "最近" not in q and "近期" not in q:
+        # 保证 Gold 语义与产品锁定一致（R23/R24 等）
+        q_for_sem = q + " 最近"
+    else:
+        q_for_sem = q
+    sem = temporal_mod.resolve_time_semantics(
+        q_for_sem, issue_mode=issue_mode, issue_slug=slug, has_event_time=False
+    )
+    if gold_window and gold_window != sem.window:
+        # 尊重 Gold 标注的 window，重算 filter
+        sem.window = gold_window
+        sem.filter_mode = temporal_mod.resolve_filter_mode(
+            issue_mode=issue_mode, window=gold_window
+        )
+    retrieval_slug = temporal_mod.retrieval_slug_for_scope(sem, slug)
+    date_from, date_to = temporal_mod.apply_time_filter_to_dates(
+        sem,
+        issue_date_from=issue_date_from,
+        issue_date_to=issue_date_to,
+        query=q_for_sem if sem.window == "recent" else q,
+    )
+    meta = {
+        "context_slug": slug,
+        "issue_mode": issue_mode,
+        "filter_mode": sem.filter_mode,
+        "window": sem.window,
+    }
+    return retrieval_slug, date_from, date_to, meta
 
 
 def _retrieve_item_ids(con, query: str, scope: dict, *, top_n: int = 40) -> tuple[list[str], dict]:
     from app.ask_scope import AskScope
     from app import retriever, embeddings
 
-    slug, date_from, date_to = _parse_issue_scope(con, scope)
+    slug, date_from, date_to, scope_meta = _parse_issue_scope(con, scope, query=query)
     ask_scope = AskScope(
         channel="harness",
         slug=slug,
@@ -109,6 +149,7 @@ def _retrieve_item_ids(con, query: str, scope: dict, *, top_n: int = 40) -> tupl
         "date_to": date_to,
         "n_hits_raw": len(hits or []),
         "used_vector": bool((meta or {}).get("used_vector")),
+        **scope_meta,
     }
     return ids, info
 
@@ -125,7 +166,10 @@ def _classify_miss(row: dict, info: dict, retrieved: list[str], missed: list[str
         return "ok"
     scope = (row.get("scope") or {}).get("issue") or ""
     hit = [x for x in (row.get("relevant_items") or []) if x in set(retrieved)]
+    # Scope 产品样本：不再记为 issue_scope_latest_miss（正交语义落地后）
     if scope == "latest_published" and missed and not hit:
+        if (info or {}).get("filter_mode") == "time_window":
+            return "empty_retrieval" if not retrieved else "total_miss"
         return "issue_scope_latest_miss"
     if not retrieved:
         return "empty_retrieval"

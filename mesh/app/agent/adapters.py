@@ -36,34 +36,39 @@ def scope_from_agent(
     *,
     query: str = "",
 ) -> tuple[AskScope, dict]:
-    """构建 AskScope，并附带 Temporal Phase 1 语义（不改 RAG）。"""
+    """构建 AskScope：IssueRef ⊥ TimeWindow（Context 锚点 ≠ 检索硬锁期次）。"""
     from . import temporal as temporal_mod
 
     qs = permission.query_scope or context.query_scope or {}
     team = (qs.get("team_focus") or "") if isinstance(qs, dict) else ""
-    slug = ""
-    date_from = None
-    date_to = None
+    context_slug = ""
+    issue_date_from = None
+    issue_date_to = None
     issue_mode = ""
     if context.issue_ref and context.issue_ref.mode != "none":
-        slug = context.issue_ref.slug or ""
+        context_slug = context.issue_ref.slug or ""
         issue_mode = context.issue_ref.mode or ""
-        # IssueRef 已定点次时：日期钉在该期（Time Filter=issue_anchor）
-        if con is not None and slug:
+        if con is not None and context_slug:
             row = con.execute(
-                "SELECT date_start, date_end FROM issues WHERE slug=?", (slug,)
+                "SELECT date_start, date_end FROM issues WHERE slug=?", (context_slug,)
             ).fetchone()
             if row:
-                date_from = (row["date_start"] or "").strip() or None
-                date_to = (row["date_end"] or "").strip() or None
+                issue_date_from = (row["date_start"] or "").strip() or None
+                issue_date_to = (row["date_end"] or "").strip() or None
+    q = query or context.text or ""
     sem = temporal_mod.resolve_time_semantics(
-        query or context.text or "",
+        q,
         issue_mode=issue_mode,
-        issue_slug=slug,
+        issue_slug=context_slug,
         has_event_time=False,
     )
+    # 检索 slug：time_window 清空 → 跨已发布；Context IssueRef 仍保留在 sem.issue_slug
+    slug = temporal_mod.retrieval_slug_for_scope(sem, context_slug)
     date_from, date_to = temporal_mod.apply_time_filter_to_dates(
-        sem, issue_date_from=date_from, issue_date_to=date_to
+        sem,
+        issue_date_from=issue_date_from,
+        issue_date_to=issue_date_to,
+        query=q,
     )
     scope = AskScope(
         channel=context.channel or identity.channel or "web",

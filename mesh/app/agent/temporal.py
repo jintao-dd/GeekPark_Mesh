@@ -6,6 +6,12 @@ Hard Rules:
   1. latest_published ≠ recent event
   2. unknown event time ≠ recent
   3. 无时间依据 → 不得使用「最近发生/本周发生」等确定性措辞
+
+Retrieval Scope（Phase 1 · IssueRef ⊥ TimeWindow）:
+  IssueRef = latest_published → 上下文/锚定期次（不等于「只搜这一期」）
+  TimeWindow = recent        → 时间范围；允许跨已发布 Issue 检索
+  explicit/pinned            → 仍钉死期次（issue_anchor）
+  本周/上周 + IssueRef       → 仍按期次理解（issue_anchor，不换墙上时钟周）
 """
 from __future__ import annotations
 
@@ -41,7 +47,8 @@ _FORBIDDEN_RECENT_EVENT = re.compile(
 class TimeSemantics:
     window: str = "none"  # recent | this_week | last_week | explicit | none
     basis: str = "issue_time"  # event_time | material_time | issue_time | unknown
-    filter_mode: str = "issue_anchor"  # issue_anchor | passthrough
+    # issue_anchor = 钉死检索期次；time_window = 跨已发布 + 时间窗；passthrough = 不改日期
+    filter_mode: str = "issue_anchor"
     hard_rules: list[str] = field(default_factory=list)
     reject_latest_equals_recent: bool = False
     require_no_event_time_caveat: bool = False
@@ -50,6 +57,30 @@ class TimeSemantics:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+def resolve_filter_mode(*, issue_mode: str, window: str) -> str:
+    """IssueRef ⊥ TimeWindow：latest_published + recent/none → 可跨已发布检索。"""
+    mode = (issue_mode or "").strip()
+    win = (window or "none").strip() or "none"
+    if mode in ("explicit", "pinned"):
+        return "issue_anchor"
+    if mode == "latest_published":
+        # 本周/上周/显式期次口径：仍钉锚定期（Temporal 既有 Hard Rule）
+        if win in ("this_week", "last_week", "explicit"):
+            return "issue_anchor"
+        # recent（含默认无时间词 → none，走系统 recent 窗）→ 跨已发布
+        return "time_window"
+    if win in ("recent", "this_week", "last_week", "explicit"):
+        return "time_window"
+    return "passthrough"
+
+
+def retrieval_slug_for_scope(sem: TimeSemantics, context_slug: str) -> str:
+    """检索用 slug：time_window 时清空（跨已发布）；Context IssueRef 不变。"""
+    if sem.filter_mode == "time_window":
+        return ""
+    return (context_slug or "").strip()
 
 
 def resolve_time_intent(query: str) -> str:
@@ -123,12 +154,7 @@ def resolve_time_semantics(
     need_caveat = basis == "unknown" or (
         window == "recent" and not has_event_time
     )
-    # Filter：有 IssueRef 时钉期次窗，禁止墙上时钟「本周/上周/最近」覆盖
-    filter_mode = "issue_anchor" if issue_mode in (
-        "explicit",
-        "pinned",
-        "latest_published",
-    ) else "passthrough"
+    filter_mode = resolve_filter_mode(issue_mode=issue_mode, window=window)
 
     return TimeSemantics(
         window=window,
@@ -149,8 +175,14 @@ def prompt_block(sem: TimeSemantics) -> str:
         "1) latest_published（最新已上线期）≠「最近发生的事件」。",
         "2) 资料未提供 event_time 时，禁止把内容说成「最近发生/本周发生/刚发生」。",
         "3) 无时间依据时，禁止使用确定性近期发生措辞；应写「依据 ×× 期已上线记录」或「资料未提供发生时间」。",
-        f"本问判定：window={sem.window}；basis={sem.basis}；issue={sem.issue_slug or '—'}（mode={sem.issue_mode or 'none'}）。",
+        f"本问判定：window={sem.window}；basis={sem.basis}；filter={sem.filter_mode}；"
+        f"issue={sem.issue_slug or '—'}（mode={sem.issue_mode or 'none'}）。",
     ]
+    if sem.filter_mode == "time_window":
+        lines.append(
+            "检索已按 TimeWindow 跨已上线期次；IssueRef 只是上下文锚点。"
+            "引用证据时写明实际期号；不得因锚点是最新期就说内容「刚发生」。"
+        )
     if sem.window in ("this_week", "last_week"):
         lines.append(
             "用户说的「本周/上周」若已定点次：只陈述该期记录，"
@@ -249,8 +281,14 @@ def apply_time_filter_to_dates(
     *,
     issue_date_from: str | None,
     issue_date_to: str | None,
+    query: str = "",
 ) -> tuple[str | None, str | None]:
-    """Time Filter：有 Issue 锚点时用期次日期，不引入墙上时钟窗。"""
+    """Time Filter：issue_anchor 用期次日期；time_window 用 Temporal/词法时间窗。"""
     if sem.filter_mode == "issue_anchor":
         return issue_date_from, issue_date_to
+    if sem.filter_mode == "time_window":
+        from ..qa_structured import parse_window
+
+        df, dt, _ = parse_window(query or "")
+        return df, dt
     return issue_date_from, issue_date_to

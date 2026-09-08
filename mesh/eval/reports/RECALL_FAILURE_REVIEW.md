@@ -2,36 +2,38 @@
 
 > **状态（2026-09-08）**  
 > Recall Phase 0 = **PASS** · Failure Review = **PASS**  
-> 本文件 = **Failure Pattern Review（只读分析，不改检索）**  
-> **下一阶段：** Retrieval Recall Phase 1 = 🟡 READY（顺序锁：Scope → R14 Index → FTS/Query → 重跑 Gold → 再开 Ranking）  
-> **GO：** 审失败模式 · **NO-GO：** 未分层就改 RAG / 因 Ranking 证据上 Rerank  
+> Phase 1 Scope = **✅ DONE**（IssueRef ⊥ TimeWindow · recent 可跨已发布）  
+> R02 / R23 / R24 = **Scope 产品验证样本**（已从 Recall 缺陷名单移除）  
+> **NEXT：** R14 Index 核查 → FTS/Query（7 miss）→ 重跑 Gold  
+> **NO-GO：** 因 Ranking 证据上 Rerank / 未分层改 RAG  
 
 基线：`RECALL_BASELINE_latest.json`（n=30，Embed=False）  
-宏观 Recall@5/@10/@20 = 74% / 79% / 79% —— **不当作立刻优化结论**；四线见下表与 `AGENT_QUALITY_V2.md`。
+宏观 Recall@5/@10/@20 = 74% / 79% / 79% —— Phase 0 诊断快照；Scope 落地后需对 R02/R23/R24 重测。
 
-对照题（同内容、不同 scope）：
+对照题（同内容、不同 scope）—— **变更前** 快照：
 
-| 对照 | latest | explicit:2026-8-17 |
-|------|--------|---------------------|
+| 对照 | latest（变更前） | explicit:2026-8-17 |
+|------|------------------|---------------------|
 | 锦涛 | R02 miss | R01 / R25 **ok** |
 | 破壳创智吴伟 | R24 miss | R03 / R20 **ok** |
 
-→ 说明内容在库内可召回；**latest 钉死期次**导致跨期相关 item 不可见。
+→ 变更前：内容可召回，但 latest 硬锁期次导致 0 hit。  
+→ 变更后：`latest_published` + recent → 跨已发布 + TimeWindow；R02/R23/R24 不再当 FTS 缺陷。
 
 ---
 
 ## 总览：8 道非 ok
 
-| ID | 粗标签 | Likely layer | 是否该进 Recall Phase 1？ |
-|----|--------|--------------|---------------------------|
-| R02 | issue_scope_latest_miss | **Scope / Product** | 慎改检索；先定「最近」是否允许跨期 |
-| R23 | issue_scope_latest_miss | **Scope / Product** | 同上 |
-| R24 | issue_scope_latest_miss | **Scope / Product** | 同上 |
-| R11 | partial | **FTS / Query**（4106 未进 Top20） | 可进 Recall 候选 |
-| R12 | partial | **混合：FTS miss(4125) + Ranking(4120@6,4128@9)** | Ranking 部分 → ③；4125 → Recall |
-| R18 | partial | **FTS / Query**（4271 未进 Top20） | 可进 Recall 候选 |
-| R13 | total_miss | **FTS / Query**（问句与条目措辞漂移） | 可进 Recall 候选 |
-| R14 | total_miss | **FTS / Query 或 Index**（播数据条未命中） | 可进 Recall 候选 |
+| ID | 粗标签 | Likely layer | Phase 1 归属 |
+|----|--------|--------------|----------------|
+| R02 | issue_scope_latest_miss | **Scope / Product ✅** | 已落地；验证样本，非 Recall 缺陷 |
+| R23 | issue_scope_latest_miss | **Scope / Product ✅** | 同上 |
+| R24 | issue_scope_latest_miss | **Scope / Product ✅** | 同上 |
+| R11 | partial | **FTS / Query**（4106 未进 Top20） | Recall 候选 |
+| R12 | partial | **混合：FTS miss(4125) + Ranking(4120@6,4128@9)** | 4125→Recall；4120/4128→③ |
+| R18 | partial | **FTS / Query**（4271 未进 Top20） | Recall 候选 |
+| R13 | total_miss | **FTS / Query**（问句与条目措辞漂移） | Recall 候选 |
+| R14 | total_miss | **Index / Data 先核**（播数据条） | 先核查索引 |
 
 **防误区：** Top20 已含 relevant、仅 Top5 没有 → **算 Ranking，不算 Recall 优化。**  
 本轮纯 Ranking 分量主要在 **R12 的 4120/4128**；其余 missed 多数 **根本不在 Top20**。
