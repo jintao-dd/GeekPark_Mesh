@@ -25,8 +25,8 @@
 | ④ Context      | ✅ **冻结**（§6：IssueRef 生命周期）              |
 | ⑤ Entity/Evidence/Relation | ✅ **冻结**（§7）                   |
 | ⑥ Tool Contract | ✅ **冻结**（§8；4 Tool）                 |
-| ⑦ Agent         | ✅ **架构冻结**；🔨 **实现/契约测试中**（先 Harness，后飞书） |
-| ⑧ 飞书 MVP      | ⛔ 等 ⑦ 测试报告；只接线不扩大脑              |
+| ⑦ Agent         | ✅ **架构冻结**；✅ Harness + v3.0 质量基线封存 |
+| ⑧ 飞书 MVP / Feishu Agent v1 | 🔨 **产品实现中**（只接线；见 `docs/FEISHU_AGENT_V1.md`） |
 
 
 Mesh 提供：**Published 事实底座 + Ask/Relation 工具能力 + canonical_team 业务语义**。  
@@ -793,10 +793,10 @@ handle(message, envelope):
 | ①～⑥ 架构 | ✅ **冻结** |
 | ⑦ Agent v1 | ✅ **实现 + 真实 Adapter 20/20**（不再改架构） |
 | ⭐ Mesh + Agent 全量验收 | 🟡 **当前主任务**（四层门禁；见 `docs/MESH_AGENT_FULL_ACCEPTANCE.md`） |
-| ⑧ 飞书 MVP | ⛔ **暂缓**（Layer 2+3 通过后只接线） |
+| ⑧ 飞书 MVP | 🔨 **产品实现中**（只接线；Evidence 必显；`docs/FEISHU_AGENT_V1.md`） |
 
 ---
 
 ## 12. 一句话
 
-**⑦ 已过真实数据闸。当前只做 Mesh+Agent 全量验收；⑧ 只接线、不扩大脑。**
+**⑦ 已过真实数据闸；v3.0 质量基线已封存。当前主任务：Feishu Agent v1（只接线、不扩大脑；可验证回答必须带 Claim 对齐 Evidence）。**

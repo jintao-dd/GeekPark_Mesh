@@ -9,6 +9,7 @@ from . import identity as idmod
 from . import intent as intentmod
 from . import permission as permmod
 from . import tools as toolsmod
+from .feishu_reply import enrich_answer_for_display
 from .models import (
     DATA_TOOLS,
     AgentAnswer,
@@ -45,21 +46,23 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
     }
 
     if not permission.agent_access:
-        return AgentAnswer(
-            text=_REFUSE_ACL,
-            intent="refuse",
-            refused=True,
-            deny_reason=permission.deny_reason or "agent_access_denied",
-            fingerprint=fp.build_fingerprint(
-                context=context, permission=permission, tool_result=None
-            ),
-            trace=fp.build_trace(
+        return enrich_answer_for_display(
+            AgentAnswer(
+                text=_REFUSE_ACL,
                 intent="refuse",
-                tool_id=None,
-                context=context,
-                identity_status=identity.status,
-            ),
-            **base_kwargs,
+                refused=True,
+                deny_reason=permission.deny_reason or "agent_access_denied",
+                fingerprint=fp.build_fingerprint(
+                    context=context, permission=permission, tool_result=None
+                ),
+                trace=fp.build_trace(
+                    intent="refuse",
+                    tool_id=None,
+                    context=context,
+                    identity_status=identity.status,
+                ),
+                **base_kwargs,
+            )
         )
 
     intent = intentmod.rule_classify_intent(envelope.text, context, permission)
@@ -67,21 +70,23 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
 
     if intent == "refuse" or tool_id is None:
         text = _refuse_text(identity.status, envelope.text, permission.deny_reason)
-        return AgentAnswer(
-            text=text,
-            intent="refuse",
-            refused=True,
-            deny_reason=permission.deny_reason or "refuse",
-            fingerprint=fp.build_fingerprint(
-                context=context, permission=permission, tool_result=None
-            ),
-            trace=fp.build_trace(
+        return enrich_answer_for_display(
+            AgentAnswer(
+                text=text,
                 intent="refuse",
-                tool_id=None,
-                context=context,
-                identity_status=identity.status,
-            ),
-            **base_kwargs,
+                refused=True,
+                deny_reason=permission.deny_reason or "refuse",
+                fingerprint=fp.build_fingerprint(
+                    context=context, permission=permission, tool_result=None
+                ),
+                trace=fp.build_trace(
+                    intent="refuse",
+                    tool_id=None,
+                    context=context,
+                    identity_status=identity.status,
+                ),
+                **base_kwargs,
+            )
         )
 
     if not permmod.tool_allowed(permission, tool_id):
@@ -90,40 +95,44 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
             help_r = toolsmod.invoke_tool(
                 "system.help", con, identity, permission, context, {}
             )
-            return AgentAnswer(
-                text=_refuse_text(identity.status, envelope.text, "acl_denied")
-                + "\n\n"
-                + str((help_r.payload or {}).get("help") or ""),
+            return enrich_answer_for_display(
+                AgentAnswer(
+                    text=_refuse_text(identity.status, envelope.text, "acl_denied")
+                    + "\n\n"
+                    + str((help_r.payload or {}).get("help") or ""),
+                    intent="refuse",
+                    tools_called=["system.help"],
+                    refused=True,
+                    deny_reason="acl_denied",
+                    fingerprint=fp.build_fingerprint(
+                        context=context, permission=permission, tool_result=help_r
+                    ),
+                    trace=fp.build_trace(
+                        intent="refuse",
+                        tool_id="system.help",
+                        context=context,
+                        identity_status=identity.status,
+                    ),
+                    **base_kwargs,
+                )
+            )
+        return enrich_answer_for_display(
+            AgentAnswer(
+                text=_REFUSE_ACL,
                 intent="refuse",
-                tools_called=["system.help"],
                 refused=True,
                 deny_reason="acl_denied",
                 fingerprint=fp.build_fingerprint(
-                    context=context, permission=permission, tool_result=help_r
+                    context=context, permission=permission, tool_result=None
                 ),
                 trace=fp.build_trace(
                     intent="refuse",
-                    tool_id="system.help",
+                    tool_id=None,
                     context=context,
                     identity_status=identity.status,
                 ),
                 **base_kwargs,
             )
-        return AgentAnswer(
-            text=_REFUSE_ACL,
-            intent="refuse",
-            refused=True,
-            deny_reason="acl_denied",
-            fingerprint=fp.build_fingerprint(
-                context=context, permission=permission, tool_result=None
-            ),
-            trace=fp.build_trace(
-                intent="refuse",
-                tool_id=None,
-                context=context,
-                identity_status=identity.status,
-            ),
-            **base_kwargs,
         )
 
     # 硬约束：至多 1 个数据 Tool
@@ -143,23 +152,27 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
         context=context,
         identity_status=identity.status,
     )
-    if isinstance(result.payload, dict) and "llm_used" in result.payload:
-        trace["llm_used"] = bool(result.payload.get("llm_used"))
-    if isinstance(result.payload, dict) and result.payload.get("temporal"):
-        trace["temporal"] = result.payload.get("temporal")
-    return AgentAnswer(
-        text=text,
-        intent=intent,
-        tools_called=[tool_id],
-        fingerprint=fp.build_fingerprint(
-            context=context, permission=permission, tool_result=result
+    payload = result.payload if isinstance(result.payload, dict) else {}
+    if "llm_used" in payload:
+        trace["llm_used"] = bool(payload.get("llm_used"))
+    if payload.get("temporal"):
+        trace["temporal"] = payload.get("temporal")
+    return enrich_answer_for_display(
+        AgentAnswer(
+            text=text,
+            intent=intent,
+            tools_called=[tool_id],
+            fingerprint=fp.build_fingerprint(
+                context=context, permission=permission, tool_result=result
+            ),
+            trace=trace,
+            claim_bindings=bindings,
+            evidence_refs=evidence,
+            refused=bool(result.denied),
+            deny_reason=result.error if result.denied else "",
+            **base_kwargs,
         ),
-        trace=trace,
-        claim_bindings=bindings,
-        evidence_refs=evidence,
-        refused=bool(result.denied),
-        deny_reason=result.error if result.denied else "",
-        **base_kwargs,
+        payload=payload,
     )
 
 

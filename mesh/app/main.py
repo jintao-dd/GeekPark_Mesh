@@ -843,7 +843,7 @@ def api_ask(request: Request, payload: dict):
 def api_agent_v1_message(request: Request, payload: dict):
     """Agent v1 Harness：不依赖飞书事件；契约与飞书接线共用同一 handle_message。
 
-    需登录 viewer+。正式飞书 Bot 走 ⑧，不扩本接口能力。
+    需登录 viewer+。正式飞书 Bot 走 /api/feishu/bot/event。
     """
     auth.require(request, "viewer")
     from .agent.harness import run_harness
@@ -853,6 +853,39 @@ def api_agent_v1_message(request: Request, payload: dict):
         return run_harness(con, payload or {})
     finally:
         con.close()
+
+
+@app.post("/api/feishu/bot/event")
+async def api_feishu_bot_event(request: Request):
+    """⑧ 飞书 Bot 事件入口：只接线 handle_message，不扩大脑。
+
+    - url_verification：回 challenge
+    - im.message：组 Envelope → Agent → display_text（含 Evidence/期次）
+    回发消息可后续接 tenant_access_token；本接口先返回 reply_text 供联调。
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(400, "invalid json")
+    from .agent.feishu_bot import handle_feishu_event
+
+    # URL 校验不需要 DB
+    if (body or {}).get("type") == "url_verification" or (
+        "challenge" in (body or {}) and not (body or {}).get("event")
+    ):
+        out = handle_feishu_event(None, body or {})
+        if "challenge" in out:
+            return {"challenge": out["challenge"]}
+        raise HTTPException(403, out.get("error") or "verification_failed")
+
+    con = db.connect()
+    try:
+        out = handle_feishu_event(con, body or {})
+    finally:
+        con.close()
+    if out.get("error") == "bad_verification_token":
+        raise HTTPException(403, "bad_verification_token")
+    return out
 
 
 @app.post("/api/ask/new_session")

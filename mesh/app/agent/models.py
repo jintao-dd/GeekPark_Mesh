@@ -218,8 +218,13 @@ class AgentAnswer:
         return [t for t in self.tools_called if t in DATA_TOOLS]
 
     def to_dict(self) -> dict[str, Any]:
+        display = ""
+        if isinstance(self.trace, dict):
+            display = str(self.trace.get("display_text") or "").strip()
         return {
             "text": self.text,
+            # Feishu / 产品侧可见正文：Answer + 期次 + Claim 对齐 Evidence
+            "display_text": display or self.text,
             "intent": self.intent,
             "tools_called": list(self.tools_called),
             "data_tools_called": self.data_tools_called,

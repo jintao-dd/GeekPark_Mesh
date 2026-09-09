@@ -304,6 +304,7 @@ def ask_published(
             "temporal": sem.to_dict(),
             "date_from": scope.date_from,
             "date_to": scope.date_to,
+            "claim_support": support_assess,
         },
         evidence_refs=evidence,
         claim_bindings=[binding] if status != "unsupported" else [
@@ -449,6 +450,10 @@ def ask_relations_summary(
             "count": len(cards),
             "issue": slug,
             "team_focus": team_focus or None,
+            "claim_support": {
+                "support": "supported" if status == "grounded" else "insufficient",
+                "reason": binding.reason,
+            },
         },
         evidence_refs=ev_out,
         claim_bindings=[binding],
