@@ -207,6 +207,10 @@ def grade(row: dict, out: dict) -> dict:
             # 有证据却无 caveat、也未泄漏短语：仍算未正确处理对抗
             correct = False
             unsupported = True
+        elif abstain_ok and not claim_leak:
+            # 正确拒答 / caveat：status=unsupported 是预期，不得当 fail
+            correct = True
+            unsupported = False
 
     # Claim → Support（v2.3）：expect_support ∈ supported|insufficient|contradicted
     support_obs = ((out.get("claim_support") or {}).get("support") or "").strip()

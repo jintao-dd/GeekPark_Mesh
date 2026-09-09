@@ -13,7 +13,17 @@
 > 注意：曾误用「纯 v1.4 替换 legacy」会打坏 R18；已改回与 gates 一致的 **legacy 后置 v1.4**。
 
 
-回归闸门（合入后 `profile=baseline` 即生产路径）：4125→Top5、R06、R16、R18、R@20、worse=[]（见本地/tmesh smoke）。
+回归闸门（合入后 `profile=baseline` = legacy→v1.4）：
+
+| 闸门 | tmesh |
+|------|-------|
+| 4125→Top5（R12） | ✅ @5 |
+| R06 / R16 / R18 | ✅ |
+| R@20 | **0.9433** |
+| macro MRR / nDCG@10 / P@5 | **0.831 / 0.8389 / 0.5106**（与 candidate 一致） |
+
+Answer hard：tmesh **pass_rate 1.0**（A12=H harness 对齐 Temporal；A17=C/G claim-support abstain）  
+Evidence claim/support：tmesh **pass_rate 1.0**（对抗题正确拒答；未放宽 forbid 短语）
 
 ## 二、Answer hard fail（逐题归因）
 
