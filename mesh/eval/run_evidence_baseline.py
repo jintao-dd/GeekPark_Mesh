@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -118,9 +119,11 @@ def _ask(con, query: str, scope: dict) -> dict:
             "n_hits": n_hits,
             "meta": meta,
             "claim_support": support_assess,
+            "llm_used": False,
         }
 
     # 无命中 / 与 query 无词交集 → 明确拒答（空答案与“有 Evidence 就算过”均不允许）
+    llm_used = False
     if n_hits == 0 or not contexts or not grounded:
         answer = "未找到与问题直接相关的已上线记录，资料未提供可核对依据，不能下结论。"
         evidence = []
@@ -130,6 +133,24 @@ def _ask(con, query: str, scope: dict) -> dict:
             query, contexts=[], evidence_refs=[]
         )
     else:
+        # Fixed-model LLM-on：与 adapters.ask_published 同序（claim_support 之后）
+        use_llm = os.environ.get("MESH_AGENT_USE_LLM", "").strip() in ("1", "true", "yes")
+        if use_llm and not answer:
+            try:
+                from app import llm as llm_mod
+
+                tblock = temporal_mod.prompt_block(sem)
+                ctxs = [c for c in contexts if isinstance(c, dict)][:12]
+                llm_ans = llm_mod.answer_question(query, ctxs, temporal_block=tblock)
+                if isinstance(llm_ans, dict):
+                    llm_ans = (llm_ans.get("answer") or llm_ans.get("text") or "").strip()
+                else:
+                    llm_ans = (str(llm_ans) if llm_ans else "").strip()
+                if llm_ans:
+                    answer = llm_ans
+                    llm_used = True
+            except Exception:
+                llm_used = False
         if not answer:
             bits = []
             for c in contexts[:6]:
@@ -142,8 +163,8 @@ def _ask(con, query: str, scope: dict) -> dict:
                 elif body:
                     bits.append(body)
             answer = "；".join(bits) if bits else "未找到相关已上线记录，不能下结论。"
-        # must_mention：并入相关条目标题（评测 harness 摘要，不改 Agent Contract）
-        if titles:
+        # must_mention 附录仅 deterministic harness；LLM 成文不加，避免污染真实路径
+        if (not llm_used) and titles:
             joined = "；".join(titles[:6])
             if joined not in answer:
                 answer = f"{answer}\n相关条目：{joined}".strip()
@@ -166,6 +187,7 @@ def _ask(con, query: str, scope: dict) -> dict:
         "n_hits": n_hits,
         "meta": meta,
         "claim_support": support_assess,
+        "llm_used": llm_used,
     }
 
 

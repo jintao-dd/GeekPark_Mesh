@@ -193,6 +193,7 @@ def main() -> int:
                     "metrics": g,
                     "n_hits": out.get("n_hits"),
                     "status": out.get("status"),
+                    "llm_used": bool(out.get("llm_used")),
                     "error": out.get("error"),
                 }
             )

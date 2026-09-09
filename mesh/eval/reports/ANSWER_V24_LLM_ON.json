@@ -1,0 +1,438 @@
+{
+  "phase": "answer",
+  "scoring": "v2_hard",
+  "gold": "answer_gold_v2.jsonl",
+  "tag": "answer_llm_v24",
+  "n": 21,
+  "pass_rate": 1.0,
+  "macro_accuracy": 1.0,
+  "macro_completeness": 1.0,
+  "macro_faithfulness": 1.0,
+  "macro_citation_correctness": 1.0,
+  "macro_abstention_correctness": 1.0,
+  "macro_nonempty": 1.0,
+  "elapsed_s": 102.29,
+  "results": [
+    {
+      "id": "A01",
+      "category": "entity",
+      "answer_snip": "依据的是 2026-8-17 那期已上线记录，锦涛（品牌创意团队）相关的事项如下：\n\n- 锦涛做了一个工具，团队内部就是否开源该工具各有判断：一方认为开源能沉淀 GitHub 记录、体现在 build 产品、立 builder 人设；另一方认为当前性价比与时机不足、人设需持续投入才能立、且工具尚未用好即开出去。该期记录写明此事次日再讨论。\n- 在李源的账号内容形态推进中，锦涛会提供 Web Cod",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 3,
+      "status": "grounded",
+      "llm_used": true,
+      "error": null
+    },
+    {
+      "id": "A02",
+      "category": "company",
+      "answer_snip": "依据的是 2026-8-17 那期已上线记录，并非今日新发生。资料未提供每次接触的具体发生时间，以下按记录内容陈述。\n\n**接触对象**：编辑部与面壁智能詹杨帆有对话记录（有原始记录），另与高通侧芯片调优负责人就端侧模型在旗舰手机应用的限制与发展方向做过交流（均为已接触）。面壁智能定位为端侧模型公司，围绕 Agent 上车与智能座舱。\n\n**交流涉及的内容**（多为受访者陈述，非核实事实）：\n\n-",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 40,
+      "status": "grounded",
+      "llm_used": true,
+      "error": null
+    },
+    {
+      "id": "A03",
+      "category": "multi_evidence",
+      "answer_snip": "依据 2026-8-17 期已上线记录（编辑部与面壁智能詹杨帆的沟通为主），关于端侧模型与智能座舱：\n\n**端侧模型的整体判断**\n\n- 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱是小型智能空间 IoT 原型（受访者陈述，非核实事实）。\n- 詹杨帆认为端侧与云端各有场景：端侧优势是响应速度、数据本地化、断网可用；云端优势是",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 40,
+      "status": "grounded",
+      "llm_used": true,
+      "error": null
+    },
+    {
+      "id": "A04",
+      "category": "topic",
+      "answer_snip": "依据 2026-09-08 那期已上线的视频号周数据，该期记录中播放处于前列的片子如下（按播放量）：\n\n- 《AGI时代来了？》（OpenAI）：播放 7618、点赞 47、分享 65。\n- 《这款Harness震撼硅谷》（AI）：播放 6429、点赞 77、分享 203、完播率 15.89%。\n- 《传统相机太难用！》（影石Insta360）：播放 4270、点赞 26、评论 2。\n- 《AI巨",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 11,
+      "status": "grounded",
+      "llm_used": true,
+      "error": null
+    },
+    {
+      "id": "A05",
+      "category": "community",
+      "answer_snip": "依据 2026-8-17 那期已上线记录，Founder Park 下半年规划有以下内容：\n\n1. 整体方向：从内容驱动转向聚焦创业者核心需求的社区基础设施。\n2. 团队判断（会议判断，非核实事实）：创业者当前最焦虑的是赛道选择和生存空间，而非技术；活动可帮助回答哪些赛道大厂已进场、哪些仍有先发优势、VC 在看什么方向。\n\n以上为社群团队在该期例会中提及的下半年规划内容。相关联的辅助情况（同期已上",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 32,
+      "status": "grounded",
+      "llm_used": true,
+      "error": null
+    },
+    {
+      "id": "A06",
+      "category": "relation",
+      "answer_snip": "依据 2026-8-17 期已上线记录，两条命中记录之间可对照的关系有限，说明如下：\n\n1. 这两条都与 AGI Playground 2026 这场活动相关：一条是品牌创意团队关于该活动主舞台场地数据的复盘经验；另一条是编辑部/英文站产出的报道，内容为 MiniMax 开发者关系负责人 Vincent Wu 在 AGI Playground 2026 的分享。两者共享同一活动背景，属于可同步的关",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 2,
+      "status": "grounded",
+      "llm_used": true,
+      "error": null
+    },
+    {
+      "id": "A07",
+      "category": "empty",
+      "answer_snip": "未找到与问题直接相关的已上线记录，资料未提供可核对依据，不能下结论。",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 0,
+      "status": "unsupported",
+      "llm_used": false,
+      "error": null
+    },
+    {
+      "id": "A08",
+      "category": "topic",
+      "answer_snip": "依据的是 2026-8-17 期已上线记录，检索到的均为具身智能相关的建联与创业者数据条目，但**没有任何一条标注为「具身智能数据圆桌」的记录**，因此无法确认是否存在这样一场圆桌讨论、也无法还原其具体讨论内容。\n\n若把范围放宽到该期与「具身智能 + 数据」相关的记录，可对照的信息如下：\n\n- 擎羽科技（深圳擎羽科技/晴雨科技）方面提到：做柔性具身机器人，核心是纯绳驱机械臂，定位跨本体适配，可兼容",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 20,
+      "status": "grounded",
+      "llm_used": true,
+      "error": null
+    },
+    {
+      "id": "A09",
+      "category": "temporal",
+      "answer_snip": "依据的是 2026-8-17 那期已上线记录（品牌创意团队周会复盘），并非今日新发生；这几条未标明具体事件发生日期，因此不作「最近/（资料记载·非事件时刻断言）」的表述。\n\n在该期记录里，涉及锦涛的内容有：\n\n- 锦涛做了一个工具，团队内部围绕是否开源该工具各有判断（一方认为开源能沉淀 GitHub 记录、体现 build 产品、立 builder 人设；另一方认为当前性价比与时机不足），该期记录",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 5,
+      "status": "grounded",
+      "llm_used": true,
+      "error": null
+    },
+    {
+      "id": "A10",
+      "category": "abstention",
+      "answer_snip": "未找到与问题直接相关的已上线记录，资料未提供可核对依据，不能下结论。",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 0,
+      "status": "unsupported",
+      "llm_used": false,
+      "error": null
+    },
+    {
+      "id": "A11",
+      "category": "team",
+      "answer_snip": "依据 2026-09-08 期已上线记录，编辑部选题表里与 IFA 相关的选题有两条，均标注为进行中：\n\n1. IFA 探展总览：IFA 现场观展心得，提报 8/31，对应 Hardwire 文章，标注待补全资料/提纲。\n2. IFA 2026 逛展稿件：IFA 2026 现场稿，提报 8/31。\n\n此外，同期还有一条来自外部媒体（非编辑部选题）的 IFA 相关记录：CNET 9/4 的《The ",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 40,
+      "status": "grounded",
+      "llm_used": true,
+      "error": null
+    },
+    {
+      "id": "A12",
+      "category": "temporal_hard",
+      "answer_snip": "上线最新期次（latest published）不等于事件发生时刻。若没有可核对的事件时间，只能说明资料所属期次或材料时间，不能把旧材料说成当下新发生。",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 0,
+      "status": "grounded",
+      "llm_used": false,
+      "error": null
+    },
+    {
+      "id": "A13",
+      "category": "company",
+      "answer_snip": "根据本次检索到的记录，没有找到关于「Seattle Times 起诉 OpenAI」的任何内容。\n\n本期（依据 2026-8-17 期已上线记录）涉及 OpenAI 的记录只有以下几项，均与 Seattle Times 诉讼无关：OpenAI 模型自主发起约 1.76 万次网络攻击引发 Altman 反思；苹果起诉 OpenAI 挖人窃密；OpenAI 关停 Atlas 浏览器；以及高通 Geni",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 5,
+      "status": "grounded",
+      "llm_used": true,
+      "error": null
+    },
+    {
+      "id": "A14",
+      "category": "caveat",
+      "answer_snip": "本轮可用记录中没有与「破壳创智」相关的条目，因此无法就该主体给出任何结论或改写建议。该问题涉及的破壳创智相关来源尚未接入本轮检索结果。\n\n来源：（本期无与破壳创智相关的记录可引用）",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 1,
+      "status": "grounded",
+      "llm_used": true,
+      "error": null
+    },
+    {
+      "id": "A15",
+      "category": "help",
+      "answer_snip": "我是 Mesh Agent，可查询已上线周报与关系摘要。",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 0,
+      "status": "grounded",
+      "llm_used": false,
+      "error": null
+    },
+    {
+      "id": "A16",
+      "category": "unsupported_claim",
+      "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 0,
+      "status": "unsupported",
+      "llm_used": false,
+      "error": null
+    },
+    {
+      "id": "A17",
+      "category": "unsupported_claim",
+      "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 17,
+      "status": "unsupported",
+      "llm_used": false,
+      "error": null
+    },
+    {
+      "id": "A18",
+      "category": "unsupported_claim",
+      "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 0,
+      "status": "unsupported",
+      "llm_used": false,
+      "error": null
+    },
+    {
+      "id": "A19",
+      "category": "temporal_hard",
+      "answer_snip": "上线最新期次（latest published）不等于事件发生时刻。若没有可核对的事件时间，只能说明资料所属期次或材料时间，不能把旧材料说成当下新发生。",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 0,
+      "status": "grounded",
+      "llm_used": false,
+      "error": null
+    },
+    {
+      "id": "A20",
+      "category": "unsupported_claim",
+      "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 11,
+      "status": "unsupported",
+      "llm_used": false,
+      "error": null
+    },
+    {
+      "id": "A21",
+      "category": "unsupported_claim",
+      "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "n_hits": 18,
+      "status": "unsupported",
+      "llm_used": false,
+      "error": null
+    }
+  ],
+  "note": "pass_rate is hard-gate; do not treat as external quality claim alone"
+}

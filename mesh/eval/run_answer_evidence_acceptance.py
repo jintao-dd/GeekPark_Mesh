@@ -153,6 +153,7 @@ def run_answer(con, gold: list[dict]) -> dict:
                 "answer_snip": (out.get("answer") or "")[:280],
                 "n_hits": out.get("n_hits"),
                 "status": out.get("status"),
+                "llm_used": bool(out.get("llm_used")),
                 "claim_support": out.get("claim_support"),
                 "evidence_refs": (out.get("evidence_refs") or [])[:8],
                 "metrics": g,

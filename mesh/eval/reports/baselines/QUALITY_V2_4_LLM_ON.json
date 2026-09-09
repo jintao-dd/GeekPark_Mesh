@@ -1,0 +1,322 @@
+{
+  "phase": "quality_v2_4_llm_on",
+  "elapsed_s": 495.99,
+  "baseline": {
+    "mesh_agent_use_llm": "1",
+    "model_version": "anthropic/claude-4.8-opus",
+    "ranking_version": "v1.4",
+    "vector": "OFF",
+    "agent_contract": "frozen_v1",
+    "claim_support": "v2.3e_frozen_no_edits",
+    "prompt_version": "ask_engine+temporal_hard_rules+claim_support+llm.answer_question",
+    "note": "measure only; no claim_support / Ranking / Ontology edits"
+  },
+  "steps": [
+    {
+      "step": "temporal_llm_on",
+      "rc": 0
+    },
+    {
+      "step": "answer_canonical_llm",
+      "rc": 0
+    },
+    {
+      "step": "evidence_canonical_llm",
+      "rc": 0
+    },
+    {
+      "step": "unseen_llm",
+      "rc": 1
+    }
+  ],
+  "temporal": {
+    "n": 24,
+    "pass_rate": 0.9583,
+    "fails": [
+      "T19"
+    ],
+    "vs_det_0_875": {
+      "fixed_by_llm": [
+        "T03",
+        "T20"
+      ],
+      "new_fails_under_llm": [],
+      "still_fail": [
+        "T19"
+      ],
+      "still_pass": "n/a"
+    }
+  },
+  "answer_canonical": {
+    "n": 21,
+    "pass_rate": 1.0,
+    "fails": [],
+    "vs_det": {
+      "fixed_by_llm": [],
+      "new_fails_under_llm": [],
+      "still_fail": [],
+      "still_pass": "n/a"
+    }
+  },
+  "evidence_canonical": {
+    "n": 20,
+    "pass_rate": 1.0,
+    "fails": [],
+    "vs_det": {
+      "fixed_by_llm": [],
+      "new_fails_under_llm": [],
+      "still_fail": [],
+      "still_pass": "n/a"
+    }
+  },
+  "unseen": {
+    "answer_pass_rate": 0.2857,
+    "evidence_pass_rate": 0.125,
+    "answer_fails": [
+      "A22",
+      "A23",
+      "A25",
+      "A27",
+      "A28"
+    ],
+    "evidence_fails": [
+      "E21",
+      "E22",
+      "E23",
+      "E24",
+      "E25",
+      "E26",
+      "E27"
+    ],
+    "vs_det_answer": {
+      "fixed_by_llm": [
+        "A24",
+        "A26"
+      ],
+      "new_fails_under_llm": [],
+      "still_fail": [
+        "A22",
+        "A23",
+        "A25",
+        "A27",
+        "A28"
+      ],
+      "still_pass": "n/a"
+    },
+    "vs_det_evidence": {
+      "fixed_by_llm": [],
+      "new_fails_under_llm": [],
+      "still_fail": [
+        "E21",
+        "E22",
+        "E23",
+        "E24",
+        "E25",
+        "E26",
+        "E27"
+      ],
+      "still_pass": "n/a"
+    },
+    "matrix": [
+      {
+        "id": "A22",
+        "pass": false,
+        "llm_used": true,
+        "support": "supported",
+        "claim_strength": "weak",
+        "fail_class": "A"
+      },
+      {
+        "id": "A23",
+        "pass": false,
+        "llm_used": true,
+        "support": "supported",
+        "claim_strength": "weak",
+        "fail_class": "A"
+      },
+      {
+        "id": "A24",
+        "pass": true,
+        "llm_used": true,
+        "support": "supported",
+        "claim_strength": "weak",
+        "fail_class": null
+      },
+      {
+        "id": "A25",
+        "pass": false,
+        "llm_used": true,
+        "support": "supported",
+        "claim_strength": "weak",
+        "fail_class": "A"
+      },
+      {
+        "id": "A26",
+        "pass": true,
+        "llm_used": true,
+        "support": "supported",
+        "claim_strength": "weak",
+        "fail_class": null
+      },
+      {
+        "id": "A27",
+        "pass": false,
+        "llm_used": true,
+        "support": "supported",
+        "claim_strength": "weak",
+        "fail_class": "A"
+      },
+      {
+        "id": "A28",
+        "pass": false,
+        "llm_used": true,
+        "support": "supported",
+        "claim_strength": "weak",
+        "fail_class": "A"
+      },
+      {
+        "id": "E21",
+        "pass": false,
+        "llm_used": null,
+        "support": "supported",
+        "expect": "insufficient",
+        "fail_class": "G"
+      },
+      {
+        "id": "E22",
+        "pass": false,
+        "llm_used": null,
+        "support": "supported",
+        "expect": "insufficient",
+        "fail_class": "G"
+      },
+      {
+        "id": "E23",
+        "pass": false,
+        "llm_used": null,
+        "support": "supported",
+        "expect": "insufficient",
+        "fail_class": "G"
+      },
+      {
+        "id": "E24",
+        "pass": false,
+        "llm_used": null,
+        "support": "supported",
+        "expect": "insufficient",
+        "fail_class": "G"
+      },
+      {
+        "id": "E25",
+        "pass": false,
+        "llm_used": null,
+        "support": "supported",
+        "expect": "insufficient",
+        "fail_class": "G"
+      },
+      {
+        "id": "E26",
+        "pass": false,
+        "llm_used": null,
+        "support": "supported",
+        "expect": "insufficient",
+        "fail_class": "G"
+      },
+      {
+        "id": "E27",
+        "pass": false,
+        "llm_used": null,
+        "support": "supported",
+        "expect": "insufficient",
+        "fail_class": "G"
+      },
+      {
+        "id": "E28",
+        "pass": true,
+        "llm_used": null,
+        "support": "supported",
+        "expect": "supported",
+        "fail_class": null
+      }
+    ]
+  },
+  "three_questions": {
+    "q1_llm_vs_det": {
+      "answer_delta": {
+        "fixed_by_llm": [],
+        "new_fails_under_llm": [],
+        "still_fail": [],
+        "still_pass": "n/a"
+      },
+      "evidence_delta": {
+        "fixed_by_llm": [],
+        "new_fails_under_llm": [],
+        "still_fail": [],
+        "still_pass": "n/a"
+      },
+      "unseen_answer_delta": {
+        "fixed_by_llm": [
+          "A24",
+          "A26"
+        ],
+        "new_fails_under_llm": [],
+        "still_fail": [
+          "A22",
+          "A23",
+          "A25",
+          "A27",
+          "A28"
+        ],
+        "still_pass": "n/a"
+      },
+      "unseen_evidence_delta": {
+        "fixed_by_llm": [],
+        "new_fails_under_llm": [],
+        "still_fail": [
+          "E21",
+          "E22",
+          "E23",
+          "E24",
+          "E25",
+          "E26",
+          "E27"
+        ],
+        "still_pass": "n/a"
+      }
+    },
+    "q2_temporal_path": {
+      "det_fails_reported": [
+        "T03",
+        "T19",
+        "T20"
+      ],
+      "llm_on_fails": [
+        "T19"
+      ],
+      "delta": {
+        "fixed_by_llm": [
+          "T03",
+          "T20"
+        ],
+        "new_fails_under_llm": [],
+        "still_fail": [
+          "T19"
+        ],
+        "still_pass": "n/a"
+      },
+      "interpretation_hint": "same_fails→likely real temporal/LLM issue; cleared→prior 0.875 was path noise; new_fails→LLM path regresses temporal"
+    },
+    "q3_unseen_strength": {
+      "det_answer_pass": 0.0,
+      "llm_answer_pass": 0.2857,
+      "det_evidence_pass": 0.125,
+      "llm_evidence_pass": 0.125,
+      "interpretation_hint": "if LLM clears unseen→model judgment helps; if still false-support with claim_strength=weak→rule generalization gap; if over-abstain on E28→LLM too cautious"
+    }
+  },
+  "verdict": {
+    "optimized": false,
+    "claim_support_edited": false,
+    "next": "analyze deltas → decide A rule / B LLM judge / C hybrid; then Model A/B"
+  }
+}

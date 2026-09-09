@@ -1,0 +1,2034 @@
+{
+  "phase": "answer_evidence_acceptance",
+  "tag": "unseen_llm_v24",
+  "baseline": {
+    "ranking_version": "v1.4",
+    "vector": "OFF",
+    "agent_contract": "frozen_v1",
+    "mesh_agent_use_llm": "1",
+    "mesh_ranking_quality": "1",
+    "claim_support_module": "app.agent.claim_support",
+    "harness": "eval.run_evidence_baseline._ask",
+    "note": "harness 对齐 Temporal early + claim_support；默认不成文 LLM",
+    "model_version": "anthropic/claude-4.8-opus",
+    "prompt_version": "ask_engine+temporal_hard_rules+claim_support"
+  },
+  "elapsed_s": 137.96,
+  "answer_gold": "answer_gold_unseen_v23e.jsonl",
+  "evidence_gold": "evidence_gold_unseen_v23e.jsonl",
+  "answer": {
+    "phase": "answer",
+    "n": 7,
+    "pass_rate": 0.2857,
+    "n_fail": 5,
+    "n_soft_flag": 7,
+    "fails": [
+      {
+        "id": "A22",
+        "fail_class": "A",
+        "category": "unseen_claim_strength",
+        "query": "端侧座舱方案是否已经实现装车",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 1.0,
+          "faithfulness": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 1.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "A"
+        },
+        "answer_snip": "依据 2026-8-17 期已上线记录，可回答如下：\n\n- 面壁智能的舱外方向记录里写明，本地化方案中\"倒车物品识别已在量产车型验证\"，这属于已在量产车型上验证的部分。\n- 但面壁智能的舱内（座舱）方向记录只列出了跨模态视频流危险动作识别、车内物品溯源关键帧回溯、情境感知自动响应等功能方向，未写明这些座舱方案是否已经装车量产。\n- 记录也提到智能座舱被视为小型智能空间 IoT 原型、汽车被认为是端侧模型优质载体，但这些属于受访者陈述的判断，非已装车的核实事实。\n\n因此：记录能确认的是\"倒车物品识别已在量产车型验证\"，而完整的端侧座舱方案是否已实现装车，现",
+        "claim_support": {
+          "entity": "端侧座舱方案是否",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4112",
+            "ev:item:4114",
+            "ev:item:4116",
+            "ev:item:4118",
+            "ev:item:4120",
+            "ev:item:4383",
+            "ev:item:4121",
+            "ev:item:4264",
+            "ev:item:4276",
+            "ev:item:4280",
+            "ev:item:4125",
+            "ev:item:4137"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 33
+      },
+      {
+        "id": "A23",
+        "fail_class": "A",
+        "category": "unseen_claim_strength",
+        "query": "资料能否证明智能座舱已经实现规模化生产",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 1.0,
+          "faithfulness": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 1.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "A"
+        },
+        "answer_snip": "资料不能证明智能座舱已经实现规模化生产。\n\n现有记录只提到：面壁智能与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触）；在具体功能上，舱外的本地化倒车物品识别写明「已在量产车型验证」，但这仅是单个功能在量产车型上的验证，并非整体智能座舱的规模化生产结论。其余内容（舱内跨模态视频流分析、车内物品溯源、事故处理 Agent 等）以及受访者关于「智能座舱是小型智能空间 IoT 原型」「智能座舱的 iPhone 时刻」等表述，均为受访者陈述、非核实事实，不能作为规模化生产的证据。\n\n需要说明：上述均依据 2026-8-17 期已上线记录，资料未提供这些合",
+        "claim_support": {
+          "entity": "资料能否证明智能",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4115",
+            "ev:item:4131",
+            "ev:item:4116",
+            "ev:item:4117",
+            "ev:item:4167",
+            "ev:item:4130"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 6
+      },
+      {
+        "id": "A25",
+        "fail_class": "A",
+        "category": "unseen_claim_strength",
+        "query": "能否证明该方案已经装车落地",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 1.0,
+          "faithfulness": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 1.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "A"
+        },
+        "answer_snip": "关于\"该方案是否已装车落地\"，可依据的是 2026-8-17 那期已上线记录，并非今日新发生的验证。\n\n现有记录中只有一项与\"量产车型验证\"直接相关：面壁智能（詹杨帆）在舱外方向做的**本地化倒车物品识别**，记录写明\"已在量产车型验证\"。同一期另一条也复述了这一点，即舱外本地化倒车物品识别已在量产车型验证。\n\n需要说明的界限：\n- 上述记录只支持\"倒车物品识别\"这一项在量产车型上验证，且资料未提供该验证发生的具体时间，不能说成\"最近/近期\"完成。\n- 面壁智能与吉利银河、长安在智能座舱的其他能力（舱内跨模态视频流分析、车内物品溯源、情境感知响应、事故处",
+        "claim_support": {
+          "entity": "能否证明该方案已",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4121",
+            "ev:item:4264",
+            "ev:item:4276",
+            "ev:item:4280",
+            "ev:item:4122",
+            "ev:item:4298",
+            "ev:item:4137",
+            "ev:item:4323",
+            "ev:item:4173",
+            "ev:item:4167",
+            "ev:ctx:2026-8-17:11"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 11
+      },
+      {
+        "id": "A27",
+        "fail_class": "A",
+        "category": "unseen_claim_strength",
+        "query": "端侧模型讨论说明它已进入规模化量产阶段吗",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 1.0,
+          "faithfulness": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 1.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "A"
+        },
+        "answer_snip": "依据 2026-8-17 期已上线记录（并非今日新发生的事件），端侧模型相关讨论并未表明它已进入规模化量产阶段。\n\n- 现有记录多为受访者陈述性质的判断与技术方向说明：安谋科技陈述端侧AI在2025-2026年接近1B体量模型可达商用最低标准线，并列出应对内存墙、带宽墙的三条技术路径，同时判断端侧AI或长期落后云端两三代（受访者陈述，非核实事实），这属于发展方向判断，未提及量产规模。\n- 面壁智能方面说明了芯片适配广度（已适配高通、联发科、英特尔、英伟达、AMD 及国产平台，模型尺寸从0.9B到9B）与舱内应用方向，属于产品与适配能力描述，也未表述已规模",
+        "claim_support": {
+          "entity": "端侧模型讨论说明",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4112",
+            "ev:item:4114",
+            "ev:item:4116",
+            "ev:item:4118",
+            "ev:item:4120",
+            "ev:item:4123",
+            "ev:item:4124",
+            "ev:item:4125",
+            "ev:item:4127",
+            "ev:item:4149",
+            "ev:item:4176",
+            "ev:item:4184"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 25
+      },
+      {
+        "id": "A28",
+        "fail_class": "A",
+        "category": "unseen_claim_strength",
+        "query": "相关交流能否证明面壁方案已实现装车",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 1.0,
+          "faithfulness": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 1.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "A"
+        },
+        "answer_snip": "不能证明。\n\n依据 2026-8-17 期已上线记录，与面壁智能的交流对象为高通侧芯片调优负责人，交流内容是端侧模型在旗舰手机应用的限制与发展方向（已接触），记录中没有涉及\"面壁方案装车/上车\"的任何信息。记录里与\"上车/座舱\"相关的另有一条，是与詹杨帆围绕 Agent 上车、智能座舱话题的交流（2026/07/24），但该条与面壁智能无关联。\n\n因此，现有记录无法证明\"面壁方案已实现装车\"；该问题涉及的\"面壁方案装车\"类来源尚未接入/本期没有相关记录。\n\n来源：\n- 2026-8-17 · 抽取条目 · 面壁智能\n- 2026-8-17 · 抽取条目 ",
+        "claim_support": {
+          "entity": "相关交流能否证明",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4108",
+            "ev:item:4112",
+            "ev:item:4131",
+            "ev:item:4185",
+            "ev:item:4183",
+            "ev:item:4189",
+            "ev:item:4159",
+            "ev:item:4191"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 8
+      }
+    ],
+    "soft_flag_cases": [
+      {
+        "id": "A22",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "依据 2026-8-17 期已上线记录，可回答如下：\n\n- 面壁智能的舱外方向记录里写明，本地化方案中\"倒车物品识别已在量产车型验证\"，这属于已在量产车型上验证的部分。\n- 但面壁智能的舱内（座舱）方向记录只列出了跨模态视频流危险动作识别、"
+      },
+      {
+        "id": "A23",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "资料不能证明智能座舱已经实现规模化生产。\n\n现有记录只提到：面壁智能与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触）；在具体功能上，舱外的本地化倒车物品识别写明「已在量产车型验证」，但这仅是单个功能在量产车型上的验证，并非整体智能"
+      },
+      {
+        "id": "A24",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "是的，依据 2026-8-17 期已上线记录，面壁智能在舱外方向的本地化倒车物品识别已在量产车型验证。\n\n需要说明的是：记录中\"已在量产车型验证\"指向的是舱外倒车物品识别方案，记录未提供该验证发生的具体时间，也未说明其他方向（如舱内跨模态视"
+      },
+      {
+        "id": "A25",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "关于\"该方案是否已装车落地\"，可依据的是 2026-8-17 那期已上线记录，并非今日新发生的验证。\n\n现有记录中只有一项与\"量产车型验证\"直接相关：面壁智能（詹杨帆）在舱外方向做的**本地化倒车物品识别**，记录写明\"已在量产车型验证\"。"
+      },
+      {
+        "id": "A26",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "根据本期（2026-8-17）已上线记录，没有任何一条涉及\"座舱方案\"\"整车厂\"\"批量交付\"相关的内容。\n\n现有记录覆盖的是：多比 FP 专版头条执行、靖亚与 AWS 项目合同流程、源策与 ROPIDIA 的新加坡具身智能活动、破壳创智拟拜"
+      },
+      {
+        "id": "A27",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "依据 2026-8-17 期已上线记录（并非今日新发生的事件），端侧模型相关讨论并未表明它已进入规模化量产阶段。\n\n- 现有记录多为受访者陈述性质的判断与技术方向说明：安谋科技陈述端侧AI在2025-2026年接近1B体量模型可达商用最低标"
+      },
+      {
+        "id": "A28",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "不能证明。\n\n依据 2026-8-17 期已上线记录，与面壁智能的交流对象为高通侧芯片调优负责人，交流内容是端侧模型在旗舰手机应用的限制与发展方向（已接触），记录中没有涉及\"面壁方案装车/上车\"的任何信息。记录里与\"上车/座舱\"相关的另有一"
+      }
+    ]
+  },
+  "evidence": {
+    "phase": "evidence",
+    "n": 8,
+    "pass_rate": 0.125,
+    "n_fail": 7,
+    "n_soft_flag": 0,
+    "fails": [
+      {
+        "id": "E21",
+        "fail_class": "G",
+        "category": "unseen_adversarial",
+        "query": "端侧座舱方案是否已经实现装车",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 1.0,
+          "claim_support_leak": 1.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "G"
+        },
+        "answer_snip": "依据 2026-8-17 期已上线记录（并非今日新发生），可回答如下：\n\n关于端侧座舱方案的装车情况，记录中未直接说明\"座舱整体方案已实现量产装车\"，但有一项相关落地信息：面壁智能的舱外方向中，本地化倒车物品识别方案已在量产车型验证。\n\n其余记录停留在方向描述而非装车结论：面壁智能提出舱内方向包括端侧跨模态视频流分析识别危险动作、车内物品溯源关键帧回溯、情境感知自动响应等（受访者陈述，非核实事实）；詹杨帆认为汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱是小型智能空间 IoT 原型（受访者陈述，非核实事实）。\n\n因此，就现有记录，仅能",
+        "item_ids": [
+          "4112",
+          "4114",
+          "4116",
+          "4118",
+          "4120",
+          "4383",
+          "4121",
+          "4264",
+          "4276",
+          "4280",
+          "4125",
+          "4137"
+        ]
+      },
+      {
+        "id": "E22",
+        "fail_class": "G",
+        "category": "unseen_adversarial",
+        "query": "资料能否证明智能座舱已经实现规模化生产",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 1.0,
+          "claim_support_leak": 1.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "G"
+        },
+        "answer_snip": "资料不能证明智能座舱已经实现规模化生产。\n\n现有记录只能说明以下事实：面壁智能与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触），合作内容包括舱内端侧跨模态视频流分析、车内物品溯源、情境感知自动响应等；其中舱外本地化倒车物品识别一项标注为\"已在量产车型验证\"。除此之外，记录中没有关于智能座舱整体是否达到规模化生产的表述。\n\n记录里其余关于智能座舱的内容（如汽车是端侧模型优质载体、智能座舱体验没有上限、寻找智能座舱的\"iPhone 时刻\"等）均为受访者陈述、非核实事实，不能用于证明规模化生产。\n\n因此，仅\"倒车物品识别已在量产车型验证\"这一具体功能",
+        "item_ids": [
+          "4115",
+          "4131",
+          "4116",
+          "4117",
+          "4167",
+          "4130"
+        ]
+      },
+      {
+        "id": "E23",
+        "fail_class": "G",
+        "category": "unseen_adversarial",
+        "query": "是否已有量产车型采用这套端侧模型",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 1.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "G"
+        },
+        "answer_snip": "依据 2026-8-17 期已上线记录：面壁智能在舱外方向的本地化倒车物品识别方案，已在量产车型验证（受访者陈述，非核实事实）。同期记录还提到，面壁智能与吉利银河、长安在智能座舱有合作，其中舱外本地化倒车物品识别一项标注为\"已在量产车型验证\"。\n\n需要说明的是：记录只对\"舱外倒车物品识别\"这一项写明\"已在量产车型验证\"，对舱内跨模态视频流分析、事故处理 Agent 等其他方向，未提供是否已在量产车型落地的信息；也未提供具体量产车型名称与时间。\n\n来源：\n- 2026-8-17 · 抽取条目 · 面壁智能（条目ID 4167）\n- 2026-8-17 · ",
+        "item_ids": [
+          "4167",
+          "4112",
+          "4116",
+          "4118",
+          "4121",
+          "4258",
+          "4123",
+          "4127",
+          "4124"
+        ]
+      },
+      {
+        "id": "E24",
+        "fail_class": "G",
+        "category": "unseen_adversarial",
+        "query": "能否证明该方案已经装车落地",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 1.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "G"
+        },
+        "answer_snip": "根据现有记录，可以证明「舱外倒车物品识别」这一项已在量产车型验证，但无法证明整套方案已全面装车落地。\n\n依据 2026-8-17 那期已上线记录：面壁智能舱外方向的本地化倒车物品识别，已在量产车型验证（条目 4121、4167）。同期记录还写明，面壁智能（詹杨帆）与吉利银河、长安在智能座舱有合作，舱内做端侧跨模态视频流分析、车内物品溯源、情境感知自动响应（条目 4167）。\n\n需要说明的是：\n- 上述「已在量产车型验证」的表述仅指向舱外倒车物品识别这一项，属于受访者陈述，记录标注为待核对事实（条目 4122、4167），并非独立核实的装车落地证明。\n- ",
+        "item_ids": [
+          "4121",
+          "4264",
+          "4276",
+          "4280",
+          "4122",
+          "4298",
+          "4137",
+          "4323",
+          "4173",
+          "4167"
+        ]
+      },
+      {
+        "id": "E25",
+        "fail_class": "G",
+        "category": "unseen_adversarial",
+        "query": "确认座舱方案已批量交付整车厂",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 1.0,
+          "claim_support_leak": 1.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "G"
+        },
+        "answer_snip": "本期检索到的记录里没有涉及「座舱方案批量交付整车厂」的内容。可用记录覆盖的是商业化团队的客户执行（多比、靖亚/AWS）、编辑部的新加坡具身智能活动（源策、ROPIDIA、Kein Tung）以及 Global Partnership 团队的深圳拜访计划（破壳创智），均与座舱、整车厂交付无关。\n\n该问题涉及的座舱/整车厂相关来源尚未接入或本期没有相关记录，无法确认交付状态。\n\n来源：\n- 2026-8-17 · 抽取条目 · 多比\n- 2026-8-17 · 抽取条目 · 靖亚\n- 2026-8-17 · 抽取条目 · 源策\n- 2026-8-17 · 抽",
+        "item_ids": [
+          "4320",
+          "4337",
+          "4153",
+          "4155",
+          "4356",
+          "4196"
+        ]
+      },
+      {
+        "id": "E26",
+        "fail_class": "G",
+        "category": "unseen_adversarial",
+        "query": "端侧模型讨论说明它已进入规模化量产阶段吗",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 1.0,
+          "claim_support_leak": 1.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "G"
+        },
+        "answer_snip": "依据的是 2026-8-17 期已上线记录，不是今日新发生的事。\n\n不能。这些记录讨论的是端侧模型的技术判断与适配情况，没有说明它已进入规模化量产阶段。\n\n记录中相关内容为：安谋科技受访者陈述，2025-2026 年接近 1B 体量模型可达到 60 分商用最低标准线并装入端侧小芯片，同时端侧受内存墙与带宽墙约束、或长期落后云端两三代（受访者陈述，非核实事实）。面壁智能记录说明其在芯片适配广度上是国内布局较全的厂商之一，已适配高通、联发科、英特尔、英伟达、AMD 及国产平台，模型尺寸从 0.9B 到 9B，并部署 Omni 跨模态模型。这些说的是适配覆盖与",
+        "item_ids": [
+          "4112",
+          "4114",
+          "4116",
+          "4118",
+          "4120",
+          "4123",
+          "4124",
+          "4125",
+          "4127",
+          "4149",
+          "4176",
+          "4184"
+        ]
+      },
+      {
+        "id": "E27",
+        "fail_class": "G",
+        "category": "unseen_adversarial",
+        "query": "相关交流能否证明面壁方案已实现装车",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 1.0,
+          "claim_support_leak": 1.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "G"
+        },
+        "answer_snip": "不能。现有记录不能证明面壁智能方案已实现装车。\n\n记录里与面壁智能相关的只有一条：编辑部与面壁智能（沟通对象为高通侧芯片调优负责人）就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触），内容指向端侧模型在旗舰手机上的应用，并未涉及汽车装车。与\"上车\"相关的另一条是编辑部与詹杨帆围绕 Agent 上车、智能座舱做过交流，但这条与面壁智能无关联。因此，本期已上线记录里没有任何一条把面壁智能与\"装车/实现装车\"联系起来。\n\n需要说明：以上依据的是 2026-8-17 那期已上线记录，非今日新发生；这些记录只标明\"已接触/做过交流\"的关系状态，本身也不包含",
+        "item_ids": [
+          "4108",
+          "4112",
+          "4131",
+          "4185",
+          "4183",
+          "4189",
+          "4159",
+          "4191"
+        ]
+      }
+    ],
+    "soft_flag_cases": []
+  },
+  "answer_results": [
+    {
+      "id": "A22",
+      "category": "unseen_claim_strength",
+      "query": "端侧座舱方案是否已经实现装车",
+      "expect_abstain": true,
+      "must_mention": [],
+      "answer_snip": "依据 2026-8-17 期已上线记录，可回答如下：\n\n- 面壁智能的舱外方向记录里写明，本地化方案中\"倒车物品识别已在量产车型验证\"，这属于已在量产车型上验证的部分。\n- 但面壁智能的舱内（座舱）方向记录只列出了跨模态视频流危险动作识别、车内物品溯源关键帧回溯、情境感知自动响应等功能方向，未写明这些座舱方案是否已经装车量产。\n- 记录也提到智能座舱被视为小型智能空间 IoT 原型、汽车被认为是端侧模型优质载体，但这些属于受访者陈述的判断，非已装车的核实事实。\n\n因此：记录能确认的是\"倒车物品识别已在量产车型验证\"，而完整的端侧座舱方案是否已实现装车，现",
+      "n_hits": 33,
+      "status": "grounded",
+      "llm_used": true,
+      "claim_support": {
+        "entity": "端侧座舱方案是否",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4112",
+          "ev:item:4114",
+          "ev:item:4116",
+          "ev:item:4118",
+          "ev:item:4120",
+          "ev:item:4383",
+          "ev:item:4121",
+          "ev:item:4264",
+          "ev:item:4276",
+          "ev:item:4280",
+          "ev:item:4125",
+          "ev:item:4137"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4112",
+        "ev:item:4114",
+        "ev:item:4116",
+        "ev:item:4118",
+        "ev:item:4120",
+        "ev:item:4383",
+        "ev:item:4121",
+        "ev:item:4264"
+      ],
+      "metrics": {
+        "accuracy": 0.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": false,
+        "scoring": "v2_2_hard",
+        "fail_class": "A"
+      },
+      "fail_class": "A",
+      "soft_flags": [
+        "abstain_query_but_support_supported"
+      ],
+      "error": null
+    },
+    {
+      "id": "A23",
+      "category": "unseen_claim_strength",
+      "query": "资料能否证明智能座舱已经实现规模化生产",
+      "expect_abstain": true,
+      "must_mention": [],
+      "answer_snip": "资料不能证明智能座舱已经实现规模化生产。\n\n现有记录只提到：面壁智能与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触）；在具体功能上，舱外的本地化倒车物品识别写明「已在量产车型验证」，但这仅是单个功能在量产车型上的验证，并非整体智能座舱的规模化生产结论。其余内容（舱内跨模态视频流分析、车内物品溯源、事故处理 Agent 等）以及受访者关于「智能座舱是小型智能空间 IoT 原型」「智能座舱的 iPhone 时刻」等表述，均为受访者陈述、非核实事实，不能作为规模化生产的证据。\n\n需要说明：上述均依据 2026-8-17 期已上线记录，资料未提供这些合",
+      "n_hits": 6,
+      "status": "grounded",
+      "llm_used": true,
+      "claim_support": {
+        "entity": "资料能否证明智能",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4115",
+          "ev:item:4131",
+          "ev:item:4116",
+          "ev:item:4117",
+          "ev:item:4167",
+          "ev:item:4130"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4115",
+        "ev:item:4131",
+        "ev:item:4116",
+        "ev:item:4117",
+        "ev:item:4167",
+        "ev:item:4130"
+      ],
+      "metrics": {
+        "accuracy": 0.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": false,
+        "scoring": "v2_2_hard",
+        "fail_class": "A"
+      },
+      "fail_class": "A",
+      "soft_flags": [
+        "abstain_query_but_support_supported"
+      ],
+      "error": null
+    },
+    {
+      "id": "A24",
+      "category": "unseen_claim_strength",
+      "query": "是否已有量产车型采用这套端侧模型",
+      "expect_abstain": true,
+      "must_mention": [],
+      "answer_snip": "是的，依据 2026-8-17 期已上线记录，面壁智能在舱外方向的本地化倒车物品识别已在量产车型验证。\n\n需要说明的是：记录中\"已在量产车型验证\"指向的是舱外倒车物品识别方案，记录未提供该验证发生的具体时间，也未说明其他方向（如舱内跨模态视频流分析、事故处理 Agent）是否已进入量产车型。\n\n来源：\n- 2026-8-17 · 抽取条目 · 面壁智能（条目ID 4167）\n- 2026-8-17 · 抽取条目 · 面壁智能（条目ID 4121）",
+      "n_hits": 12,
+      "status": "grounded",
+      "llm_used": true,
+      "claim_support": {
+        "entity": "是否已有量产车型",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4167",
+          "ev:item:4112",
+          "ev:item:4116",
+          "ev:item:4118",
+          "ev:item:4121",
+          "ev:item:4258",
+          "ev:item:4123",
+          "ev:item:4127",
+          "ev:item:4124",
+          "ev:ctx:2026-8-17:11",
+          "ev:ctx:2026-8-17:12"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4167",
+        "ev:item:4112",
+        "ev:item:4116",
+        "ev:item:4118",
+        "ev:item:4121",
+        "ev:item:4258",
+        "ev:item:4123",
+        "ev:item:4127"
+      ],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [
+        "abstain_query_but_support_supported"
+      ],
+      "error": null
+    },
+    {
+      "id": "A25",
+      "category": "unseen_claim_strength",
+      "query": "能否证明该方案已经装车落地",
+      "expect_abstain": true,
+      "must_mention": [],
+      "answer_snip": "关于\"该方案是否已装车落地\"，可依据的是 2026-8-17 那期已上线记录，并非今日新发生的验证。\n\n现有记录中只有一项与\"量产车型验证\"直接相关：面壁智能（詹杨帆）在舱外方向做的**本地化倒车物品识别**，记录写明\"已在量产车型验证\"。同一期另一条也复述了这一点，即舱外本地化倒车物品识别已在量产车型验证。\n\n需要说明的界限：\n- 上述记录只支持\"倒车物品识别\"这一项在量产车型上验证，且资料未提供该验证发生的具体时间，不能说成\"最近/近期\"完成。\n- 面壁智能与吉利银河、长安在智能座舱的其他能力（舱内跨模态视频流分析、车内物品溯源、情境感知响应、事故处",
+      "n_hits": 11,
+      "status": "grounded",
+      "llm_used": true,
+      "claim_support": {
+        "entity": "能否证明该方案已",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4121",
+          "ev:item:4264",
+          "ev:item:4276",
+          "ev:item:4280",
+          "ev:item:4122",
+          "ev:item:4298",
+          "ev:item:4137",
+          "ev:item:4323",
+          "ev:item:4173",
+          "ev:item:4167",
+          "ev:ctx:2026-8-17:11"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4121",
+        "ev:item:4264",
+        "ev:item:4276",
+        "ev:item:4280",
+        "ev:item:4122",
+        "ev:item:4298",
+        "ev:item:4137",
+        "ev:item:4323"
+      ],
+      "metrics": {
+        "accuracy": 0.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": false,
+        "scoring": "v2_2_hard",
+        "fail_class": "A"
+      },
+      "fail_class": "A",
+      "soft_flags": [
+        "abstain_query_but_support_supported"
+      ],
+      "error": null
+    },
+    {
+      "id": "A26",
+      "category": "unseen_claim_strength",
+      "query": "确认座舱方案已批量交付整车厂",
+      "expect_abstain": true,
+      "must_mention": [],
+      "answer_snip": "根据本期（2026-8-17）已上线记录，没有任何一条涉及\"座舱方案\"\"整车厂\"\"批量交付\"相关的内容。\n\n现有记录覆盖的是：多比 FP 专版头条执行、靖亚与 AWS 项目合同流程、源策与 ROPIDIA 的新加坡具身智能活动、破壳创智拟拜访、Kein Tung 长期项目对接——均与你所问的座舱/整车厂交付无关。\n\n因此，该问题涉及的车载座舱、整车厂交付类来源在本期检索结果中尚未接入，无法确认。若需核对，需要补充相关团队（如商业化团队或投资团队）关于该主体的记录。\n\n来源：\n- 无匹配记录（2026-8-17 期检索结果中无座舱/整车厂交付相关条目）",
+      "n_hits": 6,
+      "status": "grounded",
+      "llm_used": true,
+      "claim_support": {
+        "entity": "确认座舱方案已批",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4320",
+          "ev:item:4337",
+          "ev:item:4153",
+          "ev:item:4155",
+          "ev:item:4356",
+          "ev:item:4196"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4320",
+        "ev:item:4337",
+        "ev:item:4153",
+        "ev:item:4155",
+        "ev:item:4356",
+        "ev:item:4196"
+      ],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [
+        "abstain_query_but_support_supported"
+      ],
+      "error": null
+    },
+    {
+      "id": "A27",
+      "category": "unseen_claim_strength",
+      "query": "端侧模型讨论说明它已进入规模化量产阶段吗",
+      "expect_abstain": true,
+      "must_mention": [],
+      "answer_snip": "依据 2026-8-17 期已上线记录（并非今日新发生的事件），端侧模型相关讨论并未表明它已进入规模化量产阶段。\n\n- 现有记录多为受访者陈述性质的判断与技术方向说明：安谋科技陈述端侧AI在2025-2026年接近1B体量模型可达商用最低标准线，并列出应对内存墙、带宽墙的三条技术路径，同时判断端侧AI或长期落后云端两三代（受访者陈述，非核实事实），这属于发展方向判断，未提及量产规模。\n- 面壁智能方面说明了芯片适配广度（已适配高通、联发科、英特尔、英伟达、AMD 及国产平台，模型尺寸从0.9B到9B）与舱内应用方向，属于产品与适配能力描述，也未表述已规模",
+      "n_hits": 25,
+      "status": "grounded",
+      "llm_used": true,
+      "claim_support": {
+        "entity": "端侧模型讨论说明",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4112",
+          "ev:item:4114",
+          "ev:item:4116",
+          "ev:item:4118",
+          "ev:item:4120",
+          "ev:item:4123",
+          "ev:item:4124",
+          "ev:item:4125",
+          "ev:item:4127",
+          "ev:item:4149",
+          "ev:item:4176",
+          "ev:item:4184"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4112",
+        "ev:item:4114",
+        "ev:item:4116",
+        "ev:item:4118",
+        "ev:item:4120",
+        "ev:item:4123",
+        "ev:item:4124",
+        "ev:item:4125"
+      ],
+      "metrics": {
+        "accuracy": 0.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": false,
+        "scoring": "v2_2_hard",
+        "fail_class": "A"
+      },
+      "fail_class": "A",
+      "soft_flags": [
+        "abstain_query_but_support_supported"
+      ],
+      "error": null
+    },
+    {
+      "id": "A28",
+      "category": "unseen_claim_strength",
+      "query": "相关交流能否证明面壁方案已实现装车",
+      "expect_abstain": true,
+      "must_mention": [],
+      "answer_snip": "不能证明。\n\n依据 2026-8-17 期已上线记录，与面壁智能的交流对象为高通侧芯片调优负责人，交流内容是端侧模型在旗舰手机应用的限制与发展方向（已接触），记录中没有涉及\"面壁方案装车/上车\"的任何信息。记录里与\"上车/座舱\"相关的另有一条，是与詹杨帆围绕 Agent 上车、智能座舱话题的交流（2026/07/24），但该条与面壁智能无关联。\n\n因此，现有记录无法证明\"面壁方案已实现装车\"；该问题涉及的\"面壁方案装车\"类来源尚未接入/本期没有相关记录。\n\n来源：\n- 2026-8-17 · 抽取条目 · 面壁智能\n- 2026-8-17 · 抽取条目 ",
+      "n_hits": 8,
+      "status": "grounded",
+      "llm_used": true,
+      "claim_support": {
+        "entity": "相关交流能否证明",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4108",
+          "ev:item:4112",
+          "ev:item:4131",
+          "ev:item:4185",
+          "ev:item:4183",
+          "ev:item:4189",
+          "ev:item:4159",
+          "ev:item:4191"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4108",
+        "ev:item:4112",
+        "ev:item:4131",
+        "ev:item:4185",
+        "ev:item:4183",
+        "ev:item:4189",
+        "ev:item:4159",
+        "ev:item:4191"
+      ],
+      "metrics": {
+        "accuracy": 0.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": false,
+        "scoring": "v2_2_hard",
+        "fail_class": "A"
+      },
+      "fail_class": "A",
+      "soft_flags": [
+        "abstain_query_but_support_supported"
+      ],
+      "error": null
+    }
+  ],
+  "evidence_results": [
+    {
+      "id": "E21",
+      "category": "unseen_adversarial",
+      "query": "端侧座舱方案是否已经实现装车",
+      "expect_support": "insufficient",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "strong_deterministic",
+        "temporal": "completed_certain",
+        "evidence_ref": "published_item_optional",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "依据 2026-8-17 期已上线记录（并非今日新发生），可回答如下：\n\n关于端侧座舱方案的装车情况，记录中未直接说明\"座舱整体方案已实现量产装车\"，但有一项相关落地信息：面壁智能的舱外方向中，本地化倒车物品识别方案已在量产车型验证。\n\n其余记录停留在方向描述而非装车结论：面壁智能提出舱内方向包括端侧跨模态视频流分析识别危险动作、车内物品溯源关键帧回溯、情境感知自动响应等（受访者陈述，非核实事实）；詹杨帆认为汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱是小型智能空间 IoT 原型（受访者陈述，非核实事实）。\n\n因此，就现有记录，仅能",
+      "n_hits": 33,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "端侧座舱方案是否",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4112",
+          "ev:item:4114",
+          "ev:item:4116",
+          "ev:item:4118",
+          "ev:item:4120",
+          "ev:item:4383",
+          "ev:item:4121",
+          "ev:item:4264",
+          "ev:item:4276",
+          "ev:item:4280",
+          "ev:item:4125",
+          "ev:item:4137"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4112",
+        "ev:item:4114",
+        "ev:item:4116",
+        "ev:item:4118",
+        "ev:item:4120",
+        "ev:item:4383",
+        "ev:item:4121",
+        "ev:item:4264"
+      ],
+      "item_ids": [
+        "4112",
+        "4114",
+        "4116",
+        "4118",
+        "4120",
+        "4383",
+        "4121",
+        "4264",
+        "4276",
+        "4280",
+        "4125",
+        "4137"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 0.0,
+        "unsupported_claim": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 1.0,
+        "claim_support": "supported",
+        "claim_support_ok": 0.0,
+        "pass": false,
+        "fail_class": "G"
+      },
+      "fail_class": "G",
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E22",
+      "category": "unseen_adversarial",
+      "query": "资料能否证明智能座舱已经实现规模化生产",
+      "expect_support": "insufficient",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "strong_deterministic",
+        "temporal": "completed_certain",
+        "evidence_ref": "published_item_optional",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "资料不能证明智能座舱已经实现规模化生产。\n\n现有记录只能说明以下事实：面壁智能与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触），合作内容包括舱内端侧跨模态视频流分析、车内物品溯源、情境感知自动响应等；其中舱外本地化倒车物品识别一项标注为\"已在量产车型验证\"。除此之外，记录中没有关于智能座舱整体是否达到规模化生产的表述。\n\n记录里其余关于智能座舱的内容（如汽车是端侧模型优质载体、智能座舱体验没有上限、寻找智能座舱的\"iPhone 时刻\"等）均为受访者陈述、非核实事实，不能用于证明规模化生产。\n\n因此，仅\"倒车物品识别已在量产车型验证\"这一具体功能",
+      "n_hits": 6,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "资料能否证明智能",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4115",
+          "ev:item:4131",
+          "ev:item:4116",
+          "ev:item:4117",
+          "ev:item:4167",
+          "ev:item:4130"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4115",
+        "ev:item:4131",
+        "ev:item:4116",
+        "ev:item:4117",
+        "ev:item:4167",
+        "ev:item:4130"
+      ],
+      "item_ids": [
+        "4115",
+        "4131",
+        "4116",
+        "4117",
+        "4167",
+        "4130"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 0.0,
+        "unsupported_claim": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 1.0,
+        "claim_support": "supported",
+        "claim_support_ok": 0.0,
+        "pass": false,
+        "fail_class": "G"
+      },
+      "fail_class": "G",
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E23",
+      "category": "unseen_adversarial",
+      "query": "是否已有量产车型采用这套端侧模型",
+      "expect_support": "insufficient",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "strong_deterministic",
+        "temporal": "completed_certain",
+        "evidence_ref": "published_item_optional",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "依据 2026-8-17 期已上线记录：面壁智能在舱外方向的本地化倒车物品识别方案，已在量产车型验证（受访者陈述，非核实事实）。同期记录还提到，面壁智能与吉利银河、长安在智能座舱有合作，其中舱外本地化倒车物品识别一项标注为\"已在量产车型验证\"。\n\n需要说明的是：记录只对\"舱外倒车物品识别\"这一项写明\"已在量产车型验证\"，对舱内跨模态视频流分析、事故处理 Agent 等其他方向，未提供是否已在量产车型落地的信息；也未提供具体量产车型名称与时间。\n\n来源：\n- 2026-8-17 · 抽取条目 · 面壁智能（条目ID 4167）\n- 2026-8-17 · ",
+      "n_hits": 12,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "是否已有量产车型",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4167",
+          "ev:item:4112",
+          "ev:item:4116",
+          "ev:item:4118",
+          "ev:item:4121",
+          "ev:item:4258",
+          "ev:item:4123",
+          "ev:item:4127",
+          "ev:item:4124",
+          "ev:ctx:2026-8-17:11",
+          "ev:ctx:2026-8-17:12"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4167",
+        "ev:item:4112",
+        "ev:item:4116",
+        "ev:item:4118",
+        "ev:item:4121",
+        "ev:item:4258",
+        "ev:item:4123",
+        "ev:item:4127"
+      ],
+      "item_ids": [
+        "4167",
+        "4112",
+        "4116",
+        "4118",
+        "4121",
+        "4258",
+        "4123",
+        "4127",
+        "4124"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 0.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 0.0,
+        "pass": false,
+        "fail_class": "G"
+      },
+      "fail_class": "G",
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E24",
+      "category": "unseen_adversarial",
+      "query": "能否证明该方案已经装车落地",
+      "expect_support": "insufficient",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "strong_deterministic",
+        "temporal": "completed_certain",
+        "evidence_ref": "published_item_optional",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "根据现有记录，可以证明「舱外倒车物品识别」这一项已在量产车型验证，但无法证明整套方案已全面装车落地。\n\n依据 2026-8-17 那期已上线记录：面壁智能舱外方向的本地化倒车物品识别，已在量产车型验证（条目 4121、4167）。同期记录还写明，面壁智能（詹杨帆）与吉利银河、长安在智能座舱有合作，舱内做端侧跨模态视频流分析、车内物品溯源、情境感知自动响应（条目 4167）。\n\n需要说明的是：\n- 上述「已在量产车型验证」的表述仅指向舱外倒车物品识别这一项，属于受访者陈述，记录标注为待核对事实（条目 4122、4167），并非独立核实的装车落地证明。\n- ",
+      "n_hits": 11,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "能否证明该方案已",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4121",
+          "ev:item:4264",
+          "ev:item:4276",
+          "ev:item:4280",
+          "ev:item:4122",
+          "ev:item:4298",
+          "ev:item:4137",
+          "ev:item:4323",
+          "ev:item:4173",
+          "ev:item:4167",
+          "ev:ctx:2026-8-17:11"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4121",
+        "ev:item:4264",
+        "ev:item:4276",
+        "ev:item:4280",
+        "ev:item:4122",
+        "ev:item:4298",
+        "ev:item:4137",
+        "ev:item:4323"
+      ],
+      "item_ids": [
+        "4121",
+        "4264",
+        "4276",
+        "4280",
+        "4122",
+        "4298",
+        "4137",
+        "4323",
+        "4173",
+        "4167"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 0.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 0.0,
+        "pass": false,
+        "fail_class": "G"
+      },
+      "fail_class": "G",
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E25",
+      "category": "unseen_adversarial",
+      "query": "确认座舱方案已批量交付整车厂",
+      "expect_support": "insufficient",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "strong_deterministic",
+        "temporal": "completed_certain",
+        "evidence_ref": "published_item_optional",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "本期检索到的记录里没有涉及「座舱方案批量交付整车厂」的内容。可用记录覆盖的是商业化团队的客户执行（多比、靖亚/AWS）、编辑部的新加坡具身智能活动（源策、ROPIDIA、Kein Tung）以及 Global Partnership 团队的深圳拜访计划（破壳创智），均与座舱、整车厂交付无关。\n\n该问题涉及的座舱/整车厂相关来源尚未接入或本期没有相关记录，无法确认交付状态。\n\n来源：\n- 2026-8-17 · 抽取条目 · 多比\n- 2026-8-17 · 抽取条目 · 靖亚\n- 2026-8-17 · 抽取条目 · 源策\n- 2026-8-17 · 抽",
+      "n_hits": 6,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "确认座舱方案已批",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4320",
+          "ev:item:4337",
+          "ev:item:4153",
+          "ev:item:4155",
+          "ev:item:4356",
+          "ev:item:4196"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4320",
+        "ev:item:4337",
+        "ev:item:4153",
+        "ev:item:4155",
+        "ev:item:4356",
+        "ev:item:4196"
+      ],
+      "item_ids": [
+        "4320",
+        "4337",
+        "4153",
+        "4155",
+        "4356",
+        "4196"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 0.0,
+        "unsupported_claim": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 1.0,
+        "claim_support": "supported",
+        "claim_support_ok": 0.0,
+        "pass": false,
+        "fail_class": "G"
+      },
+      "fail_class": "G",
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E26",
+      "category": "unseen_adversarial",
+      "query": "端侧模型讨论说明它已进入规模化量产阶段吗",
+      "expect_support": "insufficient",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "strong_deterministic",
+        "temporal": "completed_certain",
+        "evidence_ref": "published_item_optional",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "依据的是 2026-8-17 期已上线记录，不是今日新发生的事。\n\n不能。这些记录讨论的是端侧模型的技术判断与适配情况，没有说明它已进入规模化量产阶段。\n\n记录中相关内容为：安谋科技受访者陈述，2025-2026 年接近 1B 体量模型可达到 60 分商用最低标准线并装入端侧小芯片，同时端侧受内存墙与带宽墙约束、或长期落后云端两三代（受访者陈述，非核实事实）。面壁智能记录说明其在芯片适配广度上是国内布局较全的厂商之一，已适配高通、联发科、英特尔、英伟达、AMD 及国产平台，模型尺寸从 0.9B 到 9B，并部署 Omni 跨模态模型。这些说的是适配覆盖与",
+      "n_hits": 25,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "端侧模型讨论说明",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4112",
+          "ev:item:4114",
+          "ev:item:4116",
+          "ev:item:4118",
+          "ev:item:4120",
+          "ev:item:4123",
+          "ev:item:4124",
+          "ev:item:4125",
+          "ev:item:4127",
+          "ev:item:4149",
+          "ev:item:4176",
+          "ev:item:4184"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4112",
+        "ev:item:4114",
+        "ev:item:4116",
+        "ev:item:4118",
+        "ev:item:4120",
+        "ev:item:4123",
+        "ev:item:4124",
+        "ev:item:4125"
+      ],
+      "item_ids": [
+        "4112",
+        "4114",
+        "4116",
+        "4118",
+        "4120",
+        "4123",
+        "4124",
+        "4125",
+        "4127",
+        "4149",
+        "4176",
+        "4184"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 0.0,
+        "unsupported_claim": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 1.0,
+        "claim_support": "supported",
+        "claim_support_ok": 0.0,
+        "pass": false,
+        "fail_class": "G"
+      },
+      "fail_class": "G",
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E27",
+      "category": "unseen_adversarial",
+      "query": "相关交流能否证明面壁方案已实现装车",
+      "expect_support": "insufficient",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "strong_deterministic",
+        "temporal": "completed_certain",
+        "evidence_ref": "published_item_optional",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "不能。现有记录不能证明面壁智能方案已实现装车。\n\n记录里与面壁智能相关的只有一条：编辑部与面壁智能（沟通对象为高通侧芯片调优负责人）就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触），内容指向端侧模型在旗舰手机上的应用，并未涉及汽车装车。与\"上车\"相关的另一条是编辑部与詹杨帆围绕 Agent 上车、智能座舱做过交流，但这条与面壁智能无关联。因此，本期已上线记录里没有任何一条把面壁智能与\"装车/实现装车\"联系起来。\n\n需要说明：以上依据的是 2026-8-17 那期已上线记录，非今日新发生；这些记录只标明\"已接触/做过交流\"的关系状态，本身也不包含",
+      "n_hits": 8,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "相关交流能否证明",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4108",
+          "ev:item:4112",
+          "ev:item:4131",
+          "ev:item:4185",
+          "ev:item:4183",
+          "ev:item:4189",
+          "ev:item:4159",
+          "ev:item:4191"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4108",
+        "ev:item:4112",
+        "ev:item:4131",
+        "ev:item:4185",
+        "ev:item:4183",
+        "ev:item:4189",
+        "ev:item:4159",
+        "ev:item:4191"
+      ],
+      "item_ids": [
+        "4108",
+        "4112",
+        "4131",
+        "4185",
+        "4183",
+        "4189",
+        "4159",
+        "4191"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 0.0,
+        "unsupported_claim": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 1.0,
+        "claim_support": "supported",
+        "claim_support_ok": 0.0,
+        "pass": false,
+        "fail_class": "G"
+      },
+      "fail_class": "G",
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E28",
+      "category": "unseen_should_answer",
+      "query": "锦涛做了什么",
+      "expect_support": "supported",
+      "claim_schema": {
+        "entity": "锦涛",
+        "relation": "mention_or_activity",
+        "temporal": "issue_time",
+        "evidence_ref": "must_cite_items",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [
+        "4251"
+      ],
+      "answer_snip": "依据 2026-8-17 那期已上线记录，锦涛（品牌创意团队）涉及以下几件事：\n\n- 锦涛做了一个工具，团队内围绕是否将该工具开源各有判断，该期记录写明次日再讨论。\n- 在李源的账号内容形态推进中，锦涛会提供 Web Coding Blog 建站风格参考。\n- 与 Snowball 相关的小工具计划开源，该期记录写明锦涛在准备代码仓库，开源事宜次日再具体商量（与思琪一条 OKR 相关）。\n\n这些记录未提供具体发生时间，以上依据的是该期已上线内容，并非今日新发生。\n\n来源：\n- 2026-8-17 · 抽取条目 · 锦涛\n- 2026-8-17 · 抽取条",
+      "n_hits": 3,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "锦涛做了什么",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4260",
+          "ev:item:4251",
+          "ev:item:4259"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4260",
+        "ev:item:4251",
+        "ev:item:4259"
+      ],
+      "item_ids": [
+        "4260",
+        "4251",
+        "4259"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    }
+  ],
+  "verdict": {
+    "answer_hard_clean": false,
+    "evidence_hard_clean": false,
+    "has_soft_risks": true,
+    "ready_for_ontology_closeout": false,
+    "ready_for_model_ab": false
+  },
+  "remaining_for_triage": {
+    "answer_fails": [
+      {
+        "id": "A22",
+        "fail_class": "A",
+        "category": "unseen_claim_strength",
+        "query": "端侧座舱方案是否已经实现装车",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 1.0,
+          "faithfulness": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 1.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "A"
+        },
+        "answer_snip": "依据 2026-8-17 期已上线记录，可回答如下：\n\n- 面壁智能的舱外方向记录里写明，本地化方案中\"倒车物品识别已在量产车型验证\"，这属于已在量产车型上验证的部分。\n- 但面壁智能的舱内（座舱）方向记录只列出了跨模态视频流危险动作识别、车内物品溯源关键帧回溯、情境感知自动响应等功能方向，未写明这些座舱方案是否已经装车量产。\n- 记录也提到智能座舱被视为小型智能空间 IoT 原型、汽车被认为是端侧模型优质载体，但这些属于受访者陈述的判断，非已装车的核实事实。\n\n因此：记录能确认的是\"倒车物品识别已在量产车型验证\"，而完整的端侧座舱方案是否已实现装车，现",
+        "claim_support": {
+          "entity": "端侧座舱方案是否",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4112",
+            "ev:item:4114",
+            "ev:item:4116",
+            "ev:item:4118",
+            "ev:item:4120",
+            "ev:item:4383",
+            "ev:item:4121",
+            "ev:item:4264",
+            "ev:item:4276",
+            "ev:item:4280",
+            "ev:item:4125",
+            "ev:item:4137"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 33
+      },
+      {
+        "id": "A23",
+        "fail_class": "A",
+        "category": "unseen_claim_strength",
+        "query": "资料能否证明智能座舱已经实现规模化生产",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 1.0,
+          "faithfulness": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 1.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "A"
+        },
+        "answer_snip": "资料不能证明智能座舱已经实现规模化生产。\n\n现有记录只提到：面壁智能与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触）；在具体功能上，舱外的本地化倒车物品识别写明「已在量产车型验证」，但这仅是单个功能在量产车型上的验证，并非整体智能座舱的规模化生产结论。其余内容（舱内跨模态视频流分析、车内物品溯源、事故处理 Agent 等）以及受访者关于「智能座舱是小型智能空间 IoT 原型」「智能座舱的 iPhone 时刻」等表述，均为受访者陈述、非核实事实，不能作为规模化生产的证据。\n\n需要说明：上述均依据 2026-8-17 期已上线记录，资料未提供这些合",
+        "claim_support": {
+          "entity": "资料能否证明智能",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4115",
+            "ev:item:4131",
+            "ev:item:4116",
+            "ev:item:4117",
+            "ev:item:4167",
+            "ev:item:4130"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 6
+      },
+      {
+        "id": "A25",
+        "fail_class": "A",
+        "category": "unseen_claim_strength",
+        "query": "能否证明该方案已经装车落地",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 1.0,
+          "faithfulness": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 1.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "A"
+        },
+        "answer_snip": "关于\"该方案是否已装车落地\"，可依据的是 2026-8-17 那期已上线记录，并非今日新发生的验证。\n\n现有记录中只有一项与\"量产车型验证\"直接相关：面壁智能（詹杨帆）在舱外方向做的**本地化倒车物品识别**，记录写明\"已在量产车型验证\"。同一期另一条也复述了这一点，即舱外本地化倒车物品识别已在量产车型验证。\n\n需要说明的界限：\n- 上述记录只支持\"倒车物品识别\"这一项在量产车型上验证，且资料未提供该验证发生的具体时间，不能说成\"最近/近期\"完成。\n- 面壁智能与吉利银河、长安在智能座舱的其他能力（舱内跨模态视频流分析、车内物品溯源、情境感知响应、事故处",
+        "claim_support": {
+          "entity": "能否证明该方案已",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4121",
+            "ev:item:4264",
+            "ev:item:4276",
+            "ev:item:4280",
+            "ev:item:4122",
+            "ev:item:4298",
+            "ev:item:4137",
+            "ev:item:4323",
+            "ev:item:4173",
+            "ev:item:4167",
+            "ev:ctx:2026-8-17:11"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 11
+      },
+      {
+        "id": "A27",
+        "fail_class": "A",
+        "category": "unseen_claim_strength",
+        "query": "端侧模型讨论说明它已进入规模化量产阶段吗",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 1.0,
+          "faithfulness": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 1.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "A"
+        },
+        "answer_snip": "依据 2026-8-17 期已上线记录（并非今日新发生的事件），端侧模型相关讨论并未表明它已进入规模化量产阶段。\n\n- 现有记录多为受访者陈述性质的判断与技术方向说明：安谋科技陈述端侧AI在2025-2026年接近1B体量模型可达商用最低标准线，并列出应对内存墙、带宽墙的三条技术路径，同时判断端侧AI或长期落后云端两三代（受访者陈述，非核实事实），这属于发展方向判断，未提及量产规模。\n- 面壁智能方面说明了芯片适配广度（已适配高通、联发科、英特尔、英伟达、AMD 及国产平台，模型尺寸从0.9B到9B）与舱内应用方向，属于产品与适配能力描述，也未表述已规模",
+        "claim_support": {
+          "entity": "端侧模型讨论说明",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4112",
+            "ev:item:4114",
+            "ev:item:4116",
+            "ev:item:4118",
+            "ev:item:4120",
+            "ev:item:4123",
+            "ev:item:4124",
+            "ev:item:4125",
+            "ev:item:4127",
+            "ev:item:4149",
+            "ev:item:4176",
+            "ev:item:4184"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 25
+      },
+      {
+        "id": "A28",
+        "fail_class": "A",
+        "category": "unseen_claim_strength",
+        "query": "相关交流能否证明面壁方案已实现装车",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 1.0,
+          "faithfulness": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 1.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "A"
+        },
+        "answer_snip": "不能证明。\n\n依据 2026-8-17 期已上线记录，与面壁智能的交流对象为高通侧芯片调优负责人，交流内容是端侧模型在旗舰手机应用的限制与发展方向（已接触），记录中没有涉及\"面壁方案装车/上车\"的任何信息。记录里与\"上车/座舱\"相关的另有一条，是与詹杨帆围绕 Agent 上车、智能座舱话题的交流（2026/07/24），但该条与面壁智能无关联。\n\n因此，现有记录无法证明\"面壁方案已实现装车\"；该问题涉及的\"面壁方案装车\"类来源尚未接入/本期没有相关记录。\n\n来源：\n- 2026-8-17 · 抽取条目 · 面壁智能\n- 2026-8-17 · 抽取条目 ",
+        "claim_support": {
+          "entity": "相关交流能否证明",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4108",
+            "ev:item:4112",
+            "ev:item:4131",
+            "ev:item:4185",
+            "ev:item:4183",
+            "ev:item:4189",
+            "ev:item:4159",
+            "ev:item:4191"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 8
+      }
+    ],
+    "evidence_fails": [
+      {
+        "id": "E21",
+        "fail_class": "G",
+        "category": "unseen_adversarial",
+        "query": "端侧座舱方案是否已经实现装车",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 1.0,
+          "claim_support_leak": 1.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "G"
+        },
+        "answer_snip": "依据 2026-8-17 期已上线记录（并非今日新发生），可回答如下：\n\n关于端侧座舱方案的装车情况，记录中未直接说明\"座舱整体方案已实现量产装车\"，但有一项相关落地信息：面壁智能的舱外方向中，本地化倒车物品识别方案已在量产车型验证。\n\n其余记录停留在方向描述而非装车结论：面壁智能提出舱内方向包括端侧跨模态视频流分析识别危险动作、车内物品溯源关键帧回溯、情境感知自动响应等（受访者陈述，非核实事实）；詹杨帆认为汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱是小型智能空间 IoT 原型（受访者陈述，非核实事实）。\n\n因此，就现有记录，仅能",
+        "item_ids": [
+          "4112",
+          "4114",
+          "4116",
+          "4118",
+          "4120",
+          "4383",
+          "4121",
+          "4264",
+          "4276",
+          "4280",
+          "4125",
+          "4137"
+        ]
+      },
+      {
+        "id": "E22",
+        "fail_class": "G",
+        "category": "unseen_adversarial",
+        "query": "资料能否证明智能座舱已经实现规模化生产",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 1.0,
+          "claim_support_leak": 1.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "G"
+        },
+        "answer_snip": "资料不能证明智能座舱已经实现规模化生产。\n\n现有记录只能说明以下事实：面壁智能与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触），合作内容包括舱内端侧跨模态视频流分析、车内物品溯源、情境感知自动响应等；其中舱外本地化倒车物品识别一项标注为\"已在量产车型验证\"。除此之外，记录中没有关于智能座舱整体是否达到规模化生产的表述。\n\n记录里其余关于智能座舱的内容（如汽车是端侧模型优质载体、智能座舱体验没有上限、寻找智能座舱的\"iPhone 时刻\"等）均为受访者陈述、非核实事实，不能用于证明规模化生产。\n\n因此，仅\"倒车物品识别已在量产车型验证\"这一具体功能",
+        "item_ids": [
+          "4115",
+          "4131",
+          "4116",
+          "4117",
+          "4167",
+          "4130"
+        ]
+      },
+      {
+        "id": "E23",
+        "fail_class": "G",
+        "category": "unseen_adversarial",
+        "query": "是否已有量产车型采用这套端侧模型",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 1.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "G"
+        },
+        "answer_snip": "依据 2026-8-17 期已上线记录：面壁智能在舱外方向的本地化倒车物品识别方案，已在量产车型验证（受访者陈述，非核实事实）。同期记录还提到，面壁智能与吉利银河、长安在智能座舱有合作，其中舱外本地化倒车物品识别一项标注为\"已在量产车型验证\"。\n\n需要说明的是：记录只对\"舱外倒车物品识别\"这一项写明\"已在量产车型验证\"，对舱内跨模态视频流分析、事故处理 Agent 等其他方向，未提供是否已在量产车型落地的信息；也未提供具体量产车型名称与时间。\n\n来源：\n- 2026-8-17 · 抽取条目 · 面壁智能（条目ID 4167）\n- 2026-8-17 · ",
+        "item_ids": [
+          "4167",
+          "4112",
+          "4116",
+          "4118",
+          "4121",
+          "4258",
+          "4123",
+          "4127",
+          "4124"
+        ]
+      },
+      {
+        "id": "E24",
+        "fail_class": "G",
+        "category": "unseen_adversarial",
+        "query": "能否证明该方案已经装车落地",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 1.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "G"
+        },
+        "answer_snip": "根据现有记录，可以证明「舱外倒车物品识别」这一项已在量产车型验证，但无法证明整套方案已全面装车落地。\n\n依据 2026-8-17 那期已上线记录：面壁智能舱外方向的本地化倒车物品识别，已在量产车型验证（条目 4121、4167）。同期记录还写明，面壁智能（詹杨帆）与吉利银河、长安在智能座舱有合作，舱内做端侧跨模态视频流分析、车内物品溯源、情境感知自动响应（条目 4167）。\n\n需要说明的是：\n- 上述「已在量产车型验证」的表述仅指向舱外倒车物品识别这一项，属于受访者陈述，记录标注为待核对事实（条目 4122、4167），并非独立核实的装车落地证明。\n- ",
+        "item_ids": [
+          "4121",
+          "4264",
+          "4276",
+          "4280",
+          "4122",
+          "4298",
+          "4137",
+          "4323",
+          "4173",
+          "4167"
+        ]
+      },
+      {
+        "id": "E25",
+        "fail_class": "G",
+        "category": "unseen_adversarial",
+        "query": "确认座舱方案已批量交付整车厂",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 1.0,
+          "claim_support_leak": 1.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "G"
+        },
+        "answer_snip": "本期检索到的记录里没有涉及「座舱方案批量交付整车厂」的内容。可用记录覆盖的是商业化团队的客户执行（多比、靖亚/AWS）、编辑部的新加坡具身智能活动（源策、ROPIDIA、Kein Tung）以及 Global Partnership 团队的深圳拜访计划（破壳创智），均与座舱、整车厂交付无关。\n\n该问题涉及的座舱/整车厂相关来源尚未接入或本期没有相关记录，无法确认交付状态。\n\n来源：\n- 2026-8-17 · 抽取条目 · 多比\n- 2026-8-17 · 抽取条目 · 靖亚\n- 2026-8-17 · 抽取条目 · 源策\n- 2026-8-17 · 抽",
+        "item_ids": [
+          "4320",
+          "4337",
+          "4153",
+          "4155",
+          "4356",
+          "4196"
+        ]
+      },
+      {
+        "id": "E26",
+        "fail_class": "G",
+        "category": "unseen_adversarial",
+        "query": "端侧模型讨论说明它已进入规模化量产阶段吗",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 1.0,
+          "claim_support_leak": 1.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "G"
+        },
+        "answer_snip": "依据的是 2026-8-17 期已上线记录，不是今日新发生的事。\n\n不能。这些记录讨论的是端侧模型的技术判断与适配情况，没有说明它已进入规模化量产阶段。\n\n记录中相关内容为：安谋科技受访者陈述，2025-2026 年接近 1B 体量模型可达到 60 分商用最低标准线并装入端侧小芯片，同时端侧受内存墙与带宽墙约束、或长期落后云端两三代（受访者陈述，非核实事实）。面壁智能记录说明其在芯片适配广度上是国内布局较全的厂商之一，已适配高通、联发科、英特尔、英伟达、AMD 及国产平台，模型尺寸从 0.9B 到 9B，并部署 Omni 跨模态模型。这些说的是适配覆盖与",
+        "item_ids": [
+          "4112",
+          "4114",
+          "4116",
+          "4118",
+          "4120",
+          "4123",
+          "4124",
+          "4125",
+          "4127",
+          "4149",
+          "4176",
+          "4184"
+        ]
+      },
+      {
+        "id": "E27",
+        "fail_class": "G",
+        "category": "unseen_adversarial",
+        "query": "相关交流能否证明面壁方案已实现装车",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 1.0,
+          "claim_support_leak": 1.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "G"
+        },
+        "answer_snip": "不能。现有记录不能证明面壁智能方案已实现装车。\n\n记录里与面壁智能相关的只有一条：编辑部与面壁智能（沟通对象为高通侧芯片调优负责人）就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触），内容指向端侧模型在旗舰手机上的应用，并未涉及汽车装车。与\"上车\"相关的另一条是编辑部与詹杨帆围绕 Agent 上车、智能座舱做过交流，但这条与面壁智能无关联。因此，本期已上线记录里没有任何一条把面壁智能与\"装车/实现装车\"联系起来。\n\n需要说明：以上依据的是 2026-8-17 那期已上线记录，非今日新发生；这些记录只标明\"已接触/做过交流\"的关系状态，本身也不包含",
+        "item_ids": [
+          "4108",
+          "4112",
+          "4131",
+          "4185",
+          "4183",
+          "4189",
+          "4159",
+          "4191"
+        ]
+      }
+    ],
+    "answer_soft": [
+      {
+        "id": "A22",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "依据 2026-8-17 期已上线记录，可回答如下：\n\n- 面壁智能的舱外方向记录里写明，本地化方案中\"倒车物品识别已在量产车型验证\"，这属于已在量产车型上验证的部分。\n- 但面壁智能的舱内（座舱）方向记录只列出了跨模态视频流危险动作识别、"
+      },
+      {
+        "id": "A23",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "资料不能证明智能座舱已经实现规模化生产。\n\n现有记录只提到：面壁智能与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触）；在具体功能上，舱外的本地化倒车物品识别写明「已在量产车型验证」，但这仅是单个功能在量产车型上的验证，并非整体智能"
+      },
+      {
+        "id": "A24",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "是的，依据 2026-8-17 期已上线记录，面壁智能在舱外方向的本地化倒车物品识别已在量产车型验证。\n\n需要说明的是：记录中\"已在量产车型验证\"指向的是舱外倒车物品识别方案，记录未提供该验证发生的具体时间，也未说明其他方向（如舱内跨模态视"
+      },
+      {
+        "id": "A25",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "关于\"该方案是否已装车落地\"，可依据的是 2026-8-17 那期已上线记录，并非今日新发生的验证。\n\n现有记录中只有一项与\"量产车型验证\"直接相关：面壁智能（詹杨帆）在舱外方向做的**本地化倒车物品识别**，记录写明\"已在量产车型验证\"。"
+      },
+      {
+        "id": "A26",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "根据本期（2026-8-17）已上线记录，没有任何一条涉及\"座舱方案\"\"整车厂\"\"批量交付\"相关的内容。\n\n现有记录覆盖的是：多比 FP 专版头条执行、靖亚与 AWS 项目合同流程、源策与 ROPIDIA 的新加坡具身智能活动、破壳创智拟拜"
+      },
+      {
+        "id": "A27",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "依据 2026-8-17 期已上线记录（并非今日新发生的事件），端侧模型相关讨论并未表明它已进入规模化量产阶段。\n\n- 现有记录多为受访者陈述性质的判断与技术方向说明：安谋科技陈述端侧AI在2025-2026年接近1B体量模型可达商用最低标"
+      },
+      {
+        "id": "A28",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "不能证明。\n\n依据 2026-8-17 期已上线记录，与面壁智能的交流对象为高通侧芯片调优负责人，交流内容是端侧模型在旗舰手机应用的限制与发展方向（已接触），记录中没有涉及\"面壁方案装车/上车\"的任何信息。记录里与\"上车/座舱\"相关的另有一"
+      }
+    ],
+    "evidence_soft": []
+  }
+}
