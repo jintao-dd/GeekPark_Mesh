@@ -1,0 +1,225 @@
+{
+  "timestamp": "2026-09-09T08:55:24.355487+00:00",
+  "issue": "2026-8-17",
+  "use_llm_answer": true,
+  "runs": [
+    {
+      "stages_ms": {
+        "identity_ms": 0.9,
+        "chat_team_ms": 0.0,
+        "permission_ms": 0.0,
+        "context_ms": 1.7,
+        "intent_ms": 0.0,
+        "prepare_total_ms": 6643.9,
+        "enrich_denial_ms": 0.0,
+        "semantic_gate_ms": 0.0,
+        "claim_support_ms": 4.6,
+        "answer_llm_wall_ms": 13101.2,
+        "tool_total_ms": 19750.5
+      },
+      "summary": {
+        "total_profiled_tool_ms": 19750.5,
+        "embed_call_count": 1,
+        "embed_ms_sum": 6172.2,
+        "retrieve_approx_ms": 471.7,
+        "semantic_call_count": 0,
+        "semantic_ms_each": [],
+        "semantic_ms_sum": 0,
+        "answer_call_count": 1,
+        "answer_ms_each": [
+          13100.7
+        ],
+        "answer_ms_sum": 13100.7,
+        "other_llm_call_count": 0,
+        "other_llm_ms_each": [],
+        "llm_calls_serial": true,
+        "llm_call_count_total": 1,
+        "dominant": "answer_llm",
+        "buckets_ms": {
+          "embed": 6172.2,
+          "prepare_minus_embed≈retrieve+rank+assemble": 471.7,
+          "enrich_denial": 0.0,
+          "claim_support_wall": 4.6,
+          "semantic_llm": 0.0,
+          "answer_llm": 13100.7
+        }
+      },
+      "external_calls": [
+        {
+          "i": 0,
+          "kind": "embed_texts",
+          "n": 1,
+          "ms": 6172.2,
+          "serial_leaf": true,
+          "error": "",
+          "last_error": ""
+        },
+        {
+          "i": 1,
+          "kind": "llm_call",
+          "task": "answer",
+          "json_mode": false,
+          "max_tokens": 2000,
+          "system_chars": 3037,
+          "user_chars": 2622,
+          "ms": 13100.7,
+          "serial_leaf": true,
+          "error": "",
+          "task_kw_honored": true
+        }
+      ],
+      "meta": {
+        "query": "编辑部关注了哪些话题或公司",
+        "issue": "2026-8-17",
+        "use_llm": true,
+        "config": {
+          "embed_enabled": true,
+          "embed_configured": true,
+          "embed_model": "qwen3-embedding-8b",
+          "llm_model_answer": "anthropic/claude-4.8-opus",
+          "llm_model_semantic": "anthropic/claude-4.8-opus",
+          "llm_call_accepts_task": true
+        },
+        "intent": "ask_published",
+        "identity_status": "bound",
+        "n_context": 23,
+        "prepare_n_hits": 22,
+        "prepare_mode": "hybrid",
+        "prepare_latency_ms": 6643,
+        "plan": {
+          "path": "hybrid",
+          "set_op": "none",
+          "confidence": 0.0
+        },
+        "embed_configured": true,
+        "embed_enabled": true,
+        "semantic_gate": {
+          "enter": false,
+          "reasons": [],
+          "soft_activity": false
+        },
+        "claim_support": {
+          "support": "supported",
+          "reason": "has_published_evidence",
+          "semantic_path": "det_passthrough",
+          "semantic_enabled": true
+        },
+        "llm_calls_during_claim": 0,
+        "llm_calls_during_answer": 1,
+        "abstained": false,
+        "llm_used": true,
+        "answer_head": "依据 2026-8-17 那期已上线记录，编辑部关注的话题和公司如下（非今日新发生）：\n\n**汽车 / 智能座舱方向**\n- 詹杨帆（汽车行业）：围绕 Agent 上车、智能座舱话题做过交流（记录标注 2026/07/24）。\n- 零跑汽车：就战略及经营相关问题做过沟通。\n\n**人工智能 / Agent 与巨头动态**"
+      }
+    },
+    {
+      "stages_ms": {
+        "identity_ms": 0.6,
+        "chat_team_ms": 0.0,
+        "permission_ms": 0.0,
+        "context_ms": 0.9,
+        "intent_ms": 0.0,
+        "prepare_total_ms": 2227.9,
+        "enrich_denial_ms": 0.0,
+        "semantic_gate_ms": 0.0,
+        "claim_support_ms": 3555.1,
+        "answer_llm_wall_ms": 0.0,
+        "tool_total_ms": 5783.7
+      },
+      "summary": {
+        "total_profiled_tool_ms": 5783.7,
+        "embed_call_count": 1,
+        "embed_ms_sum": 1757.7,
+        "retrieve_approx_ms": 470.2,
+        "semantic_call_count": 1,
+        "semantic_ms_each": [
+          3554.6
+        ],
+        "semantic_ms_sum": 3554.6,
+        "answer_call_count": 0,
+        "answer_ms_each": [],
+        "answer_ms_sum": 0,
+        "other_llm_call_count": 0,
+        "other_llm_ms_each": [],
+        "llm_calls_serial": true,
+        "llm_call_count_total": 1,
+        "dominant": "claim_support_wall",
+        "buckets_ms": {
+          "embed": 1757.7,
+          "prepare_minus_embed≈retrieve+rank+assemble": 470.2,
+          "enrich_denial": 0.0,
+          "claim_support_wall": 3555.1,
+          "semantic_llm": 3554.6,
+          "answer_llm": 0.0
+        }
+      },
+      "external_calls": [
+        {
+          "i": 0,
+          "kind": "embed_texts",
+          "n": 1,
+          "ms": 1757.7,
+          "serial_leaf": true,
+          "error": "",
+          "last_error": ""
+        },
+        {
+          "i": 1,
+          "kind": "llm_call",
+          "task": "semantic",
+          "json_mode": true,
+          "max_tokens": 500,
+          "system_chars": 858,
+          "user_chars": 392,
+          "ms": 3554.6,
+          "serial_leaf": true,
+          "error": "",
+          "task_kw_honored": true
+        }
+      ],
+      "meta": {
+        "query": "资料能否证明它已经量产？",
+        "issue": "2026-8-17",
+        "use_llm": true,
+        "config": {
+          "embed_enabled": true,
+          "embed_configured": true,
+          "embed_model": "qwen3-embedding-8b",
+          "llm_model_answer": "anthropic/claude-4.8-opus",
+          "llm_model_semantic": "anthropic/claude-4.8-opus",
+          "llm_call_accepts_task": true
+        },
+        "intent": "ask_published",
+        "identity_status": "bound",
+        "n_context": 24,
+        "prepare_n_hits": 23,
+        "prepare_mode": "hybrid",
+        "prepare_latency_ms": 2227,
+        "plan": {
+          "path": "hybrid",
+          "set_op": "none",
+          "confidence": 0.0
+        },
+        "embed_configured": true,
+        "embed_enabled": true,
+        "semantic_gate": {
+          "enter": true,
+          "reasons": [
+            "det_strong_claim",
+            "proof_frame"
+          ],
+          "soft_activity": false
+        },
+        "claim_support": {
+          "support": "insufficient",
+          "reason": "semantic_ext:semantic_judge:composed_from_dims",
+          "semantic_path": "semantic_judge",
+          "semantic_enabled": true
+        },
+        "llm_calls_during_claim": 1,
+        "abstained": true,
+        "llm_used": false,
+        "answer_head": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。"
+      }
+    }
+  ]
+}
