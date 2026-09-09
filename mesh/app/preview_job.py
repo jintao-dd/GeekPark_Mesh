@@ -7,16 +7,39 @@
 
 状态经 job_store 落库，多 uvicorn worker 可共享进度。
 LLM 调用不持有 write_lock / 长连接，并走全局 llm_slot。
+
+Cards：默认串行；MESH_PREVIEW_CARD_CONCURRENCY>1 时受控并行生成，
+落库与 progress 仍按 teams 原序；gate / 输出内容语义不变。
 """
 from __future__ import annotations
 import datetime
 import json
+import os
+import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any
 
 from . import ask_concurrency, db, llm, merge, job_store
 from . import preview_progressive as prog
 
 KIND = "preview"
+
+
+def _card_concurrency() -> int:
+    try:
+        n = int((os.environ.get("MESH_PREVIEW_CARD_CONCURRENCY") or "1").strip() or "1")
+    except ValueError:
+        n = 1
+    return max(1, min(8, n))
+
+
+def _force_card_rebuild() -> bool:
+    return (os.environ.get("MESH_PREVIEW_CARD_FORCE") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
 
 
 def _defaults(slug: str) -> dict:
@@ -38,6 +61,8 @@ def _defaults(slug: str) -> dict:
         "dropped_relations": None,
         "cards_done": 0,
         "cards_total": 0,
+        "card_profile": None,
+        "card_concurrency": 1,
     }
 
 
@@ -259,21 +284,21 @@ def _run(slug: str, username: str, token: int = 0) -> None:
         resilience = ResilienceReport()
         ok_cards = 0
         cards_done_teams: list[str] = []
+        card_conc = _card_concurrency()
+        force_cards = _force_card_rebuild()
+        card_profile: list[dict[str, Any]] = []
+        _set(
+            slug,
+            card_concurrency=card_conc,
+            card_count=cards_total,
+            card_profile=[],
+        )
+
+        # 1) 串行准备：读库 / fingerprint / 是否复用（与旧逻辑一致）
+        prepared: list[dict[str, Any]] = []
         for i, team in enumerate(teams):
             if not _is_current(slug, token):
                 return
-            _set(
-                slug,
-                phase="cards",
-                cur=i + 1,
-                total=total,
-                message=f"要点卡 {i + 1}/{len(teams)} · {team}",
-                preview_ready=True,
-                preview_url=_preview_url(slug),
-                cards_done=ok_cards,
-                cards_total=cards_total,
-                resilience=resilience.to_dict(),
-            )
             with db.write_lock():
                 con = db.connect()
                 try:
@@ -289,56 +314,175 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                     fp = prog.items_fingerprint(items)
                     existing = prog.load_existing_card(con, issue_id, team)
                     reuse = (
-                        existing is not None
+                        (not force_cards)
+                        and existing is not None
                         and prog.card_fingerprint(existing) == fp
                         and fp
                     )
                 finally:
                     con.close()
+            prepared.append(
+                {
+                    "i": i,
+                    "team": team,
+                    "items": items,
+                    "fp": fp,
+                    "existing": existing,
+                    "reuse": bool(reuse),
+                }
+            )
 
-            if reuse:
-                card = existing
+        def _llm_build_card(_team: str, _items: list) -> dict:
+            try:
+                with ask_concurrency.llm_slot(pool="job"):
+                    return llm.build_team_card(_team, _items, period_label)
+            except ask_concurrency.AskBusyError as e:
+                raise RuntimeError(f"要点卡排队超时：{e}") from e
+            except ask_concurrency.JobBusyError as e:
+                raise RuntimeError(f"要点卡排队超时：{e}") from e
+
+        def _build_one(job: dict[str, Any]) -> dict[str, Any]:
+            """并行 worker：try_unit + 本地 resilience；不写库。"""
+            team = job["team"]
+            local = ResilienceReport()
+            t0 = time.perf_counter()
+            start_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            card = try_unit(
+                lambda: _llm_build_card(team, job["items"]),
+                unit=_team_label(team),
+                kind="card",
+                report=local,
+            )
+            end_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            latency_ms = round((time.perf_counter() - t0) * 1000.0, 1)
+            status = "ok" if card is not None else "skipped"
+            return {
+                "team": team,
+                "card": card,
+                "local": local,
+                "profile": {
+                    "team": team,
+                    "card_count": cards_total,
+                    "card_concurrency": card_conc,
+                    "card_start": start_iso,
+                    "card_end": end_iso,
+                    "card_latency": latency_ms,
+                    "card_status": status,
+                },
+            }
+
+        # 2) 受控并行 LLM（concurrency=1 即串行）；复用卡不进池
+        build_jobs = [j for j in prepared if not j["reuse"]]
+        built: dict[str, dict[str, Any]] = {}
+        if build_jobs:
+            workers = min(card_conc, len(build_jobs))
+            _set(
+                slug,
+                phase="cards",
+                message=f"要点卡生成中 · concurrency={workers}/{len(build_jobs)}",
+                preview_ready=True,
+                preview_url=_preview_url(slug),
+                cards_done=0,
+                cards_total=cards_total,
+                card_concurrency=card_conc,
+                card_count=cards_total,
+            )
+            if workers <= 1:
+                for job in build_jobs:
+                    if not _is_current(slug, token):
+                        return
+                    built[job["team"]] = _build_one(job)
+            else:
+                with ThreadPoolExecutor(max_workers=workers) as pool:
+                    futs = {pool.submit(_build_one, job): job["team"] for job in build_jobs}
+                    for fut in as_completed(futs):
+                        if not _is_current(slug, token):
+                            return
+                        team = futs[fut]
+                        built[team] = fut.result()
+                        _set(
+                            slug,
+                            message=f"要点卡返回 · {team}",
+                            card_concurrency=card_conc,
+                        )
+
+        # 3) 按 teams 原序落库 / 记账 / progress（输出顺序与串行一致）
+        for job in prepared:
+            if not _is_current(slug, token):
+                return
+            i = job["i"]
+            team = job["team"]
+            _set(
+                slug,
+                phase="cards",
+                cur=i + 1,
+                total=total,
+                message=f"要点卡 {i + 1}/{len(teams)} · {team}",
+                preview_ready=True,
+                preview_url=_preview_url(slug),
+                cards_done=ok_cards,
+                cards_total=cards_total,
+                card_concurrency=card_conc,
+                card_count=cards_total,
+                resilience=resilience.to_dict(),
+            )
+            if job["reuse"]:
+                now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                card_profile.append(
+                    {
+                        "team": team,
+                        "card_count": cards_total,
+                        "card_concurrency": card_conc,
+                        "card_start": now_iso,
+                        "card_end": now_iso,
+                        "card_latency": 0.0,
+                        "card_status": "reuse",
+                    }
+                )
                 ok_cards += 1
                 cards_done_teams.append(team)
                 _set(
                     slug,
                     message=f"要点卡复用 · {team}",
                     cards_done=ok_cards,
+                    card_profile=list(card_profile),
                     resilience=resilience.to_dict(),
                 )
-            else:
-                def _build_card(_team=team, _items=items):
-                    with ask_concurrency.llm_slot(pool="job"):
-                        return llm.build_team_card(_team, _items, period_label)
+                continue
 
-                card = try_unit(
-                    _build_card,
-                    unit=_team_label(team),
-                    kind="card",
-                    report=resilience,
+            result = built.get(team) or _build_one(job)
+            for rec in result["local"].attempts:
+                resilience.record(rec)
+            card_profile.append(result["profile"])
+            card = result["card"]
+            if card is None:
+                _set(
+                    slug,
+                    message=f"要点卡跳过 · {team}（已重试仍失败）",
+                    card_profile=list(card_profile),
+                    resilience=resilience.to_dict(),
                 )
-                if card is None:
-                    _set(
-                        slug,
-                        message=f"要点卡跳过 · {team}（已重试仍失败）",
-                        resilience=resilience.to_dict(),
-                    )
-                    continue
-                card = prog.attach_card_fingerprint(card, fp)
-                if not _is_current(slug, token):
-                    return
-                with db.write_lock():
-                    con = db.connect()
-                    try:
-                        _upsert_team_card(con, issue_id, team, card)
-                        con.commit()
-                    finally:
-                        con.close()
-                ok_cards += 1
-                cards_done_teams.append(team)
-
+                continue
+            card = prog.attach_card_fingerprint(card, job["fp"])
             if not _is_current(slug, token):
                 return
+            with db.write_lock():
+                con = db.connect()
+                try:
+                    _upsert_team_card(con, issue_id, team, card)
+                    con.commit()
+                finally:
+                    con.close()
+            ok_cards += 1
+            cards_done_teams.append(team)
+            _set(
+                slug,
+                cards_done=ok_cards,
+                card_profile=list(card_profile),
+                resilience=resilience.to_dict(),
+            )
+
+        _set(slug, card_profile=list(card_profile), card_concurrency=card_conc, card_count=cards_total)
 
         # 卡片全部落库后统一刷一次骨架 lead（减少 write_lock）
         if cards_done_teams:
@@ -654,6 +798,9 @@ def _run(slug: str, username: str, token: int = 0) -> None:
             resilience=resilience.to_dict(),
             cards_done=ok_cards,
             cards_total=cards_total,
+            card_profile=list(card_profile),
+            card_concurrency=card_conc,
+            card_count=cards_total,
             cur=total,
             total=total,
         )
