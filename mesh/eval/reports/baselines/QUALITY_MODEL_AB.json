@@ -1,0 +1,45 @@
+{
+  "phase": "quality_model_ab",
+  "elapsed_s": 818.66,
+  "fixed": {
+    "ranking": "v1.4",
+    "recall": "frozen",
+    "vector": "OFF",
+    "claim_semantic": "v2.4c2_frozen",
+    "contract": "frozen",
+    "prompt": "unchanged",
+    "gold": "unchanged"
+  },
+  "model_a": "anthropic/claude-4.8-opus",
+  "model_b": "claude-sonnet-4-6",
+  "status": "ok",
+  "decision": {
+    "quality_gap": "negligible",
+    "recommendation": "task_level_tiering_ok",
+    "note": "Do not enable dynamic router yet; prefer Sonnet for default answer/semantic, keep Opus for sensitive copy if needed."
+  },
+  "A": {
+    "model": "anthropic/claude-4.8-opus",
+    "metrics": {
+      "answer_canonical": 1.0,
+      "evidence_canonical": 1.0,
+      "answer_unseen": 1.0,
+      "evidence_unseen": 1.0,
+      "temporal": 0.9583,
+      "answer_canonical_elapsed_s": 108.76,
+      "answer_canonical_llm_used": 11
+    }
+  },
+  "B": {
+    "model": "claude-sonnet-4-6",
+    "metrics": {
+      "answer_canonical": 1.0,
+      "evidence_canonical": 1.0,
+      "answer_unseen": 1.0,
+      "evidence_unseen": 1.0,
+      "temporal": 0.9583,
+      "answer_canonical_elapsed_s": 96.24,
+      "answer_canonical_llm_used": 11
+    }
+  }
+}

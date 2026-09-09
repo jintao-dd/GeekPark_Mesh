@@ -51,7 +51,15 @@ Claim {
   temporal:   <string>          # issue_time | future_certain | unspecified | …
   evidence_ref: [EvidenceRef]
   provenance: published_only
+  strength:   weak | strong     # 是否断言「已完成/发生/成立」的现实状态
+  assertion_type: mention | completed_state | universal_denial | …
   support:    supported | insufficient | contradicted
+}
+
+Evidence {
+  … 
+  entailment_to_claim: entailing | direct_related | topical | none | contradicted_by_evidence
+  # direct_related ≠ 足以 supported；topic ≠ entailment
 }
 ```
 
@@ -59,13 +67,15 @@ Claim {
 
 | support | 含义 |
 |---------|------|
-| **supported** | Evidence 内容与 claim 的实体/关系/时间相容，且足以支撑该主张 |
-| **insufficient** | 有或无 Evidence，但不足以支撑（含「主体相关 ≠ 支持确定性结论」） |
-| **contradicted** | Evidence 明确否定 claim |
+| **supported** | Evidence **语义蕴含** claim（不仅 topic/entity overlap）；强 claim 须 entailing |
+| **insufficient** | 有或无 Evidence，但不足以支撑（含「主体相关 ≠ 支持确定性结论」；strong + topical/direct_related） |
+| **contradicted** | 明确 published 反证；找不到支持 ≠ contradicted |
+
+> v2.4c：三维度分判 `claim_strength` / `evidence_entailment` / `counter_evidence`（见 `app/agent/claim_semantic_ext.py` Shadow）。**不**扩 Event/Relation schema。
 
 Temporal hard rules 与 Published-only **不变**：basis=unknown 时不得把 claim 说成墙上时钟「最近发生」。
 
-实现入口：`app/agent/claim_support.py`（adapter + harness 共用；**不**新增 Tool / Retrieval path）。
+实现入口：`app/agent/claim_support.py`（生产）· `app/agent/claim_semantic_ext.py`（v2.4c Shadow；Gate 接入前不影响 Answer）。**不**新增 Tool / Retrieval path。
 
 ---
 

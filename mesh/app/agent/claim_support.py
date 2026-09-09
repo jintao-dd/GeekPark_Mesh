@@ -3,12 +3,13 @@
 support ∈ {supported, insufficient, contradicted}
 有 EvidenceRef ≠ claim 已被支持。
 
-语义门：
-  strong claim  ≠  topic/entity overlap → 不得标 supported
-  contradicted  需要明确反证；insufficient 不能仅凭相关证据升级
+v2.4c-2：deterministic 判定 + selective semantic extension
+（claim_strength / evidence_entailment / counter_evidence）。
+语义层见 claim_semantic_ext；可用 MESH_CLAIM_SEMANTIC=0 关闭。
 """
 from __future__ import annotations
 
+import os
 import re
 from typing import Any, Literal
 
@@ -154,14 +155,14 @@ def evidence_directly_supports_strong_claim(query: str, blob: str) -> bool:
     return bool(_DIRECT_MASS_PROD.search(b) or _DIRECT_FINANCING.search(b) or _DIRECT_RELEASE.search(b))
 
 
-def assess_claim_support(
+def assess_claim_support_deterministic(
     query: str,
     *,
     contexts: list[dict] | None = None,
     evidence_refs: list[str] | None = None,
     answer: str = "",
 ) -> dict[str, Any]:
-    """判定 support；返回结构化字段供 Gold / harness / adapter 共用。"""
+    """纯 deterministic 判定（无 LLM）。semantic extension / 单测 / shadow 共用。"""
     q = query or ""
     ctxs = list(contexts or [])
     blob = _blob(ctxs)
@@ -223,6 +224,31 @@ def assess_claim_support(
         "universal_denial": denial,
         "reason": reason,
     }
+
+
+def semantic_extension_enabled() -> bool:
+    v = (os.environ.get("MESH_CLAIM_SEMANTIC") or "1").strip().lower()
+    return v not in ("0", "false", "no", "off")
+
+
+def assess_claim_support(
+    query: str,
+    *,
+    contexts: list[dict] | None = None,
+    evidence_refs: list[str] | None = None,
+    answer: str = "",
+) -> dict[str, Any]:
+    """判定 support；v2.4c-2 起默认叠加 selective semantic extension。"""
+    det = assess_claim_support_deterministic(
+        query, contexts=contexts, evidence_refs=evidence_refs, answer=answer
+    )
+    if not semantic_extension_enabled():
+        det = dict(det)
+        det["semantic"] = {"enabled": False, "path": "disabled"}
+        return det
+    from .claim_semantic_ext import apply_semantic_extension
+
+    return apply_semantic_extension(query, list(contexts or []), det)
 
 
 def abstain_answer_for_unsupported_claim(assessment: dict[str, Any]) -> str | None:

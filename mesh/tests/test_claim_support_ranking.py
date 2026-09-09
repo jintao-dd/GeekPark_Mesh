@@ -1,6 +1,11 @@
 """Unit tests for claim_support + ranking_quality (no DB)."""
 from __future__ import annotations
 
+import os
+
+# 单测只验 deterministic；semantic LLM 走 Gate 回归
+os.environ["MESH_CLAIM_SEMANTIC"] = "0"
+
 from app.agent.claim_support import (
     abstain_answer_for_unsupported_claim,
     assess_claim_support,
