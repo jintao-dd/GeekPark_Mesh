@@ -18,6 +18,16 @@ def test_speculative_certainty_insufficient():
     assert abstain_answer_for_unsupported_claim(a)
 
 
+def test_universal_denial_contradicted():
+    a = assess_claim_support(
+        "资料证明面壁智能从未被接触",
+        contexts=[{"title": "面壁智能", "body": "已接触芯片厂商"}],
+        evidence_refs=["ev:item:4112"],
+    )
+    assert a["support"] == "contradicted"
+    assert abstain_answer_for_unsupported_claim(a)
+
+
 def test_temporal_not_speculative():
     a = assess_claim_support(
         "面壁智能接触了什么",

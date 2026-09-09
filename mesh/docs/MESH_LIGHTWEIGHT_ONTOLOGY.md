@@ -79,3 +79,17 @@ Ranking 已收住「找什么」；本阶段钉「凭什么这么说」
 ```
 
 不单独开「Ontology 系统」里程碑。
+
+---
+
+## Schema 对 Gold 的五个问题（收口，不扩建）
+
+| 问题 | 当前结论 |
+|------|----------|
+| Claim 指向什么？ | query 意图 + 成文句；Gold 用 `claim_schema` / `expect_support` 描述 |
+| Relation subject/object/type？ | Published relation 有双边；Ask 路径 claim 的 type 目前是粗粒度（`mention` / `speculative_certainty` / `universal_denial`） |
+| EvidenceRef 如何证明 Claim？ | 必须经 support 判定；**有 Ref ≠ supported** |
+| Temporal 挂哪？ | **Claim 约束**（`TimeSemantics`），不是独立 Event 实体——接受现状 |
+| 哪些允许从 Evidence 推出？ | 仅 published；确定性完成/未来、全称否定默认 **不可** 从「主体相关」推出 |
+
+若 Gold 暴露的是 support 漏检（如「已经量产上车」），**补判定规则**，不新建图数据库或 Ontology 系统。

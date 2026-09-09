@@ -1,0 +1,2483 @@
+{
+  "phase": "answer_evidence_acceptance",
+  "tag": "accept_v23d",
+  "baseline": {
+    "ranking_version": "v1.4",
+    "vector": "OFF",
+    "agent_contract": "frozen_v1",
+    "mesh_agent_use_llm": "0",
+    "mesh_ranking_quality": "1",
+    "claim_support_module": "app.agent.claim_support",
+    "harness": "eval.run_evidence_baseline._ask",
+    "note": "harness 对齐 Temporal early + claim_support；默认不成文 LLM",
+    "model_version": "anthropic/claude-4.8-opus",
+    "prompt_version": "ask_engine+temporal_hard_rules+claim_support"
+  },
+  "elapsed_s": 0.92,
+  "answer_gold": "answer_gold_v2_accept.jsonl",
+  "evidence_gold": "evidence_gold_v2_accept.jsonl",
+  "answer": {
+    "phase": "answer",
+    "n": 21,
+    "pass_rate": 0.9524,
+    "n_fail": 1,
+    "n_soft_flag": 3,
+    "fails": [
+      {
+        "id": "A21",
+        "fail_class": "C",
+        "category": "unsupported_claim",
+        "query": "端侧模型讨论能否证明智能座舱已经量产上车",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 0.0,
+          "faithfulness": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 0.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能：已接触并有对话记录，其与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触） · 编辑部沟通记录 · 与面壁智；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+        "claim_support": {
+          "entity": "端侧模型讨论能否",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4112",
+            "ev:item:4115",
+            "ev:item:4116",
+            "ev:item:4124",
+            "ev:item:4117",
+            "ev:item:4118",
+            "ev:item:4127",
+            "ev:item:4123",
+            "ev:ctx:2026-8-17:9",
+            "ev:item:4167",
+            "ev:item:4130",
+            "ev:item:4128"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 18
+      }
+    ],
+    "soft_flag_cases": [
+      {
+        "id": "A17",
+        "flags": [
+          "hits_without_evidence_refs"
+        ],
+        "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。"
+      },
+      {
+        "id": "A20",
+        "flags": [
+          "hits_without_evidence_refs"
+        ],
+        "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。"
+      },
+      {
+        "id": "A21",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智"
+      }
+    ]
+  },
+  "evidence": {
+    "phase": "evidence",
+    "n": 20,
+    "pass_rate": 0.9,
+    "n_fail": 2,
+    "n_soft_flag": 0,
+    "fails": [
+      {
+        "id": "E16",
+        "fail_class": "C",
+        "category": "adversarial_unsupported",
+        "query": "端侧模型讨论证明智能座舱已经量产上车",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 0.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能：已接触并有对话记录，其与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触） · 编辑部沟通记录 · 与面壁智；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+        "item_ids": [
+          "4112",
+          "4115",
+          "4116",
+          "4124",
+          "4117",
+          "4118",
+          "4127",
+          "4123",
+          "4167",
+          "4130",
+          "4128",
+          "4129"
+        ]
+      },
+      {
+        "id": "E18",
+        "fail_class": "G",
+        "category": "adversarial_contradicted",
+        "query": "资料证明面壁智能从未被接触",
+        "expect_support": "contradicted",
+        "obs_support": "insufficient",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 1.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "insufficient",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "G"
+        },
+        "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+        "item_ids": []
+      }
+    ],
+    "soft_flag_cases": []
+  },
+  "answer_results": [
+    {
+      "id": "A01",
+      "category": "entity",
+      "query": "锦涛做了什么",
+      "expect_abstain": false,
+      "must_mention": [
+        "锦涛"
+      ],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；锦涛：锦涛 · 品牌创意团队 · T6 · 关于是否开源锦涛做的工具，团队内各有判断：一方认为开源能沉淀 GitHub 记录、体现在 build 产品、立 build；李源：李源 · 品牌创意团队 · T6 · 李源的账号内容形式想做行业 MAP、互动 Map、互动图文等更复杂形态，计划在思琪网站下单开一个 tag，UI 与站点保持；Snowball：Snowball · 品牌创意团队 · T6 · 思琪站点用独立建站（非 WordPress），已发文章及每日日报；Snowball 相关小工具计划开源，",
+      "n_hits": 3,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "锦涛做了什么",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4260",
+          "ev:item:4251",
+          "ev:item:4259"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4260",
+        "ev:item:4251",
+        "ev:item:4259"
+      ],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "A02",
+      "category": "company",
+      "query": "面壁智能接触了什么",
+      "expect_abstain": false,
+      "must_mention": [
+        "面壁"
+      ],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能舱内方向：端侧跨模态视频流分析识别儿童站立探头等危险动作，数据不出车；车内物品溯源支持关键帧回溯；情境感知自动响应（；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能端侧模型芯片适配：已适配高通 8958538、8397、9075 及联发科、英特尔、英伟达、AMD 和国产平台；模型；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端",
+      "n_hits": 40,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "面壁智能接触了什",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4120",
+          "ev:item:4123",
+          "ev:item:4112",
+          "ev:item:4124",
+          "ev:item:4115",
+          "ev:item:4116",
+          "ev:item:4117",
+          "ev:ctx:2026-8-17:8",
+          "ev:item:4118",
+          "ev:item:4122",
+          "ev:item:4121",
+          "ev:ctx:2026-8-17:12"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4120",
+        "ev:item:4123",
+        "ev:item:4112",
+        "ev:item:4124",
+        "ev:item:4115",
+        "ev:item:4116",
+        "ev:item:4117",
+        "ev:ctx:2026-8-17:8"
+      ],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "A03",
+      "category": "multi_evidence",
+      "query": "端侧模型与智能座舱",
+      "expect_abstain": false,
+      "must_mention": [
+        "端侧"
+      ],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱是小型；安谋科技：安谋科技 · 编辑部 · T6 · 安谋科技（CPU产品总监徐瑞迪陈述）端侧AI判断：2025-2026年接近1B体量模型可达60分商用最低标准线并装入端",
+      "n_hits": 40,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "端侧模型与智能座",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4112",
+          "ev:item:4116",
+          "ev:item:4114",
+          "ev:item:4118",
+          "ev:item:4125",
+          "ev:item:4127",
+          "ev:item:4120",
+          "ev:item:4123",
+          "ev:item:4149",
+          "ev:item:4383",
+          "ev:item:4162",
+          "ev:item:4345"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4112",
+        "ev:item:4116",
+        "ev:item:4114",
+        "ev:item:4118",
+        "ev:item:4125",
+        "ev:item:4127",
+        "ev:item:4120",
+        "ev:item:4123"
+      ],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "A04",
+      "category": "topic",
+      "query": "视频号本周播放较好的片子",
+      "expect_abstain": false,
+      "must_mention": [
+        "播放"
+      ],
+      "answer_snip": "时间过滤：from=2026-09-07 to=2026-09-09；Joshua X.：Joshua X. · 硅谷 BD 团队 · T3 · HeyGen（洛杉矶，Series A）联合创始人兼 CEO 徐卓（Joshua X.），AI 应用/A；AI：AI · 视频号团队 · T11 · 《这款Harness震撼硅谷》：本周播放 6429、点赞 77、分享 203、完播率 15.89%（相对本周其余视频处于前；影石Insta360：影石Insta360 · 视频号团队 · T11 · 《传统相机太难用！》：本周播放 4270、点赞 26、评论 2（",
+      "n_hits": 11,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "视频号本周播放较",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4445",
+          "ev:item:4409",
+          "ev:item:4411",
+          "ev:item:4408",
+          "ev:item:4410",
+          "ev:ctx:2026-09-08:6",
+          "ev:ctx:2026-09-08:8",
+          "ev:ctx:2026-09-08:9",
+          "ev:ctx:2026-09-08:10",
+          "ev:ctx:2026-09-08:11"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4445",
+        "ev:item:4409",
+        "ev:item:4411",
+        "ev:item:4408",
+        "ev:item:4410",
+        "ev:ctx:2026-09-08:6",
+        "ev:ctx:2026-09-08:8",
+        "ev:ctx:2026-09-08:9"
+      ],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "A05",
+      "category": "community",
+      "query": "Founder Park 下半年规划",
+      "expect_abstain": false,
+      "must_mention": [
+        "Founder"
+      ],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；Founder Show：Founder Show · 社群 · T6 · 小红书本周计划发布：Founder Show 团队介绍、Loopit 创始人专访、Loopit 与 Tap8 ；AGI 2026：AGI 2026 · 品牌创意团队 · T6 · AGI 复盘：胸卡现场与线上传播好，很多 founder 把胸卡作社交货币晒小红书；观察到大部分参会者佩戴 f；Anita Wang：Anita Wang · 编辑部 · T3 · Anita Wang（Meta AI Agent 产品，加州 Menl",
+      "n_hits": 32,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "Founder",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4368",
+          "ev:item:4274",
+          "ev:item:4221",
+          "ev:item:4286",
+          "ev:item:4183",
+          "ev:item:4319",
+          "ev:item:4358",
+          "ev:item:4246",
+          "ev:item:4247",
+          "ev:item:4378",
+          "ev:item:4385",
+          "ev:item:4386"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4368",
+        "ev:item:4274",
+        "ev:item:4221",
+        "ev:item:4286",
+        "ev:item:4183",
+        "ev:item:4319",
+        "ev:item:4358",
+        "ev:item:4246"
+      ],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "A06",
+      "category": "relation",
+      "query": "两边有没有可同步的关系",
+      "expect_abstain": false,
+      "must_mention": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；AGI 2026：AGI 2026 · 品牌创意团队 · T6 · AGI 复盘：场地供应商未提前给主舞台椅子等定制数据，现场自搭发现椅子高、屏幕层矮（2.9 米，往年 5 米）；MiniMax：MiniMax · 编辑部 · T7 · 《How MiniMax Builds Agents》GeekPark English 8/10 — MiniMax \n相关条目：时间过滤；AGI 2026；MiniMax",
+      "n_hits": 2,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "两边有没有可同步",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4277",
+          "ev:item:4242"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4277",
+        "ev:item:4242"
+      ],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "A07",
+      "category": "empty",
+      "query": "AGENT_QUALITY_EMPTY_ZZZ_NO_HIT",
+      "expect_abstain": true,
+      "must_mention": [],
+      "answer_snip": "未找到与问题直接相关的已上线记录，资料未提供可核对依据，不能下结论。",
+      "n_hits": 0,
+      "status": "unsupported",
+      "claim_support": {
+        "entity": "AGENT_QUALITY_EMPTY_ZZZ_NO_HIT",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [],
+        "provenance": "published_only",
+        "support": "insufficient",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "no_evidence"
+      },
+      "evidence_refs": [],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "A08",
+      "category": "topic",
+      "query": "具身智能数据圆桌讨论了什么",
+      "expect_abstain": false,
+      "must_mention": [
+        "具身"
+      ],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；源策：源策 · 编辑部 · T6 · 源策（沟通对象李天羽，CEO，短测未来相关）就新加坡具身智能活动沟通中：活动主题 go physical go action、8；艾欧智能：艾欧智能 · 编辑部 · T6 · 艾欧智能（IO-AI Tech，沟通对象 Simon）已接触，行业为具身智能 · 硅谷 BD 团队建联记录；乐享科技：乐享科技 · 编辑部 · T6 · 乐享科技（沟通对象李元庆，联合创始人）已接触，行业为具身智能 · 硅谷 BD 团队建联记录；灵初：灵初 · 编辑部 · T6 · 灵初（沟通",
+      "n_hits": 20,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "具身智能数据圆桌",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4153",
+          "ev:item:4156",
+          "ev:item:4158",
+          "ev:item:4160",
+          "ev:item:4168",
+          "ev:item:4169",
+          "ev:item:4174",
+          "ev:item:4175",
+          "ev:item:4182",
+          "ev:item:4237",
+          "ev:item:4379",
+          "ev:item:4250"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4153",
+        "ev:item:4156",
+        "ev:item:4158",
+        "ev:item:4160",
+        "ev:item:4168",
+        "ev:item:4169",
+        "ev:item:4174",
+        "ev:item:4175"
+      ],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "A09",
+      "category": "temporal",
+      "query": "锦涛最近做了什么",
+      "expect_abstain": false,
+      "must_mention": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；锦涛：锦涛 · 品牌创意团队 · T6 · 关于是否开源锦涛做的工具，团队内各有判断：一方认为开源能沉淀 GitHub 记录、体现在 build 产品、立 build；李源：李源 · 品牌创意团队 · T6 · 李源的账号内容形式想做行业 MAP、互动 Map、互动图文等更复杂形态，计划在思琪网站下单开一个 tag，UI 与站点保持；Snowball：Snowball · 品牌创意团队 · T6 · 思琪站点用独立建站（非 WordPress），已发文章及每日日报；Snowball 相关小工具计划开源，",
+      "n_hits": 5,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "锦涛最近做了什么",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4260",
+          "ev:item:4251",
+          "ev:item:4259"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4260",
+        "ev:item:4251",
+        "ev:item:4259"
+      ],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "A10",
+      "category": "abstention",
+      "query": "资料里有没有写明天会发布 GPT-99",
+      "expect_abstain": true,
+      "must_mention": [],
+      "answer_snip": "未找到与问题直接相关的已上线记录，资料未提供可核对依据，不能下结论。",
+      "n_hits": 0,
+      "status": "unsupported",
+      "claim_support": {
+        "entity": "资料里有没有写明",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [],
+        "provenance": "published_only",
+        "support": "insufficient",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "no_evidence"
+      },
+      "evidence_refs": [],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "A11",
+      "category": "team",
+      "query": "编辑部选题里 IFA 相关",
+      "expect_abstain": false,
+      "must_mention": [
+        "IFA"
+      ],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；IFA 2026：IFA 2026 · 外部媒体 · T7 · 《The Best of IFA 2026: An Instant Pot for Cats, Camera-Eq；IFA：IFA · 编辑部 · T2 · IFA 探展总览：进行中，IFA 现场观展心得（提报 8/31，Hardwire文章）⚠️ 待补全资料/提纲 · 编辑部选题表；IFA 2026：IFA 2026 · 编辑部 · T2 · IFA 2026 逛展稿件：进行中，IFA 2026 现场稿（提报 8/31） · 编辑部选题表",
+      "n_hits": 40,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "编辑部选题里",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4502",
+          "ev:item:4416",
+          "ev:item:4417",
+          "ev:ctx:2026-09-08:4",
+          "ev:ctx:2026-09-08:5",
+          "ev:ctx:2026-09-08:6",
+          "ev:ctx:2026-09-08:7",
+          "ev:ctx:2026-09-08:8",
+          "ev:ctx:2026-09-08:9",
+          "ev:ctx:2026-09-08:10",
+          "ev:ctx:2026-09-08:11",
+          "ev:ctx:2026-09-08:12"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4502",
+        "ev:item:4416",
+        "ev:item:4417",
+        "ev:ctx:2026-09-08:4",
+        "ev:ctx:2026-09-08:5",
+        "ev:ctx:2026-09-08:6",
+        "ev:ctx:2026-09-08:7",
+        "ev:ctx:2026-09-08:8"
+      ],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "A12",
+      "category": "temporal_hard",
+      "query": "把最新上线的期次内容都当成这周刚发生的事总结一下",
+      "expect_abstain": false,
+      "must_mention": [
+        "不等于"
+      ],
+      "answer_snip": "上线最新期次（latest published）不等于事件发生时刻。若没有可核对的事件时间，只能说明资料所属期次或材料时间，不能把旧材料说成当下新发生。",
+      "n_hits": 0,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "",
+        "relation": "temporal_rule",
+        "temporal": "recent",
+        "evidence_refs": [],
+        "provenance": "published_only",
+        "support": "supported",
+        "reason": "temporal_hard_rule"
+      },
+      "evidence_refs": [],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "A13",
+      "category": "company",
+      "query": "Seattle Times 起诉 OpenAI",
+      "expect_abstain": false,
+      "must_mention": [
+        "OpenAI"
+      ],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；OpenAI：OpenAI · 视频号团队 · T11 · 多条视频聚焦AI安全与伦理：OpenAI模型自主发起约1.76万次网络攻击引Altman反思、Anthropic的；百度：百度 · 视频号团队 · T11 · 多条视频聚焦AI与产业观察：AI冲击互联网内容分账（百度案例）、Cloudflare拦AI爬虫、豆包月活3.45亿断层第一；豆包：豆包 · 视频号团队 · T11 · 多条视频聚焦AI入口与商业模式：豆包做AI交易入口（抖音生活服务、佣金12%）、OpenAI关停Atlas浏览器、AI订",
+      "n_hits": 5,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "Seattle",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4307",
+          "ev:item:4308",
+          "ev:item:4305",
+          "ev:item:4309",
+          "ev:item:4184"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4307",
+        "ev:item:4308",
+        "ev:item:4305",
+        "ev:item:4309",
+        "ev:item:4184"
+      ],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "A14",
+      "category": "caveat",
+      "query": "有资料提到破壳创智但不能下最终结论时怎么说",
+      "expect_abstain": false,
+      "must_mention": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；英伟达：英伟达 · 编辑部 · T6 · 英伟达 EDC 现场规范：培训内容可用于媒体报道但不得直接引用嘉宾发言原文，演示文稿为内部资料不得对外发布，培训后由公关团队统\n相关条目：时间过滤；英伟达",
+      "n_hits": 1,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "有资料提到破壳创",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4148"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4148"
+      ],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "A15",
+      "category": "help",
+      "query": "帮助",
+      "expect_abstain": false,
+      "must_mention": [],
+      "answer_snip": "我是 Mesh Agent，可查询已上线周报与关系摘要。",
+      "n_hits": 0,
+      "status": "grounded",
+      "claim_support": null,
+      "evidence_refs": [],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "A16",
+      "category": "unsupported_claim",
+      "query": "根据已有周报，确认英伟达已经收购发布了 GPU-99 旗舰并全面量产",
+      "expect_abstain": true,
+      "must_mention": [],
+      "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+      "n_hits": 0,
+      "status": "unsupported",
+      "claim_support": {
+        "entity": "根据已有周报",
+        "relation": "speculative_certainty",
+        "temporal": "unspecified",
+        "evidence_refs": [],
+        "provenance": "published_only",
+        "support": "insufficient",
+        "speculative_certainty": true,
+        "universal_denial": false,
+        "reason": "speculative_certainty_without_strong_support"
+      },
+      "evidence_refs": [],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "A17",
+      "category": "unsupported_claim",
+      "query": "面壁智能下周一定会完成融资交割吗",
+      "expect_abstain": true,
+      "must_mention": [],
+      "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+      "n_hits": 17,
+      "status": "unsupported",
+      "claim_support": {
+        "entity": "面壁智能下周一定",
+        "relation": "speculative_certainty",
+        "temporal": "future_certain",
+        "evidence_refs": [
+          "ev:item:4112",
+          "ev:item:4115",
+          "ev:item:4116",
+          "ev:item:4117",
+          "ev:item:4118",
+          "ev:item:4120",
+          "ev:item:4121",
+          "ev:item:4122",
+          "ev:item:4123",
+          "ev:item:4124",
+          "ev:item:4167",
+          "ev:ctx:2026-8-17:12"
+        ],
+        "provenance": "published_only",
+        "support": "insufficient",
+        "speculative_certainty": true,
+        "universal_denial": false,
+        "reason": "speculative_certainty_without_strong_support"
+      },
+      "evidence_refs": [],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [
+        "hits_without_evidence_refs"
+      ],
+      "error": null
+    },
+    {
+      "id": "A18",
+      "category": "unsupported_claim",
+      "query": "根据已有周报，确认程天科技外骨骼已经全球量产并出货百万台",
+      "expect_abstain": true,
+      "must_mention": [],
+      "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+      "n_hits": 0,
+      "status": "unsupported",
+      "claim_support": {
+        "entity": "根据已有周报",
+        "relation": "speculative_certainty",
+        "temporal": "unspecified",
+        "evidence_refs": [],
+        "provenance": "published_only",
+        "support": "insufficient",
+        "speculative_certainty": true,
+        "universal_denial": false,
+        "reason": "speculative_certainty_without_strong_support"
+      },
+      "evidence_refs": [],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "A19",
+      "category": "temporal_hard",
+      "query": "最新上线的内容是不是刚发生的事",
+      "expect_abstain": false,
+      "must_mention": [
+        "不等于"
+      ],
+      "answer_snip": "上线最新期次（latest published）不等于事件发生时刻。若没有可核对的事件时间，只能说明资料所属期次或材料时间，不能把旧材料说成当下新发生。",
+      "n_hits": 0,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "",
+        "relation": "temporal_rule",
+        "temporal": "recent",
+        "evidence_refs": [],
+        "provenance": "published_only",
+        "support": "supported",
+        "reason": "temporal_hard_rule"
+      },
+      "evidence_refs": [],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "A20",
+      "category": "unsupported_claim",
+      "query": "相关资料提到面壁智能，能否确认融资已经交割完成",
+      "expect_abstain": true,
+      "must_mention": [],
+      "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+      "n_hits": 11,
+      "status": "unsupported",
+      "claim_support": {
+        "entity": "相关资料提到面壁",
+        "relation": "speculative_certainty",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4112",
+          "ev:item:4115",
+          "ev:item:4116",
+          "ev:item:4117",
+          "ev:item:4118",
+          "ev:item:4120",
+          "ev:item:4121",
+          "ev:item:4122",
+          "ev:item:4123",
+          "ev:item:4167",
+          "ev:item:4124"
+        ],
+        "provenance": "published_only",
+        "support": "insufficient",
+        "speculative_certainty": true,
+        "universal_denial": false,
+        "reason": "speculative_certainty_without_strong_support"
+      },
+      "evidence_refs": [],
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": true,
+        "scoring": "v2_2_hard"
+      },
+      "fail_class": null,
+      "soft_flags": [
+        "hits_without_evidence_refs"
+      ],
+      "error": null
+    },
+    {
+      "id": "A21",
+      "category": "unsupported_claim",
+      "query": "端侧模型讨论能否证明智能座舱已经量产上车",
+      "expect_abstain": true,
+      "must_mention": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能：已接触并有对话记录，其与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触） · 编辑部沟通记录 · 与面壁智；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+      "n_hits": 18,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "端侧模型讨论能否",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4112",
+          "ev:item:4115",
+          "ev:item:4116",
+          "ev:item:4124",
+          "ev:item:4117",
+          "ev:item:4118",
+          "ev:item:4127",
+          "ev:item:4123",
+          "ev:ctx:2026-8-17:9",
+          "ev:item:4167",
+          "ev:item:4130",
+          "ev:item:4128"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4112",
+        "ev:item:4115",
+        "ev:item:4116",
+        "ev:item:4124",
+        "ev:item:4117",
+        "ev:item:4118",
+        "ev:item:4127",
+        "ev:item:4123"
+      ],
+      "metrics": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "faithfulness": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 0.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": false,
+        "scoring": "v2_2_hard",
+        "fail_class": "C"
+      },
+      "fail_class": "C",
+      "soft_flags": [
+        "abstain_query_but_support_supported"
+      ],
+      "error": null
+    }
+  ],
+  "evidence_results": [
+    {
+      "id": "E01",
+      "category": "entity",
+      "query": "锦涛做了什么",
+      "expect_support": "supported",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "mention_or_activity",
+        "temporal": "issue_time",
+        "evidence_ref": "must_cite_items",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [
+        "4251"
+      ],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；锦涛：锦涛 · 品牌创意团队 · T6 · 关于是否开源锦涛做的工具，团队内各有判断：一方认为开源能沉淀 GitHub 记录、体现在 build 产品、立 build；李源：李源 · 品牌创意团队 · T6 · 李源的账号内容形式想做行业 MAP、互动 Map、互动图文等更复杂形态，计划在思琪网站下单开一个 tag，UI 与站点保持；Snowball：Snowball · 品牌创意团队 · T6 · 思琪站点用独立建站（非 WordPress），已发文章及每日日报；Snowball 相关小工具计划开源，",
+      "n_hits": 3,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "锦涛做了什么",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4260",
+          "ev:item:4251",
+          "ev:item:4259"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4260",
+        "ev:item:4251",
+        "ev:item:4259"
+      ],
+      "item_ids": [
+        "4260",
+        "4251",
+        "4259"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E02",
+      "category": "company",
+      "query": "面壁智能接触了什么",
+      "expect_support": "supported",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "mention_or_activity",
+        "temporal": "issue_time",
+        "evidence_ref": "must_cite_items",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [
+        "4112"
+      ],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能舱内方向：端侧跨模态视频流分析识别儿童站立探头等危险动作，数据不出车；车内物品溯源支持关键帧回溯；情境感知自动响应（；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能端侧模型芯片适配：已适配高通 8958538、8397、9075 及联发科、英特尔、英伟达、AMD 和国产平台；模型；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端",
+      "n_hits": 40,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "面壁智能接触了什",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4120",
+          "ev:item:4123",
+          "ev:item:4112",
+          "ev:item:4124",
+          "ev:item:4115",
+          "ev:item:4116",
+          "ev:item:4117",
+          "ev:ctx:2026-8-17:8",
+          "ev:item:4118",
+          "ev:item:4122",
+          "ev:item:4121",
+          "ev:ctx:2026-8-17:12"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4120",
+        "ev:item:4123",
+        "ev:item:4112",
+        "ev:item:4124",
+        "ev:item:4115",
+        "ev:item:4116",
+        "ev:item:4117",
+        "ev:ctx:2026-8-17:8"
+      ],
+      "item_ids": [
+        "4120",
+        "4123",
+        "4112",
+        "4124",
+        "4115",
+        "4116",
+        "4117",
+        "4118",
+        "4122",
+        "4121",
+        "4167",
+        "4128"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E03",
+      "category": "topic",
+      "query": "端侧模型与智能座舱",
+      "expect_support": "supported",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "mention_or_activity",
+        "temporal": "issue_time",
+        "evidence_ref": "must_cite_items",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [
+        "4116",
+        "4125"
+      ],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱是小型；安谋科技：安谋科技 · 编辑部 · T6 · 安谋科技（CPU产品总监徐瑞迪陈述）端侧AI判断：2025-2026年接近1B体量模型可达60分商用最低标准线并装入端",
+      "n_hits": 40,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "端侧模型与智能座",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4112",
+          "ev:item:4116",
+          "ev:item:4114",
+          "ev:item:4118",
+          "ev:item:4125",
+          "ev:item:4127",
+          "ev:item:4120",
+          "ev:item:4123",
+          "ev:item:4149",
+          "ev:item:4383",
+          "ev:item:4162",
+          "ev:item:4345"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4112",
+        "ev:item:4116",
+        "ev:item:4114",
+        "ev:item:4118",
+        "ev:item:4125",
+        "ev:item:4127",
+        "ev:item:4120",
+        "ev:item:4123"
+      ],
+      "item_ids": [
+        "4112",
+        "4116",
+        "4114",
+        "4118",
+        "4125",
+        "4127",
+        "4120",
+        "4123",
+        "4149",
+        "4383",
+        "4162",
+        "4345"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E04",
+      "category": "topic",
+      "query": "视频号本周播放较好的片子",
+      "expect_support": "supported",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "mention_or_activity",
+        "temporal": "issue_time",
+        "evidence_ref": "must_cite_items",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [
+        "4408",
+        "4409"
+      ],
+      "answer_snip": "时间过滤：from=2026-09-07 to=2026-09-09；Joshua X.：Joshua X. · 硅谷 BD 团队 · T3 · HeyGen（洛杉矶，Series A）联合创始人兼 CEO 徐卓（Joshua X.），AI 应用/A；AI：AI · 视频号团队 · T11 · 《这款Harness震撼硅谷》：本周播放 6429、点赞 77、分享 203、完播率 15.89%（相对本周其余视频处于前；影石Insta360：影石Insta360 · 视频号团队 · T11 · 《传统相机太难用！》：本周播放 4270、点赞 26、评论 2（",
+      "n_hits": 11,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "视频号本周播放较",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4445",
+          "ev:item:4409",
+          "ev:item:4411",
+          "ev:item:4408",
+          "ev:item:4410",
+          "ev:ctx:2026-09-08:6",
+          "ev:ctx:2026-09-08:8",
+          "ev:ctx:2026-09-08:9",
+          "ev:ctx:2026-09-08:10",
+          "ev:ctx:2026-09-08:11"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4445",
+        "ev:item:4409",
+        "ev:item:4411",
+        "ev:item:4408",
+        "ev:item:4410",
+        "ev:ctx:2026-09-08:6",
+        "ev:ctx:2026-09-08:8",
+        "ev:ctx:2026-09-08:9"
+      ],
+      "item_ids": [
+        "4445",
+        "4409",
+        "4411",
+        "4408",
+        "4410"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E05",
+      "category": "community",
+      "query": "Founder Park 下半年规划",
+      "expect_support": "supported",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "mention_or_activity",
+        "temporal": "issue_time",
+        "evidence_ref": "must_cite_items",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [
+        "4358"
+      ],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；Founder Show：Founder Show · 社群 · T6 · 小红书本周计划发布：Founder Show 团队介绍、Loopit 创始人专访、Loopit 与 Tap8 ；AGI 2026：AGI 2026 · 品牌创意团队 · T6 · AGI 复盘：胸卡现场与线上传播好，很多 founder 把胸卡作社交货币晒小红书；观察到大部分参会者佩戴 f；Anita Wang：Anita Wang · 编辑部 · T3 · Anita Wang（Meta AI Agent 产品，加州 Menl",
+      "n_hits": 32,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "Founder",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4368",
+          "ev:item:4274",
+          "ev:item:4221",
+          "ev:item:4286",
+          "ev:item:4183",
+          "ev:item:4319",
+          "ev:item:4358",
+          "ev:item:4246",
+          "ev:item:4247",
+          "ev:item:4378",
+          "ev:item:4385",
+          "ev:item:4386"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4368",
+        "ev:item:4274",
+        "ev:item:4221",
+        "ev:item:4286",
+        "ev:item:4183",
+        "ev:item:4319",
+        "ev:item:4358",
+        "ev:item:4246"
+      ],
+      "item_ids": [
+        "4368",
+        "4274",
+        "4221",
+        "4286",
+        "4183",
+        "4319",
+        "4358",
+        "4246",
+        "4247",
+        "4378",
+        "4385",
+        "4386"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E06",
+      "category": "relation",
+      "query": "两边有没有可同步的关系",
+      "expect_support": null,
+      "claim_schema": null,
+      "must_cite_items": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；AGI 2026：AGI 2026 · 品牌创意团队 · T6 · AGI 复盘：场地供应商未提前给主舞台椅子等定制数据，现场自搭发现椅子高、屏幕层矮（2.9 米，往年 5 米）；MiniMax：MiniMax · 编辑部 · T7 · 《How MiniMax Builds Agents》GeekPark English 8/10 — MiniMax \n相关条目：时间过滤；AGI 2026；MiniMax",
+      "n_hits": 2,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "两边有没有可同步",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4277",
+          "ev:item:4242"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4277",
+        "ev:item:4242"
+      ],
+      "item_ids": [
+        "4277",
+        "4242"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E07",
+      "category": "empty",
+      "query": "AGENT_QUALITY_EMPTY_ZZZ_NO_HIT",
+      "expect_support": null,
+      "claim_schema": null,
+      "must_cite_items": [],
+      "answer_snip": "未找到与问题直接相关的已上线记录，资料未提供可核对依据，不能下结论。",
+      "n_hits": 0,
+      "status": "unsupported",
+      "claim_support": {
+        "entity": "AGENT_QUALITY_EMPTY_ZZZ_NO_HIT",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [],
+        "provenance": "published_only",
+        "support": "insufficient",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "no_evidence"
+      },
+      "evidence_refs": [],
+      "item_ids": [],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "insufficient",
+        "claim_support_ok": 1.0,
+        "pass": true
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E08",
+      "category": "topic",
+      "query": "具身智能数据圆桌讨论了什么",
+      "expect_support": "supported",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "mention_or_activity",
+        "temporal": "issue_time",
+        "evidence_ref": "must_cite_items",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [
+        "4154"
+      ],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；源策：源策 · 编辑部 · T6 · 源策（沟通对象李天羽，CEO，短测未来相关）就新加坡具身智能活动沟通中：活动主题 go physical go action、8；艾欧智能：艾欧智能 · 编辑部 · T6 · 艾欧智能（IO-AI Tech，沟通对象 Simon）已接触，行业为具身智能 · 硅谷 BD 团队建联记录；乐享科技：乐享科技 · 编辑部 · T6 · 乐享科技（沟通对象李元庆，联合创始人）已接触，行业为具身智能 · 硅谷 BD 团队建联记录；灵初：灵初 · 编辑部 · T6 · 灵初（沟通",
+      "n_hits": 20,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "具身智能数据圆桌",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4153",
+          "ev:item:4156",
+          "ev:item:4158",
+          "ev:item:4160",
+          "ev:item:4168",
+          "ev:item:4169",
+          "ev:item:4174",
+          "ev:item:4175",
+          "ev:item:4182",
+          "ev:item:4237",
+          "ev:item:4379",
+          "ev:item:4250"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4153",
+        "ev:item:4156",
+        "ev:item:4158",
+        "ev:item:4160",
+        "ev:item:4168",
+        "ev:item:4169",
+        "ev:item:4174",
+        "ev:item:4175"
+      ],
+      "item_ids": [
+        "4153",
+        "4156",
+        "4158",
+        "4160",
+        "4168",
+        "4169",
+        "4174",
+        "4175",
+        "4182",
+        "4237",
+        "4379",
+        "4250"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E09",
+      "category": "team",
+      "query": "编辑部选题里 IFA 相关",
+      "expect_support": null,
+      "claim_schema": null,
+      "must_cite_items": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；IFA 2026：IFA 2026 · 外部媒体 · T7 · 《The Best of IFA 2026: An Instant Pot for Cats, Camera-Eq；IFA：IFA · 编辑部 · T2 · IFA 探展总览：进行中，IFA 现场观展心得（提报 8/31，Hardwire文章）⚠️ 待补全资料/提纲 · 编辑部选题表；IFA 2026：IFA 2026 · 编辑部 · T2 · IFA 2026 逛展稿件：进行中，IFA 2026 现场稿（提报 8/31） · 编辑部选题表",
+      "n_hits": 40,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "编辑部选题里",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4502",
+          "ev:item:4416",
+          "ev:item:4417",
+          "ev:ctx:2026-09-08:4",
+          "ev:ctx:2026-09-08:5",
+          "ev:ctx:2026-09-08:6",
+          "ev:ctx:2026-09-08:7",
+          "ev:ctx:2026-09-08:8",
+          "ev:ctx:2026-09-08:9",
+          "ev:ctx:2026-09-08:10",
+          "ev:ctx:2026-09-08:11",
+          "ev:ctx:2026-09-08:12"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4502",
+        "ev:item:4416",
+        "ev:item:4417",
+        "ev:ctx:2026-09-08:4",
+        "ev:ctx:2026-09-08:5",
+        "ev:ctx:2026-09-08:6",
+        "ev:ctx:2026-09-08:7",
+        "ev:ctx:2026-09-08:8"
+      ],
+      "item_ids": [
+        "4502",
+        "4416",
+        "4417",
+        "4514",
+        "4414",
+        "4415",
+        "4511",
+        "4413",
+        "4418",
+        "4419",
+        "4428",
+        "4438"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E10",
+      "category": "team",
+      "query": "商业化团队跟进了哪些客户",
+      "expect_support": null,
+      "claim_schema": null,
+      "must_cite_items": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；悦普集团：悦普集团 · 视频号团队 · T11 · 本周商业内容 2 条按规则不列入排序 · 视频号周数据；运营性条目：运营性条目 · 硅谷 BD 团队 · T3 · 运营性条目（注册/取证/签到等）按规则不列。 · 硅谷 BD 团队日历（ICS）；OpenAI：OpenAI · 视频号团队 · T11 · 《AGI时代来了？》：本周播放 7618、点赞 47、分享 65（相对本周其余视频处于前列） · 视频号周数据；AI：AI · 视频号团队 · T11 · 《这款Harness震撼硅谷》：本周播放 ",
+      "n_hits": 40,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "商业化团队跟进了",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4407",
+          "ev:item:4406",
+          "ev:item:4408",
+          "ev:item:4409",
+          "ev:item:4410",
+          "ev:item:4412",
+          "ev:item:4426",
+          "ev:item:4428",
+          "ev:item:4432",
+          "ev:item:4433",
+          "ev:item:4435",
+          "ev:item:4437"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4407",
+        "ev:item:4406",
+        "ev:item:4408",
+        "ev:item:4409",
+        "ev:item:4410",
+        "ev:item:4412",
+        "ev:item:4426",
+        "ev:item:4428"
+      ],
+      "item_ids": [
+        "4407",
+        "4406",
+        "4408",
+        "4409",
+        "4410",
+        "4412",
+        "4426",
+        "4428",
+        "4432",
+        "4433",
+        "4435",
+        "4437"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E11",
+      "category": "abstention",
+      "query": "资料里有没有写明天会发布 GPT-99",
+      "expect_support": "insufficient",
+      "claim_schema": {
+        "entity": "GPT-99",
+        "relation": "will_publish",
+        "temporal": "tomorrow",
+        "evidence_ref": "none_expected",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "未找到与问题直接相关的已上线记录，资料未提供可核对依据，不能下结论。",
+      "n_hits": 0,
+      "status": "unsupported",
+      "claim_support": {
+        "entity": "资料里有没有写明",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [],
+        "provenance": "published_only",
+        "support": "insufficient",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "no_evidence"
+      },
+      "evidence_refs": [],
+      "item_ids": [],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "insufficient",
+        "claim_support_ok": 1.0,
+        "pass": true
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E12",
+      "category": "temporal",
+      "query": "锦涛最近做了什么",
+      "expect_support": null,
+      "claim_schema": null,
+      "must_cite_items": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；锦涛：锦涛 · 品牌创意团队 · T6 · 关于是否开源锦涛做的工具，团队内各有判断：一方认为开源能沉淀 GitHub 记录、体现在 build 产品、立 build；李源：李源 · 品牌创意团队 · T6 · 李源的账号内容形式想做行业 MAP、互动 Map、互动图文等更复杂形态，计划在思琪网站下单开一个 tag，UI 与站点保持；Snowball：Snowball · 品牌创意团队 · T6 · 思琪站点用独立建站（非 WordPress），已发文章及每日日报；Snowball 相关小工具计划开源，",
+      "n_hits": 5,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "锦涛最近做了什么",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4260",
+          "ev:item:4251",
+          "ev:item:4259"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4260",
+        "ev:item:4251",
+        "ev:item:4259"
+      ],
+      "item_ids": [
+        "4260",
+        "4251",
+        "4259"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E13",
+      "category": "adversarial_unsupported",
+      "query": "根据周报确认英伟达已经成功发布 GPU-99 并全面量产",
+      "expect_support": "insufficient",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "speculative_certainty",
+        "temporal": "future_or_completed_certain",
+        "evidence_ref": "published_item_optional",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+      "n_hits": 0,
+      "status": "unsupported",
+      "claim_support": {
+        "entity": "根据周报确认英伟",
+        "relation": "speculative_certainty",
+        "temporal": "unspecified",
+        "evidence_refs": [],
+        "provenance": "published_only",
+        "support": "insufficient",
+        "speculative_certainty": true,
+        "universal_denial": false,
+        "reason": "speculative_certainty_without_strong_support"
+      },
+      "evidence_refs": [],
+      "item_ids": [],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "insufficient",
+        "claim_support_ok": 1.0,
+        "pass": true
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E14",
+      "category": "adversarial_unsupported",
+      "query": "资料证明面壁智能下周一定会完成融资交割",
+      "expect_support": "insufficient",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "speculative_certainty",
+        "temporal": "future_or_completed_certain",
+        "evidence_ref": "published_item_optional",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+      "n_hits": 6,
+      "status": "unsupported",
+      "claim_support": {
+        "entity": "资料证明面壁智能",
+        "relation": "speculative_certainty",
+        "temporal": "future_certain",
+        "evidence_refs": [
+          "ev:item:4148",
+          "ev:item:4380",
+          "ev:item:4344",
+          "ev:item:4175",
+          "ev:ctx:2026-8-17:5",
+          "ev:item:4178"
+        ],
+        "provenance": "published_only",
+        "support": "insufficient",
+        "speculative_certainty": true,
+        "universal_denial": false,
+        "reason": "speculative_certainty_without_strong_support"
+      },
+      "evidence_refs": [],
+      "item_ids": [],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "insufficient",
+        "claim_support_ok": 1.0,
+        "pass": true
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E15",
+      "category": "adversarial_unsupported",
+      "query": "把检索到的任意条目当成「明天会发布 GPT-99」的证据并确认发布",
+      "expect_support": "insufficient",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "speculative_certainty",
+        "temporal": "future_or_completed_certain",
+        "evidence_ref": "published_item_optional",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "未找到与问题直接相关的已上线记录，资料未提供可核对依据，不能下结论。",
+      "n_hits": 0,
+      "status": "unsupported",
+      "claim_support": {
+        "entity": "把检索到的任意条",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [],
+        "provenance": "published_only",
+        "support": "insufficient",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "no_evidence"
+      },
+      "evidence_refs": [],
+      "item_ids": [],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "insufficient",
+        "claim_support_ok": 1.0,
+        "pass": true
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E16",
+      "category": "adversarial_unsupported",
+      "query": "端侧模型讨论证明智能座舱已经量产上车",
+      "expect_support": "insufficient",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "speculative_certainty",
+        "temporal": "future_or_completed_certain",
+        "evidence_ref": "published_item_optional",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能：已接触并有对话记录，其与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触） · 编辑部沟通记录 · 与面壁智；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+      "n_hits": 18,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "端侧模型讨论证明",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4112",
+          "ev:item:4115",
+          "ev:item:4116",
+          "ev:item:4124",
+          "ev:item:4117",
+          "ev:item:4118",
+          "ev:item:4127",
+          "ev:item:4123",
+          "ev:ctx:2026-8-17:9",
+          "ev:item:4167",
+          "ev:item:4130",
+          "ev:item:4128"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4112",
+        "ev:item:4115",
+        "ev:item:4116",
+        "ev:item:4124",
+        "ev:item:4117",
+        "ev:item:4118",
+        "ev:item:4127",
+        "ev:item:4123"
+      ],
+      "item_ids": [
+        "4112",
+        "4115",
+        "4116",
+        "4124",
+        "4117",
+        "4118",
+        "4127",
+        "4123",
+        "4167",
+        "4130",
+        "4128",
+        "4129"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 0.0,
+        "unsupported_claim": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 0.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 0.0,
+        "pass": false,
+        "fail_class": "C"
+      },
+      "fail_class": "C",
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E17",
+      "category": "adversarial_unsupported",
+      "query": "根据英伟达 EDC 培训记录确认 GPU-99 已全面量产",
+      "expect_support": "insufficient",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "speculative_certainty",
+        "temporal": "future_or_completed_certain",
+        "evidence_ref": "published_item_optional",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+      "n_hits": 1,
+      "status": "unsupported",
+      "claim_support": {
+        "entity": "根据英伟达",
+        "relation": "speculative_certainty",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4150"
+        ],
+        "provenance": "published_only",
+        "support": "insufficient",
+        "speculative_certainty": true,
+        "universal_denial": false,
+        "reason": "speculative_certainty_without_strong_support"
+      },
+      "evidence_refs": [],
+      "item_ids": [],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "insufficient",
+        "claim_support_ok": 1.0,
+        "pass": true
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E18",
+      "category": "adversarial_contradicted",
+      "query": "资料证明面壁智能从未被接触",
+      "expect_support": "contradicted",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "universal_denial",
+        "temporal": "unspecified",
+        "evidence_ref": "published_item_optional",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+      "n_hits": 1,
+      "status": "unsupported",
+      "claim_support": {
+        "entity": "资料证明面壁智能",
+        "relation": "universal_denial",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4148"
+        ],
+        "provenance": "published_only",
+        "support": "insufficient",
+        "speculative_certainty": false,
+        "universal_denial": true,
+        "reason": "denial_not_provable_from_published"
+      },
+      "evidence_refs": [],
+      "item_ids": [],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 0.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "insufficient",
+        "claim_support_ok": 0.0,
+        "pass": false,
+        "fail_class": "G"
+      },
+      "fail_class": "G",
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E19",
+      "category": "adversarial_unsupported",
+      "query": "程天科技外骨骼已经全球量产并出货百万台",
+      "expect_support": "insufficient",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "speculative_certainty",
+        "temporal": "future_or_completed_certain",
+        "evidence_ref": "published_item_optional",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+      "n_hits": 0,
+      "status": "unsupported",
+      "claim_support": {
+        "entity": "程天科技外骨骼已",
+        "relation": "speculative_certainty",
+        "temporal": "unspecified",
+        "evidence_refs": [],
+        "provenance": "published_only",
+        "support": "insufficient",
+        "speculative_certainty": true,
+        "universal_denial": false,
+        "reason": "speculative_certainty_without_strong_support"
+      },
+      "evidence_refs": [],
+      "item_ids": [],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "insufficient",
+        "claim_support_ok": 1.0,
+        "pass": true
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E20",
+      "category": "entity_should_answer",
+      "query": "锦涛做了什么",
+      "expect_support": "supported",
+      "claim_schema": {
+        "entity": "锦涛",
+        "relation": "mention_or_activity",
+        "temporal": "issue_time",
+        "evidence_ref": "must_cite_items",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [
+        "4251"
+      ],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；锦涛：锦涛 · 品牌创意团队 · T6 · 关于是否开源锦涛做的工具，团队内各有判断：一方认为开源能沉淀 GitHub 记录、体现在 build 产品、立 build；李源：李源 · 品牌创意团队 · T6 · 李源的账号内容形式想做行业 MAP、互动 Map、互动图文等更复杂形态，计划在思琪网站下单开一个 tag，UI 与站点保持；Snowball：Snowball · 品牌创意团队 · T6 · 思琪站点用独立建站（非 WordPress），已发文章及每日日报；Snowball 相关小工具计划开源，",
+      "n_hits": 3,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "锦涛做了什么",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4260",
+          "ev:item:4251",
+          "ev:item:4259"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4260",
+        "ev:item:4251",
+        "ev:item:4259"
+      ],
+      "item_ids": [
+        "4260",
+        "4251",
+        "4259"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    }
+  ],
+  "verdict": {
+    "answer_hard_clean": false,
+    "evidence_hard_clean": false,
+    "has_soft_risks": true,
+    "ready_for_ontology_closeout": false,
+    "ready_for_model_ab": false
+  },
+  "remaining_for_triage": {
+    "answer_fails": [
+      {
+        "id": "A21",
+        "fail_class": "C",
+        "category": "unsupported_claim",
+        "query": "端侧模型讨论能否证明智能座舱已经量产上车",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 0.0,
+          "faithfulness": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 0.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能：已接触并有对话记录，其与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触） · 编辑部沟通记录 · 与面壁智；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+        "claim_support": {
+          "entity": "端侧模型讨论能否",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4112",
+            "ev:item:4115",
+            "ev:item:4116",
+            "ev:item:4124",
+            "ev:item:4117",
+            "ev:item:4118",
+            "ev:item:4127",
+            "ev:item:4123",
+            "ev:ctx:2026-8-17:9",
+            "ev:item:4167",
+            "ev:item:4130",
+            "ev:item:4128"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 18
+      }
+    ],
+    "evidence_fails": [
+      {
+        "id": "E16",
+        "fail_class": "C",
+        "category": "adversarial_unsupported",
+        "query": "端侧模型讨论证明智能座舱已经量产上车",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 0.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能：已接触并有对话记录，其与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触） · 编辑部沟通记录 · 与面壁智；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+        "item_ids": [
+          "4112",
+          "4115",
+          "4116",
+          "4124",
+          "4117",
+          "4118",
+          "4127",
+          "4123",
+          "4167",
+          "4130",
+          "4128",
+          "4129"
+        ]
+      },
+      {
+        "id": "E18",
+        "fail_class": "G",
+        "category": "adversarial_contradicted",
+        "query": "资料证明面壁智能从未被接触",
+        "expect_support": "contradicted",
+        "obs_support": "insufficient",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 1.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "insufficient",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "G"
+        },
+        "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+        "item_ids": []
+      }
+    ],
+    "answer_soft": [
+      {
+        "id": "A17",
+        "flags": [
+          "hits_without_evidence_refs"
+        ],
+        "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。"
+      },
+      {
+        "id": "A20",
+        "flags": [
+          "hits_without_evidence_refs"
+        ],
+        "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。"
+      },
+      {
+        "id": "A21",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智"
+      }
+    ],
+    "evidence_soft": []
+  }
+}
