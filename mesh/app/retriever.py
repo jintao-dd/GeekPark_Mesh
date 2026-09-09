@@ -168,122 +168,97 @@ def rerank_hits(
 
 ) -> list[dict]:
 
-    """规则 rerank：Quality Ranking v1.4（冻结）+ seed soft boost。
+    """规则 rerank：legacy 专名/来源/时效 + Quality Ranking v1.4 后置（冻结）。
 
-    apply_quality=None 时读环境 MESH_RANKING_QUALITY（默认 1）。
-    评测 A/B 可设 MESH_RANKING_QUALITY=0 后自行套实验函数。
+    评测 candidate 路径是 legacy → v1.4；合入必须同序，禁止用纯 v1.4 替换 legacy。
+    apply_quality=None 时读 MESH_RANKING_QUALITY（默认 1）。
     """
 
     import os
 
     if apply_quality is None:
+
         apply_quality = os.environ.get("MESH_RANKING_QUALITY", "1").strip() != "0"
+
+    terms = set(re.findall(r"[\u4e00-\u9fff]{2,}|[A-Za-z]{3,}", q or ""))
 
     seeds = {str(x) for x in (seed_chunk_ids or []) if x}
 
     seed_items = {str(x) for x in (seed_item_ids or []) if x}
 
+    today = datetime.date.today()
+
+    out: list[dict] = []
+
+    for h in hits:
+
+        h = dict(h)
+
+        bonus = 0.0
+
+        title = (h.get("title") or "").lower()
+
+        body = (h.get("body") or "").lower()
+
+        for t in terms:
+
+            tl = t.lower()
+
+            if tl in title:
+
+                bonus += 0.25
+
+            elif tl in body:
+
+                bonus += 0.08
+
+        src = h.get("source") or ""
+
+        if src == "item_entity_facts":
+
+            bonus += 0.35
+
+        elif src == "vector":
+
+            bonus += 0.12
+
+        elif src == "item_facts":
+
+            bonus += 0.18
+
+        try:
+
+            d = datetime.date.fromisoformat((h.get("date_end") or "")[:10])
+
+            age = max(0, (today - d).days)
+
+            bonus -= min(age, 365) * 0.002
+
+        except Exception:
+
+            pass
+
+        overlap = _term_overlap(q, h)
+
+        if seeds and str(h.get("chunk_id") or "") in seeds and overlap >= 0.12:
+
+            bonus += 0.15
+
+        iid = str(h.get("item_id") or "")
+
+        if seed_items and iid and iid in seed_items and overlap >= 0.08:
+
+            bonus += 0.2
+
+        h["score"] = float(h.get("score") or 0) - bonus
+
+        out.append(h)
+
+    out.sort(key=lambda x: float(x.get("score") or 0))
+
     if apply_quality:
 
-        out = apply_ranking_v1_4(list(hits), q, scope_meta=scope_meta)
-
-    else:
-
-        # legacy path（仅评测关闭 quality 时）：专名/来源/时效
-
-        terms = set(re.findall(r"[\u4e00-\u9fff]{2,}|[A-Za-z]{3,}", q or ""))
-
-        today = datetime.date.today()
-
-        out = []
-
-        for h0 in hits:
-
-            h = dict(h0)
-
-            bonus = 0.0
-
-            title = (h.get("title") or "").lower()
-
-            body = (h.get("body") or "").lower()
-
-            for t in terms:
-
-                tl = t.lower()
-
-                if tl in title:
-
-                    bonus += 0.25
-
-                elif tl in body:
-
-                    bonus += 0.08
-
-            src = h.get("source") or ""
-
-            if src == "item_entity_facts":
-
-                bonus += 0.35
-
-            elif src == "vector":
-
-                bonus += 0.12
-
-            elif src == "item_facts":
-
-                bonus += 0.18
-
-            try:
-
-                d = datetime.date.fromisoformat((h.get("date_end") or "")[:10])
-
-                age = max(0, (today - d).days)
-
-                bonus -= min(age, 365) * 0.002
-
-            except Exception:
-
-                pass
-
-            h["score"] = float(h.get("score") or 0) - bonus
-
-            out.append(h)
-
-        out.sort(key=lambda x: float(x.get("score") or 0))
-
-    # seed soft boost（quality / legacy 共用；不改召回集合）
-
-    if seeds or seed_items:
-
-        boosted = []
-
-        for h0 in out:
-
-            h = dict(h0)
-
-            bonus = 0.0
-
-            overlap = _term_overlap(q, h)
-
-            if seeds and str(h.get("chunk_id") or "") in seeds and overlap >= 0.12:
-
-                bonus += 0.15
-
-            iid = str(h.get("item_id") or "")
-
-            if seed_items and iid and iid in seed_items and overlap >= 0.08:
-
-                bonus += 0.2
-
-            if bonus:
-
-                h["score"] = float(h.get("score") or 0) - bonus
-
-            boosted.append(h)
-
-        boosted.sort(key=lambda x: float(x.get("score") or 0))
-
-        out = boosted
+        out = apply_ranking_v1_4(out, q, scope_meta=scope_meta)
 
     return out[:limit]
 

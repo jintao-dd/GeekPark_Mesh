@@ -6,9 +6,12 @@
 
 | 项 | 结果 |
 |----|------|
-| 合入点 | `app/ranking_quality.py` + `retriever.rerank_hits`（默认开启） |
-| 开关 | `MESH_RANKING_QUALITY=0` 仅评测 A/B |
+| 合入点 | `app/ranking_quality.py` + `retriever.rerank_hits`（**legacy → v1.4**，与 candidate 评测同序） |
+| 开关 | `MESH_RANKING_QUALITY=0` 仅评测 A/B（关后置 v1.4，保留 legacy） |
 | 决策 | **MERGED + FROZEN** — 除非新 Gold 暴露退化，不再做 Ranking 优化 |
+
+> 注意：曾误用「纯 v1.4 替换 legacy」会打坏 R18；已改回与 gates 一致的 **legacy 后置 v1.4**。
+
 
 回归闸门（合入后 `profile=baseline` 即生产路径）：4125→Top5、R06、R16、R18、R@20、worse=[]（见本地/tmesh smoke）。
 
