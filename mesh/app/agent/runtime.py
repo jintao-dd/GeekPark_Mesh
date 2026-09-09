@@ -157,6 +157,10 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
         trace["llm_used"] = bool(payload.get("llm_used"))
     if payload.get("temporal"):
         trace["temporal"] = payload.get("temporal")
+    if "n_hits" in payload:
+        trace["n_hits"] = payload.get("n_hits")
+    if payload.get("claim_support"):
+        trace["claim_support"] = payload.get("claim_support")
     return enrich_answer_for_display(
         AgentAnswer(
             text=text,

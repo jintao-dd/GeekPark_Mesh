@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from .models import AgentEnvelope
+from .observability import attach_observability, new_request_id, timed_run
 from .runtime import handle_message
 
 
@@ -29,6 +30,15 @@ def envelope_from_payload(payload: dict[str, Any]) -> AgentEnvelope:
 
 
 def run_harness(con, payload: dict[str, Any]) -> dict[str, Any]:
-    env = envelope_from_payload(payload)
-    answer = handle_message(con, env)
-    return answer.to_dict()
+    p = payload or {}
+    request_id = str(p.get("request_id") or "").strip() or new_request_id()
+    env = envelope_from_payload(p)
+    answer, latency_ms = timed_run(handle_message, con, env)
+    d = answer.to_dict()
+    # 透传检索命中到 observability（若 adapter 写入 trace）
+    return attach_observability(
+        d,
+        request_id=request_id,
+        envelope=p,
+        latency_ms=latency_ms,
+    )
