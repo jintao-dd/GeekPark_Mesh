@@ -144,8 +144,8 @@ def _maybe_llm_answer(
     try:
         from .. import llm
 
-        # Agent 成文只送 Top-N，避免上下文过大导致 LLM 失败后静默回落摘要
-        ctxs = [c for c in (contexts or []) if isinstance(c, dict)][:12]
+        # Agent 成文：Top-N 由 llm.pack_answer_contexts / MESH_ANSWER_CTX_N 统一裁剪
+        ctxs = [c for c in (contexts or []) if isinstance(c, dict)]
         ans = llm.answer_question(q, ctxs, temporal_block=temporal_block)
         if isinstance(ans, dict):
             return (ans.get("answer") or ans.get("text") or "").strip() or None

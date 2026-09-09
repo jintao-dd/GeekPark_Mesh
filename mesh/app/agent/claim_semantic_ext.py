@@ -54,37 +54,20 @@ _FORCED_CLAIM_FRAME = re.compile(
     r")"
 )
 
-JUDGE_SYSTEM = """你是 Mesh Claim→Evidence 语义评审（selective；写入 support 标签）。
-只根据「主张/问句」与「已上线 evidence 摘录」判断。禁止库外猜测。不要写用户答案。
+JUDGE_SYSTEM = """Mesh Claim→Evidence 语义评审（selective）。只根据主张与已上线 evidence 摘录判断；禁止库外猜测；不要写用户答案。
 
-必须分开三个维度（不要混）：
+分开三个维度：
+1) claim_strength: strong=断言已完成/成立的现实状态；weak=普通询问活动/提及
+2) evidence_entailment: entailing|direct_related|topical|none|contradicted_by_evidence
+   （direct_related ≠ supported；topic ≠ entailment）
+3) counter_evidence: true=有明确反证；false=无明确反证
 
-1) claim_strength
-- strong：主张在断言「已经完成/发生/成立」的现实状态（完成态确定性），
-  即使措辞不同于「量产上车」等已知词。
-- weak：普通询问活动/讨论/提及，不要求证明完成态。
+support: supported|insufficient|contradicted
+- strong 仅当 entailing 且无反证 → supported；否则 insufficient
+- weak：entailing/direct_related/topical → supported
+- contradicted：仅 counter_evidence 或 contradicted_by_evidence
 
-2) evidence_entailment（粒度相关 ≠ 足以证明）
-- entailing：摘录在语义上足以推出该 claim（真正蕴含）
-- direct_related：对象/粒度高度直接相关，但仍不足以证明 claim
-- topical：仅 topic/entity 相关
-- none：基本无关或无可用摘录
-- contradicted_by_evidence：摘录明确否定 claim
-
-注意：direct_related 不得自动当成 supported。
-
-3) counter_evidence
-- true：存在明确 published 反证
-- false：没有明确反证（找不到支持 ≠ 有反证）
-
-然后给出 support：
-- supported：弱 claim 有足够相关证据；或强 claim 且 entailment=entailing，且无反证
-- insufficient：相关但推不出（尤其 strong + topical/direct_related）
-- contradicted：仅当 counter_evidence=true 或 entailment=contradicted_by_evidence
-
-只输出 JSON：
-claim_strength, evidence_entailment, counter_evidence (bool),
-support, rationale (≤80字中文)
+只输出紧凑 JSON：claim_strength, evidence_entailment, counter_evidence, support, rationale(≤40字)
 """
 
 
@@ -123,11 +106,23 @@ def cheap_semantic_gate(query: str) -> dict[str, Any]:
     }
 
 
-def _ctx_snip(contexts: list[dict], limit: int = 8) -> str:
+def _env_int(name: str, default: int, *, lo: int, hi: int) -> int:
+    import os
+
+    try:
+        v = int((os.environ.get(name) or "").strip() or default)
+    except ValueError:
+        v = default
+    return max(lo, min(hi, v))
+
+
+def _ctx_snip(contexts: list[dict], limit: int | None = None) -> str:
+    n = _env_int("MESH_SEMANTIC_SNIP_N", 5, lo=2, hi=8) if limit is None else limit
+    body_n = _env_int("MESH_SEMANTIC_SNIP_CHARS", 150, lo=20, hi=220)
     lines = []
-    for i, c in enumerate(contexts[:limit], 1):
-        title = (c.get("标题") or c.get("title") or "").strip()
-        body = (c.get("内容") or c.get("body") or c.get("snippet") or "").strip()[:220]
+    for i, c in enumerate(contexts[:n], 1):
+        title = (c.get("标题") or c.get("title") or "").strip()[:80]
+        body = (c.get("内容") or c.get("body") or c.get("snippet") or "").strip()[:body_n]
         lines.append(f"[{i}] {title}\n{body}")
     return "\n\n".join(lines) if lines else "(无 evidence 摘录)"
 
@@ -226,12 +221,13 @@ def llm_semantic_judge(query: str, contexts: list[dict] | None = None) -> dict[s
     from .. import llm
 
     user = (
-        f"用户主张/问句：\n{query}\n\n"
-        f"已上线 evidence 摘录：\n{_ctx_snip(list(contexts or []))}\n\n"
-        "请输出 JSON。"
+        f"主张/问句：\n{query}\n\n"
+        f"evidence：\n{_ctx_snip(list(contexts or []))}\n\n"
+        "输出 JSON。"
     )
+    max_tok = _env_int("MESH_SEMANTIC_MAX_TOKENS", 160, lo=80, hi=500)
     try:
-        raw = llm.call(JUDGE_SYSTEM, user, max_tokens=500, json_mode=True, task="semantic")
+        raw = llm.call(JUDGE_SYSTEM, user, max_tokens=max_tok, json_mode=True, task="semantic")
     except Exception as e:
         return {
             "ok": False,

@@ -24,9 +24,16 @@ request → cheap route (Temporal/Guard/Structured)
 
 禁止：`embed_one` / Embedding API（含 denial 二次 `prepare`）。
 
-## 验收钩子
+## Performance Sprint v2（Answer + Semantic 双通道）
 
-- `prepared["retrieval_execution_mode"] == "lexical"`（Vector OFF）
-- request profile：`embed_call_count == 0`
-- 启动自检：`REPRO_STATUS=PASS`；`vector_enabled=false` 且 `embedding_calls>0` → FAIL
-- 任何性能报告必须带 Environment Manifest（见 `docs/ENVIRONMENT_REPRODUCIBILITY.md`）
+不改 Retrieval / Ranking / Claim 语义定义。仅压：
+
+| 通道 | 默认 |
+|------|------|
+| Answer max_tokens | `MESH_ANSWER_MAX_TOKENS=700` |
+| Answer Top-N / body | `MESH_ANSWER_CTX_N=6` · `MESH_ANSWER_BODY_CHARS=280` |
+| Answer system | `qa.md` + 精简运行时约束（不再整份塞 00_base_rules） |
+| Semantic max_tokens | `MESH_SEMANTIC_MAX_TOKENS=160` |
+| Semantic snips | `MESH_SEMANTIC_SNIP_N=5` × `MESH_SEMANTIC_SNIP_CHARS=150` |
+
+内部目标：普通检索 P95&lt;8s；强 Claim P95&lt;15s；简单事实不回退。

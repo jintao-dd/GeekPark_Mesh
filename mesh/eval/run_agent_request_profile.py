@@ -275,12 +275,24 @@ def profile_one(con, q: str, *, issue: str, use_llm: bool) -> dict[str, Any]:
 
     # claim_support 内可能串行 1 次 semantic llm.call
     n_llm_before = len(probe.by_kind("llm_call"))
+    try:
+        from app import llm as llm_mod
+
+        llm_mod.reset_usage_accum()
+    except Exception:
+        pass
     support, claim_ms = _ms(
         claim_support_mod.assess_claim_support,
         q,
         contexts=contexts,
         evidence_refs=evidence,
     )
+    try:
+        from app import llm as llm_mod
+
+        meta["claim_usage"] = llm_mod.take_usage_accum()
+    except Exception:
+        pass
     stages["claim_support_ms"] = claim_ms
     meta["claim_support"] = {
         "support": support.get("support"),
@@ -305,20 +317,33 @@ def profile_one(con, q: str, *, issue: str, use_llm: bool) -> dict[str, Any]:
             try:
                 from app import llm as llm_mod
 
-                ctxs12 = [c for c in contexts if isinstance(c, dict)][:12]
-                sys_p, user_p = llm_mod._qa_prompt(q, ctxs12, "lexical", temporal_block=tblock)
+                packed = llm_mod.pack_answer_contexts(contexts)
+                sys_p, user_p = llm_mod._qa_prompt(q, contexts, "lexical", temporal_block=tblock)
                 meta["answer_prompt_profile"] = {
-                    "n_contexts_sent": len(ctxs12),
+                    "n_contexts_sent": len(packed),
+                    "max_tokens": llm_mod.answer_max_tokens(),
                     "system_chars": len(sys_p or ""),
                     "user_chars": len(user_p or ""),
-                    "approx_tokens": (len(sys_p or "") + len(user_p or "")) // 2,
+                    "approx_input_tokens": (len(sys_p or "") + len(user_p or "")) // 2,
                 }
             except Exception as e:
                 meta["answer_prompt_profile"] = {"error": str(e)}
             n_before = len(probe.by_kind("llm_call"))
+            try:
+                from app import llm as llm_mod
+
+                llm_mod.reset_usage_accum()
+            except Exception:
+                pass
             llm_ans, answer_ms = _ms(
                 _maybe_llm_answer, q, contexts, temporal_block=tblock
             )
+            try:
+                from app import llm as llm_mod
+
+                meta["answer_usage"] = llm_mod.take_usage_accum()
+            except Exception:
+                pass
             meta["llm_calls_during_answer"] = len(probe.by_kind("llm_call")) - n_before
             if llm_ans:
                 answer = llm_ans

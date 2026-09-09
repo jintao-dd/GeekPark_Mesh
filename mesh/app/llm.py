@@ -736,6 +736,72 @@ def build_relation_narratives(locked_relations: list[dict]) -> list[dict]:
     return call_writer_llm(locked_relations)
 
 # ---------- 4. AI 问答 ----------
+# Performance Sprint v2 · Answer 通道（不改 Answer Contract / 业务语义）
+# 默认压低 completion + 精简送给模型的记录；可用环境变量调参。
+def _env_int(name: str, default: int, *, lo: int, hi: int) -> int:
+    import os
+
+    try:
+        v = int((os.environ.get(name) or "").strip() or default)
+    except ValueError:
+        v = default
+    return max(lo, min(hi, v))
+
+
+def answer_max_tokens() -> int:
+    return _env_int("MESH_ANSWER_MAX_TOKENS", 700, lo=200, hi=2000)
+
+
+def answer_ctx_limit() -> int:
+    return _env_int("MESH_ANSWER_CTX_N", 6, lo=3, hi=12)
+
+
+def answer_body_chars() -> int:
+    return _env_int("MESH_ANSWER_BODY_CHARS", 280, lo=40, hi=600)
+
+
+def pack_answer_contexts(contexts: list[dict] | None, *, limit: int | None = None) -> list[dict]:
+    """Answer 专用：去重、裁剪字段与正文，降低 prompt tokens（不改检索结果本身）。"""
+    n = answer_ctx_limit() if limit is None else limit
+    body_n = answer_body_chars()
+    out: list[dict] = []
+    seen: set[str] = set()
+    for c in contexts or []:
+        if not isinstance(c, dict):
+            continue
+        sec = str(c.get("章节") or "")
+        if sec in ("检索范围", "查询说明", "检索说明"):
+            continue
+        issue = str(c.get("期号") or c.get("issue") or "").strip()
+        title = str(c.get("标题") or c.get("title") or "").strip()
+        body = str(c.get("内容") or c.get("body") or c.get("snippet") or "").strip()
+        key = f"{issue}|{title}|{body[:48]}"
+        if key in seen:
+            continue
+        seen.add(key)
+        packed = {
+            "期号": issue,
+            "章节": sec,
+            "标题": title,
+            "内容": body[:body_n],
+        }
+        src = c.get("来源层") or c.get("source_label")
+        if src:
+            packed["来源层"] = str(src)[:40]
+        out.append(packed)
+        if len(out) >= n:
+            break
+    return out
+
+
+_ANSWER_RUNTIME_RULES = (
+    "【成文约束】只根据给出的可用记录回答；禁止编造。"
+    "禁用词：" + "、".join(FORBIDDEN[:12]) + " 等（见系统规则）。"
+    "内部同事不写人名；⑤区/L3 内容说明不在分发范围。"
+    "输出结构：先结论，再必要说明，末尾「来源」列出期号·章节·标题；勿写长分析或分点散文。"
+)
+
+
 def _qa_prompt(
     question: str,
     contexts: list[dict],
@@ -743,7 +809,9 @@ def _qa_prompt(
     history: list[dict] | None = None,
     temporal_block: str = "",
 ) -> tuple[str, str]:
-    system = load_prompt("00_base_rules") + "\n\n" + load_prompt("qa")
+    # Runtime：Answer 用 qa 规则 + 精简运行时约束，不再整份塞入抽取用 00_base_rules
+    # （业务语义仍以 qa.md + Answer Contract 为准；Forbidden 列表与代码侧一致）
+    system = (load_prompt("qa") or "").strip() + "\n\n" + _ANSWER_RUNTIME_RULES
     mode_hint = (
         "本轮上下文来自「主体×团队」结构化查询（差集/交集/聚合），列表即全部命中结果；不要补充未列出的公司或人。"
         if mode == "structured"
@@ -757,7 +825,7 @@ def _qa_prompt(
     if history:
         hist_block = (
             "\n\n此前对话（同一用户/群/话题线程，供指代消解；仍以本轮「可用记录」为准）：\n"
-            + json.dumps(history[-6:], ensure_ascii=False)[:4000]
+            + json.dumps(history[-4:], ensure_ascii=False)[:2000]
         )
     today = datetime.date.today().isoformat()
     time_anchor = (
@@ -766,11 +834,15 @@ def _qa_prompt(
         "回答须改写为期号或绝对日期，禁止把相对时间原样当成当下。"
     )
     temporal = f"\n\n{temporal_block.strip()}\n" if (temporal_block or "").strip() else ""
+    packed = pack_answer_contexts(contexts)
+    # Answer 专用字符预算：显著低于抽取任务，避免把窗口塞满
+    ans_budget = min(budget(reserve=28000), 9000)
     user = (
         f"问题：{question}\n\n{time_anchor}{temporal}\n{mode_hint}{hist_block}\n\n"
         f"可用记录（每条含 期号/章节/标题/内容）：\n"
-        f"{json.dumps(contexts, ensure_ascii=False)[:budget()]}\n\n"
-        "请用中文回答，每一句都要能指回上面的记录；回答末尾列出'来源'。无法回答的部分要说明缺哪类来源。"
+        f"{json.dumps(packed, ensure_ascii=False)[:ans_budget]}\n\n"
+        "请用中文简明回答：结论优先；每一句都能指回上面的记录；末尾列出「来源」。"
+        "无法回答的部分说明缺哪类来源。不要展开无关分析。"
     )
     return system, user
 
@@ -787,7 +859,7 @@ def answer_question(
     system, user = _qa_prompt(
         question, contexts, mode, history=history, temporal_block=temporal_block
     )
-    return call(system, user, max_tokens=2000, json_mode=False, task=task)
+    return call(system, user, max_tokens=answer_max_tokens(), json_mode=False, task=task)
 
 
 def answer_question_stream(
@@ -801,5 +873,5 @@ def answer_question_stream(
     system, user = _qa_prompt(
         question, contexts, mode, history=history, temporal_block=temporal_block
     )
-    yield from get_provider().stream(system, user, max_tokens=2000)
+    yield from get_provider().stream(system, user, max_tokens=answer_max_tokens())
 
