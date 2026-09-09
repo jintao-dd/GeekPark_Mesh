@@ -749,15 +749,15 @@ def _env_int(name: str, default: int, *, lo: int, hi: int) -> int:
 
 
 def answer_max_tokens() -> int:
-    return _env_int("MESH_ANSWER_MAX_TOKENS", 700, lo=200, hi=2000)
+    return _env_int("MESH_ANSWER_MAX_TOKENS", 520, lo=200, hi=2000)
 
 
 def answer_ctx_limit() -> int:
-    return _env_int("MESH_ANSWER_CTX_N", 6, lo=3, hi=12)
+    return _env_int("MESH_ANSWER_CTX_N", 5, lo=3, hi=12)
 
 
 def answer_body_chars() -> int:
-    return _env_int("MESH_ANSWER_BODY_CHARS", 280, lo=40, hi=600)
+    return _env_int("MESH_ANSWER_BODY_CHARS", 220, lo=40, hi=600)
 
 
 def pack_answer_contexts(contexts: list[dict] | None, *, limit: int | None = None) -> list[dict]:
