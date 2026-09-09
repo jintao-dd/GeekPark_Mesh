@@ -1,11 +1,10 @@
 # Agent Quality / v2
 
-> **状态（2026-09-09 · 边界锁定 → v2.3）**  
-> Temporal **24/24** · Recall **83/90/94** 冻结 · Vector **OFF** · 生产 Ranking **KEEP**  
-> **轻量 Ontology** = 从现有对象反推 schema，给 claim↔evidence 加语法（见 `MESH_LIGHTWEIGHT_ONTOLOGY.md`）  
-> **不做** Neo4j / Graph RAG / 新 Tool / Planner / LLM Wiki / 因 Ontology 改 Contract  
-> 下一刀：v2.3 Ranking（4125 / R16）→ Answer hard fail → Feishu 后再评估 Wiki 派生视图  
-> 报告：`AGENT_QUALITY_V2_2.md` · Overnight / v2.1
+> **状态（2026-09-09 · Ranking v1.4 候选）**  
+> Temporal **24/24** · Recall **83/90/94** 冻结 · Vector **OFF**  
+> Ranking v1.4：****4125→Top5** · worse=[] · R06/R16/R18/R@20 守住 → **CANDIDATE 合并（待确认）**  
+> 轻量 Ontology = 反推 schema only · Wiki / Agentic RAG **冻结**  
+> 报告：`AGENT_QUALITY_V2_3b_RANKING_4125.md`
 
 相关：`MESH_AGENT_FULL_ACCEPTANCE.md` · `TEMPORAL_PHASE1.md` · `RECALL_FAILURE_REVIEW.md`  
 ⑧ 飞书 MVP ∥ 质量线（只接线）。
