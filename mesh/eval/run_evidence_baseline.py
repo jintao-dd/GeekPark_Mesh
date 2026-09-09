@@ -71,6 +71,10 @@ def _ask(con, query: str, scope: dict) -> dict:
 
     prepared = ask_engine.prepare(con, query, ask)
     contexts = list(prepared.get("contexts") or [])
+    # 否认类：对齐明确反证（Evidence label≠Answer safety）
+    contexts = claim_support_mod.enrich_contexts_for_denial_counter_evidence(
+        con, ask, query, contexts
+    )
     evidence = _evidence_from_contexts(contexts, slug)
     terms = [t for t in tok.query_terms(query or "", limit=10) if len(t) >= 2]
     latin = re.findall(r"[A-Za-z][A-Za-z0-9_.-]{2,}", query or "")

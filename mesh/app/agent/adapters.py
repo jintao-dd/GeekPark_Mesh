@@ -224,10 +224,13 @@ def ask_published(
 
     prepared = ask_engine.prepare(con, q, scope)
     contexts = list(prepared.get("contexts") or [])
+    from . import claim_support as claim_support_mod
+
+    contexts = claim_support_mod.enrich_contexts_for_denial_counter_evidence(
+        con, scope, q, contexts
+    )
     evidence = _evidence_from_contexts(contexts, slug)
     n_hits = int(prepared.get("n_hits") or prepared.get("n_context") or 0)
-
-    from . import claim_support as claim_support_mod
 
     support_assess = claim_support_mod.assess_claim_support(
         q, contexts=contexts, evidence_refs=evidence

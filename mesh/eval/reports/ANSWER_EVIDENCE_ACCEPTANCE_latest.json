@@ -1,6 +1,6 @@
 {
   "phase": "answer_evidence_acceptance",
-  "tag": "accept_v23d",
+  "tag": "accept_v23e",
   "baseline": {
     "ranking_version": "v1.4",
     "vector": "OFF",
@@ -13,61 +13,16 @@
     "model_version": "anthropic/claude-4.8-opus",
     "prompt_version": "ask_engine+temporal_hard_rules+claim_support"
   },
-  "elapsed_s": 0.92,
+  "elapsed_s": 0.95,
   "answer_gold": "answer_gold_v2_accept.jsonl",
   "evidence_gold": "evidence_gold_v2_accept.jsonl",
   "answer": {
     "phase": "answer",
     "n": 21,
-    "pass_rate": 0.9524,
-    "n_fail": 1,
+    "pass_rate": 1.0,
+    "n_fail": 0,
     "n_soft_flag": 3,
-    "fails": [
-      {
-        "id": "A21",
-        "fail_class": "C",
-        "category": "unsupported_claim",
-        "query": "端侧模型讨论能否证明智能座舱已经量产上车",
-        "metrics": {
-          "accuracy": 0.0,
-          "completeness": 0.0,
-          "faithfulness": 0.0,
-          "citation_correctness": 1.0,
-          "abstention_correctness": 0.0,
-          "nonempty": 1.0,
-          "must_mention_ok": 1.0,
-          "pass": false,
-          "scoring": "v2_2_hard",
-          "fail_class": "C"
-        },
-        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能：已接触并有对话记录，其与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触） · 编辑部沟通记录 · 与面壁智；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
-        "claim_support": {
-          "entity": "端侧模型讨论能否",
-          "relation": "mention",
-          "temporal": "unspecified",
-          "evidence_refs": [
-            "ev:item:4112",
-            "ev:item:4115",
-            "ev:item:4116",
-            "ev:item:4124",
-            "ev:item:4117",
-            "ev:item:4118",
-            "ev:item:4127",
-            "ev:item:4123",
-            "ev:ctx:2026-8-17:9",
-            "ev:item:4167",
-            "ev:item:4130",
-            "ev:item:4128"
-          ],
-          "provenance": "published_only",
-          "support": "supported",
-          "speculative_certainty": false,
-          "universal_denial": false,
-          "reason": "has_published_evidence"
-        },
-        "n_hits": 18
-      }
-    ],
+    "fails": [],
     "soft_flag_cases": [
       {
         "id": "A17",
@@ -86,77 +41,19 @@
       {
         "id": "A21",
         "flags": [
-          "abstain_query_but_support_supported"
+          "hits_without_evidence_refs"
         ],
-        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智"
+        "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。"
       }
     ]
   },
   "evidence": {
     "phase": "evidence",
     "n": 20,
-    "pass_rate": 0.9,
-    "n_fail": 2,
+    "pass_rate": 1.0,
+    "n_fail": 0,
     "n_soft_flag": 0,
-    "fails": [
-      {
-        "id": "E16",
-        "fail_class": "C",
-        "category": "adversarial_unsupported",
-        "query": "端侧模型讨论证明智能座舱已经量产上车",
-        "expect_support": "insufficient",
-        "obs_support": "supported",
-        "metrics": {
-          "evidence_coverage": 1.0,
-          "evidence_correctness": 0.0,
-          "unsupported_claim": 1.0,
-          "citation_correctness": 1.0,
-          "abstention_ok": 0.0,
-          "claim_support_leak": 0.0,
-          "claim_support": "supported",
-          "claim_support_ok": 0.0,
-          "pass": false,
-          "fail_class": "C"
-        },
-        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能：已接触并有对话记录，其与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触） · 编辑部沟通记录 · 与面壁智；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
-        "item_ids": [
-          "4112",
-          "4115",
-          "4116",
-          "4124",
-          "4117",
-          "4118",
-          "4127",
-          "4123",
-          "4167",
-          "4130",
-          "4128",
-          "4129"
-        ]
-      },
-      {
-        "id": "E18",
-        "fail_class": "G",
-        "category": "adversarial_contradicted",
-        "query": "资料证明面壁智能从未被接触",
-        "expect_support": "contradicted",
-        "obs_support": "insufficient",
-        "metrics": {
-          "evidence_coverage": 1.0,
-          "evidence_correctness": 0.0,
-          "unsupported_claim": 0.0,
-          "citation_correctness": 1.0,
-          "abstention_ok": 1.0,
-          "claim_support_leak": 0.0,
-          "claim_support": "insufficient",
-          "claim_support_ok": 0.0,
-          "pass": false,
-          "fail_class": "G"
-        },
-        "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
-        "item_ids": []
-      }
-    ],
+    "fails": [],
     "soft_flag_cases": []
   },
   "answer_results": [
@@ -182,6 +79,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -237,6 +135,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -297,6 +196,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -355,6 +255,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -415,6 +316,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -463,6 +365,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -502,6 +405,7 @@
         "evidence_refs": [],
         "provenance": "published_only",
         "support": "insufficient",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "no_evidence"
@@ -553,6 +457,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -602,6 +507,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -642,6 +548,7 @@
         "evidence_refs": [],
         "provenance": "published_only",
         "support": "insufficient",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "no_evidence"
@@ -693,6 +600,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -782,6 +690,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -826,6 +735,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -885,14 +795,15 @@
       "status": "unsupported",
       "claim_support": {
         "entity": "根据已有周报",
-        "relation": "speculative_certainty",
+        "relation": "strong_deterministic",
         "temporal": "unspecified",
         "evidence_refs": [],
         "provenance": "published_only",
         "support": "insufficient",
+        "claim_strength": "strong",
         "speculative_certainty": true,
         "universal_denial": false,
-        "reason": "speculative_certainty_without_strong_support"
+        "reason": "strong_claim_without_direct_evidence"
       },
       "evidence_refs": [],
       "metrics": {
@@ -920,8 +831,8 @@
       "n_hits": 17,
       "status": "unsupported",
       "claim_support": {
-        "entity": "面壁智能下周一定",
-        "relation": "speculative_certainty",
+        "entity": "面壁智能",
+        "relation": "strong_deterministic",
         "temporal": "future_certain",
         "evidence_refs": [
           "ev:item:4112",
@@ -939,9 +850,10 @@
         ],
         "provenance": "published_only",
         "support": "insufficient",
+        "claim_strength": "strong",
         "speculative_certainty": true,
         "universal_denial": false,
-        "reason": "speculative_certainty_without_strong_support"
+        "reason": "strong_claim_without_direct_evidence"
       },
       "evidence_refs": [],
       "metrics": {
@@ -972,14 +884,15 @@
       "status": "unsupported",
       "claim_support": {
         "entity": "根据已有周报",
-        "relation": "speculative_certainty",
+        "relation": "strong_deterministic",
         "temporal": "unspecified",
         "evidence_refs": [],
         "provenance": "published_only",
         "support": "insufficient",
+        "claim_strength": "strong",
         "speculative_certainty": true,
         "universal_denial": false,
-        "reason": "speculative_certainty_without_strong_support"
+        "reason": "strong_claim_without_direct_evidence"
       },
       "evidence_refs": [],
       "metrics": {
@@ -1044,7 +957,7 @@
       "status": "unsupported",
       "claim_support": {
         "entity": "相关资料提到面壁",
-        "relation": "speculative_certainty",
+        "relation": "strong_deterministic",
         "temporal": "unspecified",
         "evidence_refs": [
           "ev:item:4112",
@@ -1061,9 +974,10 @@
         ],
         "provenance": "published_only",
         "support": "insufficient",
+        "claim_strength": "strong",
         "speculative_certainty": true,
         "universal_denial": false,
-        "reason": "speculative_certainty_without_strong_support"
+        "reason": "strong_claim_without_direct_evidence"
       },
       "evidence_refs": [],
       "metrics": {
@@ -1089,12 +1003,12 @@
       "query": "端侧模型讨论能否证明智能座舱已经量产上车",
       "expect_abstain": true,
       "must_mention": [],
-      "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能：已接触并有对话记录，其与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触） · 编辑部沟通记录 · 与面壁智；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+      "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
       "n_hits": 18,
-      "status": "grounded",
+      "status": "unsupported",
       "claim_support": {
-        "entity": "端侧模型讨论能否",
-        "relation": "mention",
+        "entity": "端侧模型讨论能否证明智能座舱",
+        "relation": "strong_deterministic",
         "temporal": "unspecified",
         "evidence_refs": [
           "ev:item:4112",
@@ -1111,36 +1025,27 @@
           "ev:item:4128"
         ],
         "provenance": "published_only",
-        "support": "supported",
-        "speculative_certainty": false,
+        "support": "insufficient",
+        "claim_strength": "strong",
+        "speculative_certainty": true,
         "universal_denial": false,
-        "reason": "has_published_evidence"
+        "reason": "strong_claim_without_direct_evidence"
       },
-      "evidence_refs": [
-        "ev:item:4112",
-        "ev:item:4115",
-        "ev:item:4116",
-        "ev:item:4124",
-        "ev:item:4117",
-        "ev:item:4118",
-        "ev:item:4127",
-        "ev:item:4123"
-      ],
+      "evidence_refs": [],
       "metrics": {
-        "accuracy": 0.0,
-        "completeness": 0.0,
-        "faithfulness": 0.0,
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
         "citation_correctness": 1.0,
-        "abstention_correctness": 0.0,
+        "abstention_correctness": 1.0,
         "nonempty": 1.0,
         "must_mention_ok": 1.0,
-        "pass": false,
-        "scoring": "v2_2_hard",
-        "fail_class": "C"
+        "pass": true,
+        "scoring": "v2_2_hard"
       },
-      "fail_class": "C",
+      "fail_class": null,
       "soft_flags": [
-        "abstain_query_but_support_supported"
+        "hits_without_evidence_refs"
       ],
       "error": null
     }
@@ -1175,6 +1080,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -1242,6 +1148,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -1324,6 +1231,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -1404,6 +1312,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -1478,6 +1387,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -1541,6 +1451,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -1585,6 +1496,7 @@
         "evidence_refs": [],
         "provenance": "published_only",
         "support": "insufficient",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "no_evidence"
@@ -1644,6 +1556,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -1717,6 +1630,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -1790,6 +1704,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -1856,6 +1771,7 @@
         "evidence_refs": [],
         "provenance": "published_only",
         "support": "insufficient",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "no_evidence"
@@ -1898,6 +1814,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -1945,14 +1862,15 @@
       "status": "unsupported",
       "claim_support": {
         "entity": "根据周报确认英伟",
-        "relation": "speculative_certainty",
+        "relation": "strong_deterministic",
         "temporal": "unspecified",
         "evidence_refs": [],
         "provenance": "published_only",
         "support": "insufficient",
+        "claim_strength": "strong",
         "speculative_certainty": true,
         "universal_denial": false,
-        "reason": "speculative_certainty_without_strong_support"
+        "reason": "strong_claim_without_direct_evidence"
       },
       "evidence_refs": [],
       "item_ids": [],
@@ -1988,8 +1906,8 @@
       "n_hits": 6,
       "status": "unsupported",
       "claim_support": {
-        "entity": "资料证明面壁智能",
-        "relation": "speculative_certainty",
+        "entity": "面壁智能",
+        "relation": "strong_deterministic",
         "temporal": "future_certain",
         "evidence_refs": [
           "ev:item:4148",
@@ -2001,9 +1919,10 @@
         ],
         "provenance": "published_only",
         "support": "insufficient",
+        "claim_strength": "strong",
         "speculative_certainty": true,
         "universal_denial": false,
-        "reason": "speculative_certainty_without_strong_support"
+        "reason": "strong_claim_without_direct_evidence"
       },
       "evidence_refs": [],
       "item_ids": [],
@@ -2045,6 +1964,7 @@
         "evidence_refs": [],
         "provenance": "published_only",
         "support": "insufficient",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "no_evidence"
@@ -2079,12 +1999,12 @@
         "provenance": "published_only"
       },
       "must_cite_items": [],
-      "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能：已接触并有对话记录，其与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触） · 编辑部沟通记录 · 与面壁智；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+      "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
       "n_hits": 18,
-      "status": "grounded",
+      "status": "unsupported",
       "claim_support": {
-        "entity": "端侧模型讨论证明",
-        "relation": "mention",
+        "entity": "端侧模型讨论证明智能座舱",
+        "relation": "strong_deterministic",
         "temporal": "unspecified",
         "evidence_refs": [
           "ev:item:4112",
@@ -2101,48 +2021,26 @@
           "ev:item:4128"
         ],
         "provenance": "published_only",
-        "support": "supported",
-        "speculative_certainty": false,
+        "support": "insufficient",
+        "claim_strength": "strong",
+        "speculative_certainty": true,
         "universal_denial": false,
-        "reason": "has_published_evidence"
+        "reason": "strong_claim_without_direct_evidence"
       },
-      "evidence_refs": [
-        "ev:item:4112",
-        "ev:item:4115",
-        "ev:item:4116",
-        "ev:item:4124",
-        "ev:item:4117",
-        "ev:item:4118",
-        "ev:item:4127",
-        "ev:item:4123"
-      ],
-      "item_ids": [
-        "4112",
-        "4115",
-        "4116",
-        "4124",
-        "4117",
-        "4118",
-        "4127",
-        "4123",
-        "4167",
-        "4130",
-        "4128",
-        "4129"
-      ],
+      "evidence_refs": [],
+      "item_ids": [],
       "metrics": {
         "evidence_coverage": 1.0,
-        "evidence_correctness": 0.0,
-        "unsupported_claim": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
         "citation_correctness": 1.0,
-        "abstention_ok": 0.0,
+        "abstention_ok": 1.0,
         "claim_support_leak": 0.0,
-        "claim_support": "supported",
-        "claim_support_ok": 0.0,
-        "pass": false,
-        "fail_class": "C"
+        "claim_support": "insufficient",
+        "claim_support_ok": 1.0,
+        "pass": true
       },
-      "fail_class": "C",
+      "fail_class": null,
       "soft_flags": [],
       "error": null
     },
@@ -2164,16 +2062,17 @@
       "status": "unsupported",
       "claim_support": {
         "entity": "根据英伟达",
-        "relation": "speculative_certainty",
+        "relation": "strong_deterministic",
         "temporal": "unspecified",
         "evidence_refs": [
           "ev:item:4150"
         ],
         "provenance": "published_only",
         "support": "insufficient",
+        "claim_strength": "strong",
         "speculative_certainty": true,
         "universal_denial": false,
-        "reason": "speculative_certainty_without_strong_support"
+        "reason": "strong_claim_without_direct_evidence"
       },
       "evidence_refs": [],
       "item_ids": [],
@@ -2209,33 +2108,35 @@
       "n_hits": 1,
       "status": "unsupported",
       "claim_support": {
-        "entity": "资料证明面壁智能",
+        "entity": "面壁智能",
         "relation": "universal_denial",
         "temporal": "unspecified",
         "evidence_refs": [
+          "ev:item:4112",
+          "ev:item:4115",
           "ev:item:4148"
         ],
         "provenance": "published_only",
-        "support": "insufficient",
+        "support": "contradicted",
+        "claim_strength": "strong",
         "speculative_certainty": false,
         "universal_denial": true,
-        "reason": "denial_not_provable_from_published"
+        "reason": "evidence_contradicts_universal_denial"
       },
       "evidence_refs": [],
       "item_ids": [],
       "metrics": {
         "evidence_coverage": 1.0,
-        "evidence_correctness": 0.0,
+        "evidence_correctness": 1.0,
         "unsupported_claim": 0.0,
         "citation_correctness": 1.0,
         "abstention_ok": 1.0,
         "claim_support_leak": 0.0,
-        "claim_support": "insufficient",
-        "claim_support_ok": 0.0,
-        "pass": false,
-        "fail_class": "G"
+        "claim_support": "contradicted",
+        "claim_support_ok": 1.0,
+        "pass": true
       },
-      "fail_class": "G",
+      "fail_class": null,
       "soft_flags": [],
       "error": null
     },
@@ -2257,14 +2158,15 @@
       "status": "unsupported",
       "claim_support": {
         "entity": "程天科技外骨骼已",
-        "relation": "speculative_certainty",
+        "relation": "strong_deterministic",
         "temporal": "unspecified",
         "evidence_refs": [],
         "provenance": "published_only",
         "support": "insufficient",
+        "claim_strength": "strong",
         "speculative_certainty": true,
         "universal_denial": false,
-        "reason": "speculative_certainty_without_strong_support"
+        "reason": "strong_claim_without_direct_evidence"
       },
       "evidence_refs": [],
       "item_ids": [],
@@ -2312,6 +2214,7 @@
         ],
         "provenance": "published_only",
         "support": "supported",
+        "claim_strength": "weak",
         "speculative_certainty": false,
         "universal_denial": false,
         "reason": "has_published_evidence"
@@ -2343,118 +2246,15 @@
     }
   ],
   "verdict": {
-    "answer_hard_clean": false,
-    "evidence_hard_clean": false,
+    "answer_hard_clean": true,
+    "evidence_hard_clean": true,
     "has_soft_risks": true,
-    "ready_for_ontology_closeout": false,
+    "ready_for_ontology_closeout": true,
     "ready_for_model_ab": false
   },
   "remaining_for_triage": {
-    "answer_fails": [
-      {
-        "id": "A21",
-        "fail_class": "C",
-        "category": "unsupported_claim",
-        "query": "端侧模型讨论能否证明智能座舱已经量产上车",
-        "metrics": {
-          "accuracy": 0.0,
-          "completeness": 0.0,
-          "faithfulness": 0.0,
-          "citation_correctness": 1.0,
-          "abstention_correctness": 0.0,
-          "nonempty": 1.0,
-          "must_mention_ok": 1.0,
-          "pass": false,
-          "scoring": "v2_2_hard",
-          "fail_class": "C"
-        },
-        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能：已接触并有对话记录，其与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触） · 编辑部沟通记录 · 与面壁智；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
-        "claim_support": {
-          "entity": "端侧模型讨论能否",
-          "relation": "mention",
-          "temporal": "unspecified",
-          "evidence_refs": [
-            "ev:item:4112",
-            "ev:item:4115",
-            "ev:item:4116",
-            "ev:item:4124",
-            "ev:item:4117",
-            "ev:item:4118",
-            "ev:item:4127",
-            "ev:item:4123",
-            "ev:ctx:2026-8-17:9",
-            "ev:item:4167",
-            "ev:item:4130",
-            "ev:item:4128"
-          ],
-          "provenance": "published_only",
-          "support": "supported",
-          "speculative_certainty": false,
-          "universal_denial": false,
-          "reason": "has_published_evidence"
-        },
-        "n_hits": 18
-      }
-    ],
-    "evidence_fails": [
-      {
-        "id": "E16",
-        "fail_class": "C",
-        "category": "adversarial_unsupported",
-        "query": "端侧模型讨论证明智能座舱已经量产上车",
-        "expect_support": "insufficient",
-        "obs_support": "supported",
-        "metrics": {
-          "evidence_coverage": 1.0,
-          "evidence_correctness": 0.0,
-          "unsupported_claim": 1.0,
-          "citation_correctness": 1.0,
-          "abstention_ok": 0.0,
-          "claim_support_leak": 0.0,
-          "claim_support": "supported",
-          "claim_support_ok": 0.0,
-          "pass": false,
-          "fail_class": "C"
-        },
-        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能：已接触并有对话记录，其与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触） · 编辑部沟通记录 · 与面壁智；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
-        "item_ids": [
-          "4112",
-          "4115",
-          "4116",
-          "4124",
-          "4117",
-          "4118",
-          "4127",
-          "4123",
-          "4167",
-          "4130",
-          "4128",
-          "4129"
-        ]
-      },
-      {
-        "id": "E18",
-        "fail_class": "G",
-        "category": "adversarial_contradicted",
-        "query": "资料证明面壁智能从未被接触",
-        "expect_support": "contradicted",
-        "obs_support": "insufficient",
-        "metrics": {
-          "evidence_coverage": 1.0,
-          "evidence_correctness": 0.0,
-          "unsupported_claim": 0.0,
-          "citation_correctness": 1.0,
-          "abstention_ok": 1.0,
-          "claim_support_leak": 0.0,
-          "claim_support": "insufficient",
-          "claim_support_ok": 0.0,
-          "pass": false,
-          "fail_class": "G"
-        },
-        "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
-        "item_ids": []
-      }
-    ],
+    "answer_fails": [],
+    "evidence_fails": [],
     "answer_soft": [
       {
         "id": "A17",
@@ -2473,9 +2273,9 @@
       {
         "id": "A21",
         "flags": [
-          "abstain_query_but_support_supported"
+          "hits_without_evidence_refs"
         ],
-        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智"
+        "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。"
       }
     ],
     "evidence_soft": []

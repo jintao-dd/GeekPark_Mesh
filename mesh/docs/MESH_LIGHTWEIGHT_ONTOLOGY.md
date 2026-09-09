@@ -93,3 +93,20 @@ Ranking 已收住「找什么」；本阶段钉「凭什么这么说」
 | 哪些允许从 Evidence 推出？ | 仅 published；确定性完成/未来、全称否定默认 **不可** 从「主体相关」推出 |
 
 若 Gold 暴露的是 support 漏检（如「已经量产上车」），**补判定规则**，不新建图数据库或 Ontology 系统。
+
+### Claim strength / Support（v2.3e 收口语义）
+
+```
+strong claim  ≠  topic/entity-related evidence
+  → 无直接支持该结论的 evidence 时：support = insufficient
+  → 不得因 overlap 升级为 supported
+
+contradicted
+  → 需要明确 published 反证（如「从未接触」vs「已接触」）
+
+insufficient
+  → 不能仅凭相关证据升级为 supported
+  → Answer 层可对 insufficient|contradicted 执行 abstain（safety ≠ label）
+```
+
+不增加 Relation type 爆炸、Graph、KG、Neo4j。
