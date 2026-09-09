@@ -48,7 +48,10 @@ services:
       MESH_JOB_LLM_GLOBAL: ${MESH_JOB_LLM_GLOBAL:-2}
       MESH_ALLOW_PROD_PUBLISH: "1"
       MESH_BUILD_GIT_SHA: ${MESH_GIT_SHA:-unknown}
+      MESH_EXPECTED_GIT_SHA: ${MESH_EXPECTED_GIT_SHA:-unknown}
       MESH_IMAGE_TAG: ${MESH_IMAGE_TAG:-local}
+      MESH_IMAGE_DIGEST: ${MESH_IMAGE_DIGEST:-}
+      MESH_IMAGE_ID: ${MESH_IMAGE_ID:-}
     ports: ["8091:8080"]
     volumes:
       # 仅持久化数据；app/prompts 以镜像为准（可复现）
@@ -79,7 +82,10 @@ services:
       MESH_ASK_LLM_GLOBAL: "1"
       MESH_ALLOW_PROD_PUBLISH: "1"
       MESH_BUILD_GIT_SHA: ${MESH_GIT_SHA:-unknown}
+      MESH_EXPECTED_GIT_SHA: ${MESH_EXPECTED_GIT_SHA:-unknown}
       MESH_IMAGE_TAG: ${MESH_IMAGE_TAG:-local}
+      MESH_IMAGE_DIGEST: ${MESH_IMAGE_DIGEST:-}
+      MESH_IMAGE_ID: ${MESH_IMAGE_ID:-}
     command: ["python", "-m", "app.job_worker"]
     volumes:
       - ./data:/srv/mesh/data

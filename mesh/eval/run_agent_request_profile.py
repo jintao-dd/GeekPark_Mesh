@@ -301,6 +301,20 @@ def profile_one(con, q: str, *, issue: str, use_llm: bool) -> dict[str, Any]:
         tblock = temporal_mod.prompt_block(sem)
         answer = (prepared.get("direct_answer") or "").strip()
         if not answer and contexts:
+            # Answer 上下文预算 profile（不改成文语义）
+            try:
+                from app import llm as llm_mod
+
+                ctxs12 = [c for c in contexts if isinstance(c, dict)][:12]
+                sys_p, user_p = llm_mod._qa_prompt(q, ctxs12, "lexical", temporal_block=tblock)
+                meta["answer_prompt_profile"] = {
+                    "n_contexts_sent": len(ctxs12),
+                    "system_chars": len(sys_p or ""),
+                    "user_chars": len(user_p or ""),
+                    "approx_tokens": (len(sys_p or "") + len(user_p or "")) // 2,
+                }
+            except Exception as e:
+                meta["answer_prompt_profile"] = {"error": str(e)}
             n_before = len(probe.by_kind("llm_call"))
             llm_ans, answer_ms = _ms(
                 _maybe_llm_answer, q, contexts, temporal_block=tblock
@@ -309,6 +323,7 @@ def profile_one(con, q: str, *, issue: str, use_llm: bool) -> dict[str, Any]:
             if llm_ans:
                 answer = llm_ans
                 llm_used = True
+                meta["answer_completion_chars"] = len(answer)
             else:
                 answer = _summary_from_contexts(contexts, q)
         meta["abstained"] = False
@@ -372,10 +387,21 @@ def profile_one(con, q: str, *, issue: str, use_llm: bool) -> dict[str, Any]:
 
 
 def _write_md(report: dict[str, Any], path: Path) -> None:
+    man = report.get("environment_manifest") or {}
     lines = [
         "# Agent Request Profile · Performance Sprint",
         "",
         f"**when**=`{report.get('timestamp')}`",
+        "",
+        "## Environment Manifest",
+        "",
+        f"- commit=`{man.get('commit')}`",
+        f"- image=`{man.get('image_digest') or man.get('image_tag')}`",
+        f"- model=`{man.get('model')}`",
+        f"- vector=`{man.get('vector')}`",
+        f"- embedding_calls=`{man.get('embedding_calls')}`",
+        f"- ranking=`{man.get('ranking')}`",
+        f"- claim_support=`{man.get('claim_support')}`",
         "",
     ]
     for run in report.get("runs") or []:
@@ -440,6 +466,10 @@ def main() -> int:
 
     qs = list(args.q) or [Q_SOFT, Q_STRONG]
     use_llm = not args.no_llm_answer
+    from app import embeddings
+    from app.repro_selfcheck import environment_manifest
+
+    embeddings.reset_call_count()
     report: dict[str, Any] = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "issue": args.issue,
@@ -461,6 +491,20 @@ def main() -> int:
     finally:
         con.close()
 
+    embed_total = sum(int((r.get("summary") or {}).get("embed_call_count") or 0) for r in report["runs"])
+    # also fold process counter (catches silent calls outside probe)
+    embed_total = max(embed_total, embeddings.call_count())
+    report["environment_manifest"] = environment_manifest(embedding_calls=embed_total)
+    man = report["environment_manifest"]
+    if (not man.get("vector_enabled")) and embed_total > 0:
+        report["environment_gate"] = "FAIL"
+        print(
+            f"ENVIRONMENT_GATE_FAIL vector=OFF but embedding_calls={embed_total}",
+            flush=True,
+        )
+    else:
+        report["environment_gate"] = "PASS"
+
     out_json = Path(
         args.out_json
         or str(ROOT / "eval" / "reports" / "AGENT_REQUEST_PROFILE.tmesh.json")
@@ -473,7 +517,12 @@ def main() -> int:
     _write_md(report, out_md)
     print(f"wrote {out_json}", flush=True)
     print(f"wrote {out_md}", flush=True)
-    return 0
+    print(
+        f"manifest commit={man.get('commit')} vector={man.get('vector')} "
+        f"model={man.get('model')} embedding_calls={embed_total} gate={report['environment_gate']}",
+        flush=True,
+    )
+    return 0 if report["environment_gate"] == "PASS" else 3
 
 
 if __name__ == "__main__":

@@ -86,10 +86,21 @@ def batch_size() -> int:
 
 
 _last_error: str = ""
+_call_count: int = 0
 
 
 def last_error() -> str:
     return _last_error
+
+
+def call_count() -> int:
+    """进程内 embed_texts / embed_one 入口调用次数（含 OFF 时误入热路径）。"""
+    return _call_count
+
+
+def reset_call_count() -> None:
+    global _call_count
+    _call_count = 0
 
 
 def _post_embeddings(url: str, payload: dict) -> requests.Response:
@@ -103,8 +114,11 @@ def _post_embeddings(url: str, payload: dict) -> requests.Response:
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
     """批量 embedding；失败返回空列表并记录 last_error。"""
-    global _last_error
+    global _last_error, _call_count
     _last_error = ""
+    if texts:
+        # 任何非空入口都计数：Vector OFF 下热路径误入可被自检 / 性能报告抓住
+        _call_count += 1
     if not texts or not is_configured():
         if not is_configured():
             _last_error = "embedding not configured (MESH_EMBED_API_KEY / MESH_EMBED_BASE_URL / MESH_EMBED_MODEL)"

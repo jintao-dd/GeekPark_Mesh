@@ -297,12 +297,40 @@ def _startup():
     import threading
     threading.Thread(target=_bg_maintenance, daemon=True, name="mesh-maint").start()
 
+    # Environment hard gate：启动自检（REPRO_STATUS）；不阻塞监听，但 FAIL 时 healthz 非 ok
+    def _bg_repro_selfcheck():
+        try:
+            from . import repro_selfcheck
+
+            repro_selfcheck.run_selfcheck(probe_embed=True)
+        except Exception as e:
+            print(f"[mesh] REPRO_STATUS=FAIL selfcheck_error:{e}", flush=True)
+
+    threading.Thread(target=_bg_repro_selfcheck, daemon=True, name="mesh-repro").start()
+
+
+@app.get("/api/repro/status")
+def repro_status():
+    """发布硬门：REPRO_STATUS=PASS|FAIL + Environment Manifest。"""
+    from . import repro_selfcheck
+
+    st = repro_selfcheck.last_status()
+    if not st:
+        st = repro_selfcheck.run_selfcheck(probe_embed=False)
+    code = 200 if st.get("REPRO_STATUS") == "PASS" else 503
+    return JSONResponse(st, status_code=code)
+
 
 @app.get("/healthz")
 def healthz():
     """运维探活 + 关键模块是否齐（不碰业务数据）。"""
+    from . import repro_selfcheck
+
+    repro = repro_selfcheck.last_status()
+    repro_ok = True if repro is None else (repro.get("REPRO_STATUS") == "PASS")
     info = {
-        "ok": True,
+        "ok": repro_ok,
+        "REPRO_STATUS": (repro or {}).get("REPRO_STATUS") or "PENDING",
         "schema_version": db.SCHEMA_VERSION,
         "vector_enabled": embeddings.enabled(),
         "embeddings_configured": embeddings.is_configured(),
@@ -406,6 +434,9 @@ def healthz():
     if not all(info[k] for k in (
         "db_team_alias_map", "db_normalize_team", "qa_structured", "search_fts", "tokenize", "ask_stream_llm"
     )):
+        info["ok"] = False
+        return JSONResponse(info, status_code=503)
+    if not repro_ok:
         info["ok"] = False
         return JSONResponse(info, status_code=503)
     return info

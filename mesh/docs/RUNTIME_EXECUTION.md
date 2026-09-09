@@ -28,3 +28,5 @@ request → cheap route (Temporal/Guard/Structured)
 
 - `prepared["retrieval_execution_mode"] == "lexical"`（Vector OFF）
 - request profile：`embed_call_count == 0`
+- 启动自检：`REPRO_STATUS=PASS`；`vector_enabled=false` 且 `embedding_calls>0` → FAIL
+- 任何性能报告必须带 Environment Manifest（见 `docs/ENVIRONMENT_REPRODUCIBILITY.md`）

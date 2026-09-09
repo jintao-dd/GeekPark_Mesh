@@ -380,11 +380,22 @@ def _classify(levels: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _write_md(report: dict[str, Any], path: Path) -> None:
     cls = report.get("classification") or {}
+    man = report.get("environment_manifest") or {}
     lines = [
         "# Agent Capacity / E2E Pressure Test",
         "",
         f"**target**=`{report.get('base_url')}` · **issue**=`{report.get('issue')}` · "
         f"**when**=`{report.get('timestamp')}`",
+        "",
+        "## Environment Manifest",
+        "",
+        f"- commit=`{man.get('commit')}`",
+        f"- image=`{man.get('image_digest') or man.get('image_tag')}`",
+        f"- model=`{man.get('model')}`",
+        f"- vector=`{man.get('vector')}`",
+        f"- embedding_calls=`{man.get('embedding_calls')}`",
+        f"- ranking=`{man.get('ranking')}`",
+        f"- claim_support=`{man.get('claim_support')}`",
         "",
         f"- C_safe = `{cls.get('C_safe')}`",
         f"- C_knee = `{cls.get('C_knee')}`",
@@ -490,8 +501,31 @@ def main() -> int:
         "note": "HTTP Agent only; Feishu event layer not included. Token accum not reliable under concurrency.",
         "levels": [],
     }
+    try:
+        from app.repro_selfcheck import environment_manifest
+
+        report["environment_manifest"] = environment_manifest(embedding_calls=None)
+        # Prefer live /api/repro/status when available (same env as traffic)
+        try:
+            req = request.Request(args.base_url.rstrip("/") + "/api/repro/status", method="GET")
+            with request.urlopen(req, timeout=10) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+            em = body.get("environment_manifest") or {}
+            if em:
+                report["environment_manifest"] = em
+                report["REPRO_STATUS"] = body.get("REPRO_STATUS")
+        except Exception:
+            pass
+    except Exception as e:
+        report["environment_manifest"] = {"error": str(e)}
 
     print(f"==> capacity base={args.base_url} levels={levels}", flush=True)
+    man = report.get("environment_manifest") or {}
+    print(
+        f"==> manifest commit={man.get('commit')} vector={man.get('vector')} "
+        f"model={man.get('model')} image={man.get('image_digest') or man.get('image_tag')}",
+        flush=True,
+    )
     for c in levels:
         print(f"-- level C={c} ...", flush=True)
         lv = _run_level(
