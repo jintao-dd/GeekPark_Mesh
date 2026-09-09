@@ -36,11 +36,39 @@ def _ask(con, query: str, scope: dict) -> dict:
     from app.ask_scope import AskScope
     from app import ask_engine
     from app.agent import temporal as temporal_mod
+    from app.agent import claim_support as claim_support_mod
     from app.agent.adapters import _evidence_from_contexts
     from app import tokenize as tok
 
     slug, df, dt, meta = _parse_issue_scope(con, scope or {}, query=query)
     ask = AskScope(channel="harness", slug=slug, date_from=df, date_to=dt, role="viewer")
+
+    # 对齐生产 ask.published：Temporal early path（不放宽 Gold）
+    sem = temporal_mod.resolve_time_semantics(
+        query,
+        issue_mode=meta.get("issue_mode") or "",
+        issue_slug=meta.get("context_slug") or slug or "",
+    )
+    early = temporal_mod.maybe_direct_answer(query, sem)
+    if early:
+        return {
+            "answer": early,
+            "evidence_refs": [],
+            "item_ids": [],
+            "status": "grounded",
+            "n_hits": 0,
+            "meta": meta,
+            "claim_support": {
+                "entity": "",
+                "relation": "temporal_rule",
+                "temporal": sem.window,
+                "evidence_refs": [],
+                "provenance": "published_only",
+                "support": "supported",
+                "reason": "temporal_hard_rule",
+            },
+        }
+
     prepared = ask_engine.prepare(con, query, ask)
     contexts = list(prepared.get("contexts") or [])
     evidence = _evidence_from_contexts(contexts, slug)
@@ -73,12 +101,30 @@ def _ask(con, query: str, scope: dict) -> dict:
     n_hits = int(prepared.get("n_hits") or prepared.get("n_context") or len(contexts) or 0)
     grounded = _grounded(contexts)
 
+    support_assess = claim_support_mod.assess_claim_support(
+        query, contexts=contexts, evidence_refs=evidence
+    )
+    abstain = claim_support_mod.abstain_answer_for_unsupported_claim(support_assess)
+    if abstain:
+        return {
+            "answer": abstain,
+            "evidence_refs": [],
+            "item_ids": [],
+            "status": "unsupported",
+            "n_hits": n_hits,
+            "meta": meta,
+            "claim_support": support_assess,
+        }
+
     # 无命中 / 与 query 无词交集 → 明确拒答（空答案与“有 Evidence 就算过”均不允许）
     if n_hits == 0 or not contexts or not grounded:
         answer = "未找到与问题直接相关的已上线记录，资料未提供可核对依据，不能下结论。"
         evidence = []
         n_hits = 0
         status = "unsupported"
+        support_assess = claim_support_mod.assess_claim_support(
+            query, contexts=[], evidence_refs=[]
+        )
     else:
         if not answer:
             bits = []
@@ -97,11 +143,11 @@ def _ask(con, query: str, scope: dict) -> dict:
             joined = "；".join(titles[:6])
             if joined not in answer:
                 answer = f"{answer}\n相关条目：{joined}".strip()
-        sem = temporal_mod.resolve_time_semantics(
-            query, issue_mode=meta.get("issue_mode") or "", issue_slug=meta.get("context_slug") or ""
-        )
         answer = temporal_mod.apply_hard_rules(answer, sem)
         status = "grounded" if evidence else "weak"
+        support_assess = claim_support_mod.assess_claim_support(
+            query, contexts=contexts, evidence_refs=evidence, answer=answer
+        )
 
     item_ids = []
     for e in evidence:
@@ -115,6 +161,7 @@ def _ask(con, query: str, scope: dict) -> dict:
         "status": status,
         "n_hits": n_hits,
         "meta": meta,
+        "claim_support": support_assess,
     }
 
 
@@ -161,6 +208,20 @@ def grade(row: dict, out: dict) -> dict:
             correct = False
             unsupported = True
 
+    # Claim → Support（v2.3）：expect_support ∈ supported|insufficient|contradicted
+    support_obs = ((out.get("claim_support") or {}).get("support") or "").strip()
+    expect_support = (row.get("expect_support") or "").strip()
+    support_ok = True
+    if expect_support:
+        support_ok = support_obs == expect_support
+        if not support_ok:
+            correct = False
+    # 对抗题默认期望 insufficient（除非显式 expect_support）
+    if row.get("claim_must_not_be_supported") and not expect_support:
+        if support_obs == "supported" and not abstain_ok:
+            support_ok = False
+            correct = False
+
     return {
         "evidence_coverage": round(cov if must else (1.0 if coverage_ok else 0.0), 4),
         "evidence_correctness": 1.0 if correct else 0.0,
@@ -168,7 +229,9 @@ def grade(row: dict, out: dict) -> dict:
         "citation_correctness": 1.0 if citation_ok else 0.0,
         "abstention_ok": 1.0 if abstain_ok else 0.0,
         "claim_support_leak": 1.0 if claim_leak else 0.0,
-        "pass": bool(correct and coverage_ok and abstain_ok and not claim_leak),
+        "claim_support": support_obs or "n/a",
+        "claim_support_ok": 1.0 if support_ok else 0.0,
+        "pass": bool(correct and coverage_ok and abstain_ok and not claim_leak and support_ok),
     }
 
 

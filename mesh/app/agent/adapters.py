@@ -227,6 +227,36 @@ def ask_published(
     evidence = _evidence_from_contexts(contexts, slug)
     n_hits = int(prepared.get("n_hits") or prepared.get("n_context") or 0)
 
+    from . import claim_support as claim_support_mod
+
+    support_assess = claim_support_mod.assess_claim_support(
+        q, contexts=contexts, evidence_refs=evidence
+    )
+    abstain = claim_support_mod.abstain_answer_for_unsupported_claim(support_assess)
+    if abstain:
+        return ToolResult(
+            ok=True,
+            tool_id="ask.published",
+            payload={
+                "answer": abstain,
+                "mode": "claim_support_abstain",
+                "n_hits": n_hits,
+                "issue": slug,
+                "llm_used": False,
+                "temporal": sem.to_dict(),
+                "claim_support": support_assess,
+            },
+            evidence_refs=[],
+            claim_bindings=[
+                ClaimBinding(
+                    claim=abstain[:500],
+                    evidence_refs=[],
+                    status="unsupported",
+                    reason=support_assess.get("reason") or "claim_unsupported",
+                )
+            ],
+        )
+
     llm_used = False
     tblock = temporal_mod.prompt_block(sem)
     answer = (prepared.get("direct_answer") or "").strip()

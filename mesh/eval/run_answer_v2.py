@@ -32,6 +32,34 @@ def _load(path: Path) -> list[dict]:
     ]
 
 
+def _fail_class(row: dict, out: dict, metrics: dict) -> str | None:
+    """A–H 归因（不放宽门槛）。"""
+    if metrics.get("pass"):
+        return None
+    text = (out.get("answer") or "").strip()
+    if not text:
+        return "E"  # 空答案
+    if metrics.get("must_mention_ok", 1) < 1:
+        # harness 误走拒答而缺 must → 常为 H；否则 B
+        if out.get("n_hits", 0) == 0 and row.get("category") == "temporal_hard":
+            return "H"
+        return "B"
+    if row.get("expect_abstain") and metrics.get("abstention_correctness", 1) < 1:
+        return "C"
+    if (not row.get("expect_abstain")) and re.search(
+        r"未找到|不能下结论|资料未提供", text
+    ) and (out.get("n_hits") or 0) > 0:
+        return "D"
+    support = (out.get("claim_support") or {}).get("support")
+    if support == "insufficient" and metrics.get("accuracy", 1) < 1:
+        return "G"
+    if (out.get("n_hits") or 0) == 0 and metrics.get("accuracy", 1) < 1:
+        return "F"
+    if metrics.get("faithfulness", 1) < 1 or metrics.get("accuracy", 1) < 1:
+        return "A"
+    return "A"
+
+
 def grade_v2(row: dict, out: dict) -> dict:
     """硬门槛：must_mention / nonempty / faithfulness / abstention；Evidence 数量不能单独过门。"""
     text = (out.get("answer") or "").strip()
@@ -53,6 +81,7 @@ def grade_v2(row: dict, out: dict) -> dict:
             "pass": False,
             "scoring": "v2_2_hard",
             "fail_reason": "empty_answer",
+            "fail_class": "E",
         }
 
     must_ok = True
@@ -108,7 +137,7 @@ def grade_v2(row: dict, out: dict) -> dict:
         and (abstain_ok if expect_abstain else True)
         and citation >= 0.99
     )
-    return {
+    metrics = {
         "accuracy": round(accuracy, 4),
         "completeness": round(completeness, 4),
         "faithfulness": round(faithfulness, 4),
@@ -119,6 +148,10 @@ def grade_v2(row: dict, out: dict) -> dict:
         "pass": bool(hard_ok),
         "scoring": "v2_2_hard",
     }
+    fc = _fail_class(row, out, metrics)
+    if fc:
+        metrics["fail_class"] = fc
+    return metrics
 
 
 def main() -> int:

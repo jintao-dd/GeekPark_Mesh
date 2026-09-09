@@ -41,13 +41,8 @@
 
 ```
 gates: 4125 Top5 ✅ · R06/R16/R18/R@20 ✅ · worse=[] ✅
-→ CANDIDATE：可考虑将 ranking_v1_4 合入生产 rerank
-→ 默认仍 KEEP production，待人工确认后再合
+→ MERGED into production rerank (v2.3c) + FROZEN
+→ 不再继续 Ranking 优化，除非新 Gold 暴露退化
 ```
 
-未自动合并 `retriever.rerank_hits`（需你点头）。
-
-## 下一刀（确认合并与否之后）
-
-Answer hard fail → Evidence claim/support → 轻量 ontology schema 对齐  
-（仍不把 Ranking 剩余问题说成 Ontology）
+合入：`app/ranking_quality.py` ← `retriever.rerank_hits`（`MESH_RANKING_QUALITY` 可关）。
