@@ -105,6 +105,7 @@ def _write_status(doc: dict[str, Any]) -> None:
 def _probe_embed_on_prepare() -> int:
     """Vector OFF 时跑一次轻量 prepare；返回期间 embedding 调用次数。"""
     from . import db, embeddings
+    from .ask_scope import AskScope
 
     embeddings.reset_call_count()
     before = embeddings.call_count()
@@ -115,16 +116,22 @@ def _probe_embed_on_prepare() -> int:
                 "SELECT slug FROM issues WHERE status='published' ORDER BY date_end DESC LIMIT 1"
             ).fetchone()
             if not row:
-                # 无期次时仍探测：直接走 embed_one 入口不应被热路径调用；
-                # 这里只保证 counter 可用，不主动调用 embed。
                 return 0
             from . import ask_engine
 
+            scope = AskScope(
+                channel="repro_selfcheck",
+                slug=row["slug"],
+                team="编辑部",
+                user_id=None,
+                feishu_open_id="ou_repro_selfcheck",
+                role="viewer",
+                user_team="编辑部",
+            )
             ask_engine.prepare(
                 con,
                 "编辑部关注了哪些话题或公司",
-                team="编辑部",
-                issue_slug=row["slug"],
+                scope,
             )
         finally:
             con.close()
