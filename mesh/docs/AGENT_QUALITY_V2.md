@@ -1,10 +1,11 @@
 # Agent Quality / v2
 
-> **状态（2026-09-08 · v2.2）**  
-> Temporal **24/24** · Recall **83/90/94** 冻结 · Vector **OFF**  
-> Ranking v1.2：R18 回退已消、R06 稳、R12 nDCG↑；**R16 微退 → 不合并生产**  
-> Answer hard pass **71%→88%**（must_mention/abstention/非空硬门槛）  
-> 报告：`AGENT_QUALITY_V2_1.md` · `AGENT_QUALITY_V2_2.md`
+> **状态（2026-09-09 · 边界锁定 → v2.3）**  
+> Temporal **24/24** · Recall **83/90/94** 冻结 · Vector **OFF** · 生产 Ranking **KEEP**  
+> **轻量 Ontology** = 从现有对象反推 schema，给 claim↔evidence 加语法（见 `MESH_LIGHTWEIGHT_ONTOLOGY.md`）  
+> **不做** Neo4j / Graph RAG / 新 Tool / Planner / LLM Wiki / 因 Ontology 改 Contract  
+> 下一刀：v2.3 Ranking（4125 / R16）→ Answer hard fail → Feishu 后再评估 Wiki 派生视图  
+> 报告：`AGENT_QUALITY_V2_2.md` · Overnight / v2.1
 
 相关：`MESH_AGENT_FULL_ACCEPTANCE.md` · `TEMPORAL_PHASE1.md` · `RECALL_FAILURE_REVIEW.md`  
 ⑧ 飞书 MVP ∥ 质量线（只接线）。
@@ -15,18 +16,33 @@
 
 ```
 v1                         ✅ GO
-Overnight Batch            ✅ PASS
-Quality v2.1               ✅ 已执行
+Overnight / v2.1 / v2.2    ✅ 收口
 
-① Temporal                 ✅ 24/24（T19 = evaluator FP，已修评测）
-② Retrieval Recall         ✅ 冻结 83 / 90 / 94 · Vector OFF
-③ Ranking-adjusted         🟡 v1.1 实验
-   Production              KEEP current production ranking
-   v1.1                    MRR+0.048 / nDCG+0.020 / P@5+0.007 · R06 误杀已消
-④ Evidence v2              🟡 pass 80%（对抗题生效）
-⑤ Answer v2                🟡 hard pass 71% · acc 0.71
+① Temporal                 ✅ 24/24
+② Retrieval Recall         ✅ 冻结 83/90/94 · Vector OFF
+③ Ranking-adjusted         🟡 v1.2 实验（R16 挡合并）→ v2.3 攻 4125/R16
+④ Evidence                 🟡 对抗题生效 · claim/support 语法化
+⑤ Answer                   🟡 hard pass ~88% · 继续清 fail
 ⑥ Data Domain              🔒 LOCKED
+
+轻量 Ontology              📌 反推稿（非系统）MESH_LIGHTWEIGHT_ONTOLOGY.md
+LLM Wiki                   ⛔ 延后（Feishu 后评估 · 仅派生视图）
 ```
+
+### 执行边界（最终锁定）
+
+**Ontology schema 必须从现有对象反推**（item_facts / Relation / EvidenceRef / Entity / team / event_time），  
+禁止「理想 Agent 模型 → 改库 → 改 Retrieval → 改 Contract」。
+
+| 现在做 | 现在不做 |
+|--------|----------|
+| v2.3 Ranking：4125 / R16 | Neo4j / KG / Graph RAG |
+| Answer 逐题 hard fail | 新 Retrieval path / 新 Tool |
+| Evidence：claim→support 判定 | Planner / ReAct |
+| 轻量 Ontology：整理已有 schema | LLM Wiki / Wiki 写入 |
+| Gold 用 schema 描述 claim/support | 因 Ontology 改 Recall / Vector / Contract |
+
+以后：Quality 稳定 → Feishu Agent → 再评估 Wiki。
 
 ---
 
