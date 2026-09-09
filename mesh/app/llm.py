@@ -98,10 +98,42 @@ def _accum_usage(usage: dict | None, *, attempts: int = 1) -> None:
                 usage.get("prompt_tokens") or 0
             ) + int(usage.get("completion_tokens") or 0)
 
+def model_for_task(task: str = "default") -> str | None:
+    """任务级固定模型配置（非动态 router）。
+
+    环境变量（可选）：
+      MESH_LLM_MODEL_SEMANTIC  — Claim semantic judge
+      MESH_LLM_MODEL_ANSWER    — Answer 成文
+      MESH_LLM_MODEL_SENSITIVE — 敏感/对外成文（未设则回落 ANSWER / MODEL）
+      MESH_LLM_MODEL           — 默认回落
+    """
+    import os
+
+    t = (task or "default").strip().lower()
+    keys = {
+        "semantic": ("MESH_LLM_MODEL_SEMANTIC",),
+        "answer": ("MESH_LLM_MODEL_ANSWER",),
+        "sensitive": ("MESH_LLM_MODEL_SENSITIVE", "MESH_LLM_MODEL_ANSWER"),
+        "default": ("MESH_LLM_MODEL",),
+    }.get(t, ("MESH_LLM_MODEL",))
+    for k in keys:
+        v = (os.environ.get(k) or "").strip()
+        if v:
+            return v
+    return (os.environ.get("MESH_LLM_MODEL") or "").strip() or None
+
+
 def provider_info() -> dict:
     """后台"规则提示词"页显示当前模型配置，便于换模型后核对。"""
     try:
-        return get_provider().describe()
+        info = get_provider().describe()
+        info["task_models"] = {
+            "semantic": model_for_task("semantic"),
+            "answer": model_for_task("answer"),
+            "sensitive": model_for_task("sensitive"),
+            "default": model_for_task("default"),
+        }
+        return info
     except Exception as e:
         return {"provider": "?", "model": "?", "configured": False, "error": str(e)}
 
@@ -122,10 +154,17 @@ def load_prompt(name: str) -> str:
     p = PROMPT_DIR / f"{name}.md"
     return p.read_text(encoding="utf-8") if p.exists() else ""
 
-def call(system: str, user: str, max_tokens: int = 4000, json_mode: bool = True):
-    """模型调用。json_mode 下解析失败会自动再请求一次。"""
+def call(
+    system: str,
+    user: str,
+    max_tokens: int = 4000,
+    json_mode: bool = True,
+    *,
+    task: str = "default",
+):
+    """模型调用。json_mode 下解析失败会自动再请求一次。task 选固定任务模型配置。"""
     last_err = None
-    provider = get_provider()
+    provider = get_provider(model=model_for_task(task))
     for attempt in range(2 if json_mode else 1):
         if hasattr(provider, "complete_detail"):
             detail = provider.complete_detail(system, user, max_tokens=max_tokens)
@@ -742,11 +781,13 @@ def answer_question(
     mode: str = "lexical",
     history: list[dict] | None = None,
     temporal_block: str = "",
+    *,
+    task: str = "answer",
 ) -> str:
     system, user = _qa_prompt(
         question, contexts, mode, history=history, temporal_block=temporal_block
     )
-    return call(system, user, max_tokens=2000, json_mode=False)
+    return call(system, user, max_tokens=2000, json_mode=False, task=task)
 
 
 def answer_question_stream(

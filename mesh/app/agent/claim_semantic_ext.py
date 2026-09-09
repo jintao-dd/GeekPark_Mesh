@@ -231,7 +231,7 @@ def llm_semantic_judge(query: str, contexts: list[dict] | None = None) -> dict[s
         "请输出 JSON。"
     )
     try:
-        raw = llm.call(JUDGE_SYSTEM, user, max_tokens=500, json_mode=True)
+        raw = llm.call(JUDGE_SYSTEM, user, max_tokens=500, json_mode=True, task="semantic")
     except Exception as e:
         return {
             "ok": False,

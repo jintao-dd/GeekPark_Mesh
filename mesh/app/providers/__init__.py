@@ -13,9 +13,13 @@ REGISTRY = {
 }
 
 
-def get_provider() -> Provider:
+def get_provider(*, model: str | None = None) -> Provider:
+    """返回 Provider。可选 model 覆盖（任务级配置：semantic / answer），非动态 router。"""
     name = (env("MESH_LLM_PROVIDER") or "anthropic").lower()
     cls = REGISTRY.get(name)
     if not cls:
         raise LLMError(f"未知的 MESH_LLM_PROVIDER={name}；可选：{', '.join(sorted(REGISTRY))}")
-    return cls()
+    p = cls()
+    if model and hasattr(p, "model"):
+        p.model = model
+    return p

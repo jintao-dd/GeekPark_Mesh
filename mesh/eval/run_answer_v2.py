@@ -165,6 +165,9 @@ def main() -> int:
 
     gold_path = Path(args.gold) if args.gold else (GOLD_V2 if GOLD_V2.exists() else GOLD_V1)
     gold = _load(gold_path)
+    from app import llm as llm_mod
+
+    llm_mod.reset_usage_accum()
     con = db.connect()
     results = []
     t0 = time.time()
@@ -216,6 +219,7 @@ def main() -> int:
         ),
         "macro_nonempty": round(mean(r["metrics"]["nonempty"] for r in results), 4),
         "elapsed_s": round(time.time() - t0, 2),
+        "usage": llm_mod.take_usage_accum(),
         "results": results,
         "note": "pass_rate is hard-gate; do not treat as external quality claim alone",
     }

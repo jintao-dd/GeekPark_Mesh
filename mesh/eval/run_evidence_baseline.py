@@ -281,6 +281,9 @@ def main() -> int:
     else:
         gold_path = GOLD
     gold = _load(gold_path)
+    from app import llm as llm_mod
+
+    llm_mod.reset_usage_accum()
     con = db.connect()
     results = []
     t0 = time.time()
@@ -322,6 +325,7 @@ def main() -> int:
         "macro_citation_correctness": round(mean(r["metrics"]["citation_correctness"] for r in results), 4),
         "gold": gold_path.name,
         "elapsed_s": round(time.time() - t0, 2),
+        "usage": llm_mod.take_usage_accum(),
         "results": results,
     }
     out_dir = ROOT / "eval" / "reports" / ("baselines" if args.tag == "baseline" else f"experiments/{args.tag}")
