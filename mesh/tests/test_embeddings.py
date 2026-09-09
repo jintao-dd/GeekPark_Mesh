@@ -49,6 +49,26 @@ def test_is_configured_requires_key_when_base_set(monkeypatch):
     assert embeddings.is_configured() is True
 
 
+def test_vector_default_off_even_if_keys_present(monkeypatch):
+    """冻结：Vector OFF 默认；仅有 key 不得进热路径 embed。"""
+    monkeypatch.delenv("MESH_EMBED_ENABLED", raising=False)
+    monkeypatch.delenv("MESH_VECTOR_ENABLED", raising=False)
+    monkeypatch.setenv("MESH_EMBED_BASE_URL", "https://example.com/v1")
+    monkeypatch.setenv("MESH_EMBED_API_KEY", "sk-test")
+    assert embeddings.enabled() is False
+    assert embeddings.is_configured() is False
+    assert embeddings.retrieval_execution_mode(structured_candidate=False) == "lexical"
+
+
+def test_vector_on_requires_explicit_enable(monkeypatch):
+    monkeypatch.setenv("MESH_EMBED_ENABLED", "1")
+    monkeypatch.setenv("MESH_EMBED_BASE_URL", "https://example.com/v1")
+    monkeypatch.setenv("MESH_EMBED_API_KEY", "sk-test")
+    assert embeddings.enabled() is True
+    assert embeddings.retrieval_execution_mode(structured_candidate=False) == "hybrid"
+    assert embeddings.retrieval_execution_mode(structured_candidate=True) == "structured"
+
+
 def test_base_urls_supports_comma_fallback(monkeypatch):
     monkeypatch.setenv(
         "MESH_EMBED_BASE_URL",

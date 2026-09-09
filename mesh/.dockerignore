@@ -1,0 +1,25 @@
+# Mesh image build context — keep runtime image lean & reproducible.
+__pycache__
+*.pyc
+*.pyo
+.git
+.gitignore
+.env
+.env.*
+*.tgz
+*.tar
+*.tar.gz
+app-deploy.tgz
+data/
+eval/reports/
+**/reports/
+deploy/_*.py
+deploy/_*.sh
+docs/_check.txt
+*.md
+!requirements.txt
+.pytest_cache
+.mypy_cache
+.venv
+venv
+node_modules

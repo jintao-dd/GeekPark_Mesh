@@ -1,11 +1,16 @@
-"""向量 embedding：OpenAI 兼容接口 + 本地 cosine 检索（零额外依赖）。"""
+"""向量 embedding：OpenAI 兼容接口 + 本地 cosine 检索（零额外依赖）。
+
+Runtime 纪律（与质量冻结对齐）：
+  - 默认 Vector / Embedding = OFF（须显式 MESH_EMBED_ENABLED=1 或 MESH_VECTOR_ENABLED=1）
+  - OFF 时 Ask/Agent 热路径不得调用 embed API；不靠「调用失败再 fallback」
+"""
 from __future__ import annotations
 
 import heapq
 import json
 import math
 import re
-from typing import Any
+from typing import Any, Literal
 
 import requests
 
@@ -13,10 +18,32 @@ from .providers.base import env
 
 _HTTP = requests.Session()
 
+RetrievalMode = Literal["structured", "lexical", "hybrid"]
+
 
 def enabled() -> bool:
-    v = (env("MESH_EMBED_ENABLED") or env("MESH_VECTOR_ENABLED") or "1").lower()
-    return v not in ("0", "false", "no", "off")
+    """向量检索 / query embedding 开关。默认 OFF（与 Vector frozen OFF 一致）。"""
+    v = (env("MESH_EMBED_ENABLED") or env("MESH_VECTOR_ENABLED") or "0").lower()
+    return v not in ("0", "false", "no", "off", "")
+
+
+def vector_retrieval_enabled() -> bool:
+    """热路径是否允许 vector / embed_one。等同 enabled ∧ configured keys。"""
+    return is_configured()
+
+
+def retrieval_execution_mode(*, structured_candidate: bool) -> RetrievalMode:
+    """本次请求实际执行模式（非 Planner，仅 Runtime 决策）。
+
+    - structured：结构化候选
+    - hybrid：显式打开 Vector 且已配置
+    - lexical：默认 / Vector OFF
+    """
+    if structured_candidate:
+        return "structured"
+    if vector_retrieval_enabled():
+        return "hybrid"
+    return "lexical"
 
 
 def model_name() -> str:

@@ -8,23 +8,26 @@ alwaysApply: true
 完成 `mesh/` 下需要上线的改动后，**默认按此顺序执行**，不要只改本地就结束：
 
 1. **本地确认**
-   - 相关 pytest / smoke（至少覆盖改动点）
-   - 只读页不得触发 Preview / Ask / Embed / Publish
+ - 相关 pytest / smoke（至少覆盖改动点）
+ - 只读页不得触发 Preview / Ask / Embed / Publish
 2. **提交代码**（用户已授权本流水线时直接 commit；否则先问一句）
-   - 按仓库 git 提交规范；不把 `.env`、密钥、`app-deploy.tgz`、无关 reports 打进 commit
-3. **上测试环境 tmesh**
-   - 主机 `104.250.53.182:22341`，目录 `/opt/geekpark-tmesh`
-   - 容器 `geekpark-tmesh` + `geekpark-tmesh-worker`
-   - 同步改动文件 → restart → 冒烟（路由非 404、关键 import/页面可用）
-   - 入口：`https://tmesh.geekpark.net`
+ - 按仓库 git 提交规范；不把 `.env`、密钥、`app-deploy.tgz`、无关 reports 打进 commit
+3. **上测试环境 tmesh（镜像路径，强制）**
+ - 主机 `104.250.53.182:22341`，目录 `/opt/geekpark-tmesh`
+ - **正确：** `mesh/deploy/ship_image.ps1 -Target tmesh`
+   - Git commit → `docker build` → `geekpark-mesh:<date>-<sha>` → digest → compose recreate
+ - **禁止**把 `docker cp` 进运行中容器当作 Agent/Runtime 发布方式（recreate 丢代码）
+ - 冒烟：路由非 404；核对 `ENV_REPRO_BASELINE.tmesh.json` 的 commit/digest
+ - 入口：`https://tmesh.geekpark.net`
+ - 规范：`mesh/docs/ENVIRONMENT_REPRODUCIBILITY.md`
 4. **tmesh 没问题后上生产**
-   - 目录 `/opt/geekpark-mesh`，容器 `geekpark-mesh` + `geekpark-mesh-worker`
-   - **禁止**在未验证 tmesh 时直接上 prod
-   - 默认同步 app/deploy 所需文件并 restart；**不要**顺手 Publish / Preview / 跑全量 Ask，除非用户明确要求
-   - 入口：`https://mesh.geekpark.ai`
+ - `ship_image.ps1 -Target prod`；目录 `/opt/geekpark-mesh`
+ - **禁止**在未验证 tmesh 时直接上 prod
+ - **不要**顺手 Publish / Preview / 跑全量 Ask，除非用户明确要求
+ - 入口：`https://mesh.geekpark.ai`
 5. **收尾**
-   - 回报：commit、tmesh 验证结果、prod 验证结果、可点开的 URL
+ - 回报：commit、image tag/digest、tmesh 验证、prod 验证、可点开的 URL
 
-可用脚本：`mesh/deploy/ship_changed_files.ps1`（本地 → 远程 tmesh/prod）。
+遗留：`ship_changed_files.ps1` 仅紧急热修；热修后必须再用 `ship_image.ps1` 收口。
 
 例外：纯文档/本地-only、用户明确说「先别上线」时跳过部署。

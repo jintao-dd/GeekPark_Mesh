@@ -383,7 +383,7 @@ def _hybrid_recall(
 
             break
 
-    if embeddings.is_configured():
+    if embeddings.vector_retrieval_enabled():
 
         qvec = query_vec if query_vec is not None else embeddings.embed_one(search_q)
 

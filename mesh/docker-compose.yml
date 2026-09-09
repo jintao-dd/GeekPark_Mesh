@@ -19,29 +19,43 @@ services:
       retries: 10
 
   mesh:
-    build: .
+    image: geekpark-mesh:${MESH_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GIT_SHA: ${MESH_GIT_SHA:-unknown}
+        BUILD_DATE: ${MESH_BUILD_DATE:-unknown}
+        IMAGE_TAG: ${MESH_IMAGE_TAG:-local}
     container_name: geekpark-mesh
     restart: unless-stopped
     env_file: .env
     environment:
       MESH_DB_URL: postgresql://${POSTGRES_USER:-mesh}:${POSTGRES_PASSWORD:-mesh}@postgres:5432/${POSTGRES_DB:-mesh}
       MESH_UVICORN_WORKERS: ${MESH_UVICORN_WORKERS:-2}
-      # Web 只入队；后台由 mesh-worker 执行
       MESH_JOB_INLINE: "0"
       MESH_ASK_LLM_CONCURRENCY: ${MESH_ASK_LLM_CONCURRENCY:-2}
       MESH_ASK_LLM_GLOBAL: ${MESH_ASK_LLM_GLOBAL:-4}
       MESH_JOB_LLM_CONCURRENCY: ${MESH_JOB_LLM_CONCURRENCY:-2}
       MESH_JOB_LLM_GLOBAL: ${MESH_JOB_LLM_GLOBAL:-2}
+      MESH_BUILD_GIT_SHA: ${MESH_GIT_SHA:-unknown}
+      MESH_IMAGE_TAG: ${MESH_IMAGE_TAG:-local}
     ports: ["8090:8080"]
     volumes:
       - ./data:/srv/mesh/data
-      - ./app/prompts:/srv/mesh/app/prompts
     depends_on:
       postgres:
         condition: service_healthy
 
   mesh-worker:
-    build: .
+    image: geekpark-mesh:${MESH_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GIT_SHA: ${MESH_GIT_SHA:-unknown}
+        BUILD_DATE: ${MESH_BUILD_DATE:-unknown}
+        IMAGE_TAG: ${MESH_IMAGE_TAG:-local}
     container_name: geekpark-mesh-worker
     restart: unless-stopped
     env_file: .env
@@ -53,10 +67,11 @@ services:
       MESH_JOB_LLM_GLOBAL: ${MESH_JOB_LLM_GLOBAL:-2}
       MESH_ASK_LLM_CONCURRENCY: "1"
       MESH_ASK_LLM_GLOBAL: "1"
+      MESH_BUILD_GIT_SHA: ${MESH_GIT_SHA:-unknown}
+      MESH_IMAGE_TAG: ${MESH_IMAGE_TAG:-local}
     command: ["python", "-m", "app.job_worker"]
     volumes:
       - ./data:/srv/mesh/data
-      - ./app/prompts:/srv/mesh/app/prompts
     depends_on:
       postgres:
         condition: service_healthy
