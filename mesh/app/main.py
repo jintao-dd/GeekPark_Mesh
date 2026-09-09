@@ -310,9 +310,21 @@ def _startup():
 
 
 @app.get("/api/repro/status")
-def repro_status():
-    """发布硬门：REPRO_STATUS=PASS|FAIL + Environment Manifest。"""
-    from . import repro_selfcheck
+def repro_status(request: Request):
+    """发布硬门：REPRO_STATUS + Environment Manifest。仅 admin/owner 或内部 token。"""
+    from . import auth, repro_selfcheck
+
+    tok = (os.environ.get("MESH_REPRO_TOKEN") or "").strip()
+    hdr = (request.headers.get("X-Mesh-Repro-Token") or "").strip()
+    allowed = bool(tok and hdr and hdr == tok)
+    if not allowed:
+        try:
+            auth.require(request, "admin")
+            allowed = True
+        except HTTPException:
+            allowed = False
+    if not allowed:
+        raise HTTPException(status_code=401, detail="repro status is admin/internal only")
 
     st = repro_selfcheck.last_status()
     if not st:

@@ -142,14 +142,13 @@ test -f "`$COMPOSE"
 docker compose -f "`$COMPOSE" up -d --force-recreate --no-build mesh mesh-worker || \
   docker-compose -f "`$COMPOSE" up -d --force-recreate --no-build mesh mesh-worker
 
-echo "==> runtime self-check (REPRO_STATUS hard gate)"
+echo "==> runtime self-check (REPRO_STATUS hard gate via container file)"
 REPRO_OK=0
 for i in `$(seq 1 36); do
-  BODY=`$(curl -sS "`$REPRO" 2>/dev/null || true)
+  BODY=`$(docker exec "`$WEB" cat /srv/mesh/data/REPRO_STATUS.json 2>/dev/null || true)
   STATUS=`$(printf '%s' "`$BODY" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("REPRO_STATUS",""))' 2>/dev/null || true)
-  HTTP=`$(curl -sS -o /dev/null -w '%{http_code}' "`$REPRO" 2>/dev/null || echo 000)
-  echo "  try=`$i http=`$HTTP REPRO_STATUS=`$STATUS"
-  if [ "`$STATUS" = "PASS" ] && [ "`$HTTP" = "200" ]; then
+  echo "  try=`$i REPRO_STATUS=`$STATUS"
+  if [ "`$STATUS" = "PASS" ]; then
     REPRO_OK=1
     break
   fi

@@ -507,7 +507,12 @@ def main() -> int:
         report["environment_manifest"] = environment_manifest(embedding_calls=None)
         # Prefer live /api/repro/status when available (same env as traffic)
         try:
-            req = request.Request(args.base_url.rstrip("/") + "/api/repro/status", method="GET")
+            # Prefer live /api/repro/status with admin session (endpoint is admin/internal only)
+            req = request.Request(
+                args.base_url.rstrip("/") + "/api/repro/status",
+                method="GET",
+                headers={"Cookie": cookie},
+            )
             with request.urlopen(req, timeout=10) as resp:
                 body = json.loads(resp.read().decode("utf-8"))
             em = body.get("environment_manifest") or {}

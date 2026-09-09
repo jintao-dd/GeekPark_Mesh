@@ -98,6 +98,8 @@ claim_support: v2.4c-2
 
 否则无法判断「P95 8s→15s」是代码变慢还是环境偷换。上一轮无 Manifest / embed 偷跑的 100s 数据**作废**。
 
+`/api/repro/status`：**admin/owner 或 `X-Mesh-Repro-Token`** 才可读（运维信息，不对普通用户开放）。发布硬门以容器内 `data/REPRO_STATUS.json` 为准。
+
 ## 发布命令
 
 ```powershell
