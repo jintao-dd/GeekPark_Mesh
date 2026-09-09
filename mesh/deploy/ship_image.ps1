@@ -65,7 +65,10 @@ if ($Target -eq "tmesh") {
   $SmokeUrl = "http://127.0.0.1:8090/"
 }
 
-Write-Host "==> ship_image Target=$Target tag=geekpark-mesh:$ImageTag sha=$GitShort"
+$WebCtr = $Containers[0]
+$BaselineName = "ENV_REPRO_BASELINE.$Target"
+
+Write-Host "==> ship_image Target=$Target tag=geekpark-mesh:$ImageTag sha=$GitShort web=$WebCtr"
 
 # Pack reproducible build context (+ compose + emit script)
 $tarLocal = Join-Path $env:TEMP "mesh_image_ctx.tgz"
@@ -84,6 +87,7 @@ try {
 Write-Host "==> upload context ($([math]::Round((Get-Item $tarLocal).Length/1KB)) KB)"
 & scp -P $DeployPort -o StrictHostKeyChecking=no $tarLocal "root@${DeployHost}:/tmp/mesh_image_ctx.tgz"
 
+# Build remote bash with PowerShell-expanded constants (avoid ${array[i]} pitfalls)
 $remoteScript = @"
 set -euo pipefail
 BASE='$RemoteBase'
@@ -92,15 +96,15 @@ SHA='$GitSha'
 SHORT='$GitShort'
 BDATE='$BuildDate'
 COMPOSE='$ComposeFile'
+WEB='$WebCtr'
+BASELINE='$BaselineName'
+SMOKE='$SmokeUrl'
 cd "`$BASE"
 TS=`$(date +%Y%m%d%H%M%S)
 mkdir -p "bak_ctx_`$TS"
-# refresh build inputs from pack (keep .env + data)
 tar -xzf /tmp/mesh_image_ctx.tgz
-# pin env for compose
 grep -q '^MESH_IMAGE_TAG=' .env 2>/dev/null && sed -i "s|^MESH_IMAGE_TAG=.*|MESH_IMAGE_TAG=`$TAG|" .env || echo "MESH_IMAGE_TAG=`$TAG" >> .env
 grep -q '^MESH_GIT_SHA=' .env 2>/dev/null && sed -i "s|^MESH_GIT_SHA=.*|MESH_GIT_SHA=`$SHORT|" .env || echo "MESH_GIT_SHA=`$SHORT" >> .env
-# Vector OFF freeze (lexical default)
 grep -q '^MESH_EMBED_ENABLED=' .env 2>/dev/null && sed -i 's|^MESH_EMBED_ENABLED=.*|MESH_EMBED_ENABLED=0|' .env || echo 'MESH_EMBED_ENABLED=0' >> .env
 grep -q '^MESH_VECTOR_ENABLED=' .env 2>/dev/null && sed -i 's|^MESH_VECTOR_ENABLED=.*|MESH_VECTOR_ENABLED=0|' .env || echo 'MESH_VECTOR_ENABLED=0' >> .env
 
@@ -117,50 +121,57 @@ docker build \
   -t "geekpark-mesh:`$SHORT" \
   .
 
-DIGEST=`$(docker image inspect "geekpark-mesh:`$TAG" --format '{{index .RepoDigests 0}}' 2>/dev/null || true)
 ID=`$(docker image inspect "geekpark-mesh:`$TAG" --format '{{.Id}}')
-# local builds may lack RepoDigests until push; fall back to Id
+DIGEST=`$(docker image inspect "geekpark-mesh:`$TAG" --format '{{index .RepoDigests 0}}' 2>/dev/null || true)
 if [ -z "`$DIGEST" ] || [ "`$DIGEST" = "<no value>" ]; then
   DIGEST=`$ID
 fi
 echo "IMAGE_ID=`$ID"
 echo "IMAGE_DIGEST=`$DIGEST"
 
-echo "==> compose up ($COMPOSE) image=`$TAG"
+echo "==> compose up (file=`$COMPOSE) image=`$TAG"
+test -n "`$COMPOSE"
+test -f "`$COMPOSE"
 docker compose -f "`$COMPOSE" up -d --force-recreate --no-build mesh mesh-worker || \
   docker-compose -f "`$COMPOSE" up -d --force-recreate --no-build mesh mesh-worker
 
-# ensure compose references the tag we built (image: geekpark-mesh:`$TAG)
 sleep 8
-curl -sS -o /dev/null -w 'smoke=%{http_code}\n' '$SmokeUrl' || true
+curl -sS -o /dev/null -w 'smoke=%{http_code}\n' "`$SMOKE" || true
 
-# verify no stale docker-cp expectation: code comes from image
-RUNNING_SHA=`$(docker exec ${Containers[0]} printenv MESH_BUILD_GIT_SHA || true)
+RUNNING_SHA=`$(docker exec "`$WEB" printenv MESH_BUILD_GIT_SHA || true)
+RUNNING_TAG=`$(docker exec "`$WEB" printenv MESH_IMAGE_TAG || true)
 echo "RUNNING_MESH_BUILD_GIT_SHA=`$RUNNING_SHA"
+echo "RUNNING_MESH_IMAGE_TAG=`$RUNNING_TAG"
 
-mkdir -p eval/reports
-docker cp eval/emit_repro_baseline.py ${Containers[0]}:/srv/mesh/eval/emit_repro_baseline.py
+mkdir -p eval/reports /tmp/mesh_eval_emit
+cp -f eval/emit_repro_baseline.py /tmp/mesh_eval_emit/ 2>/dev/null || true
+docker exec "`$WEB" mkdir -p /srv/mesh/eval/reports
+docker cp /tmp/mesh_eval_emit/emit_repro_baseline.py "`$WEB`:/srv/mesh/eval/emit_repro_baseline.py" 2>/dev/null || \
+  docker cp eval/emit_repro_baseline.py "`$WEB`:/srv/mesh/eval/emit_repro_baseline.py"
+
 docker exec \
   -e MESH_IMAGE_TAG=`$TAG \
   -e MESH_IMAGE_ID=`$ID \
   -e MESH_IMAGE_DIGEST=`$DIGEST \
   -e MESH_BUILD_GIT_SHA=`$SHORT \
   -e MESH_BUILD_DATE=`$BDATE \
-  ${Containers[0]} \
+  "`$WEB" \
   python /srv/mesh/eval/emit_repro_baseline.py --in-container \
     --image-tag "`$TAG" --image-id "`$ID" --image-digest "`$DIGEST" \
-    --out /srv/mesh/eval/reports/ENV_REPRO_BASELINE.json || true
-docker cp ${Containers[0]}:/srv/mesh/eval/reports/ENV_REPRO_BASELINE.json eval/reports/ENV_REPRO_BASELINE.$Target.json 2>/dev/null || true
-docker cp ${Containers[0]}:/srv/mesh/eval/reports/ENV_REPRO_BASELINE.md eval/reports/ENV_REPRO_BASELINE.$Target.md 2>/dev/null || true
+    --out /srv/mesh/eval/reports/ENV_REPRO_BASELINE.json
 
-echo "SHIP_IMAGE_OK tag=`$TAG digest=`$DIGEST"
+docker cp "`$WEB`:/srv/mesh/eval/reports/ENV_REPRO_BASELINE.json" "eval/reports/`$BASELINE.json"
+docker cp "`$WEB`:/srv/mesh/eval/reports/ENV_REPRO_BASELINE.md" "eval/reports/`$BASELINE.md"
+
+echo "SHIP_IMAGE_OK tag=`$TAG digest=`$DIGEST web=`$WEB"
 "@
 
 $remotePath = "/tmp/mesh_ship_image_$Target.sh"
 $remoteScript = $remoteScript -replace "`r`n", "`n"
-Set-Content -Path (Join-Path $env:TEMP "mesh_ship_image_$Target.sh") -Value $remoteScript -Encoding ascii -NoNewline
-& scp -P $DeployPort -o StrictHostKeyChecking=no (Join-Path $env:TEMP "mesh_ship_image_$Target.sh") "root@${DeployHost}:$remotePath"
+$localSh = Join-Path $env:TEMP "mesh_ship_image_$Target.sh"
+[System.IO.File]::WriteAllText($localSh, $remoteScript)
+& scp -P $DeployPort -o StrictHostKeyChecking=no $localSh "root@${DeployHost}:$remotePath"
 & ssh -p $DeployPort -o StrictHostKeyChecking=no "root@$DeployHost" "bash $remotePath"
 
 Write-Host "DONE $Target geekpark-mesh:$ImageTag"
-Write-Host "Pull baseline: ${RemoteBase}/eval/reports/ENV_REPRO_BASELINE.$Target.json"
+Write-Host "Pull baseline: $RemoteBase/eval/reports/$BaselineName.json"

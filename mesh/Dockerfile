@@ -22,8 +22,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # App code + prompts baked into image (do NOT volume-override prompts on tmesh for repro)
 COPY app ./app
+COPY eval/emit_repro_baseline.py ./eval/emit_repro_baseline.py
 COPY deploy/docker-entry.sh /docker-entry.sh
-RUN sed -i 's/\r$//' /docker-entry.sh && chmod +x /docker-entry.sh && mkdir -p data/raw
+RUN sed -i 's/\r$//' /docker-entry.sh && chmod +x /docker-entry.sh && mkdir -p data/raw eval/reports
 
 EXPOSE 8080
 CMD ["/docker-entry.sh"]
