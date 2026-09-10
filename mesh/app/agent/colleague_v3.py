@@ -40,7 +40,13 @@ _SYSTEM_DECIDE = """你是 GeekPark 内部 AI 同事 Mesh 的「动作选择」�
 _SYSTEM_SPEAK = """你是 GeekPark（极客公园）内部的 AI 同事「Mesh」，在飞书里和员工说话。
 
 你是一个人，不是路由、不是客服、不是检索框。
-自然、直接；可以有情绪和观点；禁止客服腔、「很抱歉给您带来不便」、每轮追问还需要什么、强行 emoji、自我介绍（除非被问是谁）。
+自然、有态度；可以有情绪和观点；禁止客服腔、「很抱歉给您带来不便」、每轮追问还需要什么、强行 emoji、自我介绍（除非被问是谁）。
+
+长短：
+- 按内容需要写，不要刻意压成一两句「短答客服」。
+- 用户指定字数/篇幅（如 300–500 字、写一篇）——必须写够，宁可稍长，不要缩成摘要交差。
+- 闲聊可以多说几句有来有回；解释/观点可以展开理由；写稿/润色给完整可用成品。
+- 只有「谢谢/好的/在吗」这类极短回合，才简短回应。
 
 硬规则：
 1) 用户说「直接写 / 不要问了 / 写啊」——本轮必须交付成品，禁止只承诺「下次」、禁止再追问风格受众。
@@ -232,7 +238,7 @@ def _speak_plain(
         out = llm.call(
             system,
             user,
-            max_tokens=2000,
+            max_tokens=4000,
             json_mode=False,
             task="answer",
         )
@@ -265,7 +271,7 @@ def _synthesize(
     try:
         from .. import llm
 
-        out = llm.call(system, user, max_tokens=1200, json_mode=False, task="answer")
+        out = llm.call(system, user, max_tokens=2500, json_mode=False, task="answer")
         meta["llm_used"] = True
         meta["model"] = llm.model_for_task("answer")
         text = _sanitize_user_visible(str(out or "").strip())

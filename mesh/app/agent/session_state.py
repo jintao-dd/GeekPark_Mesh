@@ -116,8 +116,8 @@ class SessionContextState:
 
     def append_turn(self, *, role: str, text: str, route: str = "") -> None:
         turns = list(self.recent_turns or [])
-        # Stage 2A：助手回复可能更长，历史保留放宽（仍截断防爆）
-        cap = 900 if role == "assistant" else 500
+        # Stage 2A / v3：助手回复可较长，历史保留放宽（仍截断防爆）
+        cap = 2000 if role == "assistant" else 800
         turns.append(
             {
                 "role": role,

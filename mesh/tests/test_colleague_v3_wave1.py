@@ -104,7 +104,7 @@ def test_handle_speak_uses_plain_second_call():
     assert len(calls) == 2
     assert calls[0]["json_mode"] is True
     assert calls[1]["json_mode"] is False
-    assert calls[1]["max_tokens"] >= 1500
+    assert calls[1]["max_tokens"] >= 3000
 
 
 def test_handle_ask_then_synthesize():
