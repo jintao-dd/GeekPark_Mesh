@@ -1,9 +1,10 @@
-"""⑦ Agent v1 编排：Conversation Route →（可选）Ask。
+"""⑦ Agent 编排：Wave1 = Safety → Colleague v3（一张嘴）；可选回退 v2 Controller 路径。
 
 Session Context 只消解指代；事实必须重新 Retrieval / Evidence。
 """
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from . import context as ctxmod
@@ -36,6 +37,11 @@ _REFUSE_CAPABILITY = (
     "这个我做不了——我只能查已上线周报，不能改权限、发布或写回数据。"
     "权限相关请找管理员；内容问题可以直接问我人和事。"
 )
+
+
+def colleague_v3_enabled() -> bool:
+    v = (os.environ.get("MESH_COLLEAGUE_V3") or "1").strip().lower()
+    return v not in ("0", "false", "off", "no")
 
 
 def _colleague_turn(
@@ -168,6 +174,20 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
                 **base_kwargs,
             ),
             route=route,
+        )
+
+    # —— Wave 1：Safety → Colleague v3（默认开；MESH_COLLEAGUE_V3=0 回退旧路径）——
+    if colleague_v3_enabled():
+        return _handle_colleague_v3(
+            con,
+            envelope=envelope,
+            identity=identity,
+            permission=permission,
+            context=context,
+            session=session,
+            sk=sk,
+            base_kwargs=base_kwargs,
+            _finish=_finish,
         )
 
     controller = intentmod.classify_controller(envelope.text, session)
@@ -425,6 +445,178 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
         **base_kwargs,
     )
     return _finish(answer, route=route, payload=payload, user_for_state=ask_q, controller=controller)
+
+
+def _handle_colleague_v3(
+    con,
+    *,
+    envelope: AgentEnvelope,
+    identity,
+    permission,
+    context,
+    session: sstore.SessionContextState,
+    sk: str,
+    base_kwargs: dict[str, Any],
+    _finish,
+) -> AgentAnswer:
+    """SafetyGate → Colleague v3；旁路 Controller。"""
+    from . import colleague_v3
+    from . import safety_gate
+
+    text_in = envelope.text or ""
+
+    # 确定性 whoami：绑定状态必须准，不交给模型瞎编
+    qn = conv.normalize_query(text_in)
+    if conv._WHOAMI.search(qn) and not conv._META.search(qn):
+        route = conv.RouteDecision(route="meta", intent="whoami", notes="v3_whoami")
+        return _finish(
+            AgentAnswer(
+                text=_whoami_text(identity),
+                intent="whoami",
+                tools_called=[],
+                fingerprint=fp.build_fingerprint(
+                    context=context, permission=permission, tool_result=None
+                ),
+                trace={
+                    **fp.build_trace(
+                        intent="whoami",
+                        tool_id=None,
+                        context=context,
+                        identity_status=identity.status,
+                    ),
+                    "colleague_v3": True,
+                    "router_llm_used": False,
+                },
+                **base_kwargs,
+            ),
+            route=route,
+        )
+
+    kind, _notes = safety_gate.check_refuse(text_in)
+    if kind == "draft":
+        route = conv.RouteDecision(route="refuse", intent="refuse", notes="draft_raw")
+        return _finish(
+            AgentAnswer(
+                text=_REFUSE_DRAFT,
+                intent="refuse",
+                refused=True,
+                deny_reason="draft_raw",
+                fingerprint=fp.build_fingerprint(
+                    context=context, permission=permission, tool_result=None
+                ),
+                trace={
+                    **fp.build_trace(
+                        intent="refuse",
+                        tool_id=None,
+                        context=context,
+                        identity_status=identity.status,
+                    ),
+                    "colleague_v3": True,
+                    "safety_gate": "draft",
+                    "router_llm_used": False,
+                },
+                **base_kwargs,
+            ),
+            route=route,
+        )
+    if kind == "capability":
+        route = conv.RouteDecision(route="refuse", intent="refuse", notes="capability")
+        return _finish(
+            AgentAnswer(
+                text=_REFUSE_CAPABILITY,
+                intent="refuse",
+                refused=True,
+                deny_reason="capability_boundary",
+                fingerprint=fp.build_fingerprint(
+                    context=context, permission=permission, tool_result=None
+                ),
+                trace={
+                    **fp.build_trace(
+                        intent="refuse",
+                        tool_id=None,
+                        context=context,
+                        identity_status=identity.status,
+                    ),
+                    "colleague_v3": True,
+                    "safety_gate": "capability",
+                    "router_llm_used": False,
+                },
+                **base_kwargs,
+            ),
+            route=route,
+        )
+
+    result = colleague_v3.handle(
+        con=con,
+        user_text=text_in,
+        identity=identity,
+        permission=permission,
+        context=context,
+        session=session,
+        invoke_tool=toolsmod.invoke_tool,
+        render_tool_result=_render,
+    )
+
+    # 映射 route 供 Session 更新
+    if result.action == "ask":
+        route = conv.RouteDecision(
+            route="ask"
+            if result.intent == "ask_published"
+            else ("relations" if result.intent == "ask_relations" else "list"),
+            intent=result.intent,
+            rewritten_query=str((result.trace or {}).get("ask_query") or text_in),
+            notes="colleague_v3_ask",
+        )
+    elif result.action == "refuse" or result.refused:
+        route = conv.RouteDecision(route="refuse", intent="refuse", notes="colleague_v3")
+    else:
+        route = conv.RouteDecision(
+            route="general_conversation",
+            intent="casual",
+            notes="colleague_v3_speak",
+        )
+
+    tr = fp.build_trace(
+        intent=result.intent,
+        tool_id=(result.tools_called[0] if result.tools_called else None),
+        context=context,
+        identity_status=identity.status,
+    )
+    tr["colleague_v3"] = True
+    tr["router_llm_used"] = False  # 无独立 Controller
+    tr["llm_used"] = bool(result.llm_used or result.synthesize_llm_used)
+    tr["colleague_action"] = result.action
+    if result.model:
+        tr["model_used"] = result.model
+    tr.update(result.trace or {})
+    if result.payload.get("temporal"):
+        tr["temporal"] = result.payload.get("temporal")
+    if "n_hits" in (result.payload or {}):
+        tr["n_hits"] = result.payload.get("n_hits")
+    if result.payload.get("claim_support"):
+        tr["claim_support"] = result.payload.get("claim_support")
+
+    answer = AgentAnswer(
+        text=result.text,
+        intent=result.intent,
+        tools_called=list(result.tools_called or []),
+        fingerprint=fp.build_fingerprint(
+            context=context, permission=permission, tool_result=None
+        ),
+        trace=tr,
+        claim_bindings=list(result.claim_bindings or []),
+        evidence_refs=list(result.evidence_refs or []),
+        refused=bool(result.refused),
+        deny_reason=result.deny_reason or "",
+        **base_kwargs,
+    )
+    user_for_state = str((result.trace or {}).get("ask_query") or text_in)
+    return _finish(
+        answer,
+        route=route,
+        payload=result.payload if result.action == "ask" else None,
+        user_for_state=user_for_state,
+    )
 
 
 def _whoami_text(identity) -> str:

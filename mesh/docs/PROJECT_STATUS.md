@@ -22,22 +22,17 @@ Mesh 今天是两件事：
 | 飞书 Agent Phase 1 | ✅ **Done** | 入站+解密+出站思考卡→终答 |
 | Conversation Runtime | ✅ **Done** | Session Context + Route + Failure UX；`e8c6eb8` |
 | **Colleague Agent v1** | ✅ 薄壳已上 | 规则路由 + 闲聊 LLM + Session（决策路径已被 v2 Stage1 取代） |
-| **Colleague Agent v2 Stage 1** | ✅ **冻结** | Controller 只决策；禁止再堆规则/schema |
-| **Colleague Agent v2 Stage 2A** | → **进行中** | Conversation Core；见 `COLLEAGUE_AGENT_V2_STAGE2.md` |
+| **Colleague Agent v2 Stage 1–2A** | ⚠ **旁路** | 组件化路径归档；见 `COLLEAGUE_AGENT_V3.md` |
+| **Colleague Agent v3 Wave 1** | → **主路径** | Safety → 一张嘴 Colleague；Ask 当工具 |
 | 全谱 Canary | ✅ CONDITIONAL GO | Follow-up/模糊 PASS；A 残留先不抠 |
-| **当前主战场** | → **Stage 2A Conversation** | 自然长短/情绪/不客服腔；**不动 Controller** |
+| **当前主战场** | → **V3 Wave 1** | 飞书里先是一个人；`MESH_COLLEAGUE_V3=1` |
 
 ```
-Colleague Agent v2
-  Stage 1 Controller ✅ 冻结
-  Stage 2A Conversation Core ← 现在
-  Stage 2B Self / Relationship
-  Stage 2C Opinion / Initiative
-  Stage 3 Memory（像人之后再记住你）
-  Stage 4 Collaboration
-  Stage 5 Enterprise Memory
-  Stage 6 Production Runtime
-不做：Wiki / 长期 Memory 抢跑 / ReAct / Multi-Agent / 解冻质量 / 继续打 Stage1 / 往 Controller 堆规则
+Colleague Agent v3
+  Wave 1 一张嘴 + Identity ← 现在（默认开）
+  Wave 2 会话内懂你
+  Wave 3 Memory
+不做：Decide/Multi-Agent / 重做组织 / 解冻质量 / 继续堆 Controller
 ```
 
 ---

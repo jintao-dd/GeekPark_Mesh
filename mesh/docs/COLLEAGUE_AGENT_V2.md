@@ -1,7 +1,8 @@
 # Colleague Agent v2 · 总览（重新梳理）
 
+> **状态：** v2 组件化路径已由 **v3 Wave 1** 旁路。现行主文档：[`COLLEAGUE_AGENT_V3.md`](./COLLEAGUE_AGENT_V3.md)。  
 > **日期：** 2026-09-10  
-> **一句话：** Controller 只决定「这句话怎么处理」；用户体验的中心是 Conversation 与 Enterprise Answer，不是 Controller 的 schema。
+> **一句话（历史）：** Controller 只决定「这句话怎么处理」——该中轴已废弃。
 
 ---
 
