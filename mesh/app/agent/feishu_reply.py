@@ -19,11 +19,13 @@ _NO_HIT_MARKERS = (
 
 _NO_HIT_UX = "这期周报里我没找到能直接回答的内容。你可以换个人名/公司名，或换个说法再问一次。"
 _INSUFFICIENT_UX = (
-    "我看到一些相关记录，但还不足以把话说死。"
-    "如果你愿意，可以再具体一点（人名、公司，或问是哪一期）。"
+    "有相关记录，但还不足以证明你问的那一点。"
+    "可以再具体一点（人名、公司，或问是哪一期）。"
 )
 _CONTRADICTED_UX = "周报里有和这个说法不太一致的记录，我先不按原说法下结论。"
 _SYSTEM_UX = "刚才没查顺，你再发一次我就好。"
+_TIMEOUT_UX = "这次有点慢，我这边超时了。你再发一次，或把问题缩短一点。"
+_PERMISSION_UX = "这部分信息不在你当前可查看的范围内。"
 
 
 def _issue_slug(answer: AgentAnswer, payload: dict[str, Any] | None = None) -> str:
@@ -58,7 +60,7 @@ def _failure_kind(
     support: str,
     reason: str,
 ) -> str:
-    """no_hit | insufficient | contradicted | permission | system_error | ok"""
+    """no_hit | insufficient | contradicted | permission | system_error | timeout | ok"""
     if answer.refused or answer.intent == "refuse":
         dr = (answer.deny_reason or "").lower()
         if "acl" in dr or "permission" in dr or "identity" in dr:
@@ -67,6 +69,8 @@ def _failure_kind(
     if answer.intent in ("help", "whoami", "casual", "clarify", "list_issues"):
         return "ok"
     body = (answer.text or "").strip()
+    if "超时" in body or "timeout" in body.lower() or reason == "timeout":
+        return "timeout"
     if any(m in body for m in _NO_HIT_MARKERS) or reason in ("no_evidence", "no_hit", "empty"):
         # n_hits==0 更像 no_hit
         n_hits = (payload or {}).get("n_hits")
@@ -118,6 +122,10 @@ def _rewrite_body_for_failure(body: str, kind: str) -> str:
         return body
     if kind == "system_error":
         return _SYSTEM_UX
+    if kind == "timeout":
+        return _TIMEOUT_UX
+    if kind == "permission":
+        return body or _PERMISSION_UX
     return body
 
 
@@ -153,21 +161,21 @@ def format_display_text(
     blocks: list[str] = [body]
     meta_lines: list[str] = []
 
-    # no_hit / system_error：只留人话，不甩期次/依据技术块
-    if kind in ("no_hit", "system_error"):
+    # no_hit / system_error / timeout：只留人话，不甩内部字段
+    if kind in ("no_hit", "system_error", "timeout", "permission"):
         return body
 
-    if issue and kind == "supported":
+    if issue and kind in ("ok", "supported", ""):
         meta_lines.append(f"来源：{issue} 已上线周报")
     elif issue and kind not in ("",):
         meta_lines.append(f"来源期次：{issue}")
 
     if kind == "insufficient":
-        meta_lines.append("说明：有相关内容，但还不够下强结论")
+        meta_lines.append("目前能确认的有限：有相关记录，但还不足以证明那一点")
     elif kind == "contradicted":
-        meta_lines.append("说明：存在不一致记录")
+        meta_lines.append("说明：周报里有不一致记录")
 
-    if uniq_refs and kind not in ("no_hit", "system_error"):
+    if uniq_refs and kind not in ("no_hit", "system_error", "timeout", "permission"):
         meta_lines.append("可核对：")
         for r in uniq_refs[:6]:
             meta_lines.append(f"· {_humanize_ref(r)}")

@@ -37,6 +37,29 @@ _REFUSE_CAPABILITY = (
 )
 
 
+def _colleague_turn(
+    *,
+    user_text: str,
+    session: sstore.SessionContextState,
+    mode: str,
+    identity=None,
+) -> tuple[str, dict[str, Any]]:
+    """1× Conversation LLM（general / meta）。不进 Retrieval。"""
+    from . import colleague_chat
+
+    hint = ""
+    if identity is not None:
+        person = getattr(identity, "person", None) or {}
+        if isinstance(person, dict):
+            name = str(person.get("display") or person.get("name") or "").strip()
+            team = str(getattr(identity, "primary_team", None) or "").strip()
+            if name:
+                hint = f"{name}" + (f"/{team}" if team else "")
+    return colleague_chat.reply_colleague(
+        user_text, session, mode=mode, identity_hint=hint
+    )
+
+
 def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
     """本地/HTTP Harness 入口。不依赖飞书事件。"""
     identity = idmod.resolve_identity(con, envelope)
@@ -157,42 +180,67 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
             route=route,
         )
 
-    # Meta：短人话，不走 system.help 说明书
+    # Meta：Conversation LLM（不走 system.help 说明书 / 不进 Retrieval）
     if intent == "help":
+        text, chat_meta = _colleague_turn(
+            user_text=envelope.text or "",
+            session=session,
+            mode="meta",
+            identity=identity,
+        )
+        if not (text or "").strip():
+            text = route.casual_text or conv._meta_reply(envelope.text or "")
+        tr = fp.build_trace(
+            intent="help",
+            tool_id=None,
+            context=context,
+            identity_status=identity.status,
+        )
+        tr["llm_used"] = bool(chat_meta.get("llm_used"))
+        if chat_meta.get("model"):
+            tr["model_used"] = chat_meta.get("model")
         return _finish(
             AgentAnswer(
-                text=route.casual_text or conv._meta_reply(envelope.text or ""),
+                text=text,
                 intent="help",
                 tools_called=[],
                 fingerprint=fp.build_fingerprint(
                     context=context, permission=permission, tool_result=None
                 ),
-                trace=fp.build_trace(
-                    intent="help",
-                    tool_id=None,
-                    context=context,
-                    identity_status=identity.status,
-                ),
+                trace=tr,
                 **base_kwargs,
             ),
             route=route,
         )
 
+    # General conversation：必须 1× Answer LLM，不进 Published Retrieval
     if intent == "casual":
+        text, chat_meta = _colleague_turn(
+            user_text=envelope.text or "",
+            session=session,
+            mode="chat",
+            identity=identity,
+        )
+        if not (text or "").strip():
+            text = route.casual_text or conv._casual_reply(envelope.text or "")
+        tr = fp.build_trace(
+            intent="casual",
+            tool_id=None,
+            context=context,
+            identity_status=identity.status,
+        )
+        tr["llm_used"] = bool(chat_meta.get("llm_used"))
+        if chat_meta.get("model"):
+            tr["model_used"] = chat_meta.get("model")
         return _finish(
             AgentAnswer(
-                text=route.casual_text or conv._casual_reply(envelope.text or ""),
+                text=text,
                 intent="casual",
                 tools_called=[],
                 fingerprint=fp.build_fingerprint(
                     context=context, permission=permission, tool_result=None
                 ),
-                trace=fp.build_trace(
-                    intent="casual",
-                    tool_id=None,
-                    context=context,
-                    identity_status=identity.status,
-                ),
+                trace=tr,
                 **base_kwargs,
             ),
             route=route,

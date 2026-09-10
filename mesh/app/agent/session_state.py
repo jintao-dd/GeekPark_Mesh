@@ -1,8 +1,7 @@
-"""Session Context State — 只帮助理解「用户在说什么」，不作事实来源。
+"""Session Context — Colleague Agent v1。
 
-硬约束：
-- active_entities / last_* 仅用于指代消解与 query rewrite
-- 下一轮必须重新 Retrieval + Evidence，禁止把上一轮答案当事实
+只服务：指代、话题连续性、mode 切换。
+不得作为企业事实来源；Follow-up 必须重新 Retrieval + Evidence。
 """
 from __future__ import annotations
 
@@ -13,6 +12,29 @@ from typing import Any
 
 
 @dataclass
+class TopicFrame:
+    """可压栈的企业话题快照。"""
+
+    entities: list[str] = field(default_factory=list)
+    topic: str = ""
+    issue: str = ""
+    period: str = ""
+    team: str = ""
+    frame: str = ""  # contact|relations|progress|about
+    query: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any] | None) -> "TopicFrame":
+        if not d:
+            return cls()
+        known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+        return cls(**{k: v for k, v in d.items() if k in known})
+
+
+@dataclass
 class SessionContextState:
     session_key: str = ""
     turn_id: int = 0
@@ -20,13 +42,17 @@ class SessionContextState:
     active_team: str = ""
     active_issue: str = ""
     active_period: str = ""
+    active_topic: str = ""
     last_intent: str = ""
     last_route: str = ""
     last_query: str = ""
     last_query_refs: list[str] = field(default_factory=list)
     last_evidence_refs: list[str] = field(default_factory=list)
-    last_topic_frame: str = ""  # contact | relations | progress | about
+    last_topic_frame: str = ""
     unresolved_references: list[str] = field(default_factory=list)
+    conversation_mode: str = ""  # enterprise|chat|clarify|meta|error
+    recent_turns: list[dict[str, Any]] = field(default_factory=list)
+    topic_stack: list[dict[str, Any]] = field(default_factory=list)
     updated_at: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
@@ -37,7 +63,61 @@ class SessionContextState:
         if not d:
             return cls()
         known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
-        return cls(**{k: v for k, v in d.items() if k in known})
+        raw = {k: v for k, v in d.items() if k in known}
+        return cls(**raw)
+
+    def current_topic(self) -> TopicFrame:
+        return TopicFrame(
+            entities=list(self.active_entities or []),
+            topic=self.active_topic or "",
+            issue=self.active_issue or "",
+            period=self.active_period or "",
+            team=self.active_team or "",
+            frame=self.last_topic_frame or "",
+            query=self.last_query or "",
+        )
+
+    def push_topic(self) -> None:
+        snap = self.current_topic().to_dict()
+        if not (snap.get("entities") or snap.get("topic") or snap.get("query")):
+            return
+        stack = list(self.topic_stack or [])
+        stack.append(snap)
+        self.topic_stack = stack[-8:]
+
+    def restore_topic(self) -> bool:
+        stack = list(self.topic_stack or [])
+        if not stack:
+            return False
+        snap = TopicFrame.from_dict(stack.pop())
+        self.topic_stack = stack
+        if snap.entities:
+            self.active_entities = list(snap.entities)
+        if snap.topic:
+            self.active_topic = snap.topic
+        if snap.issue:
+            self.active_issue = snap.issue
+            self.active_period = snap.period or snap.issue
+        if snap.team:
+            self.active_team = snap.team
+        if snap.frame:
+            self.last_topic_frame = snap.frame
+        if snap.query:
+            self.last_query = snap.query
+        self.conversation_mode = "enterprise"
+        return True
+
+    def append_turn(self, *, role: str, text: str, route: str = "") -> None:
+        turns = list(self.recent_turns or [])
+        turns.append(
+            {
+                "role": role,
+                "text": (text or "")[:400],
+                "route": route,
+                "turn_id": self.turn_id,
+            }
+        )
+        self.recent_turns = turns[-12:]
 
 
 _LOCK = threading.Lock()
@@ -54,7 +134,6 @@ def session_key_of(
     session_id: str = "",
     mesh_user_id: int | None = None,
 ) -> str:
-    """稳定会话键：不含 issue（期次变化不应丢对话实体）。"""
     ch = (channel or "web").strip()
     if ch == "feishu_group" and chat_id:
         base = f"grp:{chat_id}"

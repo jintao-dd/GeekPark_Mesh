@@ -44,7 +44,7 @@ def setup_function():
 def test_casual_no_tool():
     for q in ("你好", "哈哈", "谢谢", "好的", "收到", "明白", "算了", "好的明白了", "哈哈在忙吗"):
         d = conv.route_message(q)
-        assert d.route == "casual", q
+        assert d.route == "general_conversation", q
         assert d.intent == "casual"
         assert intent_to_tool("casual") is None
         assert d.casual_text

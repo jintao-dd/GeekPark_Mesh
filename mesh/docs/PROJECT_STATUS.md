@@ -3,7 +3,7 @@
 > **日期：** 2026-09-10  
 > **读者：** 产品 / 工程 / 对接方  
 > **原则：** 只写「现在真的怎样」+「下一步做什么」；不写愿景空话。  
-> **镜像锚点：** `geekpark-mesh:2026-09-10-03204493a7e1`（tmesh + prod 已对齐）
+> **镜像锚点：** `geekpark-mesh:2026-09-10-e8c6eb8d0ec2`（tmesh + prod 已对齐）
 
 ---
 
@@ -19,19 +19,21 @@ Mesh 今天是两件事：
 | Mesh v1 质量 | ✅ **冻结** v3.0 | Ranking v1.4 + Claim Support v2.4c-2；禁止质量微补丁 |
 | Mesh v1 生产链 | ✅ **候选 Go** | 可作 Agent 底座（见 `MESH_V1_AGENT_GO_NOGO.md`） |
 | 关系召回工程刀 | ✅ **够用封存** | `card_bridge` 已上；不再扩 Decision/Ranking/Claim |
-| 飞书 Agent Phase 1 | ✅ **Done** | 入站+解密+出站思考卡→终答；tmesh 冒烟 + prod 已上 |
-| P0.0 Meta short-circuit | ✅ **Done** | 「你是谁」等不进 Retrieval；commit `0320449` |
-| **当前主战场** | → **Conversation Runtime Sprint** | Session Context + Route + Failure UX + Help；不解冻质量 |
+| 飞书 Agent Phase 1 | ✅ **Done** | 入站+解密+出站思考卡→终答 |
+| Conversation Runtime | ✅ **Done** | Session Context + Route + Failure UX；`e8c6eb8` |
+| **Colleague Agent v1** | → **本轮上线** | Conversation Intelligence + 闲聊 LLM；Brain 冻结 |
+| 全谱 Canary | ✅ CONDITIONAL GO | Follow-up/模糊 PASS；A 残留先不抠 |
+| **当前主战场** | → **真人 Canary 2.0** | 在 Colleague v1 上续跑四指标 |
 
 ```
-P0.0 Meta/Identity ✅
-P0.1 全谱 Canary → NO-GO（B/A/F/E）
-Conversation Runtime Sprint ← 现在（一次集中：B+A+F+E）
+Colleague Agent v1 ← 现在（docs/COLLEAGUE_AGENT_V1.md）
      ↓
-自动回归全谱 Canary
+真人 Canary 2.0（docs/AGENT_CANARY_2.md）
      ↓
-真人 Canary（repair_rate + 自然追问）
-不做：Wiki / Memory 大架构 / ReAct / 解冻 Ranking·Claim·Retrieval
+Top 2～3 共性 → 一次集中修 → 再 Canary
+     ↓
+小规模稳定 →【放量门槛】多实例 Session 外置或 sticky
+不做：Wiki / 长期 Memory / ReAct / Graph / ES / 解冻质量 / 为单 case 打补丁
 ```
 
 ---
@@ -55,7 +57,7 @@ Conversation Runtime Sprint ← 现在（一次集中：B+A+F+E）
 | | tmesh | prod |
 |--|--|--|
 | URL | https://tmesh.geekpark.net | https://mesh.geekpark.ai |
-| 镜像 | `2026-09-10-03204493a7e1` | 同左 |
+| 镜像 | `2026-09-10-e8c6eb8d0ec2` | 同左 |
 | REPRO | PASS | PASS |
 | Claim Check | `enforce` | `enforce` |
 | 密码登录 | ✅ 可开（staging） | ❌ 关（`MESH_ENV=production`） |
@@ -114,8 +116,9 @@ Conversation Runtime Sprint ← 现在（一次集中：B+A+F+E）
 | Bot 事件订阅 | ✅ | `POST /api/feishu/bot/event` |
 | Encrypt + Verification | ✅ | tmesh + **prod 已同步** |
 | 出站 + 思考卡 → Patch 终答 | ✅ **Phase 1 Done** | 私聊 + 群（CCC技术组）冒烟过 |
-| 小范围真人 Canary | 🔨 **P0.1 进行中** | 像不像同事；见 `AGENT_CANARY_P01.md` |
+| 小范围真人 Canary | 🔨 **Canary 2.0 进行中** | 四指标；见 `AGENT_CANARY_2.md`；本轮不修 |
 | Evidence 卡片交互增强 | ❌ | Canary 后按需 |
+| 多实例 Session Store | ⏸ **放量门槛** | 现为进程内内存；放量前 sticky 或外置 store |
 
 ### E. 明确不做
 
@@ -144,13 +147,14 @@ Conversation Runtime Sprint ← 现在（一次集中：B+A+F+E）
 
 | # | 工作项 | 验收 |
 |---|--------|------|
-| **0.0** | Agent 基础行为 short-circuit | ✅ Done（`0320449` / 镜像 `03204493a7e1`） |
-| **0.1** | **真人 Canary（像不像同事）** | 3～5 人×10～20 问 + 群；记真实聊天与行为信号；**本轮不修**；见 `AGENT_CANARY_P01.md` |
-| 0.2 | 可观测固化 | request_id / intent / latency / evidence / refuse / model |
+| **0.0** | Agent 基础行为 + Conversation Runtime | ✅ Done（`e8c6eb8`） |
+| **0.1** | **真人 Canary 2.0** | 四指标：Natural Follow-up / repair_rate / 不用教机器人 / 愿继续用；**本轮不修**；见 `AGENT_CANARY_2.md` |
+| 0.2 | 可观测固化 | request_id / intent / route / latency / repair 信号 |
 | 0.3 | 群边界实战 | 群绑定团队生效；不越权 |
 | 0.4 | 失败手册 | 超时 / 解密 / 无证据 / 拒答处置 |
+| **放量前** | Session 多实例 | sticky **或** 共享 Session Store（门槛，非本轮） |
 
-**P0.1 第一性指标：用户会不会自然问下一句。** 重复 failure 模式出现前不集中修。
+**Canary 2.0 第一性：自然追问 + repair_rate。** A 残留 ×3 先不修。重复共性出现前不集中打补丁。
 ### P1 · Canary 稳定后按需
 
 | # | 工作项 | 触发条件 |
@@ -187,7 +191,7 @@ Conversation Runtime Sprint ← 现在（一次集中：B+A+F+E）
         ↓
 ③ 飞书私聊 + 群各问 1 句（真实 Bot，不经 harness）
         ↓
-④ 按 `AGENT_CANARY_P01.md` 跑真人 Canary（记聊天，不修）
+④ 按 `AGENT_CANARY_2.md` 跑真人 Canary 2.0（四指标；不修）
         ↓
 ⑤ 每日扫 observability / 日志失败类
 ```
@@ -227,4 +231,4 @@ Conversation Runtime Sprint ← 现在（一次集中：B+A+F+E）
 
 > Mesh 周报与「有证据的问答」已在 tmesh/prod 可跑；**答案质量基线已冻**。  
 > **飞书 Bot Phase 1 已完成**（能收、能回、有思考卡）；关系召回工程刀**够用封存**。  
-> **下一步：P0.1 真人 Canary（像不像同事）。收集真实对话后再打共性产品问题。**
+> **下一步：真人 Canary 2.0（自然追问 / repair_rate）。放量前必须解决多实例 Session。**

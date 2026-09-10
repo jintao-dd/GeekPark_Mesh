@@ -47,6 +47,20 @@ _REPAIR = re.compile(
     re.I,
 )
 
+# 观点/润色/闲聊内容 —— 必须走 Conversation LLM，不进 Retrieval
+_GENERAL_CHAT = re.compile(
+    r"(你觉得|你怎么看|有什么看法|怎么理解|"
+    r"帮我润色|润色一下|帮我写(?:一段|一下|个)?|"
+    r"帮我改(?:一下)?(?:文案|措辞|说法|标题|开头)|"
+    r"今天好忙|好累|好烦|好开心|聊聊)",
+    re.I,
+)
+
+_RESUME = re.compile(
+    r"^(对了|说回来|回到正题|刚才那个|回到刚才)[，,：:\s]*(?P<rest>.+)$",
+    re.I,
+)
+
 _CAPABILITY_REFUSE = re.compile(
     r"(改|修改|调整).{0,8}(权限|角色|密码)|(帮我发布|帮我上线|写回|删除周报)",
     re.I,
@@ -85,8 +99,13 @@ _FU_THAT_ENTITY = re.compile(
     r"^那\s*(?P<name>[\u4e00-\u9fffA-Za-z0-9·．\.]{1,20}?)\s*(?:呢|呢\？|\？|\?|怎么样|如何|后来)?[?？!！。.\s]*$",
     re.I,
 )
+# 「高德呢」——有会话话题时视为同框 follow-up（无「那」）
+_FU_ENTITY_NE = re.compile(
+    r"^(?P<name>[\u4e00-\u9fffA-Za-z0-9·．\.]{2,20}?)\s*呢[?？!！。.\s]*$",
+    re.I,
+)
 _FU_HE = re.compile(
-    r"^(他|她|它|对方)(?:呢|后来|还有吗|怎么样|如何|跟谁\S*|对接\S*|相关\S*)?[?？!！。.\s]*$",
+    r"^(他|她|它|对方)(?:呢|后来(?:呢|怎么样|如何)?|还有吗|怎么样|如何|跟谁\S*|对接\S*|相关\S*)?[?？!！。.\s]*$",
     re.I,
 )
 _FU_LATER = re.compile(r"^(后来呢|后来怎么样|之后呢|然后呢)[?？!！。.\s]*$", re.I)
@@ -108,7 +127,7 @@ _CN_NAME = re.compile(r"[\u4e00-\u9fff]{2,6}")
 
 @dataclass
 class RouteDecision:
-    route: str  # meta|casual|clarify|followup|list|relations|ask|refuse
+    route: str  # meta|general_conversation|clarify|followup|list|relations|ask|refuse|ambiguous
     intent: str  # maps to runtime intent
     rewritten_query: str = ""
     clarify_text: str = ""
@@ -226,12 +245,19 @@ def route_message(
     if _WHOAMI.search(q):
         return RouteDecision(route="meta", intent="whoami", notes="whoami")
 
-    if _CASUAL.match(q):
+    if _CAPABILITY_REFUSE.search(q):
         return RouteDecision(
-            route="casual",
+            route="refuse",
+            intent="refuse",
+            notes="capability_boundary",
+        )
+
+    if _CASUAL.match(q) or _GENERAL_CHAT.search(q):
+        return RouteDecision(
+            route="general_conversation",
             intent="casual",
             casual_text=_casual_reply(q),
-            notes="casual",
+            notes="general_chat",
         )
 
     if _REPAIR.search(q):
@@ -242,12 +268,26 @@ def route_message(
             notes="repair",
         )
 
-    if _CAPABILITY_REFUSE.search(q):
-        return RouteDecision(
-            route="refuse",
-            intent="refuse",
-            notes="capability_boundary",
-        )
+    # 话题恢复：「对了，高德呢」
+    m_res = _RESUME.match(q)
+    if m_res:
+        rest = (m_res.group("rest") or "").strip()
+        if rest:
+            if not st.active_entities:
+                st.restore_topic()
+            fu = _try_followup(rest, st)
+            if fu is not None:
+                fu.notes = "resume_" + (fu.notes or "followup")
+                return fu
+            # rest 像企业问句
+            if len(rest) >= 2:
+                return RouteDecision(
+                    route="followup",
+                    intent="ask_published",
+                    rewritten_query=rest,
+                    topic_frame=st.last_topic_frame or "about",
+                    notes="resume_as_ask",
+                )
 
     # Follow-up resolution (needs session entities OR named entity in utterance)
     fu = _try_followup(q, st)
@@ -320,34 +360,45 @@ def _try_followup(q: str, st: SessionContextState) -> RouteDecision | None:
         )
 
     m = _FU_THAT_ENTITY.match(q)
+    if not m and (st.active_entities or st.last_topic_frame or st.topic_stack):
+        m = _FU_ENTITY_NE.match(q)
     if m:
         name = (m.group("name") or "").strip()
-        if name in ("个", "些", "么", "样", "边", "里") or len(name) < 2:
-            return None
-        if name.startswith("个") or name in ("个项目", "件事", "个事"):
-            return None
-        if name in ("商务", "编辑部", "海外", "投资"):
-            # team switch follow-up
+        bad = (
+            not name
+            or len(name) < 2
+            or name in ("个", "些", "么", "样", "边", "里")
+            or name in _STOP
+            or name in ("这个", "那个", "后来", "还有", "之前", "刚才", "他后来", "她后来")
+            or name.startswith("个")
+            or name in ("个项目", "件事", "个事")
+            or name[0] in ("他", "她", "它")
+            or "后来" in name
+            or "还有" in name
+        )
+        if not bad:
+            if name in ("商务", "编辑部", "海外", "投资"):
+                return RouteDecision(
+                    route="followup",
+                    intent="ask_published" if frame != "relations" else "ask_relations",
+                    rewritten_query=_rewrite_for_entity(name, frame, st.last_query)
+                    if frame != "about"
+                    else f"{name}关注了哪些公司或接触对象",
+                    topic_frame=frame or "about",
+                    resolved_entity=name,
+                    notes="followup_team_or_entity",
+                )
+            rw = _rewrite_for_entity(name, frame, st.last_query)
+            intent = "ask_relations" if frame == "relations" else "ask_published"
             return RouteDecision(
                 route="followup",
-                intent="ask_published" if frame != "relations" else "ask_relations",
-                rewritten_query=_rewrite_for_entity(name, frame, st.last_query)
-                if frame != "about"
-                else f"{name}关注了哪些公司或接触对象",
-                topic_frame=frame or "about",
+                intent=intent,
+                rewritten_query=rw,
+                topic_frame=frame,
                 resolved_entity=name,
-                notes="followup_team_or_entity",
+                notes="followup_named",
             )
-        rw = _rewrite_for_entity(name, frame, st.last_query)
-        intent = "ask_relations" if frame == "relations" else "ask_published"
-        return RouteDecision(
-            route="followup",
-            intent=intent,
-            rewritten_query=rw,
-            topic_frame=frame,
-            resolved_entity=name,
-            notes="followup_named",
-        )
+        # bad bare「X呢」：不要 return None，继续落到代词/后来等规则
 
     if _FU_HE.match(q):
         if not primary:
@@ -393,7 +444,7 @@ def _try_followup(q: str, st: SessionContextState) -> RouteDecision | None:
     if _FU_WHICH_ISSUE.search(q) and len(q) <= 20:
         if st.active_issue:
             return RouteDecision(
-                route="casual",
+                route="general_conversation",
                 intent="casual",
                 casual_text=f"上面说的内容对应期次是 **{st.active_issue}**。还想顺着问谁或哪家公司，直接说就行。",
                 notes="followup_which_issue",
@@ -469,22 +520,50 @@ def update_state_after_turn(
     team: str = "",
 ) -> SessionContextState:
     """写入会话状态。answer 只用于抽实体名，不作事实缓存。"""
+    prev_mode = state.conversation_mode or ""
     state.turn_id = int(state.turn_id or 0) + 1
     state.last_route = route.route
     state.last_intent = intent or route.intent
     state.last_query = normalize_query(user_text)
     if route.rewritten_query:
         state.last_query = route.rewritten_query
+
+    # mode + topic stack
+    if route.route in ("ask", "relations", "followup", "list") or intent in (
+        "ask_published",
+        "ask_relations",
+        "list_issues",
+    ):
+        new_mode = "enterprise"
+    elif route.route in ("general_conversation",) or intent == "casual":
+        new_mode = "chat"
+    elif intent in ("help", "whoami") or route.route == "meta":
+        new_mode = "meta"
+    elif intent == "clarify" or route.route == "clarify":
+        new_mode = "clarify"
+    else:
+        new_mode = prev_mode or "chat"
+
+    if prev_mode == "enterprise" and new_mode == "chat":
+        state.push_topic()
+    state.conversation_mode = new_mode
+
     q_ents = extract_entities_from_text(user_text)
     if route.resolved_entity:
         q_ents = merge_entities([route.resolved_entity], q_ents)
     a_ents = extract_entities_from_text(answer_text) if answer_text else []
-    # 回答抽实体仅作指代候选；限制数量避免噪声
-    state.active_entities = merge_entities(state.active_entities, merge_entities(q_ents, a_ents[:8]))
-    state.last_query_refs = q_ents[:8]
-    if evidence_refs is not None:
+    if new_mode == "enterprise":
+        state.active_entities = merge_entities(
+            state.active_entities, merge_entities(q_ents, a_ents[:8])
+        )
+        state.last_query_refs = q_ents[:8]
+        if q_ents:
+            state.active_topic = "、".join(q_ents[:3])
+        elif route.rewritten_query:
+            state.active_topic = route.rewritten_query[:40]
+    if evidence_refs is not None and new_mode == "enterprise":
         state.last_evidence_refs = list(evidence_refs)[:16]
-    if issue:
+    if issue and new_mode == "enterprise":
         state.active_issue = issue
         state.active_period = issue
     if team:
@@ -493,12 +572,17 @@ def update_state_after_turn(
         state.last_topic_frame = route.topic_frame
     elif intent == "ask_relations":
         state.last_topic_frame = "relations"
-    elif not state.last_topic_frame:
+    elif new_mode == "enterprise" and not state.last_topic_frame:
         state.last_topic_frame = _topic_frame_from_query(state.last_query, intent)
+
     if route.route == "clarify":
         state.unresolved_references = [user_text.strip()]
     else:
         state.unresolved_references = []
+
+    state.append_turn(role="user", text=user_text, route=route.route)
+    if answer_text:
+        state.append_turn(role="assistant", text=answer_text, route=route.route)
     return state
 
 
