@@ -13,25 +13,25 @@ Mesh 今天是两件事：
 1. **周报生产线**：各部门素材 → 抽取 → 要点卡 → 草稿/关系 → Owner 确认上线  
 2. **已上线语料上的问答（Agent/Ask）**：只能答 Published；要 Evidence / 期次
 
-**当前主战场（已排期）：**
+**当前主战场（2026-09-10 切换）：**
 
 ```
-Phase 1 [P0] 飞书 Bot 基础闭环  ← 正在做 / 优先
-  · 出站 im/v1/messages
-  · <1s「思考中」Interactive Card → 后台 Agent → Patch 最终回答+Evidence
-Phase 2 [P1] 关系召回饥荒（单独开刀）
-  · 实体对齐 / 别名 / 跨团队共现
-Phase 3 [P2] 性能与产线微调
-  · Cards concurrency=2 稳定化
-  · Web Ask 流式首 token 探索
-体验收口：飞书 Bot 100% 可用（入站+出站+状态反馈）
+✅ Phase 1 [P0] 飞书 Bot 基础闭环  — Done
+  · 入站/解密/Verification · 出站 · 思考卡 → Patch 终答
+  · tmesh 私聊+群聊冒烟；prod 镜像已上（2fc80f3884a7）
+✅ 关系召回工程刀  — 封存够用
+  · card_bridge + 实体 key 规范化 + 徽章去重
+  · 不再扩 Decision/Ranking/Claim；「尚未接触」不硬造双边
+→ Phase 2 [P1] Agent 工程化（Canary / 可观测 / 群边界）
+  · 小规模真人 · 失败归因 · 不回头开质量微补丁
+Phase 3 [P2] 性能与产线微调（按需）
 ```
 
 | 轨道 | 状态 | 一句话 |
 |------|------|--------|
 | **质量（答得对不对）** | ✅ **已冻结** v3.0 | Ranking v1.4 + Claim Support v2.4c-2；禁止回头开质量小版本 |
-| **运行时 / 飞书** | 🔨 **Phase 1** | 入站+解密✅ · **出站+思考卡（本迭代）** · 关系召回未修 |
-| **关系召回** | 🔍 **Phase 2 排队** | 候选层饥荒（实体按团队隔离），不是 Decision 误杀 |
+| **运行时 / 飞书** | ✅ **Phase 1 Done** | 入站+出站+思考卡；下一刀 Canary |
+| **关系召回** | ✅ **够用封存** | card_bridge 已上；Gap 仍可 partial，产品停刀 |
 
 ---
 
@@ -72,9 +72,9 @@ Phase 3 [P2] 性能与产线微调
 | Pipeline 抽取（含并行 extract） | ✅ | ⑤区/L3 硬拦 |
 | Preview 渐进开门 | ✅ | 骨架可先进预览页 |
 | 要点卡生成 | ✅ | 默认 **串行**；`MESH_PREVIEW_CARD_CONCURRENCY` 可开并行（tmesh 已 A/B） |
-| 周报壳 + 关系 Decision→Gate→Writer | ✅ 链路在 | **本期待修：候选召回过少** |
+| 周报壳 + 关系 Decision→Gate→Writer | ✅ | Claim Check enforce；徽章实线/虚线去重 |
 | Owner 上线 / EDM | ✅ | |
-| 关系「卡面有线索但候选=0」 | ❌ 未修 | 见 `eval/reports/RELATION_RECALL_GAP.2026-09-08.*` |
+| 关系候选召回（card_bridge） | ✅ **够用封存** | 实体 key + 卡面桥接 + 海外已沟通→编辑部；不再开质量微刀 |
 
 ### B. Agent / Ask 质量
 
@@ -104,10 +104,10 @@ Phase 3 [P2] 性能与产线微调
 | OAuth 登录网页 | ✅ | `FEISHU_APP_ID/SECRET` |
 | 群 → 团队绑定 | ✅ | |
 | Bot 事件订阅（开发者服务器） | ✅ 接线 | `POST /api/feishu/bot/event` |
-| Encrypt Key 解密 + Verification Token | ✅ | tmesh 已配 |
-| **Bot 出站 + 思考中卡片 → Patch 终答** | 🔨 Phase 1 | `feishu_api` / `feishu_cards`；`FEISHU_BOT_REPLY=1` |
-| Evidence 卡片交互 / 更细状态机 | ❌ | Phase 1 最小可用后可增强 |
-| 小范围真人 Canary | ❌ | 路线图 ⑥ |
+| Encrypt Key 解密 + Verification Token | ✅ | tmesh 已配；**prod 需确认同钥**（见 §5） |
+| **Bot 出站 + 思考中卡片 → Patch 终答** | ✅ Phase 1 Done | tmesh 私聊+群聊冒烟；prod 镜像已对齐 |
+| Evidence 卡片交互 / 更细状态机 | ❌ | Canary 后按需 |
+| 小范围真人 Canary | 🔨 **下一刀** | Agent Phase 2 |
 
 ### E. 明确不做（冻结禁止项）
 
@@ -123,8 +123,9 @@ Phase 3 [P2] 性能与产线微调
 | Answer/Semantic packing | 压 token；普通问仍 ~10s+ | ✅ 已在运行时 |
 | Weekly Preview Job Profile | 总墙钟约数分钟级；Cards 曾是 Preview 主瓶颈 | 测量脚本 |
 | Cards 受控并行 A/B | conc=2 卡片阶段约 **1.7×**；retry=0；输出因 LLM 非确定会变 | **默认仍 concurrency=1** |
-| Relation Recall Gap 诊断 | raw 候选≈1；跨团队共现实体=0 | 未改代码 |
-| Feishu 加密事件解密 | tmesh 可收加密回调 | ✅ tmesh；出站仍缺 |
+| Relation Recall Gap 诊断 | 曾 raw≈1；现 card_bridge 补召回 | ✅ 代码已上；报告可留档 |
+| Feishu Phase 1 | 入站+出站+思考卡 | ✅ tmesh 冒烟 + prod `2fc80f3884a7` |
+| 团队徽章去重 | 同队不再实线+→并存 | ✅ |
 
 ---
 
@@ -133,13 +134,14 @@ Phase 3 [P2] 性能与产线微调
 ```
 ① 读本页（你在这里）
         ↓
-② 自测问答：网页 Ask 或 POST /api/agent/v1/message（同大脑）
+② 确认 prod 飞书事件钥（VERIFICATION_TOKEN / ENCRYPT_KEY）与 tmesh 一致
+   （url_verification 已过；加密入站缺钥会静默失败）
         ↓
-③ 飞书：事件已能进 tmesh → 下一刀做「自动回消息」才算 Bot 闭环
+③ Agent Phase 2：小范围真人 Canary（私聊 + 已拉群）
         ↓
-④ 关系空：单独开「候选召回 / 实体对齐」刀，不要和 Bot/性能绑一起
+④ 可观测：request_id / latency / refuse / evidence count 固化看板
         ↓
-⑤ 质量线继续冻；有 failure 再决定是否解冻
+⑤ 质量线继续冻；有真实 failure 再决定是否解冻
 ```
 
 ---
