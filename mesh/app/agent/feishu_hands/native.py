@@ -51,7 +51,12 @@ def _api(
         params=params,
         timeout=timeout,
     )
-    data = r.json() if r.content else {}
+    try:
+        data = r.json() if r.content else {}
+    except Exception:
+        raise RuntimeError(f"feishu_api_non_json:{r.status_code}:{r.text[:120]}")
+    if not isinstance(data, dict):
+        raise RuntimeError(f"feishu_api_bad_json:{r.status_code}")
     code = int(data.get("code") or 0)
     if r.status_code >= 400 or code != 0:
         msg = str(data.get("msg") or data or r.text[:200])
@@ -181,7 +186,8 @@ def _list_chats(query: str, *, max_results: int) -> ToolResultEnvelope:
     out = []
     for c in items if isinstance(items, list) else []:
         name = str(c.get("name") or "")
-        if q and q not in name.lower():
+        # 空 query：列出机器人可见群；有 query：按名过滤
+        if q and q not in name.lower() and q not in str(c.get("chat_id") or "").lower():
             continue
         out.append(
             {
