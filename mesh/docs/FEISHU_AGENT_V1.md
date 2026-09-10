@@ -2,7 +2,7 @@
 
 > **质量基线：** Agent Quality v3.0 Production Baseline / E2E RC  
 > **原则：** 只接线、不扩大脑；不回头开 v2.x / v3.x 质量微调。  
-> **状态：** 硬边界 ✅ 冻结 · 当前主任务 = Capacity / E2E Pressure Test
+> **状态（2026-09-10）：** 硬边界 ✅ 冻结 · HTTP Capacity 已测 · **Bot 入站（含加密）已接线 · 出站回消息 ❌** · 总览见 [`PROJECT_STATUS.md`](./PROJECT_STATUS.md)
 
 ## 主链路（不可改）
 
@@ -78,13 +78,13 @@ Published items / relations / Evidence only。LLM 摘要不得成为第二 truth
 ```
 ① v1 硬边界冻结 ✅
         ↓
-② Capacity / Pressure Test  ← 现在
+② Capacity / Pressure Test ✅（HTTP 已测）
         ↓
-③ 找出 C_safe / C_knee / C_max
+③ C_safe / C_knee / C_max ✅（量过一版）
         ↓
-④ 并发 / 超时 / 队列策略
+④ 并发 / 超时 / 队列策略  ← 部分未做
         ↓
-⑤ Feishu UX + Evidence Card
+⑤ Feishu UX：出站 + 思考卡 → Patch 终答  ← Phase 1（当前）
         ↓
 ⑥ 小规模真实用户 Canary
         ↓

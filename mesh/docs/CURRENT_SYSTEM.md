@@ -1,7 +1,8 @@
 # GeekPark Mesh · 当前系统说明
 
-> 写的是 **2026-09-07 代码里实际在跑的系统**（Relation 两阶段 + `decision_tier` + 已上线可 Preview 不空窗 + `publish_lane` 写入边界 + 段级/关系指纹缓存），不是规划。  
-> 部署操作看 `README.md`；更细的模块索引看 `ARCHITECTURE_HANDOVER.md`（部分段落可能略旧，以本文为准）；知识图谱方案看 `KNOWLEDGE_GRAPH_DESIGN.md`（设计，未全面落地）。
+> 写的是 **代码里实际在跑的系统**（Relation 两阶段 + `decision_tier` + 已上线可 Preview 不空窗 + `publish_lane` 写入边界 + 段级/关系指纹缓存），不是规划。  
+> **阶段总览 / 已做未做（2026-09-10）请先看 → [`PROJECT_STATUS.md`](./PROJECT_STATUS.md)**（给外人/接手人的一页纸）。  
+> 部署操作看 `README.md`；更细的模块索引看 `ARCHITECTURE_HANDOVER.md`（部分段落可能略旧，以本文与 `PROJECT_STATUS.md` 为准）；知识图谱方案看 `KNOWLEDGE_GRAPH_DESIGN.md`（设计，未全面落地）。
 
 ---
 
@@ -12,7 +13,7 @@ Mesh 是极客公园内部用的两件事：
 1. **做一期沟通情报周报**：把各部门的会、沟通记录、选题、RSS 放进某一期，抽成条目，生成五块结构的周报，owner 确认后上线，并可发 EDM。
 2. **在已上线周报上提问**：问「谁接触了谁、各团队在看什么、两边有没有交集」。答案只能来自已 publish 的语料。
 
-它不是通用知识库，也不是 Agent。Ask 不读草稿、不读未上线素材。
+它不是通用知识库。Ask/Agent 不读草稿、不读未上线素材。
 
 ---
 
@@ -27,10 +28,9 @@ Mesh 是极客公园内部用的两件事：
 | viewer / 飞书登录 | `/{slug}`、`/archive`、读者页 Ask     | 读周报、搜索、问答         |
 
 
-飞书目前只有 **OAuth 登录** 和 **群→团队绑定**。没有飞书 Bot 收消息答问。
+飞书：**OAuth 登录** + **群→团队绑定** + **Bot 事件入站已接线**（含 Encrypt 解密）。**自动回飞书消息尚未做**——详见 `PROJECT_STATUS.md` §3.D。
 
-Agent v1：①～⑥ 冻结；⑦ **20/20 已通过**（不再改架构）。  
-全量验收：**🟡 未结案** — Layer1✅ / Layer2～3⬜ / Layer4⛔（`docs/MESH_AGENT_FULL_ACCEPTANCE.md`）。⑧ 飞书暂缓。
+Agent：**质量 v3.0 已冻结**；运行时/飞书体验进行中。总览见 `PROJECT_STATUS.md`。
 
 后台四步：放入素材 → 挖掘 → 审校（要点卡 + 草稿）→ 确认上线。
 

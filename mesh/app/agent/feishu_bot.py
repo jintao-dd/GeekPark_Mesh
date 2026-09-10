@@ -1,6 +1,7 @@
 """⑧ 飞书 Bot 事件接线（只接线，不扩大脑）。
 
-飞书事件 →（可选）解密 → Envelope → handle_message → display_text →（可选）回发。
+飞书事件 →（可选）解密 → 立即回思考卡片 → 后台 Agent → Patch 最终卡片。
+HTTP 回调必须在数秒内返回；重活进后台线程。
 """
 from __future__ import annotations
 
@@ -9,12 +10,19 @@ import hashlib
 import json
 import logging
 import os
+import threading
+import time
 from typing import Any
 
+from . import feishu_api, feishu_cards
 from .harness import envelope_from_payload
 from .runtime import handle_message
 
 log = logging.getLogger("mesh.feishu_bot")
+
+_DEDUP_LOCK = threading.Lock()
+_DEDUP: dict[str, float] = {}
+_DEDUP_TTL_S = 15 * 60
 
 
 def _verification_token() -> str:
@@ -26,10 +34,7 @@ def _encrypt_key() -> str:
 
 
 def decrypt_feishu_encrypt(encrypt_b64: str, encrypt_key: str | None = None) -> str:
-    """解密飞书 Encrypt Key 密文（AES-256-CBC · SHA256(key) · PKCS7）。
-
-    官方约定：密文 = base64(iv[16] + ciphertext)。
-    """
+    """解密飞书 Encrypt Key 密文（AES-256-CBC · SHA256(key) · PKCS7）。"""
     key_s = (encrypt_key if encrypt_key is not None else _encrypt_key()).strip()
     if not key_s:
         raise ValueError("FEISHU_ENCRYPT_KEY missing")
@@ -45,8 +50,6 @@ def decrypt_feishu_encrypt(encrypt_b64: str, encrypt_key: str | None = None) -> 
     key = hashlib.sha256(key_s.encode("utf-8")).digest()
     plain = AES.new(key, AES.MODE_CBC, iv).decrypt(ct)
     pad = plain[-1]
-    if isinstance(pad, str):  # py2 safety; unused on 3
-        pad = ord(pad)
     if pad < 1 or pad > 16:
         raise ValueError("bad pkcs7 padding")
     plain = plain[:-pad]
@@ -54,12 +57,11 @@ def decrypt_feishu_encrypt(encrypt_b64: str, encrypt_key: str | None = None) -> 
 
 
 def unwrap_feishu_body(body: dict[str, Any]) -> dict[str, Any]:
-    """若推送为 Encrypt Key 密文包（通常仅含 encrypt），则解密为业务 JSON。"""
+    """若推送为 Encrypt Key 密文包，则解密为业务 JSON。"""
     body = body or {}
     enc = body.get("encrypt")
     if not enc:
         return body
-    # 明文业务体不应再走 decrypt；飞书加密推送时顶层通常只有 encrypt
     if body.get("event") or body.get("header") or body.get("type") == "url_verification" or "challenge" in body:
         return body
     raw = decrypt_feishu_encrypt(str(enc))
@@ -87,10 +89,14 @@ def parse_im_message(event: dict[str, Any]) -> dict[str, Any] | None:
     msg = (event or {}).get("message") or {}
     sender = (event or {}).get("sender") or {}
     sender_id = sender.get("sender_id") or {}
+    sender_type = str(sender.get("sender_type") or "").strip().lower()
+    if sender_type and sender_type not in ("user",):
+        return None
     open_id = str(sender_id.get("open_id") or "").strip()
     chat_id = str(msg.get("chat_id") or "").strip()
     chat_type = str(msg.get("chat_type") or "").strip().lower()
     msg_type = str(msg.get("message_type") or "").strip().lower()
+    message_id = str(msg.get("message_id") or "").strip()
     if msg_type and msg_type != "text":
         return None
     text = _extract_text(str(msg.get("content") or ""))
@@ -104,14 +110,134 @@ def parse_im_message(event: dict[str, Any]) -> dict[str, Any] | None:
         "chat_id": chat_id,
         "thread_id": str(msg.get("thread_id") or msg.get("root_id") or "").strip(),
         "session_id": str(msg.get("chat_id") or "").strip(),
+        "inbound_message_id": message_id,
     }
 
 
-def handle_feishu_event(con, body: dict[str, Any]) -> dict[str, Any]:
+def _dedup_seen(message_id: str) -> bool:
+    """True = 已处理过，应跳过。"""
+    mid = (message_id or "").strip()
+    if not mid:
+        return False
+    now = time.time()
+    with _DEDUP_LOCK:
+        # GC
+        stale = [k for k, t in _DEDUP.items() if now - t > _DEDUP_TTL_S]
+        for k in stale:
+            _DEDUP.pop(k, None)
+        if mid in _DEDUP:
+            return True
+        _DEDUP[mid] = now
+        return False
+
+
+def _receive_target(payload: dict[str, Any]) -> tuple[str, str]:
+    """返回 (receive_id, receive_id_type)。优先 chat_id。"""
+    chat_id = str(payload.get("chat_id") or "").strip()
+    open_id = str(payload.get("feishu_open_id") or "").strip()
+    if chat_id:
+        return chat_id, "chat_id"
+    if open_id:
+        return open_id, "open_id"
+    raise ValueError("no chat_id/open_id to reply")
+
+
+def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
+    """后台任务：发思考卡 → Agent → Patch 最终卡。"""
+    from .. import db
+
+    query = str(payload.get("text") or "")
+    card_message_id = ""
+    try:
+        if feishu_api.bot_reply_enabled():
+            receive_id, rid_type = _receive_target(payload)
+            sent = feishu_api.send_message(
+                receive_id=receive_id,
+                receive_id_type=rid_type,
+                msg_type="interactive",
+                content=feishu_cards.thinking_card(query=query),
+            )
+            card_message_id = str(sent.get("message_id") or "")
+            log.info(
+                "feishu thinking card sent message_id=%s chat=%s",
+                card_message_id,
+                payload.get("chat_id"),
+            )
+        else:
+            log.warning("feishu bot reply disabled; skip outbound")
+
+        con = db.connect()
+        try:
+            env = envelope_from_payload(payload)
+            answer = handle_message(con, env)
+            d = answer.to_dict()
+            reply = str(d.get("display_text") or d.get("text") or "").strip()
+        finally:
+            con.close()
+
+        log.info(
+            "feishu_bot reply open_id=%s intent=%s chars=%s",
+            payload.get("feishu_open_id"),
+            d.get("intent"),
+            len(reply),
+        )
+
+        if feishu_api.bot_reply_enabled():
+            final = feishu_cards.answer_card(display_text=reply, query=query)
+            if card_message_id:
+                feishu_api.patch_message(message_id=card_message_id, content=final)
+            else:
+                receive_id, rid_type = _receive_target(payload)
+                sent2 = feishu_api.send_message(
+                    receive_id=receive_id,
+                    receive_id_type=rid_type,
+                    msg_type="interactive",
+                    content=final,
+                )
+                card_message_id = str(sent2.get("message_id") or "")
+
+        return {
+            "ok": True,
+            "reply_text": reply,
+            "card_message_id": card_message_id,
+            "answer": d,
+        }
+    except Exception as e:
+        log.exception("feishu message job failed: %s", e)
+        if feishu_api.bot_reply_enabled():
+            try:
+                err_card = feishu_cards.error_card(message=str(e)[:300], query=query)
+                if card_message_id:
+                    feishu_api.patch_message(message_id=card_message_id, content=err_card)
+                else:
+                    receive_id, rid_type = _receive_target(payload)
+                    feishu_api.send_message(
+                        receive_id=receive_id,
+                        receive_id_type=rid_type,
+                        msg_type="interactive",
+                        content=err_card,
+                    )
+            except Exception as e2:
+                log.warning("feishu error card failed: %s", e2)
+        return {"ok": False, "error": str(e)[:300], "card_message_id": card_message_id}
+
+
+def _spawn_message_job(payload: dict[str, Any]) -> None:
+    t = threading.Thread(
+        target=process_feishu_message_job,
+        args=(payload,),
+        name="feishu-bot-msg",
+        daemon=True,
+    )
+    t.start()
+
+
+def handle_feishu_event(con, body: dict[str, Any], *, sync: bool = False) -> dict[str, Any]:
     """处理飞书事件回调。
 
-    - url_verification → 回 challenge（支持 Encrypt Key 密文包）
-    - im.message.receive_v1 → handle_message；回发由调用方决定（本函数返回 reply_text）
+    - url_verification → 回 challenge
+    - im.message → 默认异步（立刻 accepted）；sync=True 时同步跑完（单测/联调）
+    - con 在异步路径可忽略（后台自开连接）
     """
     body = body or {}
     try:
@@ -120,7 +246,6 @@ def handle_feishu_event(con, body: dict[str, Any]) -> dict[str, Any]:
         log.warning("feishu decrypt failed: %s", e)
         return {"ok": False, "error": "decrypt_failed", "detail": str(e)[:200]}
 
-    # 明文 / 解密后的 challenge（URL 校验）
     if body.get("type") == "url_verification" or (
         "challenge" in body and not body.get("event") and not body.get("header")
     ):
@@ -129,7 +254,6 @@ def handle_feishu_event(con, body: dict[str, Any]) -> dict[str, Any]:
             return {"ok": False, "error": "bad_verification_token"}
         return {"challenge": body.get("challenge")}
 
-    # 可选：校验 event token（header 或 body.token）
     token = _verification_token()
     body_token = body.get("token") or (body.get("header") or {}).get("token")
     if token and body_token and body_token != token:
@@ -145,21 +269,29 @@ def handle_feishu_event(con, body: dict[str, Any]) -> dict[str, Any]:
         payload = parse_im_message(event)
         if not payload:
             return {"ok": True, "skipped": True, "reason": "unsupported_or_empty"}
-        env = envelope_from_payload(payload)
-        answer = handle_message(con, env)
-        d = answer.to_dict()
-        reply = str(d.get("display_text") or d.get("text") or "").strip()
-        log.info(
-            "feishu_bot reply open_id=%s intent=%s chars=%s",
-            payload.get("feishu_open_id"),
-            d.get("intent"),
-            len(reply),
-        )
+        inbound_id = str(payload.get("inbound_message_id") or "")
+        if _dedup_seen(inbound_id):
+            log.info("feishu dedup skip message_id=%s", inbound_id)
+            return {"ok": True, "skipped": True, "reason": "duplicate_event", "inbound_message_id": inbound_id}
+
+        if sync:
+            # 单测 / 调试：同步执行（仍尽量出站）
+            out = process_feishu_message_job(payload)
+            out["envelope"] = {
+                "channel": payload.get("channel"),
+                "feishu_open_id": payload.get("feishu_open_id"),
+                "chat_id": payload.get("chat_id"),
+            }
+            out["accepted"] = True
+            out["mode"] = "sync"
+            return out
+
+        _spawn_message_job(payload)
         return {
             "ok": True,
-            "skipped": False,
-            "reply_text": reply,
-            "answer": d,
+            "accepted": True,
+            "mode": "async",
+            "inbound_message_id": inbound_id,
             "envelope": {
                 "channel": payload.get("channel"),
                 "feishu_open_id": payload.get("feishu_open_id"),

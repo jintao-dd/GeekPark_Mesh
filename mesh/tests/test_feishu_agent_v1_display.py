@@ -127,3 +127,62 @@ def test_encrypted_url_verification(monkeypatch):
     enc = base64.b64encode(iv + ct).decode("ascii")
     out = feishu_bot.handle_feishu_event(None, {"encrypt": enc})
     assert out.get("challenge") == "chal-9"
+
+
+def test_thinking_and_answer_cards():
+    from app.agent import feishu_cards
+
+    t = feishu_cards.thinking_card(query="本期关注谁？")
+    assert t["config"]["update_multi"] is True
+    assert "思考中" in t["header"]["title"]["content"]
+    a = feishu_cards.answer_card(display_text="答案\n期次：2026-9-8", query="q")
+    assert a["config"]["update_multi"] is True
+    assert "答案" in a["elements"][0]["text"]["content"]
+
+
+def test_async_accept_spawns_and_dedups(monkeypatch):
+    from app.agent import feishu_bot
+
+    calls = []
+
+    def fake_spawn(payload):
+        calls.append(payload)
+
+    monkeypatch.setattr(feishu_bot, "_spawn_message_job", fake_spawn)
+    feishu_bot._DEDUP.clear()
+    body = {
+        "header": {"event_type": "im.message.receive_v1"},
+        "event": {
+            "sender": {"sender_type": "user", "sender_id": {"open_id": "ou_1"}},
+            "message": {
+                "message_id": "om_test_1",
+                "chat_id": "oc_1",
+                "chat_type": "p2p",
+                "message_type": "text",
+                "content": '{"text":"hello"}',
+            },
+        },
+    }
+    out1 = feishu_bot.handle_feishu_event(None, body)
+    assert out1.get("accepted") is True
+    assert out1.get("mode") == "async"
+    assert len(calls) == 1
+    out2 = feishu_bot.handle_feishu_event(None, body)
+    assert out2.get("skipped") is True
+    assert out2.get("reason") == "duplicate_event"
+    assert len(calls) == 1
+
+
+def test_skip_non_user_sender():
+    p = parse_im_message(
+        {
+            "sender": {"sender_type": "app", "sender_id": {"open_id": "ou_bot"}},
+            "message": {
+                "chat_id": "oc_1",
+                "chat_type": "p2p",
+                "message_type": "text",
+                "content": '{"text":"x"}',
+            },
+        }
+    )
+    assert p is None
