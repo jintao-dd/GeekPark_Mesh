@@ -1,7 +1,7 @@
-"""Tool Contract — Colleague Brain 看到的统一工具表面。
+"""Tool Contract — Colleague Brain 统一工具表面（10 项 Hands 能力）。
 
-Brain 不直接依赖 MCP/CLI 细节；只消费 Contract + 规范化结果。
-飞书 live 与 Published 事实必须分 tier，禁止混级。
+Brain 不直接依赖 MCP/CLI；只消费 Contract + 规范化结果。
+飞书 live 与 Published 禁止混级；写工具必须 confirmation_required。
 """
 from __future__ import annotations
 
@@ -27,7 +27,6 @@ class SideEffect(str, Enum):
     WRITE = "write"
 
 
-# source_tier → 允许的 truth_level（死契约）
 _TIER_TRUTH: dict[SourceTier, TruthLevel] = {
     SourceTier.PUBLISHED: TruthLevel.ENTERPRISE_FACT,
     SourceTier.FEISHU_LIVE: TruthLevel.LIVE_CONTEXT,
@@ -80,9 +79,6 @@ class ToolContract:
         assert_tier_truth_pair(self.source_tier, self.truth_level)
         if self.side_effect == SideEffect.WRITE and not self.confirmation_required:
             raise ValueError(f"写工具必须 confirmation_required=True: {self.name}")
-        if self.side_effect == SideEffect.NONE and self.confirmation_required:
-            # 读工具不应要求确认（准备写入另议）
-            pass
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -94,8 +90,6 @@ class ToolContract:
 
 @dataclass
 class ToolResultEnvelope:
-    """工具回传给 Brain 的规范化包（非用户可见）。"""
-
     ok: bool
     tool: str
     source_tier: SourceTier
@@ -103,6 +97,7 @@ class ToolResultEnvelope:
     items: list[dict[str, Any]] = field(default_factory=list)
     error: str = ""
     empty: bool = False
+    meta: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         assert_tier_truth_pair(self.source_tier, self.truth_level)
@@ -118,11 +113,11 @@ class ToolResultEnvelope:
             "items": list(self.items or []),
             "error": self.error,
             "empty": self.empty,
+            "meta": dict(self.meta or {}),
         }
 
 
 def speech_hint(tier: SourceTier | str) -> str:
-    """合成话术提示（给 Brain，不是给用户看协议）。"""
     t = _as_tier(tier)
     return {
         SourceTier.PUBLISHED: "周报里记录的是",
@@ -131,13 +126,21 @@ def speech_hint(tier: SourceTier | str) -> str:
     }[t]
 
 
-# —— 首批登记（Phase 2 只开放 doc）——
+_LIVE_OUT = {
+    "type": "object",
+    "properties": {
+        "title": {"type": "string"},
+        "snippet": {"type": "string"},
+        "url": {"type": "string"},
+        "permission_ok": {"type": "boolean"},
+    },
+}
 
 FEISHU_SEARCH = ToolContract(
     name="feishu.search",
     description=(
-        "在飞书中搜索。resource_type 首期仅开放 doc；"
-        "返回 live_context，不得当作 published 企业事实。"
+        "统一飞书搜索。resource_type: doc|message|group|wiki|folder|calendar。"
+        "返回 live_context，不得当作 published。"
     ),
     input_schema={
         "type": "object",
@@ -145,28 +148,150 @@ FEISHU_SEARCH = ToolContract(
             "query": {"type": "string"},
             "resource_type": {
                 "type": "string",
-                "enum": ["doc", "message", "group"],
-                "description": "Phase2-3 运行时仅允许 doc",
+                "enum": ["doc", "message", "group", "wiki", "folder", "calendar"],
             },
         },
         "required": ["query", "resource_type"],
     },
-    permission_scope="doc.read",
+    permission_scope="feishu.search",
     timeout_sec=8.0,
     max_results=8,
     source_tier=SourceTier.FEISHU_LIVE,
     truth_level=TruthLevel.LIVE_CONTEXT,
-    output_schema={
+    output_schema=_LIVE_OUT,
+    side_effect=SideEffect.NONE,
+)
+
+FEISHU_DOC_GET = ToolContract(
+    name="feishu.doc.get",
+    description="读取一篇飞书文档要点（标题/摘要/链接），只读。",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "doc_token": {"type": "string"},
+            "url": {"type": "string"},
+            "query": {"type": "string"},
+        },
+    },
+    permission_scope="doc.read",
+    timeout_sec=10.0,
+    max_results=1,
+    source_tier=SourceTier.FEISHU_LIVE,
+    truth_level=TruthLevel.LIVE_CONTEXT,
+    output_schema=_LIVE_OUT,
+    side_effect=SideEffect.NONE,
+)
+
+FEISHU_CALENDAR_LIST = ToolContract(
+    name="feishu.calendar.list",
+    description="列出近期日历日程（live_context）。",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "query": {"type": "string"},
+            "days": {"type": "integer"},
+        },
+    },
+    permission_scope="calendar.read",
+    timeout_sec=8.0,
+    max_results=12,
+    source_tier=SourceTier.FEISHU_LIVE,
+    truth_level=TruthLevel.LIVE_CONTEXT,
+    output_schema=_LIVE_OUT,
+    side_effect=SideEffect.NONE,
+)
+
+FEISHU_DISCUSS_SUMMARY = ToolContract(
+    name="feishu.discuss.summary",
+    description=(
+        "某人/某群最近讨论摘要：底层走 message 检索 + 规范化条目；"
+        "Brain 成文，不另造事实。"
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "query": {"type": "string"},
+            "person": {"type": "string"},
+            "chat_id": {"type": "string"},
+        },
+        "required": ["query"],
+    },
+    permission_scope="im.read",
+    timeout_sec=10.0,
+    max_results=10,
+    source_tier=SourceTier.FEISHU_LIVE,
+    truth_level=TruthLevel.LIVE_CONTEXT,
+    output_schema=_LIVE_OUT,
+    side_effect=SideEffect.NONE,
+)
+
+FEISHU_DOC_CREATE = ToolContract(
+    name="feishu.doc.create",
+    description="创建飞书文档。须用户确认；受 MESH_FEISHU_HANDS_WRITE 约束。",
+    input_schema={
         "type": "object",
         "properties": {
             "title": {"type": "string"},
-            "snippet": {"type": "string"},
-            "url": {"type": "string"},
-            "permission_ok": {"type": "boolean"},
+            "content": {"type": "string"},
+            "confirmed": {"type": "boolean"},
         },
+        "required": ["title", "content", "confirmed"],
     },
-    side_effect=SideEffect.NONE,
-    confirmation_required=False,
+    permission_scope="doc.write",
+    timeout_sec=15.0,
+    max_results=1,
+    source_tier=SourceTier.FEISHU_LIVE,
+    truth_level=TruthLevel.LIVE_CONTEXT,
+    output_schema=_LIVE_OUT,
+    side_effect=SideEffect.WRITE,
+    confirmation_required=True,
+)
+
+FEISHU_IM_SEND = ToolContract(
+    name="feishu.im.send",
+    description="向指定人/群发送消息。须确认目标 + 正文；受 WRITE 开关约束。",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "receive_id": {"type": "string"},
+            "receive_id_type": {"type": "string"},
+            "text": {"type": "string"},
+            "confirmed": {"type": "boolean"},
+        },
+        "required": ["receive_id", "text", "confirmed"],
+    },
+    permission_scope="im.write",
+    timeout_sec=10.0,
+    max_results=1,
+    source_tier=SourceTier.FEISHU_LIVE,
+    truth_level=TruthLevel.LIVE_CONTEXT,
+    output_schema=_LIVE_OUT,
+    side_effect=SideEffect.WRITE,
+    confirmation_required=True,
+)
+
+FEISHU_CALENDAR_CREATE = ToolContract(
+    name="feishu.calendar.create",
+    description="创建日程。须确认时间与标题；受 WRITE 开关约束。",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "start": {"type": "string"},
+            "end": {"type": "string"},
+            "description": {"type": "string"},
+            "confirmed": {"type": "boolean"},
+        },
+        "required": ["title", "start", "end", "confirmed"],
+    },
+    permission_scope="calendar.write",
+    timeout_sec=12.0,
+    max_results=1,
+    source_tier=SourceTier.FEISHU_LIVE,
+    truth_level=TruthLevel.LIVE_CONTEXT,
+    output_schema=_LIVE_OUT,
+    side_effect=SideEffect.WRITE,
+    confirmation_required=True,
 )
 
 ASK_PUBLISHED = ToolContract(
@@ -184,20 +309,52 @@ ASK_PUBLISHED = ToolContract(
     truth_level=TruthLevel.ENTERPRISE_FACT,
     output_schema={"type": "object"},
     side_effect=SideEffect.NONE,
-    confirmation_required=False,
 )
 
+# 生成成文 = Brain speak，无独立 Tool（#7）
+SPEAK_GENERATE_NOTE = "colleague.speak — 整理成文/写稿，不写飞书；无需 Hands。"
+
+FEISHU_SEARCH_ALLOWED_TYPES = frozenset(
+    {"doc", "message", "group", "wiki", "folder", "calendar"}
+)
+# 兼容旧名
 FEISHU_SEARCH_ALLOWED_TYPES_PHASE2 = frozenset({"doc"})
 
+FEISHU_READ_TOOLS = frozenset(
+    {
+        FEISHU_SEARCH.name,
+        FEISHU_DOC_GET.name,
+        FEISHU_CALENDAR_LIST.name,
+        FEISHU_DISCUSS_SUMMARY.name,
+    }
+)
+FEISHU_WRITE_TOOLS = frozenset(
+    {
+        FEISHU_DOC_CREATE.name,
+        FEISHU_IM_SEND.name,
+        FEISHU_CALENDAR_CREATE.name,
+    }
+)
+FEISHU_ALL_TOOLS = FEISHU_READ_TOOLS | FEISHU_WRITE_TOOLS
 
-def feishu_search_type_allowed(resource_type: str, *, phase: str = "2") -> bool:
+
+def feishu_search_type_allowed(resource_type: str, *, phase: str = "full") -> bool:
     rt = (resource_type or "").strip().lower()
-    if phase in ("2", "3"):
+    if phase in ("2",):
         return rt in FEISHU_SEARCH_ALLOWED_TYPES_PHASE2
-    return rt in ("doc", "message", "group")
+    return rt in FEISHU_SEARCH_ALLOWED_TYPES
 
 
 REGISTRY: dict[str, ToolContract] = {
-    FEISHU_SEARCH.name: FEISHU_SEARCH,
-    ASK_PUBLISHED.name: ASK_PUBLISHED,
+    c.name: c
+    for c in (
+        FEISHU_SEARCH,
+        FEISHU_DOC_GET,
+        FEISHU_CALENDAR_LIST,
+        FEISHU_DISCUSS_SUMMARY,
+        FEISHU_DOC_CREATE,
+        FEISHU_IM_SEND,
+        FEISHU_CALENDAR_CREATE,
+        ASK_PUBLISHED,
+    )
 }

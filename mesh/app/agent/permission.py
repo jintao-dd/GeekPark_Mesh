@@ -25,13 +25,20 @@ _FORBIDDEN_MY_TEAM = "ask.published.my_team"
 
 
 def _bound_tools() -> list[str]:
-    """Hands 开才把 feishu.search 放进 ACL；关则 Brain 选了也会被 tool_allowed 挡住。"""
+    """Hands 开才把飞书工具放进 ACL。"""
     tools = list(_BOUND_TOOLS)
     try:
-        from .feishu_hands import hands_enabled
+        from .feishu_hands import hands_enabled, write_enabled
+        from .tool_contract import FEISHU_READ_TOOLS, FEISHU_WRITE_TOOLS
 
-        if hands_enabled() and "feishu.search" not in tools:
-            tools.append("feishu.search")
+        if hands_enabled():
+            for t in sorted(FEISHU_READ_TOOLS):
+                if t not in tools:
+                    tools.append(t)
+            if write_enabled():
+                for t in sorted(FEISHU_WRITE_TOOLS):
+                    if t not in tools:
+                        tools.append(t)
     except Exception:
         pass
     return tools

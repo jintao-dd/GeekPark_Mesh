@@ -26,7 +26,7 @@ Mesh 今天是两件事：
 | **Colleague Agent v3 Wave 1** | → **主路径** | Safety → 一张嘴 Colleague；Ask 当工具 |
 | **Feishu Hands** | 📋 计划已定 | MCP 为主 / CLI 为辅；见 `COLLEAGUE_FEISHU_HANDS.md` |
 | 全谱 Canary | ✅ CONDITIONAL GO | Follow-up/模糊 PASS；A 残留先不抠 |
-| **当前主战场** | → **Phase 2 Hands（默认关）→ 一起盲测** | `MESH_FEISHU_HANDS=0`；开闸需 MCP URL |
+| **当前主战场** | → **Hands 10 项已接入（默认关）** | 开闸：`MESH_FEISHU_HANDS`(+WRITE)；可 `BACKEND=mock` 联调 |
 
 ```
 Colleague Agent v3

@@ -19,6 +19,12 @@ DATA_TOOLS = frozenset({
     "ask.relations_summary",
     "context.list_issues",
     "feishu.search",
+    "feishu.doc.get",
+    "feishu.calendar.list",
+    "feishu.discuss.summary",
+    "feishu.doc.create",
+    "feishu.im.send",
+    "feishu.calendar.create",
 })
 ALL_TOOLS = frozenset({
     "system.help",
@@ -26,6 +32,12 @@ ALL_TOOLS = frozenset({
     "ask.published",
     "ask.relations_summary",
     "feishu.search",
+    "feishu.doc.get",
+    "feishu.calendar.list",
+    "feishu.discuss.summary",
+    "feishu.doc.create",
+    "feishu.im.send",
+    "feishu.calendar.create",
 })
 
 INTENTS = frozenset({
@@ -37,6 +49,10 @@ INTENTS = frozenset({
     "ask_relations",
     "ask_published",
     "feishu_search",
+    "feishu_doc_get",
+    "feishu_calendar_list",
+    "feishu_discuss",
+    "feishu_write",
     "refuse",
 })
 

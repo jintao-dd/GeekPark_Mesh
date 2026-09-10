@@ -1,4 +1,4 @@
-"""feishu.search — Phase 2 仅 resource_type=doc。"""
+"""feishu.search — 统一 resource_type。"""
 from __future__ import annotations
 
 from typing import Any
@@ -18,7 +18,7 @@ def search(
     resource_type: str = "doc",
     identity: Any = None,
     user_access_token: str = "",
-    phase: str = "2",
+    phase: str = "full",
 ) -> ToolResultEnvelope:
     if not flags.hands_enabled():
         return envelope_fail("hands_disabled")
@@ -35,9 +35,9 @@ def search(
     if identity is not None:
         open_id = str(getattr(identity, "feishu_open_id", None) or "").strip()
 
-    # 禁止用租户身份默默抬权：openapi 路径必须带 user token；mcp 侧车自行鉴权
     return backends.run_search(
         q,
+        resource_type=rt,
         max_results=FEISHU_SEARCH.max_results,
         timeout_sec=FEISHU_SEARCH.timeout_sec,
         user_access_token=(user_access_token or "").strip(),

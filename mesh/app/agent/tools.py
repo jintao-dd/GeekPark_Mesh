@@ -219,56 +219,27 @@ def tool_ask_relations(
     return adapter(con, identity, permission, context, args)
 
 
-def tool_feishu_search(
-    con,
-    identity: IdentityResult,
-    permission: PermissionDecision,
-    context: AgentContext,
-    args: dict[str, Any] | None = None,
-) -> ToolResult:
-    """feishu.search — live_context；不进 Published 事实池。"""
-    args = args or {}
-    blocked = _guard_common("feishu.search", identity, permission, context, args=args)
-    if blocked:
-        return blocked
-
-    from . import feishu_hands
+def _feishu_tool_result(tool_id: str, env, *, empty_msg: str) -> ToolResult:
     from .tool_contract import SourceTier, TruthLevel, speech_hint
 
-    if not feishu_hands.hands_enabled():
-        return _deny("feishu.search", "hands_disabled")
-
-    query = str(args.get("q") or args.get("query") or "").strip()
-    resource_type = str(args.get("resource_type") or "doc").strip() or "doc"
-    user_token = str(args.get("user_access_token") or "").strip()
-
-    env = feishu_hands.feishu_search(
-        query,
-        resource_type=resource_type,
-        identity=identity,
-        user_access_token=user_token,
-        phase="2",
-    )
     payload = {
         "source_tier": SourceTier.FEISHU_LIVE.value,
         "truth_level": TruthLevel.LIVE_CONTEXT.value,
         "speech_hint": speech_hint(SourceTier.FEISHU_LIVE),
-        "resource_type": resource_type,
         "items": list(env.items or []),
         "empty": bool(env.empty),
         "n_hits": len(env.items or []),
+        "meta": dict(getattr(env, "meta", None) or {}),
     }
     if not env.ok:
-        # 失败：不编造；Brain 合成时用诚实空话
         payload["error"] = env.error
         return ToolResult(
             ok=False,
-            tool_id="feishu.search",
+            tool_id=tool_id,
             payload=payload,
-            error=env.error or "feishu_search_failed",
-            denied=False,
+            error=env.error or f"{tool_id}_failed",
+            denied=env.error in ("hands_disabled", "write_disabled", "acl_denied"),
         )
-    # 空结果也 ok：让合成层说「没查到」
     lines = []
     refs = []
     for it in env.items or []:
@@ -277,23 +248,176 @@ def tool_feishu_search(
         snip = str(it.get("snippet") or "").strip()
         bit = title
         if snip:
-            bit += f" — {snip[:120]}"
+            bit += f" — {snip[:160]}"
         if url:
             bit += f" ({url})"
-            refs.append(f"feishu_doc:{url}")
+            refs.append(f"feishu:{url}")
         lines.append(f"- {bit}")
     if lines:
         hint = speech_hint(SourceTier.FEISHU_LIVE)
         answer = f"【{hint}】\n" + "\n".join(lines)
     else:
-        answer = "飞书文档这边这轮没查到相关结果。"
+        answer = empty_msg
     payload["answer"] = answer
     return ToolResult(
         ok=True,
-        tool_id="feishu.search",
+        tool_id=tool_id,
         payload=payload,
         evidence_refs=refs[:12],
-        claim_bindings=[],  # live 不进 enterprise claim
+        claim_bindings=[],
+    )
+
+
+def tool_feishu_search(
+    con,
+    identity: IdentityResult,
+    permission: PermissionDecision,
+    context: AgentContext,
+    args: dict[str, Any] | None = None,
+) -> ToolResult:
+    args = args or {}
+    blocked = _guard_common("feishu.search", identity, permission, context, args=args)
+    if blocked:
+        return blocked
+    from . import feishu_hands
+
+    if not feishu_hands.hands_enabled():
+        return _deny("feishu.search", "hands_disabled")
+    query = str(args.get("q") or args.get("query") or "").strip()
+    resource_type = str(args.get("resource_type") or "doc").strip() or "doc"
+    env = feishu_hands.feishu_search(
+        query,
+        resource_type=resource_type,
+        identity=identity,
+        user_access_token=str(args.get("user_access_token") or ""),
+        phase="full",
+    )
+    tr = _feishu_tool_result(
+        "feishu.search",
+        env,
+        empty_msg=f"飞书 {resource_type} 这边这轮没查到相关结果。",
+    )
+    tr.payload["resource_type"] = resource_type
+    return tr
+
+
+def tool_feishu_doc_get(con, identity, permission, context, args=None):
+    args = args or {}
+    blocked = _guard_common("feishu.doc.get", identity, permission, context, args=args)
+    if blocked:
+        return blocked
+    from . import feishu_hands
+
+    env = feishu_hands.doc_get(
+        doc_token=str(args.get("doc_token") or ""),
+        url=str(args.get("url") or ""),
+        query=str(args.get("q") or args.get("query") or ""),
+        identity=identity,
+        user_access_token=str(args.get("user_access_token") or ""),
+    )
+    return _feishu_tool_result("feishu.doc.get", env, empty_msg="这篇飞书文档这轮没读到要点。")
+
+
+def tool_feishu_calendar_list(con, identity, permission, context, args=None):
+    args = args or {}
+    blocked = _guard_common(
+        "feishu.calendar.list", identity, permission, context, args=args
+    )
+    if blocked:
+        return blocked
+    from . import feishu_hands
+
+    env = feishu_hands.calendar_list(
+        query=str(args.get("q") or args.get("query") or ""),
+        days=int(args.get("days") or 7),
+        identity=identity,
+        user_access_token=str(args.get("user_access_token") or ""),
+    )
+    return _feishu_tool_result(
+        "feishu.calendar.list", env, empty_msg="近期日程这边没查到。"
+    )
+
+
+def tool_feishu_discuss_summary(con, identity, permission, context, args=None):
+    args = args or {}
+    blocked = _guard_common(
+        "feishu.discuss.summary", identity, permission, context, args=args
+    )
+    if blocked:
+        return blocked
+    from . import feishu_hands
+
+    env = feishu_hands.discuss_summary(
+        query=str(args.get("q") or args.get("query") or ""),
+        person=str(args.get("person") or ""),
+        chat_id=str(args.get("chat_id") or ""),
+        identity=identity,
+        user_access_token=str(args.get("user_access_token") or ""),
+    )
+    return _feishu_tool_result(
+        "feishu.discuss.summary",
+        env,
+        empty_msg="飞书讨论这边没查到可摘要的内容。",
+    )
+
+
+def tool_feishu_doc_create(con, identity, permission, context, args=None):
+    args = args or {}
+    blocked = _guard_common("feishu.doc.create", identity, permission, context, args=args)
+    if blocked:
+        return blocked
+    from . import feishu_hands
+
+    env = feishu_hands.doc_create(
+        title=str(args.get("title") or "").strip() or "未命名文档",
+        content=str(args.get("content") or args.get("q") or ""),
+        confirmed=bool(args.get("confirmed")),
+        identity=identity,
+        user_access_token=str(args.get("user_access_token") or ""),
+    )
+    return _feishu_tool_result(
+        "feishu.doc.create", env, empty_msg="文档没有创建成功。"
+    )
+
+
+def tool_feishu_im_send(con, identity, permission, context, args=None):
+    args = args or {}
+    blocked = _guard_common("feishu.im.send", identity, permission, context, args=args)
+    if blocked:
+        return blocked
+    from . import feishu_hands
+
+    env = feishu_hands.im_send(
+        receive_id=str(args.get("receive_id") or "").strip(),
+        text=str(args.get("text") or args.get("q") or ""),
+        receive_id_type=str(args.get("receive_id_type") or "chat_id"),
+        confirmed=bool(args.get("confirmed")),
+        identity=identity,
+        user_access_token=str(args.get("user_access_token") or ""),
+    )
+    return _feishu_tool_result("feishu.im.send", env, empty_msg="消息没有发出去。")
+
+
+def tool_feishu_calendar_create(con, identity, permission, context, args=None):
+    args = args or {}
+    blocked = _guard_common(
+        "feishu.calendar.create", identity, permission, context, args=args
+    )
+    if blocked:
+        return blocked
+    from . import feishu_hands
+
+    env = feishu_hands.calendar_create(
+        title=str(args.get("title") or "").strip() or "未命名日程",
+        start=str(args.get("start") or ""),
+        end=str(args.get("end") or ""),
+        description=str(args.get("description") or ""),
+        confirmed=bool(args.get("confirmed")),
+        identity=identity,
+        user_access_token=str(args.get("user_access_token") or ""),
+    )
+    return _feishu_tool_result(
+        "feishu.calendar.create", env, empty_msg="日程没有创建成功。"
     )
 
 
@@ -303,6 +427,12 @@ _REGISTRY: dict[str, Callable[..., ToolResult]] = {
     "ask.published": tool_ask_published,
     "ask.relations_summary": tool_ask_relations,
     "feishu.search": tool_feishu_search,
+    "feishu.doc.get": tool_feishu_doc_get,
+    "feishu.calendar.list": tool_feishu_calendar_list,
+    "feishu.discuss.summary": tool_feishu_discuss_summary,
+    "feishu.doc.create": tool_feishu_doc_create,
+    "feishu.im.send": tool_feishu_im_send,
+    "feishu.calendar.create": tool_feishu_calendar_create,
 }
 
 

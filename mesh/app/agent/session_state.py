@@ -60,6 +60,8 @@ class SessionContextState:
     colleague_emotional_tone: str = "neutral"
     colleague_feedback: str = ""
     colleague_goal: str = ""
+    # Feishu Hands：待确认写操作（非企业事实）
+    pending_write: dict[str, Any] | None = None
     updated_at: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:

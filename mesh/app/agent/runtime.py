@@ -565,6 +565,13 @@ def _handle_colleague_v3(
             route_name = "relations"
         elif result.intent == "feishu_search":
             route_name = "feishu"
+        elif result.intent in (
+            "feishu_doc_get",
+            "feishu_calendar_list",
+            "feishu_discuss",
+            "feishu_write",
+        ):
+            route_name = "feishu"
         else:
             route_name = "list"
         route = conv.RouteDecision(
@@ -695,6 +702,16 @@ def _render(
                 answer = "飞书文档这边这轮没查到相关结果。"
             else:
                 answer = "飞书文档这边这轮没查到相关结果。"
+        return answer, visible_bindings, list(result.evidence_refs or [])
+    if intent in (
+        "feishu_doc_get",
+        "feishu_calendar_list",
+        "feishu_discuss",
+        "feishu_write",
+    ):
+        answer = str(payload.get("answer") or "").strip()
+        if not answer:
+            answer = "飞书这边这轮没查到相关结果。" if intent != "feishu_write" else "写入未完成。"
         return answer, visible_bindings, list(result.evidence_refs or [])
     answer = str(payload.get("answer") or "").strip()
     if not answer:
