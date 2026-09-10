@@ -31,6 +31,22 @@ def test_debug_user_default():
     assert auth.is_debug_user("张三", "fs_abc") is False
 
 
+def test_password_login_enabled_respects_flag_and_prod(monkeypatch):
+    monkeypatch.delenv("MESH_ALLOW_PASSWORD_LOGIN", raising=False)
+    monkeypatch.setenv("MESH_ENV", "staging")
+    assert auth.password_login_enabled() is False
+
+    monkeypatch.setenv("MESH_ALLOW_PASSWORD_LOGIN", "1")
+    monkeypatch.setenv("MESH_ENV", "staging")
+    assert auth.password_login_enabled() is True
+
+    monkeypatch.setenv("MESH_ENV", "production")
+    assert auth.password_login_enabled() is False
+
+    monkeypatch.setenv("MESH_ENV", "prod")
+    assert auth.password_login_enabled() is False
+
+
 def test_debug_perms_with_role_override():
     u = {"u": "u1", "r": "admin", "real_r": "viewer", "d": "杜锦涛", "debug_r": "admin"}
     p = auth.perms(u)

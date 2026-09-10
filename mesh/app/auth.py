@@ -199,6 +199,17 @@ def local_login(username: str, password: str):
 def feishu_enabled() -> bool:
     return bool(os.environ.get("FEISHU_APP_ID") and os.environ.get("FEISHU_APP_SECRET"))
 
+
+def password_login_enabled() -> bool:
+    """账号密码登录：仅当显式打开，且非生产环境。"""
+    flag = (os.environ.get("MESH_ALLOW_PASSWORD_LOGIN") or "").strip().lower()
+    if flag not in ("1", "true", "yes"):
+        return False
+    env = (os.environ.get("MESH_ENV") or "").strip().lower()
+    if env in ("prod", "production"):
+        return False
+    return True
+
 class FeishuLoginError(RuntimeError):
     def __init__(self, user_message: str, detail: str = ""):
         super().__init__(detail or user_message)

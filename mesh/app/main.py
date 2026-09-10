@@ -488,6 +488,7 @@ def ctx(request: Request, **kw):
         "user": u,
         "perms": auth.perms(u),
         "feishu_enabled": auth.feishu_enabled(),
+        "password_login_enabled": auth.password_login_enabled(),
         "base_url": BASE_URL,
         "flag_colors": FLAG_COLORS,
         "team_order": TEAM_ORDER,
@@ -666,14 +667,18 @@ async def login_debug_preset(request: Request):
 
 @app.post("/login")
 def login_post(request: Request, username: str = Form(...), password: str = Form(...), next: str = Form("/")):
-    """密码登录已关闭；保留接口供紧急运维（需 MESH_ALLOW_PASSWORD_LOGIN=1）。"""
-    if os.environ.get("MESH_ALLOW_PASSWORD_LOGIN", "").strip() not in ("1", "true", "yes"):
-        raise HTTPException(403, "请使用飞书登录")
+    """密码登录：需 MESH_ALLOW_PASSWORD_LOGIN=1，且非生产（见 auth.password_login_enabled）。"""
     target = auth.normalize_next(next)
+    if not auth.password_login_enabled():
+        raise HTTPException(403, "请使用飞书登录")
     if auth.current_user(request):
         return RedirectResponse(target, status_code=302)
     u = auth.local_login(username, password)
-    if not u: return templates.TemplateResponse("login.html", ctx(request, next=target, error="账号或密码不对"))
+    if not u:
+        return templates.TemplateResponse(
+            "login.html",
+            ctx(request, next=target, error="账号或密码不对", debug_panel=False, debug_preset=""),
+        )
     resp = RedirectResponse(target, status_code=302)
     resp.set_cookie(auth.COOKIE, auth.make_session(u), httponly=True, samesite="lax",
                     secure=_cookie_secure(request), max_age=auth.SESSION_MAX_AGE)
