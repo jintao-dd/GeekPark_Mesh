@@ -558,14 +558,22 @@ def _handle_colleague_v3(
     )
 
     # 映射 route 供 Session 更新
-    if result.action == "ask":
+    if result.action == "ask" or result.intent in (
+        "ask_published",
+        "ask_relations",
+        "feishu_search",
+        "feishu_doc_get",
+        "feishu_calendar_list",
+        "feishu_discuss",
+        "feishu_write",
+        "list_issues",
+    ):
         if result.intent == "ask_published":
             route_name = "ask"
         elif result.intent == "ask_relations":
             route_name = "relations"
-        elif result.intent == "feishu_search":
-            route_name = "feishu"
         elif result.intent in (
+            "feishu_search",
             "feishu_doc_get",
             "feishu_calendar_list",
             "feishu_discuss",

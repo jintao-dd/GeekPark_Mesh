@@ -1,9 +1,13 @@
 # Colleague × Feishu Hands · 接入计划
 
 > **日期：** 2026-09-10  
-> **状态：** **10 项能力已接入代码**（默认 Hands 关；写另需 WRITE=1；联调可用 `MESH_FEISHU_HANDS_BACKEND=mock`）  
-> **目标态：** 飞书 → Colleague Brain →（Mesh Ask | Feishu MCP/CLI | Org）→ 一张嘴  
-> **原则：** 官方当手脚；不自研全套飞书 Tool；**绝不混级**；**绝不越权**。  
+> **状态：** **10 项能力已接入代码**（联调：`MESH_FEISHU_HANDS=1` + WRITE；backend=`native|cli|mock`）  
+> **目标态：** 飞书 → Colleague Brain →（Mesh Ask | **官方 lark-cli / Skills** | Org）→ 一张嘴  
+> **原则：** 官方当手脚（[`larksuite/cli`](https://github.com/larksuite/cli) 的 26 个 Agent Skills + shortcuts）；不自研全套飞书 Tool；**绝不混级**；**绝不越权**。  
+>
+> 官方 CLI Skills（`npx skills add larksuite/cli`）面向 Coding Agent；Mesh 运行时用同一命令面：  
+> `MESH_FEISHU_HANDS_BACKEND=cli` + `MESH_FEISHU_CLI_BIN=lark-cli`（需容器内已 login / 注入凭证）。  
+> `native` 是无 CLI 时的 OpenAPI 兜底，不是长期自研替代。  
 >
 > 十项：search(doc/message/wiki/folder/calendar) · doc.get · calendar.list · discuss.summary ·  
 > speak 成文 · doc.create / im.send / calendar.create（确认式写）  

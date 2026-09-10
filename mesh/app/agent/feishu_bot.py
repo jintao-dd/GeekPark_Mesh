@@ -139,7 +139,9 @@ def parse_im_message(event: dict[str, Any]) -> dict[str, Any] | None:
         "channel": channel,
         "feishu_open_id": open_id,
         "chat_id": chat_id,
-        "thread_id": str(msg.get("thread_id") or msg.get("root_id") or "").strip(),
+        # 只用话题 thread_id；切勿把 root_id（回复某条消息）当成会话隔离键，
+        # 否则「准备写入」与「确认」会落到不同 session，pending_write 必丢。
+        "thread_id": str(msg.get("thread_id") or "").strip(),
         "session_id": str(chat_id or "").strip(),
         "inbound_message_id": message_id,
     }

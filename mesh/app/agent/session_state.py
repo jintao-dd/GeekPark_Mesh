@@ -154,11 +154,73 @@ def session_key_of(
         base = f"u:{mesh_user_id}"
     else:
         base = f"anon:{session_id or chat_id or 'x'}"
+    # 飞书群/私聊：一会话一键。不要用 reply root / thread 切分，否则确认写必丢 pending。
+    if ch in ("feishu_group", "feishu_dm"):
+        return base
     if thread_id:
         base += f":t{thread_id}"
     elif session_id:
         base += f":s{session_id}"
     return base
+
+
+def pending_key_of(
+    *,
+    channel: str = "",
+    chat_id: str = "",
+    feishu_open_id: str = "",
+) -> str:
+    """待确认写操作的稳定键（比 session_key 更粗，跨 reply 存活）。"""
+    ch = (channel or "").strip()
+    if ch == "feishu_group" and chat_id:
+        return f"pend:grp:{chat_id}"
+    if chat_id and ch.startswith("feishu"):
+        return f"pend:chat:{chat_id}"
+    if feishu_open_id:
+        return f"pend:dm:{feishu_open_id}"
+    if chat_id:
+        return f"pend:chat:{chat_id}"
+    return ""
+
+
+_PENDING_LOCK = threading.Lock()
+_PENDING_STORE: dict[str, dict[str, Any]] = {}
+_PENDING_TTL_SEC = 2 * 3600
+
+
+def save_pending_write(key: str, pending: dict[str, Any] | None) -> None:
+    if not key:
+        return
+    now = time.time()
+    with _PENDING_LOCK:
+        if not pending or not pending.get("tool"):
+            _PENDING_STORE.pop(key, None)
+            return
+        blob = dict(pending)
+        blob["_saved_at"] = now
+        _PENDING_STORE[key] = blob
+
+
+def load_pending_write(key: str) -> dict[str, Any] | None:
+    if not key:
+        return None
+    now = time.time()
+    with _PENDING_LOCK:
+        st = _PENDING_STORE.get(key)
+        if not st:
+            return None
+        if now - float(st.get("_saved_at") or 0) > _PENDING_TTL_SEC:
+            _PENDING_STORE.pop(key, None)
+            return None
+        out = {k: v for k, v in st.items() if k != "_saved_at"}
+        return out if out.get("tool") else None
+
+
+def clear_pending_write(key: str) -> None:
+    if not key:
+        return
+    with _PENDING_LOCK:
+        _PENDING_STORE.pop(key, None)
 
 
 def load(session_key: str) -> SessionContextState:
@@ -189,7 +251,12 @@ def clear(session_key: str = "") -> None:
             _STORE.pop(session_key, None)
         else:
             _STORE.clear()
+    with _PENDING_LOCK:
+        if not session_key:
+            _PENDING_STORE.clear()
 
 
 def reset_for_tests() -> None:
     clear()
+    with _PENDING_LOCK:
+        _PENDING_STORE.clear()

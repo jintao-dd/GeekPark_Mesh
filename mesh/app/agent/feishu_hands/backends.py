@@ -122,30 +122,189 @@ def _openapi_search_docs(
         return envelope_fail(f"openapi_error:{type(e).__name__}", tool="feishu.search")
 
 
-def _cli_search(query: str, *, max_results: int, timeout_sec: float) -> ToolResultEnvelope:
-    bin_path = flags.cli_bin()
-    if not bin_path:
-        return envelope_fail("cli_not_configured", tool="feishu.search")
+def _cli_bin() -> str:
+    return flags.cli_bin() or "lark-cli"
+
+
+def _cli_run(argv: list[str], *, timeout_sec: float, tool: str) -> ToolResultEnvelope:
+    import os
+
+    bin_path = _cli_bin()
     try:
         proc = subprocess.run(
-            [bin_path, "docs", "search", "--query", query, "--limit", str(max_results), "--json"],
+            [bin_path, *argv, "--format", "json"],
             capture_output=True,
             text=True,
             timeout=timeout_sec,
             check=False,
+            env=os.environ.copy(),
         )
-        if proc.returncode != 0:
-            return envelope_fail(f"cli_exit_{proc.returncode}", tool="feishu.search")
-        data = json.loads(proc.stdout or "{}")
-        items = data if isinstance(data, list) else (data.get("items") or [])
-        return envelope_ok(
-            normalize_docs(items if isinstance(items, list) else [], kind="doc"),
-            tool="feishu.search",
-        )
+    except FileNotFoundError:
+        return envelope_fail("cli_not_installed", tool=tool)
     except subprocess.TimeoutExpired:
-        return envelope_fail("cli_timeout", tool="feishu.search")
+        return envelope_fail("cli_timeout", tool=tool)
     except Exception as e:
-        return envelope_fail(f"cli_error:{type(e).__name__}", tool="feishu.search")
+        return envelope_fail(f"cli_error:{type(e).__name__}", tool=tool)
+    raw_out = (proc.stdout or "").strip()
+    raw_err = (proc.stderr or "").strip()
+    data: dict[str, Any] = {}
+    try:
+        data = json.loads(raw_out) if raw_out else {}
+    except Exception:
+        data = {}
+    if proc.returncode != 0 or (isinstance(data, dict) and data.get("ok") is False):
+        err = ""
+        if isinstance(data, dict):
+            eobj = data.get("error") or {}
+            if isinstance(eobj, dict):
+                err = str(eobj.get("message") or eobj.get("hint") or "")
+            err = err or str(data.get("error") or "")
+        err = err or raw_err[:160] or f"cli_exit_{proc.returncode}"
+        return envelope_fail(f"cli:{err[:160]}", tool=tool)
+    if not isinstance(data, dict):
+        data = {"data": data}
+    return envelope_ok([], tool=tool, meta={"cli": data})
+
+
+def _cli_call(tool: str, arguments: dict[str, Any], *, timeout_sec: float) -> ToolResultEnvelope:
+    """官方 lark-cli shortcuts（与 larksuite/cli Skills 同源命令面）。"""
+    args = dict(arguments or {})
+    if tool == "feishu.search":
+        rt = str(args.get("resource_type") or "doc").lower()
+        q = str(args.get("query") or "").strip()
+        mr = str(int(args.get("max_results") or 8))
+        if rt in ("doc", "folder", "wiki"):
+            env = _cli_run(["docs", "+search", "--query", q, "--limit", mr], timeout_sec=timeout_sec, tool=tool)
+            if not env.ok:
+                return env
+            payload = (env.meta or {}).get("cli") or {}
+            items = payload.get("data") if isinstance(payload, dict) else []
+            if isinstance(payload, dict) and isinstance(payload.get("items"), list):
+                items = payload.get("items")
+            if not isinstance(items, list):
+                items = []
+            return envelope_ok(normalize_docs(items, kind=rt), tool=tool)
+        if rt == "message":
+            chat_id = str(args.get("chat_id") or "").strip()
+            argv = ["im", "+messages-search", "--query", q]
+            if chat_id:
+                argv += ["--chat-id", chat_id]
+            env = _cli_run(argv, timeout_sec=timeout_sec, tool=tool)
+            if not env.ok:
+                return env
+            payload = (env.meta or {}).get("cli") or {}
+            items = payload.get("data") if isinstance(payload, dict) else []
+            if isinstance(payload, dict) and isinstance(payload.get("items"), list):
+                items = payload.get("items")
+            return envelope_ok(normalize_docs(items if isinstance(items, list) else [], kind="message"), tool=tool)
+        return envelope_fail(f"cli_resource_unsupported:{rt}", tool=tool)
+
+    if tool == "feishu.doc.get":
+        token = str(args.get("doc_token") or "").strip()
+        url = str(args.get("url") or "").strip()
+        argv = ["docs", "+fetch"]
+        if token:
+            argv += ["--doc", token]
+        elif url:
+            argv += ["--doc", url]
+        else:
+            return envelope_fail("doc_token_or_url_required", tool=tool)
+        env = _cli_run(argv, timeout_sec=timeout_sec, tool=tool)
+        if not env.ok:
+            return env
+        payload = (env.meta or {}).get("cli") or {}
+        data = payload.get("data") if isinstance(payload, dict) else {}
+        title = str((data or {}).get("title") or token or "文档")
+        snippet = str((data or {}).get("content") or (data or {}).get("markdown") or "")[:500]
+        return envelope_ok(
+            normalize_docs([{"title": title, "snippet": snippet, "url": url or "", "docs_token": token}]),
+            tool=tool,
+        )
+
+    if tool == "feishu.calendar.list":
+        return _cli_run(["calendar", "+agenda"], timeout_sec=timeout_sec, tool=tool)
+
+    if tool == "feishu.discuss.summary":
+        chat_id = str(args.get("chat_id") or "").strip()
+        q = str(args.get("query") or args.get("person") or "").strip() or " "
+        return _cli_call(
+            "feishu.search",
+            {"resource_type": "message", "query": q, "chat_id": chat_id, "max_results": 10},
+            timeout_sec=timeout_sec,
+        )
+
+    if tool == "feishu.doc.create":
+        if not args.get("confirmed"):
+            return envelope_fail("confirmation_required", tool=tool)
+        title = str(args.get("title") or "未命名文档")
+        content = str(args.get("content") or "")
+        md = f"<title>{title}</title>\n{content}"
+        env = _cli_run(
+            ["docs", "+create", "--doc-format", "markdown", "--content", md],
+            timeout_sec=timeout_sec,
+            tool=tool,
+        )
+        if not env.ok:
+            return env
+        payload = (env.meta or {}).get("cli") or {}
+        data = payload.get("data") if isinstance(payload, dict) else {}
+        url = str((data or {}).get("url") or (data or {}).get("doc_url") or "")
+        token = str((data or {}).get("document_id") or (data or {}).get("doc_token") or "")
+        if not url and token:
+            url = f"https://feishu.cn/docx/{token}"
+        return envelope_ok(
+            [{"title": title, "url": url, "snippet": "已创建", "docs_token": token}],
+            tool=tool,
+            meta={"url": url, "doc_token": token},
+        )
+
+    if tool == "feishu.im.send":
+        if not args.get("confirmed"):
+            return envelope_fail("confirmation_required", tool=tool)
+        rid = str(args.get("receive_id") or args.get("chat_id") or "").strip()
+        text = str(args.get("text") or "").strip()
+        if not rid or not text:
+            return envelope_fail("receive_id_and_text_required", tool=tool)
+        env = _cli_run(
+            ["im", "+messages-send", "--chat-id", rid, "--text", text],
+            timeout_sec=timeout_sec,
+            tool=tool,
+        )
+        if not env.ok:
+            return env
+        return envelope_ok(
+            [{"title": "已发送", "snippet": text[:120], "docs_type": "message"}],
+            tool=tool,
+        )
+
+    if tool == "feishu.calendar.create":
+        if not args.get("confirmed"):
+            return envelope_fail("confirmation_required", tool=tool)
+        title = str(args.get("title") or "日程")
+        start = str(args.get("start") or "")
+        end = str(args.get("end") or "")
+        argv = ["calendar", "+create", "--summary", title]
+        if start:
+            argv += ["--start", start]
+        if end:
+            argv += ["--end", end]
+        env = _cli_run(argv, timeout_sec=timeout_sec, tool=tool)
+        if not env.ok:
+            return env
+        return envelope_ok(
+            [{"title": title, "snippet": f"{start} ~ {end}", "docs_type": "event"}],
+            tool=tool,
+        )
+
+    return envelope_fail(f"cli_unknown_tool:{tool}", tool=tool)
+
+
+def _cli_search(query: str, *, max_results: int, timeout_sec: float) -> ToolResultEnvelope:
+    return _cli_call(
+        "feishu.search",
+        {"query": query, "resource_type": "doc", "max_results": max_results},
+        timeout_sec=timeout_sec,
+    )
 
 
 def _mock_call(tool: str, arguments: dict[str, Any]) -> ToolResultEnvelope:
@@ -300,12 +459,8 @@ def call_tool(
             user_access_token=user_access_token,
         )
 
-    if backend == "cli" and tool == "feishu.search":
-        return _cli_search(
-            str(args.get("query") or ""),
-            max_results=int(args.get("max_results") or FEISHU_SEARCH.max_results),
-            timeout_sec=to,
-        )
+    if backend == "cli":
+        return _cli_call(tool, args, timeout_sec=to)
 
     return _mcp_post(
         tool,

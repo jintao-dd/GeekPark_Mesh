@@ -35,6 +35,12 @@ _CANCEL_RE = re.compile(
 )
 _CONFIRM_SOFT = re.compile(r"(确认|可以发|发吧|创建吧|写吧|执行吧|\bok\b|\byes\b)", re.I)
 _CANCEL_SOFT = re.compile(r"(不要|别发|取消|算了|先不用|\bno\b)", re.I)
+_DOC_CREATE_HARD = re.compile(
+    r"(?:创建|新建|写一?[个篇]?|帮我写).{0,12}(?:空的?)?(?:飞书)?(?:云)?文档"
+    r"|标题\s*[：:]\s*.+内容\s*[：:]",
+    re.I,
+)
+_CONFIRM_LEAD = re.compile(r"^确认([，,。\s]|创建|发送|写入|执行|$)", re.I)
 
 
 def _clean_user_text(text: str) -> str:
@@ -53,6 +59,9 @@ def _looks_like_confirm(text: str) -> bool:
     # 短句软确认：有 pending 时「@_user_1 确认发送」等
     if len(q) <= 24 and _CONFIRM_SOFT.search(q) and not _CANCEL_SOFT.search(q):
         return True
+    # 「确认」开头（可带后续内容：确认创建…内容…）
+    if _CONFIRM_LEAD.match(q) and not _CANCEL_SOFT.search(q):
+        return True
     return False
 
 
@@ -65,6 +74,92 @@ def _looks_like_cancel(text: str) -> bool:
     if len(q) <= 24 and _CANCEL_SOFT.search(q):
         return True
     return False
+
+
+def _pending_key(context: Any, identity: Any) -> str:
+    from . import session_state as sstore
+
+    ch = str(getattr(context, "channel", None) or "").strip()
+    chat_id = str(getattr(context, "chat_id", None) or "").strip()
+    open_id = str(getattr(identity, "feishu_open_id", None) or "").strip()
+    return sstore.pending_key_of(channel=ch, chat_id=chat_id, feishu_open_id=open_id)
+
+
+def _sync_pending_from_store(session: SessionContextState, context: Any, identity: Any) -> None:
+    """session 可能因 reply/root 切键丢 pending；从粗粒度 store 回填。"""
+    from . import session_state as sstore
+
+    if isinstance(session.pending_write, dict) and session.pending_write.get("tool"):
+        return
+    key = _pending_key(context, identity)
+    loaded = sstore.load_pending_write(key)
+    if loaded:
+        session.pending_write = loaded
+
+
+def _persist_pending(session: SessionContextState, context: Any, identity: Any) -> None:
+    from . import session_state as sstore
+
+    key = _pending_key(context, identity)
+    sstore.save_pending_write(key, session.pending_write if isinstance(session.pending_write, dict) else None)
+
+
+def _clear_pending(session: SessionContextState, context: Any, identity: Any) -> None:
+    from . import session_state as sstore
+
+    session.pending_write = None
+    sstore.clear_pending_write(_pending_key(context, identity))
+
+
+def _merge_confirm_args(tool: str, args: dict[str, Any], user_text: str) -> dict[str, Any]:
+    """确认句里若夹带新内容，写入 args（不覆盖已有非空字段时仍可更新 content/text）。"""
+    out = dict(args)
+    q = _clean_user_text(user_text)
+    if tool == "feishu.doc.create":
+        m = re.match(
+            r"^确认[，,\s]*(?:创建(?:一个)?(?:空的?)?(?:飞书)?(?:云)?文档)?[，,\s]*"
+            r"(?:内容(?:主要)?(?:是|为)?[：:]?)?(.*)$",
+            q,
+            re.I | re.S,
+        )
+        extra = (m.group(1) if m else "").strip()
+        if extra and extra not in ("创建", "文档", "空文档", "空的文档"):
+            # 「确认创建一个空文档，内容主要是XXX」
+            cm = re.search(r"内容(?:主要)?(?:是|为)?[：:]?\s*(.+)$", q, re.I | re.S)
+            if cm and cm.group(1).strip():
+                out["content"] = cm.group(1).strip()
+            elif len(extra) > 8:
+                out["content"] = extra
+        tm = re.search(r"标题\s*[：:]\s*([^\s，,。]{1,40})", q)
+        if tm:
+            out["title"] = tm.group(1).strip()
+    if tool == "feishu.im.send":
+        m = re.match(r"^确认[，,\s]*(?:发送|发)?[：:]?\s*(.*)$", q, re.I | re.S)
+        extra = (m.group(1) if m else "").strip()
+        if extra and len(extra) > 1:
+            out["text"] = extra
+    return out
+
+
+def _hard_prepare_doc(user_text: str) -> dict[str, Any] | None:
+    q = _clean_user_text(user_text)
+    if not _DOC_CREATE_HARD.search(q):
+        return None
+    title = "未命名文档"
+    content = ""
+    tm = re.search(r"标题\s*[：:]\s*(.+?)(?:\s*内容\s*[：:]|$)", q)
+    if tm:
+        title = tm.group(1).strip()[:80] or title
+    cm = re.search(r"内容\s*[：:]\s*(.+)$", q, re.S)
+    if cm:
+        content = cm.group(1).strip()
+    if not content and "空" in q:
+        content = ""
+    return {
+        "action": "prepare_write",
+        "tool": "feishu.doc.create",
+        "args": {"title": title, "content": content},
+    }
 
 _SYSTEM_DECIDE = """你是 GeekPark 内部 AI 同事 Mesh 的「动作选择」层。
 只输出一个严格 JSON（双引号，不要 markdown，不要长文）：
@@ -270,6 +365,18 @@ def _decide(user_text: str, identity: Any, state: SessionContextState | None) ->
             meta["hard_cancel"] = True
             return {"action": "cancel_write"}, meta
 
+    # 硬准备：创建文档类短指令不交给模型（避免乱 refuse / JSON 炸掉）
+    try:
+        from . import feishu_hands
+
+        if feishu_hands.write_enabled():
+            hard = _hard_prepare_doc(qn)
+            if hard:
+                meta["hard_prepare"] = True
+                return hard, meta
+    except Exception:
+        pass
+
     system = _SYSTEM_DECIDE + "\n\n## 对方\n" + _identity_block(identity)
     hist = _history_block(state)
     user = (hist + "\n\n" if hist else "") + f"用户：{qn}\nJSON："
@@ -453,6 +560,7 @@ def handle(
     render_tool_result,
 ) -> ColleagueV3Result:
     q = _clean_user_text(user_text)
+    _sync_pending_from_store(session, context, identity)
     decision, dmeta = _decide(q, identity, session)
     action = str(decision.get("action") or "speak").strip().lower()
     log.info(
@@ -460,7 +568,7 @@ def handle(
         action,
         str(decision.get("tool") or "")[:40],
         bool(isinstance(session.pending_write, dict) and (session.pending_write or {}).get("tool")),
-        bool(dmeta.get("hard_confirm") or dmeta.get("hard_cancel")),
+        bool(dmeta.get("hard_confirm") or dmeta.get("hard_cancel") or dmeta.get("hard_prepare")),
         (q or "")[:80],
     )
     if action not in (
@@ -481,6 +589,7 @@ def handle(
             "decide_error": dmeta.get("error") or "",
             "hard_confirm": bool(dmeta.get("hard_confirm")),
             "hard_cancel": bool(dmeta.get("hard_cancel")),
+            "hard_prepare": bool(dmeta.get("hard_prepare")),
             "decision": {
                 "action": action,
                 "tool": str(decision.get("tool") or ""),
@@ -500,7 +609,7 @@ def handle(
         return out
 
     if action == "cancel_write":
-        session.pending_write = None
+        _clear_pending(session, context, identity)
         out.action = "speak"
         out.text = "好，已取消，不会写入飞书。"
         out.intent = "casual"
@@ -538,19 +647,24 @@ def handle(
             if tool == "feishu.im.send":
                 args.setdefault("receive_id", chat_id)
                 args.setdefault("receive_id_type", "chat_id")
-        # 缺正文时用 speak 生成一版 content（文档）
+        # 缺正文时用 speak 生成一版 content（文档）；用户明确要空文档则不生成
         if tool == "feishu.doc.create" and not str(args.get("content") or "").strip():
-            draft, smeta = _speak_plain(
-                f"请把下面需求整理成可写入飞书的正文（不要寒暄）：{q}",
-                identity,
-                session,
-            )
-            out.llm_used = bool(out.llm_used or smeta.get("llm_used"))
-            args["content"] = draft
-            args.setdefault("title", (q[:40] or "Mesh 整理").strip())
+            if re.search(r"空的?文档|空文档", q):
+                args["content"] = ""
+                args.setdefault("title", "未命名文档")
+            else:
+                draft, smeta = _speak_plain(
+                    f"请把下面需求整理成可写入飞书的正文（不要寒暄）：{q}",
+                    identity,
+                    session,
+                )
+                out.llm_used = bool(out.llm_used or smeta.get("llm_used"))
+                args["content"] = draft
+                args.setdefault("title", (q[:40] or "Mesh 整理").strip())
         if tool == "feishu.im.send" and not str(args.get("text") or "").strip():
             args["text"] = q
         session.pending_write = {"tool": tool, "args": args}
+        _persist_pending(session, context, identity)
         out.action = "speak"
         out.intent = "feishu_write"
         out.tool_id = tool
@@ -572,7 +686,7 @@ def handle(
             out.intent = "casual"
             return out
         tool = str(pending.get("tool") or "")
-        args = dict(pending.get("args") or {})
+        args = _merge_confirm_args(tool, dict(pending.get("args") or {}), q)
         args["confirmed"] = True
         chat_id = str(getattr(context, "chat_id", None) or "").strip()
         if chat_id:
@@ -584,13 +698,13 @@ def handle(
         from . import feishu_hands
 
         if not feishu_hands.write_enabled():
-            session.pending_write = None
+            _clear_pending(session, context, identity)
             out.action = "speak"
             out.text = "写入开关关着（MESH_FEISHU_HANDS_WRITE），我不能真正写入飞书。预览还在，打开开关后再说「确认」。"
             out.intent = "feishu_write"
             return out
         if not permmod.tool_allowed(permission, tool):
-            session.pending_write = None
+            _clear_pending(session, context, identity)
             out.action = "speak"
             out.text = "你当前没有这项飞书写入权限。"
             out.intent = "casual"
@@ -605,7 +719,7 @@ def handle(
         out.claim_bindings = list(bindings or [])
         out.evidence_refs = list(evidence or [])
         out.payload = result.payload if isinstance(getattr(result, "payload", None), dict) else {}
-        session.pending_write = None
+        _clear_pending(session, context, identity)
         if getattr(result, "ok", False):
             spoken, smeta = _synthesize(
                 q,

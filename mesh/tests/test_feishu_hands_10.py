@@ -37,6 +37,9 @@ def setup_function():
     os.environ.pop("MESH_FEISHU_HANDS_WRITE", None)
     os.environ.pop("MESH_FEISHU_HANDS_BACKEND", None)
     os.environ.pop("MESH_FEISHU_HANDS_MCP_URL", None)
+    from app.agent import session_state as sstore
+
+    sstore.reset_for_tests()
 
 
 def _ident():
@@ -55,7 +58,12 @@ def _perm_all():
 
 
 def _ctx():
-    return AgentContext(scope_key="t", channel="harness", issue_ref=IssueRef(mode="none"))
+    return AgentContext(
+        scope_key="t",
+        channel="feishu_group",
+        chat_id="oc_test_chat",
+        issue_ref=IssueRef(mode="none"),
+    )
 
 
 def test_registry_has_ten_capabilities():
@@ -291,6 +299,160 @@ def test_parse_im_strips_mention_for_confirm_len():
     assert p is not None
     assert p["text"] == "确认"
     assert len("@_user_1 确认") == 11
+
+
+def test_pending_survives_reply_root_session_fragment():
+    """复现线上 bug：prepare 无 root，确认带 root_id 时旧逻辑会丢 pending。"""
+    from app.agent import session_state as sstore
+    from app.agent.feishu_bot import parse_im_message
+    from app.agent.runtime import handle_message
+    from app.agent.models import AgentEnvelope
+
+    os.environ["MESH_FEISHU_HANDS"] = "1"
+    os.environ["MESH_FEISHU_HANDS_WRITE"] = "1"
+    os.environ["MESH_FEISHU_HANDS_BACKEND"] = "mock"
+    sstore.reset_for_tests()
+
+    chat = "oc_788_test_pending"
+    p1 = parse_im_message(
+        {
+            "sender": {"sender_id": {"open_id": "ou_fd"}},
+            "message": {
+                "chat_id": chat,
+                "chat_type": "group",
+                "message_type": "text",
+                "content": '{"text":"创建一个空的文档"}',
+            },
+        }
+    )
+    assert p1 and p1["thread_id"] == ""
+
+    # 旧代码会把 root_id 写入 thread_id；新代码必须忽略
+    p2_raw = {
+        "sender": {"sender_id": {"open_id": "ou_fd"}},
+        "message": {
+            "chat_id": chat,
+            "chat_type": "group",
+            "message_type": "text",
+            "root_id": "om_bot_card_root",
+            "content": '{"text":"确认"}',
+        },
+    }
+    p2 = parse_im_message(p2_raw)
+    assert p2 and p2["thread_id"] == ""
+
+    k1 = sstore.session_key_of(
+        channel="feishu_group", chat_id=chat, session_id=chat, thread_id=p1["thread_id"]
+    )
+    k2 = sstore.session_key_of(
+        channel="feishu_group", chat_id=chat, session_id=chat, thread_id="om_bot_card_root"
+    )
+    # 飞书通道：即使误传 thread，也不再切键
+    assert k1 == sstore.session_key_of(channel="feishu_group", chat_id=chat)
+
+    st = SessionContextState(session_key=k1)
+    ctx = AgentContext(scope_key="t", channel="feishu_group", chat_id=chat, issue_ref=IssueRef(mode="none"))
+
+    def fake_llm(system, user, max_tokens=4000, json_mode=False, task="default"):
+        if json_mode:
+            raise AssertionError("should hard path")
+        return "ok"
+
+    with mock.patch("app.llm.call", side_effect=fake_llm):
+        r1 = colleague_v3.handle(
+            con=None,
+            user_text="创建一个空的文档",
+            identity=_ident(),
+            permission=_perm_all(),
+            context=ctx,
+            session=st,
+            invoke_tool=toolsmod.invoke_tool,
+            render_tool_result=lambda r, i, s: ("ok", [], []),
+        )
+        assert r1.intent == "feishu_write"
+        assert st.pending_write and st.pending_write["tool"] == "feishu.doc.create"
+        # 模拟「另一把 session 键」但同 chat：应从 pending store 回填
+        st2 = SessionContextState(session_key=k2 or "other")
+        r2 = colleague_v3.handle(
+            con=None,
+            user_text="确认",
+            identity=_ident(),
+            permission=_perm_all(),
+            context=ctx,
+            session=st2,
+            invoke_tool=toolsmod.invoke_tool,
+            render_tool_result=lambda r, i, s: ("已创建", [], []),
+        )
+    assert r2.tools_called == ["feishu.doc.create"]
+    assert st2.pending_write is None
+    assert r2.trace.get("hard_confirm") is True
+
+
+def test_compound_confirm_merges_content():
+    os.environ["MESH_FEISHU_HANDS"] = "1"
+    os.environ["MESH_FEISHU_HANDS_WRITE"] = "1"
+    os.environ["MESH_FEISHU_HANDS_BACKEND"] = "mock"
+    st = SessionContextState()
+    st.pending_write = {
+        "tool": "feishu.doc.create",
+        "args": {"title": "空文档", "content": ""},
+    }
+    captured = {}
+
+    def fake_invoke(tool, con, identity, permission, context, arguments):
+        captured.update(arguments or {})
+        return type(
+            "R",
+            (),
+            {
+                "ok": True,
+                "error": "",
+                "denied": False,
+                "payload": {"answer": "ok"},
+                "evidence_refs": [],
+            },
+        )()
+
+    def fake_llm(system, user, max_tokens=4000, json_mode=False, task="default"):
+        if json_mode:
+            raise AssertionError("decide must hard-confirm")
+        return "已创建文档。"
+
+    with mock.patch("app.llm.call", side_effect=fake_llm):
+        r = colleague_v3.handle(
+            con=None,
+            user_text="确认创建一个空文档，内容主要是详细的介绍一下你自己吧",
+            identity=_ident(),
+            permission=_perm_all(),
+            context=_ctx(),
+            session=st,
+            invoke_tool=fake_invoke,
+            render_tool_result=lambda r, i, s: ("ok", [], []),
+        )
+    assert r.tools_called == ["feishu.doc.create"]
+    assert "介绍一下你自己" in str(captured.get("content") or "")
+    assert r.trace.get("hard_confirm") is True
+
+
+def test_parse_im_ignores_root_id():
+    from app.agent.feishu_bot import parse_im_message
+
+    p = parse_im_message(
+        {
+            "sender": {"sender_id": {"open_id": "ou_x"}},
+            "message": {
+                "chat_id": "oc_g",
+                "chat_type": "group",
+                "message_type": "text",
+                "root_id": "om_xxx",
+                "thread_id": "",
+                "content": '{"text":"确认"}',
+            },
+        }
+    )
+    assert p is not None
+    assert p["thread_id"] == ""
+    assert p["text"] == "确认"
 
 
 def test_cancel_write():
