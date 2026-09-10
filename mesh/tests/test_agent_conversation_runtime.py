@@ -42,13 +42,19 @@ def setup_function():
 
 # --- Casual ---
 def test_casual_no_tool():
-    for q in ("你好", "哈哈", "谢谢", "好的", "收到", "明白", "算了"):
+    for q in ("你好", "哈哈", "谢谢", "好的", "收到", "明白", "算了", "好的明白了", "哈哈在忙吗"):
         d = conv.route_message(q)
         assert d.route == "casual", q
         assert d.intent == "casual"
         assert intent_to_tool("casual") is None
         assert d.casual_text
         assert "Query Scope" not in d.casual_text
+
+
+def test_capability_boundary_refuses():
+    d = conv.route_message("你能不能帮我改一下周报权限")
+    assert d.route == "refuse"
+    assert d.intent == "refuse"
 
 
 # --- Ambiguous / clarify ---

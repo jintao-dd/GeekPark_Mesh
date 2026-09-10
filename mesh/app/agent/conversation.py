@@ -29,12 +29,18 @@ _WHOAMI = re.compile(r"(我是谁|我是什么身份|我的身份|我叫什么|w
 _CASUAL = re.compile(
     r"^("
     r"你好|您好|hello|\bhi\b|嗨|在吗|早安|午安|晚安|"
-    r"谢谢|感谢|thanks|thank\s*you|"
-    r"哈哈+|呵呵+|嘿+|嗯+|哦+|喔+|"
-    r"好的|好哒|好呀|行|可以|收到|明白|了解|知道了|嗯嗯|ok|okay|"
-    r"没事|算了|不用了|先这样|"
-    r"在忙吗|忙吗"
+    r"谢谢(?:你|啦|了)?|感谢|thanks|thank\s*you|"
+    r"哈哈+[^\u4e00-\u9fff]{0,8}|呵呵+[^\u4e00-\u9fff]{0,8}|嘿+|"
+    r"(?:哈哈+|呵呵+)?\s*(?:在忙吗|忙吗)|"
+    r"好的?(?:明白了?|知道了?)?|好哒|好呀|行|可以|"
+    r"收到|明白了?|了解|知道了|嗯嗯|嗯+|哦+|喔+|ok|okay|"
+    r"没事|算了|不用了|先这样"
     r")[!！。.?？\s]*$",
+    re.I,
+)
+
+_CAPABILITY_REFUSE = re.compile(
+    r"(改|修改|调整).{0,8}(权限|角色|密码)|(帮我发布|帮我上线|写回|删除周报)",
     re.I,
 )
 
@@ -213,6 +219,13 @@ def route_message(
             intent="casual",
             casual_text=_casual_reply(q),
             notes="casual",
+        )
+
+    if _CAPABILITY_REFUSE.search(q):
+        return RouteDecision(
+            route="refuse",
+            intent="refuse",
+            notes="capability_boundary",
         )
 
     # Follow-up resolution (needs session entities OR named entity in utterance)

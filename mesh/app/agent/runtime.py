@@ -31,6 +31,10 @@ _REFUSE_CONFLICT = (
 _REFUSE_ACL = "这部分信息不在你当前可查看的范围内。"
 _REFUSE_DRAFT = "我只能查已上线的内容，不能读草稿、原文或未上线素材。"
 _REFUSE_GENERIC = "我还不太确定你的意思。可以说具体一点，或发「帮助」看问法示例。"
+_REFUSE_CAPABILITY = (
+    "这个我做不了——我只能查已上线周报，不能改权限、发布或写回数据。"
+    "权限相关请找管理员；内容问题可以直接问我人和事。"
+)
 
 
 def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
@@ -328,6 +332,10 @@ def _whoami_text(identity) -> str:
 
 
 def _refuse_text(status: str, text: str, deny_reason: str) -> str:
+    from . import conversation as convmod
+
+    if convmod._CAPABILITY_REFUSE.search(text or ""):
+        return _REFUSE_CAPABILITY
     if intentmod._DRAFT_RAW.search(text or ""):  # noqa: SLF001
         if any(
             k in (text or "").lower()
