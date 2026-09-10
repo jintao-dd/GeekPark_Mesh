@@ -1,68 +1,91 @@
 # Colleague Agent v2 · Stage 1 — Semantic Decision Layer
 
-> **原则：规则定义边界，模型理解语言。**
+> **状态：** ✅ 收口（Gate A + Gate B 通过）。**停止继续打 Stage 1。**  
+> **总览心智模型：** 见 [`COLLEAGUE_AGENT_V2.md`](./COLLEAGUE_AGENT_V2.md)（Controller 不是 UX 中心）。
 
-## 成功标准
+## 成功标准（已验证）
 
-> 开发人员没写过这句话，Controller 还能不能听懂。
+> 即使用户用了一句开发人员没有提前想到的话，Controller 仍能正确理解他在做什么，并选择自然的处理路径。
 
-## 路径
+## 架构
 
 ```
-Hard boundary（仅安全且确定）
-  ├─ 命中 → 0 Controller LLM
-  └─ 未命中 → 1× Sonnet Controller → fixed schema
-         → Conversation | Enterprise Ask | Clarify
+message + SessionContext
+        │
+        ▼
+ hard boundary? ──yes──► 0 Controller LLM → schema
+        │ no
+        ▼
+ 1× Controller LLM (Sonnet / task=controller)
+        │
+        ▼
+ fixed schema → runtime
+        ├─ Conversation → colleague_chat
+        ├─ Enterprise   → Existing Ask
+        └─ Clarify      → 问清楚
 ```
 
-Controller **只决策**，不生成最终回答。
+Controller **只决策**：不回答、不 Retrieval、不造公司事实、不把上轮答案当 Truth。
 
-## Hard boundary（克制）
+## Schema（形状冻结）
 
-只保留：
+```json
+{
+  "mode": "conversation|enterprise|followup|clarify|meta|system",
+  "intent": "...",
+  "entities": [],
+  "topic": "",
+  "needs_grounding": true,
+  "needs_clarification": false,
+  "response_mode": "conversational|direct|clarify|opinion|rewrite|explain|abstain|followup",
+  "context_refs": [],
+  "confidence": "high|medium|low"
+}
+```
+
+`needs_grounding=true` → Existing Ask；`false` → Conversation LLM。
+
+## Hard boundary（极少）
 
 - permission / system / draft / capability
 - meta / whoami
-- 极低风险协议闭集：`谢谢` / `好的` / `收到` / `明白` / `ok`（**不含**「哈哈」）
-- Session 已明确且结构完整的 follow-up（那X呢 / 还有吗 / 他后来…）
+- 极小协议闭集：谢谢 / 好的 / 收到 / 明白 / ok（**不含「哈哈」**）
+- Session 足够时的结构 follow-up（那 X 呢 / 他后来 / 还有吗）
 
-**不在 Hard：**
+**禁止**继续加 soft phrase regex。「哈哈」、闲聊、企业问句自然语言 → Controller。
 
-- 「哈哈」「今天忙死了」等口语
-- 「跟谁聊过」「有哪些关系」「期次列表」
-- 「X最近怎么样」
+## 性能
 
-以上一律 Controller。
+| 路径 | Controller LLM |
+|------|----------------|
+| hard | 0 |
+| semantic / ambiguous | ≤1 |
+| 禁止多层 LLM pipeline | |
 
-## 双门验收
+## Gate（双门）
 
-### Gate A — CI deterministic
+| Gate | 作用 |
+|------|------|
+| **A** CI + mock | schema / hard / wiring / fallback；决策准确率 + runtime 行为 |
+| **B** tmesh + 真 Sonnet | 未见表达 / 自然语言 / 上下文语义 |
+
+指标同时看：
+
+- Controller：`controller_decision_accuracy` / `mode_accuracy` / `needs_grounding_accuracy` / `response_mode_accuracy`
+- Runtime：`wrong_route` / `retrieval_when_unneeded` / `missed_grounding`
 
 ```bash
 python -m eval.run_colleague_controller_stage1 --gate A
+# Gate B：mesh/deploy/_tmesh_controller_gate_b.sh
 ```
 
-看：schema / hard-boundary / wiring / fallback / mock LLM  
-指标：`controller_decision_accuracy` / `mode_accuracy` / `needs_grounding_accuracy` / `response_mode_accuracy` + runtime 行为。
+## 成文限制（已移交 Stage 2A）
 
-### Gate B — tmesh semantic（真实 Sonnet）
+Conversation 旧护栏（1～3 句 / 350 tokens / 600 字截断）已在 Stage 2A 拆除，改为 response_mode 预算。见 `COLLEAGUE_AGENT_V2_STAGE2.md`。
 
-```bash
-# 镜像需含 eval runner；或在宿主机：
-python -m eval.run_colleague_controller_stage1 --gate B
-# 或 deploy/_tmesh_controller_gate_b.sh（docker cp eval 后 exec）
-```
+## 冻结
 
-验证：未见自然语言 + 上下文多轮，Controller 真理解。
+Retrieval / Ranking v1.4 / Claim v2.4c-2 / Ontology / Gold / Multi-Agent / ReAct / 长期 Memory / Wiki·ES·Graph  
+**以及：** 不再扩 Controller 规则 / schema / intent。
 
-## 通过条件（同时）
-
-| 层 | 条件 |
-|----|------|
-| Controller | decision / mode / grounding 准确 |
-| Runtime | retrieval_when_unneeded↓、missed_grounding 不升 |
-| 性能 | 明确路径 0 Controller LLM；ambiguous ≤1 |
-| 质量 | Canonical / Unseen / S01–S05 / REPRO 不回退 |
-| 泛化 | Gate B 未见表达仍能判对 |
-
-通过后 **停止打 Stage 1**，进入 Stage 2 · Persona / Conversation。
+镜像：`geekpark-mesh:2026-09-10-1ffe3abc0d3a`

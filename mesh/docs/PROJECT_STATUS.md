@@ -3,7 +3,7 @@
 > **日期：** 2026-09-10  
 > **读者：** 产品 / 工程 / 对接方  
 > **原则：** 只写「现在真的怎样」+「下一步做什么」；不写愿景空话。  
-> **镜像锚点：** `geekpark-mesh:2026-09-10-e8c6eb8d0ec2`（tmesh + prod 已对齐）
+> **镜像锚点：** `geekpark-mesh:2026-09-10-1ffe3abc0d3a`（tmesh + prod 已对齐；Colleague Stage 1 收口）
 
 ---
 
@@ -21,20 +21,23 @@ Mesh 今天是两件事：
 | 关系召回工程刀 | ✅ **够用封存** | `card_bridge` 已上；不再扩 Decision/Ranking/Claim |
 | 飞书 Agent Phase 1 | ✅ **Done** | 入站+解密+出站思考卡→终答 |
 | Conversation Runtime | ✅ **Done** | Session Context + Route + Failure UX；`e8c6eb8` |
-| **Colleague Agent v1** | ✅ 薄壳已上 | 规则路由 + 闲聊 LLM + Session |
-| **Colleague Agent v2 Stage 1** | → **Semantic Controller** | 规则守边界，模型理解语言；见 `COLLEAGUE_AGENT_V2_STAGE1.md` |
+| **Colleague Agent v1** | ✅ 薄壳已上 | 规则路由 + 闲聊 LLM + Session（决策路径已被 v2 Stage1 取代） |
+| **Colleague Agent v2 Stage 1** | ✅ **冻结** | Controller 只决策；禁止再堆规则/schema |
+| **Colleague Agent v2 Stage 2A** | → **进行中** | Conversation Core；见 `COLLEAGUE_AGENT_V2_STAGE2.md` |
 | 全谱 Canary | ✅ CONDITIONAL GO | Follow-up/模糊 PASS；A 残留先不抠 |
-| **当前主战场** | → **Stage 1 Gate** | wrong_route / 不该查却查 / 该查未查 / clarify |
+| **当前主战场** | → **Stage 2A Conversation** | 自然长短/情绪/不客服腔；**不动 Controller** |
 
 ```
 Colleague Agent v2
-  Stage 1 Controller ← 现在
-  Stage 2 Conversation / Persona
-  Stage 3 Session Memory v2
+  Stage 1 Controller ✅ 冻结
+  Stage 2A Conversation Core ← 现在
+  Stage 2B Self / Relationship
+  Stage 2C Opinion / Initiative
+  Stage 3 Memory（像人之后再记住你）
   Stage 4 Collaboration
   Stage 5 Enterprise Memory
   Stage 6 Production Runtime
-不做：Wiki / 长期 Memory 抢跑 / ReAct / Multi-Agent / 解冻质量 / 为单 case 打补丁
+不做：Wiki / 长期 Memory 抢跑 / ReAct / Multi-Agent / 解冻质量 / 继续打 Stage1 / 往 Controller 堆规则
 ```
 
 ---

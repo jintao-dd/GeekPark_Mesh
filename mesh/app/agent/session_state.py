@@ -53,6 +53,13 @@ class SessionContextState:
     conversation_mode: str = ""  # enterprise|chat|clarify|meta|error
     recent_turns: list[dict[str, Any]] = field(default_factory=list)
     topic_stack: list[dict[str, Any]] = field(default_factory=list)
+    # Stage 2A Colleague Core（仅 session；非长期 Memory）
+    colleague_relationship: str = "internal-colleague"
+    colleague_pref: str = ""
+    colleague_user_tone: str = "neutral"
+    colleague_emotional_tone: str = "neutral"
+    colleague_feedback: str = ""
+    colleague_goal: str = ""
     updated_at: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
@@ -109,10 +116,12 @@ class SessionContextState:
 
     def append_turn(self, *, role: str, text: str, route: str = "") -> None:
         turns = list(self.recent_turns or [])
+        # Stage 2A：助手回复可能更长，历史保留放宽（仍截断防爆）
+        cap = 900 if role == "assistant" else 500
         turns.append(
             {
                 "role": role,
-                "text": (text or "")[:400],
+                "text": (text or "")[:cap],
                 "route": route,
                 "turn_id": self.turn_id,
             }

@@ -44,8 +44,9 @@ def _colleague_turn(
     session: sstore.SessionContextState,
     mode: str,
     identity=None,
+    response_mode: str = "",
 ) -> tuple[str, dict[str, Any]]:
-    """1× Conversation LLM（general / meta）。不进 Retrieval。"""
+    """1× Conversation LLM（general / meta / clarify）。不进 Retrieval。"""
     from . import colleague_chat
 
     hint = ""
@@ -57,7 +58,11 @@ def _colleague_turn(
             if name:
                 hint = f"{name}" + (f"/{team}" if team else "")
     return colleague_chat.reply_colleague(
-        user_text, session, mode=mode, identity_hint=hint
+        user_text,
+        session,
+        mode=mode,
+        identity_hint=hint,
+        response_mode=response_mode,
     )
 
 
@@ -206,6 +211,7 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
             session=session,
             mode="meta",
             identity=identity,
+            response_mode=controller.response_mode or "explain",
         )
         if not (text or "").strip():
             text = route.casual_text or conv._meta_reply(envelope.text or "")
@@ -218,6 +224,7 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
         tr["llm_used"] = bool(chat_meta.get("llm_used"))
         if chat_meta.get("model"):
             tr["model_used"] = chat_meta.get("model")
+        tr["colleague_response_mode"] = chat_meta.get("response_mode")
         return _finish(
             AgentAnswer(
                 text=text,
@@ -240,6 +247,7 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
             session=session,
             mode="chat",
             identity=identity,
+            response_mode=controller.response_mode or "conversational",
         )
         if not (text or "").strip():
             text = route.casual_text or conv._casual_reply(envelope.text or "")
@@ -252,6 +260,7 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
         tr["llm_used"] = bool(chat_meta.get("llm_used"))
         if chat_meta.get("model"):
             tr["model_used"] = chat_meta.get("model")
+        tr["colleague_response_mode"] = chat_meta.get("response_mode")
         return _finish(
             AgentAnswer(
                 text=text,
@@ -267,21 +276,36 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
             controller=controller,
         )
 
+    # Clarify：Stage 2A 走 Conversation LLM（response_mode=clarify），模板仅回落
     if intent == "clarify":
+        text, chat_meta = _colleague_turn(
+            user_text=envelope.text or "",
+            session=session,
+            mode="clarify",
+            identity=identity,
+            response_mode=controller.response_mode or "clarify",
+        )
+        if not (text or "").strip():
+            text = route.clarify_text or "能再说具体一点吗？"
+        tr = fp.build_trace(
+            intent="clarify",
+            tool_id=None,
+            context=context,
+            identity_status=identity.status,
+        )
+        tr["llm_used"] = bool(chat_meta.get("llm_used"))
+        if chat_meta.get("model"):
+            tr["model_used"] = chat_meta.get("model")
+        tr["colleague_response_mode"] = chat_meta.get("response_mode")
         return _finish(
             AgentAnswer(
-                text=route.clarify_text or "能再说具体一点吗？",
+                text=text,
                 intent="clarify",
                 tools_called=[],
                 fingerprint=fp.build_fingerprint(
                     context=context, permission=permission, tool_result=None
                 ),
-                trace=fp.build_trace(
-                    intent="clarify",
-                    tool_id=None,
-                    context=context,
-                    identity_status=identity.status,
-                ),
+                trace=tr,
                 **base_kwargs,
             ),
             route=route,

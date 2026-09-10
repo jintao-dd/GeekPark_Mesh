@@ -1,5 +1,6 @@
 # GeekPark Mesh · Colleague Agent v1
 
+> **历史壳层。** 当前总览与心智模型见 [`COLLEAGUE_AGENT_V2.md`](./COLLEAGUE_AGENT_V2.md)；决策路径已由 Stage 1 Semantic Controller 取代。  
 > 产品层：Conversation Intelligence Layer  
 > Grounded Brain（Retrieval / Ranking v1.4 / Claim Support v2.4c-2 / Evidence / Temporal / Published-only / Ask Contract / Ontology / Gold）**冻结不动**。
 

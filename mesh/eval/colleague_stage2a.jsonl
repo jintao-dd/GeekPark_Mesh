@@ -1,0 +1,12 @@
+{"id": "n01", "bucket": "natural", "user": "哈哈今天忙死了", "expect_mode": "conversational", "notes": "闲聊情绪"}
+{"id": "n02", "bucket": "natural", "user": "这事真烦", "expect_mode": "conversational", "notes": "frustrated"}
+{"id": "n03", "bucket": "natural", "user": "在吗", "expect_mode": "conversational", "notes": "轻量招呼"}
+{"id": "n04", "bucket": "natural", "user": "帮我把这句话说自然点：我们将持续关注该领域的发展趋势", "expect_mode": "rewrite", "notes": "润色"}
+{"id": "o01", "bucket": "opinion", "user": "你觉得这个怎么样", "expect_mode": "opinion", "notes": "观点"}
+{"id": "o02", "bucket": "opinion", "user": "你觉得哪个更值得关注", "expect_mode": "opinion", "notes": "判断"}
+{"id": "o03", "bucket": "opinion", "user": "你自己感觉呢", "expect_mode": "opinion", "notes": "自我感受"}
+{"id": "e01", "bucket": "emotional", "user": "你刚才有点机械", "expect_mode": "conversational", "notes": "纠正"}
+{"id": "e02", "bucket": "emotional", "user": "你和傻子没区别。", "expect_mode": "conversational", "notes": "强反馈"}
+{"id": "e03", "bucket": "emotional", "user": "我想让你成为我们的同事", "expect_mode": "conversational", "notes": "关系定位"}
+{"id": "c01", "bucket": "chain", "turns": ["你和傻子没区别。", "你自己感觉呢？", "我想让你成为我们同事。"], "expect_mode": "conversational", "notes": "真实对话链"}
+{"id": "x01", "bucket": "anti_robot", "user": "谢谢", "expect_mode": "direct", "notes": "短确认勿说明书"}
