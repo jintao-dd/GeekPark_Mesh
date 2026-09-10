@@ -32,7 +32,7 @@ services:
     env_file: .env
     environment:
       MESH_DB_URL: postgresql://${POSTGRES_USER:-mesh}:${POSTGRES_PASSWORD:-mesh}@postgres:5432/${POSTGRES_DB:-mesh}
-      MESH_UVICORN_WORKERS: ${MESH_UVICORN_WORKERS:-2}
+      MESH_UVICORN_WORKERS: ${MESH_UVICORN_WORKERS:-1}
       MESH_JOB_INLINE: "0"
       MESH_ASK_LLM_CONCURRENCY: ${MESH_ASK_LLM_CONCURRENCY:-2}
       MESH_ASK_LLM_GLOBAL: ${MESH_ASK_LLM_GLOBAL:-4}

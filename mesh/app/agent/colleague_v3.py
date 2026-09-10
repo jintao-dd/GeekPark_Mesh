@@ -24,56 +24,31 @@ _MESH_TOOLS = {
 _TOOLS = _MESH_TOOLS | set(FEISHU_ALL_TOOLS)
 
 _CONFIRM_RE = re.compile(
-    r"^(好的?|可以|要|行|嗯+|确认|创建吧|发吧|发|创建|写吧|就这样|ok|yes|y)"
-    r"(?:[，,。.!！\s]*(?:一下|创建|发送|执行|写入|吧|了)?)*"
-    r"\s*[。.!！]*$",
+    r"^(好的?|可以|要|行|嗯+|确认|创建吧|发吧|写吧|就这样|ok|yes|y)\s*[。.!！]*$",
     re.I,
 )
 _CANCEL_RE = re.compile(
     r"^(不要|别|取消|算了|先不用|no|n)\s*[。.!！]*$",
     re.I,
 )
-_CONFIRM_SOFT = re.compile(r"(确认|可以发|发吧|创建吧|写吧|执行吧|\bok\b|\byes\b)", re.I)
-_CANCEL_SOFT = re.compile(r"(不要|别发|取消|算了|先不用|\bno\b)", re.I)
-_DOC_CREATE_HARD = re.compile(
-    r"(?:创建|新建|写一?[个篇]?|帮我写).{0,12}(?:空的?)?(?:飞书)?(?:云)?文档"
-    r"|标题\s*[：:]\s*.+内容\s*[：:]",
-    re.I,
-)
-_CONFIRM_LEAD = re.compile(r"^确认([，,。\s]|创建|发送|写入|执行|$)", re.I)
 
 
 def _clean_user_text(text: str) -> str:
-    """去掉飞书 @ 占位（群聊常为 @_user_1），否则硬确认整句匹配必挂。"""
+    """去掉飞书 @ 占位（群聊常为 @_user_1）。"""
     from .conversation import normalize_query
 
     return normalize_query(text or "")
 
 
 def _looks_like_confirm(text: str) -> bool:
+    """仅短句硬确认：有 pending 时防 JSON 炸掉。意图判断交给 LLM。"""
     q = _clean_user_text(text)
-    if not q:
-        return False
-    if _CONFIRM_RE.match(q):
-        return True
-    # 短句软确认：有 pending 时「@_user_1 确认发送」等
-    if len(q) <= 24 and _CONFIRM_SOFT.search(q) and not _CANCEL_SOFT.search(q):
-        return True
-    # 「确认」开头（可带后续内容：确认创建…内容…）
-    if _CONFIRM_LEAD.match(q) and not _CANCEL_SOFT.search(q):
-        return True
-    return False
+    return bool(q and _CONFIRM_RE.match(q))
 
 
 def _looks_like_cancel(text: str) -> bool:
     q = _clean_user_text(text)
-    if not q:
-        return False
-    if _CANCEL_RE.match(q):
-        return True
-    if len(q) <= 24 and _CANCEL_SOFT.search(q):
-        return True
-    return False
+    return bool(q and _CANCEL_RE.match(q))
 
 
 def _pending_key(context: Any, identity: Any) -> str:
@@ -86,7 +61,7 @@ def _pending_key(context: Any, identity: Any) -> str:
 
 
 def _sync_pending_from_store(session: SessionContextState, context: Any, identity: Any) -> None:
-    """session 可能因 reply/root 切键丢 pending；从粗粒度 store 回填。"""
+    """跨 worker：从磁盘/粗粒度 store 回填 pending。"""
     from . import session_state as sstore
 
     if isinstance(session.pending_write, dict) and session.pending_write.get("tool"):
@@ -112,54 +87,28 @@ def _clear_pending(session: SessionContextState, context: Any, identity: Any) ->
 
 
 def _merge_confirm_args(tool: str, args: dict[str, Any], user_text: str) -> dict[str, Any]:
-    """确认句里若夹带新内容，写入 args（不覆盖已有非空字段时仍可更新 content/text）。"""
+    """确认句若夹带新内容，并入 args（由 LLM 决策确认后执行时使用）。"""
     out = dict(args)
     q = _clean_user_text(user_text)
-    if tool == "feishu.doc.create":
-        m = re.match(
-            r"^确认[，,\s]*(?:创建(?:一个)?(?:空的?)?(?:飞书)?(?:云)?文档)?[，,\s]*"
-            r"(?:内容(?:主要)?(?:是|为)?[：:]?)?(.*)$",
-            q,
-            re.I | re.S,
-        )
-        extra = (m.group(1) if m else "").strip()
-        if extra and extra not in ("创建", "文档", "空文档", "空的文档"):
-            # 「确认创建一个空文档，内容主要是XXX」
-            cm = re.search(r"内容(?:主要)?(?:是|为)?[：:]?\s*(.+)$", q, re.I | re.S)
-            if cm and cm.group(1).strip():
-                out["content"] = cm.group(1).strip()
-            elif len(extra) > 8:
-                out["content"] = extra
+    if tool == "feishu.doc.create" and len(q) > 4:
+        cm = re.search(r"内容(?:主要)?(?:是|为)?[：:]?\s*(.+)$", q, re.I | re.S)
+        if cm and cm.group(1).strip():
+            out["content"] = cm.group(1).strip()
+        elif q.startswith("确认") and len(q) > 8:
+            # 「确认，再加点自我介绍」之类：去掉开头确认词后若仍有实质，当作补充说明并入
+            rest = re.sub(r"^确认[，,。\s]*", "", q).strip()
+            if rest and not re.match(r"^(创建|发送|写入|执行|吧|了)+$", rest):
+                if len(str(out.get("content") or "")) < 20:
+                    out["content"] = (str(out.get("content") or "") + "\n" + rest).strip()
         tm = re.search(r"标题\s*[：:]\s*([^\s，,。]{1,40})", q)
         if tm:
             out["title"] = tm.group(1).strip()
-    if tool == "feishu.im.send":
+    if tool == "feishu.im.send" and len(q) > 4:
         m = re.match(r"^确认[，,\s]*(?:发送|发)?[：:]?\s*(.*)$", q, re.I | re.S)
         extra = (m.group(1) if m else "").strip()
         if extra and len(extra) > 1:
             out["text"] = extra
     return out
-
-
-def _hard_prepare_doc(user_text: str) -> dict[str, Any] | None:
-    q = _clean_user_text(user_text)
-    if not _DOC_CREATE_HARD.search(q):
-        return None
-    title = "未命名文档"
-    content = ""
-    tm = re.search(r"标题\s*[：:]\s*(.+?)(?:\s*内容\s*[：:]|$)", q)
-    if tm:
-        title = tm.group(1).strip()[:80] or title
-    cm = re.search(r"内容\s*[：:]\s*(.+)$", q, re.S)
-    if cm:
-        content = cm.group(1).strip()
-    if not content and "空" in q:
-        content = ""
-    return {
-        "action": "prepare_write",
-        "tool": "feishu.doc.create",
-        "args": {"title": title, "content": content},
-    }
 
 _SYSTEM_DECIDE = """你是 GeekPark 内部 AI 同事 Mesh 的「动作选择」层。
 只输出一个严格 JSON（双引号，不要 markdown，不要长文）：
@@ -176,7 +125,7 @@ _SYSTEM_DECIDE = """你是 GeekPark 内部 AI 同事 Mesh 的「动作选择」�
 可写 tool（必须先 prepare_write，等用户确认后再 confirm_write）：
   feishu.doc.create | feishu.im.send | feishu.calendar.create
 
-规则：
+规则（按上下文判断，不要死抠字面）：
 - 闲聊/情绪/观点/写稿润色（不写入飞书）→ speak
 - 已上线周报事实 → ask + ask.published / ask.relations_summary
 - 搜飞书文档/Wiki/文件夹 → ask + feishu.search，resource_type=doc|wiki|folder
@@ -184,9 +133,12 @@ _SYSTEM_DECIDE = """你是 GeekPark 内部 AI 同事 Mesh 的「动作选择」�
 - 查日程 → ask + feishu.calendar.list（或 search calendar）
 - 读某篇文档要点 → ask + feishu.doc.get
 - 整理成文但不写入飞书 → speak（直接成文）
-- 要创建飞书文档 / 发消息 / 建日程 → prepare_write，args 填齐 title/content 或 receive_id/text 或 title/start/end；不要直接写
-- 用户明确确认上一轮准备写入 → confirm_write；明确取消 → cancel_write
-- 改权限/读草稿原文 → refuse
+- 用户要「创建/新建飞书文档」且一句话说了写什么（如「创建新文档详细介绍你自己」）
+  → prepare_write + feishu.doc.create；args.title 起个短标题；args.content 可先写要点或留空（系统会按用户原话生成正文）
+- 要发消息 / 建日程 → prepare_write，填齐 receive_id/text 或 title/start/end
+- 系统提示「有待确认写操作」时：用户同意/确认 → confirm_write；明确取消 → cancel_write；
+  若用户确认时又补充内容 → 仍 confirm_write（系统会合并）
+- 只有改权限/读草稿原文 → refuse；「创建文档」本身绝不 refuse
 - 不要编造飞书内容；Hands 不可用时用 speak 诚实说边界
 """
 
@@ -354,9 +306,9 @@ def _sanitize_user_visible(text: str) -> str:
 
 def _decide(user_text: str, identity: Any, state: SessionContextState | None) -> tuple[dict[str, Any], dict[str, Any]]:
     meta: dict[str, Any] = {"llm_used": False, "model": None, "error": ""}
-    # 硬确认 / 取消：有 pending 时优先，避免模型漏判（须先剥飞书 @）
     qn = _clean_user_text(user_text)
     pending = getattr(state, "pending_write", None) if state else None
+    # 仅短句硬确认/取消：防模型 JSON 炸掉；复合意图一律交给上下文 LLM
     if isinstance(pending, dict) and pending.get("tool"):
         if _looks_like_confirm(qn):
             meta["hard_confirm"] = True
@@ -364,18 +316,6 @@ def _decide(user_text: str, identity: Any, state: SessionContextState | None) ->
         if _looks_like_cancel(qn):
             meta["hard_cancel"] = True
             return {"action": "cancel_write"}, meta
-
-    # 硬准备：创建文档类短指令不交给模型（避免乱 refuse / JSON 炸掉）
-    try:
-        from . import feishu_hands
-
-        if feishu_hands.write_enabled():
-            hard = _hard_prepare_doc(qn)
-            if hard:
-                meta["hard_prepare"] = True
-                return hard, meta
-    except Exception:
-        pass
 
     system = _SYSTEM_DECIDE + "\n\n## 对方\n" + _identity_block(identity)
     hist = _history_block(state)
@@ -396,6 +336,9 @@ def _decide(user_text: str, identity: Any, state: SessionContextState | None) ->
     except Exception as e:
         log.warning("colleague_v3 decide failed: %s", e)
         meta["error"] = str(e)[:120]
+        # pending 在且模型挂了：宁可再问一句，不要瞎 confirm
+        if isinstance(pending, dict) and pending.get("tool"):
+            return {"action": "speak"}, meta
         return {"action": "speak"}, meta
 
 
@@ -568,7 +511,7 @@ def handle(
         action,
         str(decision.get("tool") or "")[:40],
         bool(isinstance(session.pending_write, dict) and (session.pending_write or {}).get("tool")),
-        bool(dmeta.get("hard_confirm") or dmeta.get("hard_cancel") or dmeta.get("hard_prepare")),
+        bool(dmeta.get("hard_confirm") or dmeta.get("hard_cancel")),
         (q or "")[:80],
     )
     if action not in (
@@ -589,7 +532,6 @@ def handle(
             "decide_error": dmeta.get("error") or "",
             "hard_confirm": bool(dmeta.get("hard_confirm")),
             "hard_cancel": bool(dmeta.get("hard_cancel")),
-            "hard_prepare": bool(dmeta.get("hard_prepare")),
             "decision": {
                 "action": action,
                 "tool": str(decision.get("tool") or ""),
@@ -647,20 +589,27 @@ def handle(
             if tool == "feishu.im.send":
                 args.setdefault("receive_id", chat_id)
                 args.setdefault("receive_id_type", "chat_id")
-        # 缺正文时用 speak 生成一版 content（文档）；用户明确要空文档则不生成
+        # 缺正文：用用户原话当写作任务生成（「创建新文档详细介绍你自己」→ 生成自我介绍）
         if tool == "feishu.doc.create" and not str(args.get("content") or "").strip():
-            if re.search(r"空的?文档|空文档", q):
+            want_empty = bool(
+                re.search(r"空的?文档|空文档", q)
+                and not re.search(r"介绍|关于|写|内容|说明", q)
+            )
+            if want_empty:
                 args["content"] = ""
                 args.setdefault("title", "未命名文档")
             else:
                 draft, smeta = _speak_plain(
-                    f"请把下面需求整理成可写入飞书的正文（不要寒暄）：{q}",
+                    "用户要创建飞书文档。请按用户原话直接写出可粘贴进文档的完整正文"
+                    "（不要寒暄、不要问要不要创建、不要输出 JSON）。\n"
+                    f"用户原话：{q}",
                     identity,
                     session,
                 )
                 out.llm_used = bool(out.llm_used or smeta.get("llm_used"))
                 args["content"] = draft
-                args.setdefault("title", (q[:40] or "Mesh 整理").strip())
+                if not str(args.get("title") or "").strip():
+                    args["title"] = (q[:32] or "Mesh 整理").strip()
         if tool == "feishu.im.send" and not str(args.get("text") or "").strip():
             args["text"] = q
         session.pending_write = {"tool": tool, "args": args}

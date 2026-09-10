@@ -355,7 +355,12 @@ def test_pending_survives_reply_root_session_fragment():
 
     def fake_llm(system, user, max_tokens=4000, json_mode=False, task="default"):
         if json_mode:
-            raise AssertionError("should hard path")
+            if "创建一个空的文档" in user:
+                return (
+                    '{"action":"prepare_write","tool":"feishu.doc.create",'
+                    '"args":{"title":"空文档","content":""}}'
+                )
+            raise AssertionError("confirm should hard-path")
         return "ok"
 
     with mock.patch("app.llm.call", side_effect=fake_llm):
@@ -371,8 +376,10 @@ def test_pending_survives_reply_root_session_fragment():
         )
         assert r1.intent == "feishu_write"
         assert st.pending_write and st.pending_write["tool"] == "feishu.doc.create"
-        # 模拟「另一把 session 键」但同 chat：应从 pending store 回填
-        st2 = SessionContextState(session_key=k2 or "other")
+        # 模拟另一 worker：清内存，只留磁盘 pending
+        sstore._STORE.clear()
+        sstore._PENDING_STORE.clear()
+        st2 = SessionContextState(session_key="grp:other_should_not_matter")
         r2 = colleague_v3.handle(
             con=None,
             user_text="确认",
@@ -415,7 +422,7 @@ def test_compound_confirm_merges_content():
 
     def fake_llm(system, user, max_tokens=4000, json_mode=False, task="default"):
         if json_mode:
-            raise AssertionError("decide must hard-confirm")
+            return '{"action":"confirm_write"}'
         return "已创建文档。"
 
     with mock.patch("app.llm.call", side_effect=fake_llm):
@@ -431,7 +438,38 @@ def test_compound_confirm_merges_content():
         )
     assert r.tools_called == ["feishu.doc.create"]
     assert "介绍一下你自己" in str(captured.get("content") or "")
-    assert r.trace.get("hard_confirm") is True
+
+
+def test_create_doc_intro_yourself_uses_utterance_as_brief():
+    os.environ["MESH_FEISHU_HANDS"] = "1"
+    os.environ["MESH_FEISHU_HANDS_WRITE"] = "1"
+    os.environ["MESH_FEISHU_HANDS_BACKEND"] = "mock"
+    st = SessionContextState()
+
+    def fake_llm(system, user, max_tokens=4000, json_mode=False, task="default"):
+        if json_mode:
+            return (
+                '{"action":"prepare_write","tool":"feishu.doc.create",'
+                '"args":{"title":"关于我"}}'
+            )
+        return "我是 Mesh，GeekPark 内部 AI 同事。我能查已上线周报，也能帮你操作飞书。"
+
+    with mock.patch("app.llm.call", side_effect=fake_llm):
+        r = colleague_v3.handle(
+            con=None,
+            user_text="创建一个新文档详细的介绍一下你自己",
+            identity=_ident(),
+            permission=_perm_all(),
+            context=_ctx(),
+            session=st,
+            invoke_tool=toolsmod.invoke_tool,
+            render_tool_result=lambda r, i, s: ("ok", [], []),
+        )
+    assert r.intent == "feishu_write"
+    assert st.pending_write and st.pending_write["tool"] == "feishu.doc.create"
+    body = str((st.pending_write.get("args") or {}).get("content") or "")
+    assert "Mesh" in body
+    assert "确认" in r.text
 
 
 def test_parse_im_ignores_root_id():

@@ -188,17 +188,79 @@ _PENDING_STORE: dict[str, dict[str, Any]] = {}
 _PENDING_TTL_SEC = 2 * 3600
 
 
+def _data_dir() -> "Path":
+    import os
+    from pathlib import Path
+
+    raw = (os.environ.get("MESH_AGENT_SESSION_DIR") or "").strip()
+    if raw:
+        p = Path(raw)
+    else:
+        # /srv/mesh/data in container；本地则相对 cwd
+        p = Path("data") / "agent_sessions"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def _safe_name(key: str) -> str:
+    import hashlib
+
+    h = hashlib.sha256((key or "").encode("utf-8")).hexdigest()[:40]
+    return h
+
+
+def _disk_path(kind: str, key: str):
+    return _data_dir() / f"{kind}_{_safe_name(key)}.json"
+
+
+def _disk_write(kind: str, key: str, payload: dict[str, Any] | None) -> None:
+    import json
+
+    path = _disk_path(kind, key)
+    if not payload:
+        try:
+            path.unlink(missing_ok=True)  # type: ignore[call-arg]
+        except TypeError:
+            if path.exists():
+                path.unlink()
+        except Exception:
+            pass
+        return
+    tmp = path.with_suffix(".tmp")
+    try:
+        tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+    except Exception:
+        pass
+
+
+def _disk_read(kind: str, key: str) -> dict[str, Any] | None:
+    import json
+
+    path = _disk_path(kind, key)
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
 def save_pending_write(key: str, pending: dict[str, Any] | None) -> None:
+    """跨 uvicorn worker 共享：内存 + 磁盘（workers>1 时内存不可靠）。"""
     if not key:
         return
     now = time.time()
     with _PENDING_LOCK:
         if not pending or not pending.get("tool"):
             _PENDING_STORE.pop(key, None)
+            _disk_write("pending", key, None)
             return
         blob = dict(pending)
         blob["_saved_at"] = now
         _PENDING_STORE[key] = blob
+        _disk_write("pending", key, blob)
 
 
 def load_pending_write(key: str) -> dict[str, Any] | None:
@@ -208,9 +270,14 @@ def load_pending_write(key: str) -> dict[str, Any] | None:
     with _PENDING_LOCK:
         st = _PENDING_STORE.get(key)
         if not st:
+            st = _disk_read("pending", key)
+            if st:
+                _PENDING_STORE[key] = st
+        if not st:
             return None
         if now - float(st.get("_saved_at") or 0) > _PENDING_TTL_SEC:
             _PENDING_STORE.pop(key, None)
+            _disk_write("pending", key, None)
             return None
         out = {k: v for k, v in st.items() if k != "_saved_at"}
         return out if out.get("tool") else None
@@ -221,6 +288,7 @@ def clear_pending_write(key: str) -> None:
         return
     with _PENDING_LOCK:
         _PENDING_STORE.pop(key, None)
+        _disk_write("pending", key, None)
 
 
 def load(session_key: str) -> SessionContextState:
@@ -230,9 +298,15 @@ def load(session_key: str) -> SessionContextState:
     with _LOCK:
         st = _STORE.get(session_key)
         if not st:
+            raw = _disk_read("session", session_key)
+            if raw:
+                st = SessionContextState.from_dict(raw)
+                _STORE[session_key] = st
+        if not st:
             return SessionContextState(session_key=session_key)
         if st.updated_at and now - st.updated_at > _TTL_SEC:
             _STORE.pop(session_key, None)
+            _disk_write("session", session_key, None)
             return SessionContextState(session_key=session_key)
         return SessionContextState.from_dict(st.to_dict())
 
@@ -241,22 +315,36 @@ def save(state: SessionContextState) -> None:
     if not state.session_key:
         return
     state.updated_at = time.time()
+    blob = state.to_dict()
     with _LOCK:
-        _STORE[state.session_key] = SessionContextState.from_dict(state.to_dict())
+        _STORE[state.session_key] = SessionContextState.from_dict(blob)
+        _disk_write("session", state.session_key, blob)
 
 
 def clear(session_key: str = "") -> None:
     with _LOCK:
         if session_key:
             _STORE.pop(session_key, None)
+            _disk_write("session", session_key, None)
         else:
             _STORE.clear()
     with _PENDING_LOCK:
         if not session_key:
             _PENDING_STORE.clear()
+            # 测试清空：扫盘
+            try:
+                for p in _data_dir().glob("*.json"):
+                    p.unlink()
+            except Exception:
+                pass
 
 
 def reset_for_tests() -> None:
     clear()
     with _PENDING_LOCK:
         _PENDING_STORE.clear()
+        try:
+            for p in _data_dir().glob("*.json"):
+                p.unlink()
+        except Exception:
+            pass
