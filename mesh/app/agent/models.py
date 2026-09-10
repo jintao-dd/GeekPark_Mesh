@@ -29,6 +29,8 @@ ALL_TOOLS = frozenset({
 INTENTS = frozenset({
     "help",
     "whoami",
+    "casual",
+    "clarify",
     "list_issues",
     "ask_relations",
     "ask_published",
@@ -133,7 +135,6 @@ class IssueRef:
             "epoch": self.epoch,
             "reason": self.reason,
         }
-
 
 @dataclass
 class AgentContext:

@@ -36,7 +36,7 @@ def test_display_includes_issue_and_evidence_for_supported():
     )
     assert "XX 尚不能证明已经量产。" in text
     assert "期次：2026-8-17" in text
-    assert "证据（对齐本答 Claim）" in text
+    assert "可核对" in text
     assert "4251" in text
 
 
@@ -54,11 +54,28 @@ def test_display_insufficient_without_related_only():
         payload={
             "issue": "2026-8-17",
             "claim_support": {"support": "insufficient", "reason": "no_direct_support"},
+            "n_hits": 2,
         },
     )
-    assert "依据判定" in text
-    assert "依据不足" in text
-    assert "不足以直接支持" in text
+    assert "依据" in text
+    assert "不足以" in text or "相关内容" in text
+    assert "no_evidence" not in text.lower()
+
+
+def test_display_no_hit_natural():
+    ans = AgentAnswer(
+        text="未在已上线周报中找到与问题直接相关的记录。",
+        intent="ask_published",
+        evidence_refs=[],
+        context={"issue_ref": {"slug": "2026-8-17"}},
+        trace={},
+    )
+    text = format_display_text(
+        ans,
+        payload={"issue": "2026-8-17", "claim_support": {"support": "insufficient", "reason": "no_evidence"}, "n_hits": 0},
+    )
+    assert "没查到已发布" in text or "暂无直接命中" in text
+    assert "no_evidence" not in text.lower()
 
 
 def test_refuse_no_evidence_block():

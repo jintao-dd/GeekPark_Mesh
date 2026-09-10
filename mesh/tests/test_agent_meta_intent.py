@@ -52,8 +52,6 @@ def test_meta_queries_are_help_not_ask():
         "你能做什么",
         "帮助",
         "怎么问你",
-        "你好",
-        "hi",
         "who are you",
     ]
     for q in cases:
@@ -64,6 +62,13 @@ def test_meta_queries_are_help_not_ask():
             "ask.published",
             "ask.relations_summary",
         )
+
+
+def test_greeting_is_casual_not_ask():
+    for q in ("你好", "hi", "谢谢", "好的", "收到"):
+        intent = rule_classify_intent(q, _ctx(), _perm())
+        assert intent == "casual", q
+        assert intent_to_tool(intent) is None
 
 
 def test_whoami_short_circuits():

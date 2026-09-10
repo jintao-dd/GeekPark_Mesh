@@ -1,13 +1,18 @@
-"""⑦ Agent v1 单轮编排。"""
+"""⑦ Agent v1 编排：Conversation Route →（可选）Ask。
+
+Session Context 只消解指代；事实必须重新 Retrieval / Evidence。
+"""
 from __future__ import annotations
 
 from typing import Any
 
 from . import context as ctxmod
+from . import conversation as conv
 from . import fingerprint as fp
 from . import identity as idmod
 from . import intent as intentmod
 from . import permission as permmod
+from . import session_state as sstore
 from . import tools as toolsmod
 from .feishu_reply import enrich_answer_for_display
 from .models import (
@@ -23,9 +28,9 @@ _REFUSE_CONFLICT = (
     "检测到团队归属冲突，无法安全选择查询视角。"
     "请管理员消歧后再问；我仍可提供使用帮助。"
 )
-_REFUSE_ACL = "当前身份无权执行该操作。"
-_REFUSE_DRAFT = "只能查询已上线（Published）内容，不能读取草稿、原文或未上线素材。"
-_REFUSE_GENERIC = "无法可靠理解该请求，未调用数据工具。可发送「帮助」查看用法。"
+_REFUSE_ACL = "这部分信息不在你当前可查看的范围内。"
+_REFUSE_DRAFT = "我只能查已上线的内容，不能读草稿、原文或未上线素材。"
+_REFUSE_GENERIC = "我还不太确定你的意思。可以说具体一点，或发「帮助」看问法示例。"
 
 
 def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
@@ -39,14 +44,63 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
     )
     context = ctxmod.assemble_context(con, envelope, identity, permission)
 
+    sk = sstore.session_key_of(
+        channel=envelope.channel or identity.channel or "web",
+        feishu_open_id=envelope.feishu_open_id or identity.feishu_open_id or "",
+        chat_id=envelope.chat_id,
+        thread_id=envelope.thread_id,
+        session_id=envelope.session_id,
+        mesh_user_id=identity.mesh_user_id or envelope.mesh_user_id,
+    )
+    session = sstore.load(sk)
+    session.session_key = sk
+
     base_kwargs: dict[str, Any] = {
         "identity": identity.to_dict(),
         "permission": permission.to_dict(),
         "context": context.to_dict(),
     }
 
+    def _finish(
+        answer: AgentAnswer,
+        *,
+        route: conv.RouteDecision,
+        payload: dict[str, Any] | None = None,
+        user_for_state: str = "",
+    ) -> AgentAnswer:
+        issue = ""
+        if payload and payload.get("issue"):
+            issue = str(payload.get("issue") or "")
+        if not issue:
+            iref = (answer.context or {}).get("issue_ref") or {}
+            if isinstance(iref, dict):
+                issue = str(iref.get("slug") or "")
+        team = str(getattr(identity, "primary_team", None) or "") or ""
+        sstore.save(
+            conv.update_state_after_turn(
+                session,
+                route=route,
+                user_text=user_for_state or (envelope.text or ""),
+                answer_text=str(answer.text or ""),
+                intent=answer.intent,
+                issue=issue,
+                evidence_refs=list(answer.evidence_refs or []),
+                team=team,
+            )
+        )
+        answer.trace = dict(answer.trace or {})
+        answer.trace["conversation_route"] = route.route
+        answer.trace["session_key"] = sk
+        answer.trace["session_turn"] = session.turn_id
+        if route.rewritten_query:
+            answer.trace["rewritten_query"] = route.rewritten_query
+        if route.resolved_entity:
+            answer.trace["resolved_entity"] = route.resolved_entity
+        return enrich_answer_for_display(answer, payload=payload)
+
     if not permission.agent_access:
-        return enrich_answer_for_display(
+        route = conv.RouteDecision(route="refuse", intent="refuse", notes="acl")
+        return _finish(
             AgentAnswer(
                 text=_REFUSE_ACL,
                 intent="refuse",
@@ -62,17 +116,27 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
                     identity_status=identity.status,
                 ),
                 **base_kwargs,
-            )
+            ),
+            route=route,
         )
 
-    intent = intentmod.rule_classify_intent(envelope.text, context, permission)
+    route = intentmod.classify_route(envelope.text, session)
+    intent = route.intent
+    # ACL overlay for data intents
+    if intent in ("list_issues", "ask_relations", "ask_published"):
+        intent = intentmod.rule_classify_intent(
+            envelope.text, context, permission, session=session
+        )
+        # keep route rewrite if still data path
+        if intent != route.intent and intent == "refuse":
+            route = conv.RouteDecision(route="refuse", intent="refuse", notes="acl_data")
+
     tool_id = intentmod.intent_to_tool(intent)
 
-    # Agent meta / 自身份：Retrieval 前 short-circuit（不进 Published / Claim）
     if intent == "whoami":
-        return enrich_answer_for_display(
+        return _finish(
             AgentAnswer(
-                text=_whoami_text(identity, permission),
+                text=_whoami_text(identity),
                 intent="whoami",
                 tools_called=[],
                 fingerprint=fp.build_fingerprint(
@@ -85,12 +149,53 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
                     identity_status=identity.status,
                 ),
                 **base_kwargs,
-            )
+            ),
+            route=route,
+        )
+
+    if intent == "casual":
+        return _finish(
+            AgentAnswer(
+                text=route.casual_text or conv._casual_reply(envelope.text or ""),
+                intent="casual",
+                tools_called=[],
+                fingerprint=fp.build_fingerprint(
+                    context=context, permission=permission, tool_result=None
+                ),
+                trace=fp.build_trace(
+                    intent="casual",
+                    tool_id=None,
+                    context=context,
+                    identity_status=identity.status,
+                ),
+                **base_kwargs,
+            ),
+            route=route,
+        )
+
+    if intent == "clarify":
+        return _finish(
+            AgentAnswer(
+                text=route.clarify_text or "能再说具体一点吗？",
+                intent="clarify",
+                tools_called=[],
+                fingerprint=fp.build_fingerprint(
+                    context=context, permission=permission, tool_result=None
+                ),
+                trace=fp.build_trace(
+                    intent="clarify",
+                    tool_id=None,
+                    context=context,
+                    identity_status=identity.status,
+                ),
+                **base_kwargs,
+            ),
+            route=route,
         )
 
     if intent == "refuse" or tool_id is None:
         text = _refuse_text(identity.status, envelope.text, permission.deny_reason)
-        return enrich_answer_for_display(
+        return _finish(
             AgentAnswer(
                 text=text,
                 intent="refuse",
@@ -106,18 +211,18 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
                     identity_status=identity.status,
                 ),
                 **base_kwargs,
-            )
+            ),
+            route=route,
         )
 
     if not permmod.tool_allowed(permission, tool_id):
-        # 可降级 help
         if permmod.tool_allowed(permission, "system.help") and tool_id != "system.help":
             help_r = toolsmod.invoke_tool(
                 "system.help", con, identity, permission, context, {}
             )
-            return enrich_answer_for_display(
+            return _finish(
                 AgentAnswer(
-                    text=_refuse_text(identity.status, envelope.text, "acl_denied")
+                    text=_REFUSE_ACL
                     + "\n\n"
                     + str((help_r.payload or {}).get("help") or ""),
                     intent="refuse",
@@ -134,9 +239,10 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
                         identity_status=identity.status,
                     ),
                     **base_kwargs,
-                )
+                ),
+                route=route,
             )
-        return enrich_answer_for_display(
+        return _finish(
             AgentAnswer(
                 text=_REFUSE_ACL,
                 intent="refuse",
@@ -152,19 +258,20 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
                     identity_status=identity.status,
                 ),
                 **base_kwargs,
-            )
+            ),
+            route=route,
         )
 
-    # 硬约束：至多 1 个数据 Tool
     data_count = 1 if tool_id in DATA_TOOLS else 0
     assert data_count <= 1
 
-    args: dict[str, Any] = {"q": (envelope.text or "").strip()}
+    # Follow-up：用 rewrite 后的问句检索（不是上一轮答案）
+    ask_q = (route.rewritten_query or envelope.text or "").strip()
+    args: dict[str, Any] = {"q": ask_q}
     result = toolsmod.invoke_tool(
         tool_id, con, identity, permission, context, args
     )
 
-    # 禁止因空/差结果再打第二个数据 Tool（硬约束：此处直接 render）
     text, bindings, evidence = _render(result, intent, identity.status)
     trace = fp.build_trace(
         intent=intent,
@@ -181,26 +288,24 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
         trace["n_hits"] = payload.get("n_hits")
     if payload.get("claim_support"):
         trace["claim_support"] = payload.get("claim_support")
-    return enrich_answer_for_display(
-        AgentAnswer(
-            text=text,
-            intent=intent,
-            tools_called=[tool_id],
-            fingerprint=fp.build_fingerprint(
-                context=context, permission=permission, tool_result=result
-            ),
-            trace=trace,
-            claim_bindings=bindings,
-            evidence_refs=evidence,
-            refused=bool(result.denied),
-            deny_reason=result.error if result.denied else "",
-            **base_kwargs,
+    answer = AgentAnswer(
+        text=text,
+        intent=intent,
+        tools_called=[tool_id],
+        fingerprint=fp.build_fingerprint(
+            context=context, permission=permission, tool_result=result
         ),
-        payload=payload,
+        trace=trace,
+        claim_bindings=bindings,
+        evidence_refs=evidence,
+        refused=bool(result.denied),
+        deny_reason=result.error if result.denied else "",
+        **base_kwargs,
     )
+    return _finish(answer, route=route, payload=payload, user_for_state=ask_q)
 
 
-def _whoami_text(identity, permission) -> str:
+def _whoami_text(identity) -> str:
     person = getattr(identity, "person", None) or {}
     if not isinstance(person, dict):
         person = {}
@@ -209,33 +314,25 @@ def _whoami_text(identity, permission) -> str:
         or str(person.get("display") or person.get("name") or "").strip()
     )
     team = str(getattr(identity, "primary_team", None) or "").strip()
-    role = str(getattr(identity, "mesh_role", None) or "").strip()
-    status = str(getattr(identity, "status", "") or "")
-    scope = getattr(permission, "query_scope", None)
     if display:
         name = display
-    elif status.startswith("bound"):
+    elif str(getattr(identity, "status", "") or "").startswith("bound"):
         name = "（已绑定，无显示名）"
     else:
-        name = "（未识别显示名）"
-    lines = [
-        f"你是 **{name}**。",
-        f"身份状态：`{status}`"
-        + (f"；角色：{role}" if role else "")
-        + (f"；团队：{team}" if team else "；团队：未绑定"),
-    ]
-    if scope:
-        lines.append(f"当前 Query Scope：`{scope}`。")
-    lines.append("我只能查询已上线（Published）周报，不能读草稿、原文或未上线素材。")
-    lines.append("发送「帮助」可看我能做什么。")
+        name = "（还没认出你的显示名）"
+    lines = [f"你是 **{name}**。"]
+    if team:
+        lines.append(f"当前团队视角：{team}。")
+    lines.append("我只能查已上线周报；想接着问谁或哪家公司，直接说就行。")
     return "\n".join(lines)
 
 
 def _refuse_text(status: str, text: str, deny_reason: str) -> str:
-    from . import intent as intentmod
-
-    if intentmod._DRAFT_RAW.search(text or ""):  # noqa: SLF001 — shared pattern
-        if "草稿" in (text or "") or "draft" in (text or "").lower() or "原文" in (text or "") or "raw" in (text or "").lower() or "未上线" in (text or "") or "查库" in (text or ""):
+    if intentmod._DRAFT_RAW.search(text or ""):  # noqa: SLF001
+        if any(
+            k in (text or "").lower()
+            for k in ("草稿", "draft", "原文", "raw", "未上线", "查库")
+        ) or "草稿" in (text or "") or "未上线" in (text or "") or "原文" in (text or ""):
             return _REFUSE_DRAFT
     if status in ("unlinked", "anonymous_web", "ambiguous", "open_id_mismatch"):
         return _REFUSE_BIND
@@ -252,13 +349,15 @@ def _render(
     identity_status: str,
 ) -> tuple[str, list[ClaimBinding], list[str]]:
     if result.denied:
+        err = str(result.error or "")
+        if "identity" in err or "acl" in err:
+            return (_REFUSE_ACL, [], [])
         return (
-            f"{_REFUSE_ACL}（{result.error}）",
+            "刚才没查成功，你可以再试一次；或换个说法问问。",
             [],
             [],
         )
     payload = result.payload or {}
-    # unsupported 不上屏为事实句
     visible_bindings = [
         b for b in (result.claim_bindings or []) if b.status != "unsupported"
     ]
@@ -272,6 +371,5 @@ def _render(
         return "已上线期次：\n" + "\n".join(lines), visible_bindings, list(result.evidence_refs or [])
     answer = str(payload.get("answer") or "").strip()
     if not answer:
-        # 空结果也不二次 Tool
-        answer = "未在已上线语料中找到可引用依据。"
+        answer = "我目前没查到已发布的内容能确认这件事。"
     return answer, visible_bindings, list(result.evidence_refs or [])

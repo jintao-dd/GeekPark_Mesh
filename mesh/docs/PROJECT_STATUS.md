@@ -3,7 +3,7 @@
 > **日期：** 2026-09-10  
 > **读者：** 产品 / 工程 / 对接方  
 > **原则：** 只写「现在真的怎样」+「下一步做什么」；不写愿景空话。  
-> **镜像锚点：** `geekpark-mesh:2026-09-10-2fc80f3884a7`（tmesh + prod 已对齐）
+> **镜像锚点：** `geekpark-mesh:2026-09-10-03204493a7e1`（tmesh + prod 已对齐）
 
 ---
 
@@ -20,16 +20,18 @@ Mesh 今天是两件事：
 | Mesh v1 生产链 | ✅ **候选 Go** | 可作 Agent 底座（见 `MESH_V1_AGENT_GO_NOGO.md`） |
 | 关系召回工程刀 | ✅ **够用封存** | `card_bridge` 已上；不再扩 Decision/Ranking/Claim |
 | 飞书 Agent Phase 1 | ✅ **Done** | 入站+解密+出站思考卡→终答；tmesh 冒烟 + prod 已上 |
-| **当前主战场** | → **P0.0→Canary** | 基础行为 short-circuit 后立即真人 Canary |
+| P0.0 Meta short-circuit | ✅ **Done** | 「你是谁」等不进 Retrieval；commit `0320449` |
+| **当前主战场** | → **Conversation Runtime Sprint** | Session Context + Route + Failure UX + Help；不解冻质量 |
 
 ```
-P0.0 Agent 基础行为修正（meta 不进 Retrieval）→ 本刀
-P0.1 真人 Canary（私聊≥3 / 群 / 事实 / 关系 / 拒答）
-P0.2 可观测固化
-P0.3 群边界
-P0.4 失败手册
-→ Phase 2 完成
-不做：因「你是谁」开大改 Agent；不回头动 Ranking/Claim/Retrieval
+P0.0 Meta/Identity ✅
+P0.1 全谱 Canary → NO-GO（B/A/F/E）
+Conversation Runtime Sprint ← 现在（一次集中：B+A+F+E）
+     ↓
+自动回归全谱 Canary
+     ↓
+真人 Canary（repair_rate + 自然追问）
+不做：Wiki / Memory 大架构 / ReAct / 解冻 Ranking·Claim·Retrieval
 ```
 
 ---
@@ -53,7 +55,7 @@ P0.4 失败手册
 | | tmesh | prod |
 |--|--|--|
 | URL | https://tmesh.geekpark.net | https://mesh.geekpark.ai |
-| 镜像 | `2026-09-10-2fc80f3884a7` | 同左 |
+| 镜像 | `2026-09-10-03204493a7e1` | 同左 |
 | REPRO | PASS | PASS |
 | Claim Check | `enforce` | `enforce` |
 | 密码登录 | ✅ 可开（staging） | ❌ 关（`MESH_ENV=production`） |
@@ -112,7 +114,7 @@ P0.4 失败手册
 | Bot 事件订阅 | ✅ | `POST /api/feishu/bot/event` |
 | Encrypt + Verification | ✅ | tmesh + **prod 已同步** |
 | 出站 + 思考卡 → Patch 终答 | ✅ **Phase 1 Done** | 私聊 + 群（CCC技术组）冒烟过 |
-| 小范围真人 Canary | 🔨 **Phase 2** | 下一刀 |
+| 小范围真人 Canary | 🔨 **P0.1 进行中** | 像不像同事；见 `AGENT_CANARY_P01.md` |
 | Evidence 卡片交互增强 | ❌ | Canary 后按需 |
 
 ### E. 明确不做
@@ -142,14 +144,13 @@ P0.4 失败手册
 
 | # | 工作项 | 验收 |
 |---|--------|------|
-| **0.0** | **Agent 基础行为**：你是谁 / 你能干什么 / 帮助 / greeting / 我是谁 → Retrieval 前 short-circuit | 不得出现 no_evidence；事实/关系问法不受影响 |
-| 0.1 | 真人 Canary（私聊 ≥3 + 群 + 事实 + 关系 + 拒答） | 各至少 1 通；有 Evidence（事实/关系） |
+| **0.0** | Agent 基础行为 short-circuit | ✅ Done（`0320449` / 镜像 `03204493a7e1`） |
+| **0.1** | **真人 Canary（像不像同事）** | 3～5 人×10～20 问 + 群；记真实聊天与行为信号；**本轮不修**；见 `AGENT_CANARY_P01.md` |
 | 0.2 | 可观测固化 | request_id / intent / latency / evidence / refuse / model |
 | 0.3 | 群边界实战 | 群绑定团队生效；不越权 |
 | 0.4 | 失败手册 | 超时 / 解密 / 无证据 / 拒答处置 |
 
-**P0.0 完成后立刻进 0.1，不再抠 meta 文案。**
-
+**P0.1 第一性指标：用户会不会自然问下一句。** 重复 failure 模式出现前不集中修。
 ### P1 · Canary 稳定后按需
 
 | # | 工作项 | 触发条件 |
@@ -186,7 +187,7 @@ P0.4 失败手册
         ↓
 ③ 飞书私聊 + 群各问 1 句（真实 Bot，不经 harness）
         ↓
-④ 开始 Phase 2.1 Canary 名单与问题集
+④ 按 `AGENT_CANARY_P01.md` 跑真人 Canary（记聊天，不修）
         ↓
 ⑤ 每日扫 observability / 日志失败类
 ```
@@ -226,4 +227,4 @@ P0.4 失败手册
 
 > Mesh 周报与「有证据的问答」已在 tmesh/prod 可跑；**答案质量基线已冻**。  
 > **飞书 Bot Phase 1 已完成**（能收、能回、有思考卡）；关系召回工程刀**够用封存**。  
-> **下一步不是改质量，而是 Agent Phase 2：真人 Canary + 可观测 + 群边界。**
+> **下一步：P0.1 真人 Canary（像不像同事）。收集真实对话后再打共性产品问题。**
