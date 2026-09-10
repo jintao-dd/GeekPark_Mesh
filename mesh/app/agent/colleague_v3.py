@@ -1,10 +1,11 @@
 """Colleague v3 — 单一主体：一张嘴听+说；Ask 只是工具。
 
-Wave 1：旁路 Controller；注入 Identity；speak | ask_* | refuse。
-禁止：Decide Agent、Multi-Agent、response_mode 预算中轴。
+协议（action JSON）绝不能泄漏到用户可见文本。
+Decide 只出短 JSON；speak 正文另用明文生成。
 """
 from __future__ import annotations
 
+import ast
 import json
 import logging
 import re
@@ -21,35 +22,38 @@ _TOOLS = {
     "context.list_issues",
 }
 
-_SYSTEM = """你是 GeekPark（极客公园）内部的 AI 同事「Mesh」，在飞书里和员工说话。
+_SYSTEM_DECIDE = """你是 GeekPark 内部 AI 同事 Mesh 的「动作选择」层。
+只输出一个严格 JSON（双引号，不要 markdown，不要长文）：
 
-你是一个人，不是路由系统、不是客服、不是检索框。
-用自然同事口吻回应；可以有情绪和观点；不要客服腔、不要「很抱歉给您带来不便」、不要每轮追问还需要什么、不要强行 emoji。
-除非用户问你是谁/能干什么，不要自我介绍或背能力清单。
-
-公司事实（某人/公司在已上线周报里怎样、跟谁聊过、关系、期次列表）必须通过工具查，不能编造。
-观点用「我觉得」可以；但必须说清这是看法不是周报事实。
-
-你每次只输出一个 JSON 对象（不要 markdown）：
-{"action":"speak","text":"..."}
+{"action":"speak"}
 {"action":"ask","tool":"ask.published|ask.relations_summary|context.list_issues","query":"..."}
-{"action":"refuse","text":"..."}
+{"action":"refuse","text":"一句短拒"}
 
-选择：
-- 闲聊、吐槽、情绪、观点、润色改写、澄清问题、自我反馈 → speak
-- 明确要查已上线周报事实 → ask（query 写成完整可检索问句）
-- 用户要改权限/发布/读草稿原文 → refuse（Safety 也会拦；你仍可 refuse）
+规则：
+- 闲聊/吐槽/情绪/观点/写稿润色/改写/自我反馈/用户让你直接做事 → speak（正文稍后生成，JSON 里不要写正文）
+- 明确要查已上线周报事实（某人跟谁聊过、关系、期次）→ ask，query 写成完整问句
+- 改权限/发布/读草稿原文 → refuse
+- 写文章、直接写、不要问 → 必须 speak，不要 ask 周报
+- 对象不清且确实是查周报 → 用 speak（稍后用嘴问一句），不要瞎 ask
+"""
 
-ask.published：人物/公司进展、跟谁聊过、最近怎么样（有明确对象时）
-ask.relations_summary：团队/实体之间有哪些关系
-context.list_issues：有哪些已上线期次
-对象不清时用 speak 问一句，不要盲目 ask。
+_SYSTEM_SPEAK = """你是 GeekPark（极客公园）内部的 AI 同事「Mesh」，在飞书里和员工说话。
+
+你是一个人，不是路由、不是客服、不是检索框。
+自然、直接；可以有情绪和观点；禁止客服腔、「很抱歉给您带来不便」、每轮追问还需要什么、强行 emoji、自我介绍（除非被问是谁）。
+
+硬规则：
+1) 用户说「直接写 / 不要问了 / 写啊」——本轮必须交付成品，禁止只承诺「下次」、禁止再追问风格受众。
+2) 写稿/润色：直接给一版可用的；不确定风格就选自然有态度的内部同事写法，写完可补一句「要改风格再说」。
+3) 不要编造「某人在周报里怎样」的公司事实；若用户在问周报事实，自然说需要人名/公司或请他们直接问。
+4) 观点用「我觉得」可以，并标明是看法。
+5) 只输出对用户说的话，不要输出 JSON、不要输出 action/tool 字段。
 """
 
 
 @dataclass
 class ColleagueV3Result:
-    action: str = "speak"  # speak|ask|refuse
+    action: str = "speak"
     text: str = ""
     tool_id: str = ""
     query: str = ""
@@ -66,9 +70,15 @@ class ColleagueV3Result:
     trace: dict[str, Any] = field(default_factory=dict)
 
 
+_LEAK_RE = re.compile(
+    r"""^\s*[\{\[]\s*['"]action['"]\s*:""",
+    re.I,
+)
+
+
 def _identity_block(identity: Any) -> str:
     if identity is None:
-        return "对方身份：未知（尚未绑定）。不确定时不要假装认识，可自然说明。"
+        return "对方身份：未知（尚未绑定）。不确定时不要假装认识。"
     person = getattr(identity, "person", None) or {}
     if not isinstance(person, dict):
         person = {}
@@ -90,7 +100,7 @@ def _identity_block(identity: Any) -> str:
         lines.append("对方团队：未知或不唯一")
     if role:
         lines.append(f"Mesh 角色：{role}")
-    lines.append("用这些信息自然对话（例如知道对方团队时可以说「你们…」），但不要每句点名汇报身份。")
+    lines.append("可自然使用身份，但不要每句点名汇报。")
     return "\n".join(lines)
 
 
@@ -100,38 +110,92 @@ def _history_block(state: SessionContextState | None) -> str:
     lines = []
     for t in (state.recent_turns or [])[-8:]:
         role = "用户" if t.get("role") == "user" else "Mesh"
-        lines.append(f"{role}：{t.get('text') or ''}")
+        # 历史里若曾泄漏 JSON，只留可读片段，避免模型学会泄漏
+        raw = str(t.get("text") or "")
+        lines.append(f"{role}：{_sanitize_user_visible(raw)}")
     return "最近对话：\n" + "\n".join(lines)
 
 
 def _parse_decision(raw: str) -> dict[str, Any]:
     s = (raw or "").strip()
     if not s:
-        return {"action": "speak", "text": "嗯，我在听。你接着说。"}
-    # strip fence
+        return {"action": "speak"}
     if s.startswith("```"):
         s = re.sub(r"^```(?:json)?\s*", "", s)
-        s = re.sub(r"\s*```$", "", s)
-    try:
-        data = json.loads(s)
-        if isinstance(data, dict):
-            return data
-    except Exception:
-        pass
-    m = re.search(r"\{[\s\S]*\}", s)
-    if m:
+        s = re.sub(r"\s*```$", "", s).strip()
+
+    for candidate in (s,):
         try:
-            data = json.loads(m.group(0))
-            if isinstance(data, dict):
+            data = json.loads(candidate)
+            if isinstance(data, dict) and data.get("action"):
                 return data
         except Exception:
             pass
-    return {"action": "speak", "text": s[:1200]}
+
+    m = re.search(r"\{[\s\S]*\}", s)
+    blob = m.group(0) if m else s
+    try:
+        data = json.loads(blob)
+        if isinstance(data, dict) and data.get("action"):
+            return data
+    except Exception:
+        pass
+    try:
+        data = ast.literal_eval(blob)
+        if isinstance(data, dict) and data.get("action"):
+            return {str(k): v for k, v in data.items()}
+    except Exception:
+        pass
+
+    # 从脏文本抽 action
+    am = re.search(r"['\"]action['\"]\s*:\s*['\"](\w+)['\"]", s, re.I)
+    action = (am.group(1) if am else "speak").lower()
+    out: dict[str, Any] = {"action": action}
+    tm = re.search(r"['\"]tool['\"]\s*:\s*['\"]([^'\"]+)['\"]", s, re.I)
+    if tm:
+        out["tool"] = tm.group(1)
+    qm = re.search(r"['\"]query['\"]\s*:\s*['\"]([^'\"]*)['\"]", s, re.I)
+    if qm:
+        out["query"] = qm.group(1)
+    # 绝不把整段协议当 text
+    if action == "refuse":
+        out["text"] = "这个我做不了。"
+    return out
+
+
+def _sanitize_user_visible(text: str) -> str:
+    """防止协议 JSON 漏到飞书。"""
+    t = (text or "").strip()
+    if not t:
+        return t
+    if not _LEAK_RE.search(t) and "'action'" not in t and '"action"' not in t:
+        return t
+    # 尝试抽出 text 字段
+    for parser in (json.loads, ast.literal_eval):
+        try:
+            m = re.search(r"\{[\s\S]*\}", t)
+            data = parser(m.group(0) if m else t)
+            if isinstance(data, dict):
+                inner = str(data.get("text") or "").strip()
+                if inner and "'action'" not in inner and '"action"' not in inner[:20]:
+                    return inner
+        except Exception:
+            pass
+    # 宽松抽 text
+    m = re.search(
+        r"['\"]text['\"]\s*:\s*['\"]([\s\S]*?)['\"]\s*\}?\s*$",
+        t,
+    )
+    if m:
+        return m.group(1).replace("\\n", "\n").strip()
+    # 抽失败：给短回落，绝不回整段 JSON
+    log.warning("colleague_v3 stripped leaked protocol from user text")
+    return "刚才格式乱了一下。你要我说啥，直接再说一遍。"
 
 
 def _decide(user_text: str, identity: Any, state: SessionContextState | None) -> tuple[dict[str, Any], dict[str, Any]]:
     meta: dict[str, Any] = {"llm_used": False, "model": None, "error": ""}
-    system = _SYSTEM + "\n\n## 对方\n" + _identity_block(identity)
+    system = _SYSTEM_DECIDE + "\n\n## 对方\n" + _identity_block(identity)
     hist = _history_block(state)
     user = (hist + "\n\n" if hist else "") + f"用户：{(user_text or '').strip()}\nJSON："
     try:
@@ -140,7 +204,7 @@ def _decide(user_text: str, identity: Any, state: SessionContextState | None) ->
         raw = llm.call(
             system,
             user,
-            max_tokens=700,
+            max_tokens=220,
             json_mode=True,
             task="answer",
         )
@@ -150,10 +214,35 @@ def _decide(user_text: str, identity: Any, state: SessionContextState | None) ->
     except Exception as e:
         log.warning("colleague_v3 decide failed: %s", e)
         meta["error"] = str(e)[:120]
-        return {
-            "action": "speak",
-            "text": "刚才卡了一下。你再说一遍，或直接丢个人名/公司名我帮你查周报。",
-        }, meta
+        return {"action": "speak"}, meta
+
+
+def _speak_plain(
+    user_text: str,
+    identity: Any,
+    state: SessionContextState | None,
+) -> tuple[str, dict[str, Any]]:
+    meta: dict[str, Any] = {"llm_used": False, "model": None}
+    system = _SYSTEM_SPEAK + "\n\n## 对方\n" + _identity_block(identity)
+    hist = _history_block(state)
+    user = (hist + "\n\n" if hist else "") + f"用户：{(user_text or '').strip()}\nMesh："
+    try:
+        from .. import llm
+
+        out = llm.call(
+            system,
+            user,
+            max_tokens=2000,
+            json_mode=False,
+            task="answer",
+        )
+        meta["llm_used"] = True
+        meta["model"] = llm.model_for_task("answer")
+        text = _sanitize_user_visible(str(out or "").strip())
+        return (text or "嗯，我在听。你接着说。"), meta
+    except Exception as e:
+        log.warning("colleague_v3 speak failed: %s", e)
+        return "刚才卡了一下。你再说一遍。", meta
 
 
 def _synthesize(
@@ -165,9 +254,7 @@ def _synthesize(
     meta: dict[str, Any] = {"llm_used": False, "model": None}
     system = (
         "你是 GeekPark 内部同事 Mesh。下面是已从已上线周报查到的事实材料。"
-        "用同一张同事的嘴转述给用户：自然、清楚、可保留关键证据感；"
-        "不要编造材料没有的事实；不要客服腔；不要自我介绍。"
-        "若材料说查不到，就坦诚说没查到。\n\n"
+        "用同事口吻转述：自然、清楚；不要编造材料没有的事实；不要客服腔；不要输出 JSON。\n\n"
         + _identity_block(identity)
     )
     hist = _history_block(state)
@@ -178,10 +265,10 @@ def _synthesize(
     try:
         from .. import llm
 
-        out = llm.call(system, user, max_tokens=900, json_mode=False, task="answer")
+        out = llm.call(system, user, max_tokens=1200, json_mode=False, task="answer")
         meta["llm_used"] = True
         meta["model"] = llm.model_for_task("answer")
-        text = str(out or "").strip()
+        text = _sanitize_user_visible(str(out or "").strip())
         return (text or fact_text), meta
     except Exception as e:
         log.warning("colleague_v3 synthesize failed: %s", e)
@@ -211,27 +298,31 @@ def handle(
     invoke_tool,
     render_tool_result,
 ) -> ColleagueV3Result:
-    """主回合：Decide(+可选 Ask + 可选合成)。"""
     q = (user_text or "").strip()
     decision, dmeta = _decide(q, identity, session)
     action = str(decision.get("action") or "speak").strip().lower()
+    if action not in ("speak", "ask", "refuse"):
+        action = "speak"
+
     out = ColleagueV3Result(
         llm_used=bool(dmeta.get("llm_used")),
         model=dmeta.get("model"),
         trace={
             "colleague_v3": True,
             "decide_error": dmeta.get("error") or "",
+            "decision": {
+                "action": action,
+                "tool": str(decision.get("tool") or ""),
+                "query": str(decision.get("query") or "")[:200],
+            },
         },
     )
-    out.trace["decision"] = {
-        "action": action,
-        "tool": str(decision.get("tool") or ""),
-        "query": str(decision.get("query") or "")[:200],
-    }
 
     if action == "refuse":
         out.action = "refuse"
-        out.text = str(decision.get("text") or "这个我做不了。").strip()
+        out.text = _sanitize_user_visible(
+            str(decision.get("text") or "这个我做不了。").strip()
+        )
         out.intent = "refuse"
         out.refused = True
         out.deny_reason = "colleague_refuse"
@@ -260,20 +351,24 @@ def handle(
         if getattr(result, "denied", False):
             out.refused = True
             out.deny_reason = str(getattr(result, "error", "") or "ask_denied")
-            out.text = fact_text
+            out.text = _sanitize_user_visible(fact_text)
             out.action = "ask"
             return out
-        # 同声线合成
         spoken, smeta = _synthesize(q, fact_text, identity, session)
         out.synthesize_llm_used = bool(smeta.get("llm_used"))
-        out.text = spoken
+        out.llm_used = bool(out.llm_used or smeta.get("llm_used"))
+        out.text = _sanitize_user_visible(spoken)
         out.action = "ask"
         out.trace["synthesize"] = bool(smeta.get("llm_used"))
         out.trace["ask_query"] = query
         return out
 
-    # speak（默认）
+    # speak：明文成文（协议与正文分离）
+    spoken, smeta = _speak_plain(q, identity, session)
     out.action = "speak"
-    out.text = str(decision.get("text") or "").strip() or "嗯，我在听。你接着说。"
+    out.text = _sanitize_user_visible(spoken)
     out.intent = "casual"
+    out.llm_used = bool(out.llm_used or smeta.get("llm_used"))
+    out.synthesize_llm_used = bool(smeta.get("llm_used"))
+    out.trace["speak_plain"] = True
     return out

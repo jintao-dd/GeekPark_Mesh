@@ -22,14 +22,25 @@ def _clip(text: str, n: int = 6000) -> str:
 
 
 def stage_copy(stage: int, *, query: str = "") -> str:
-    """等待阶段文案（口语）。"""
+    """等待阶段文案（口语）。不默认假装「正在查周报」。"""
     q = _clip(query, 80)
     quote = f"\n\n> {q}" if q else ""
+    # 明显写稿/闲聊：别说翻周报
+    soft = bool(
+        re.search(
+            r"(写|文章|润色|改写|翻译|帮忙看看|忙死了|哈哈|傻|机械|同事)",
+            query or "",
+        )
+    )
+    if soft:
+        if stage <= 0:
+            return f"嗯，我想一下…{quote}"
+        return f"差不多了…{quote}"
     if stage <= 0:
-        return f"收到，我去翻翻最近的周报…{quote}"
+        return f"收到，我看一下…{quote}"
     if stage == 1:
-        return f"正在已上线周报里检索相关证据…{quote}"
-    return f"在整理可引用的依据，马上好…{quote}"
+        return f"若要查周报，我在已上线内容里找证据…{quote}"
+    return f"在整理，马上好…{quote}"
 
 
 def followup_suggestions(query: str = "", *, display_text: str = "") -> list[str]:
