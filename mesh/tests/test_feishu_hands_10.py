@@ -242,6 +242,57 @@ def test_hard_confirm_regex_without_llm_decide():
     assert calls["n"] == 1  # synthesize only
 
 
+def test_hard_confirm_strips_feishu_mention():
+    """群聊确认常为 '@_user_1 确认'（11 字），旧正则整句匹配失败会掉成 casual。"""
+    os.environ["MESH_FEISHU_HANDS"] = "1"
+    os.environ["MESH_FEISHU_HANDS_WRITE"] = "1"
+    os.environ["MESH_FEISHU_HANDS_BACKEND"] = "mock"
+    st = SessionContextState()
+    st.pending_write = {
+        "tool": "feishu.im.send",
+        "args": {"receive_id": "oc_x", "text": "hi", "receive_id_type": "chat_id"},
+    }
+
+    def fake_llm(system, user, max_tokens=4000, json_mode=False, task="default"):
+        if json_mode:
+            raise AssertionError("decide must hard-confirm after mention strip")
+        return "已发送。"
+
+    with mock.patch("app.llm.call", side_effect=fake_llm):
+        r = colleague_v3.handle(
+            con=None,
+            user_text="@_user_1 确认",
+            identity=_ident(),
+            permission=_perm_all(),
+            context=_ctx(),
+            session=st,
+            invoke_tool=toolsmod.invoke_tool,
+            render_tool_result=lambda r, i, s: ("ok", [], []),
+        )
+    assert r.tools_called == ["feishu.im.send"]
+    assert st.pending_write is None
+    assert r.trace.get("hard_confirm") is True
+
+
+def test_parse_im_strips_mention_for_confirm_len():
+    from app.agent.feishu_bot import parse_im_message
+
+    p = parse_im_message(
+        {
+            "sender": {"sender_id": {"open_id": "ou_x"}},
+            "message": {
+                "chat_id": "oc_g",
+                "chat_type": "group",
+                "message_type": "text",
+                "content": '{"text":"@_user_1 确认"}',
+            },
+        }
+    )
+    assert p is not None
+    assert p["text"] == "确认"
+    assert len("@_user_1 确认") == 11
+
+
 def test_cancel_write():
     st = SessionContextState()
     st.pending_write = {"tool": "feishu.im.send", "args": {"receive_id": "x", "text": "hi"}}

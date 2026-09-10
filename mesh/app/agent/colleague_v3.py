@@ -24,13 +24,47 @@ _MESH_TOOLS = {
 _TOOLS = _MESH_TOOLS | set(FEISHU_ALL_TOOLS)
 
 _CONFIRM_RE = re.compile(
-    r"^(好的?|可以|要|行|嗯+|确认|创建吧|发吧|发|创建|写吧|就这样|ok|yes|y)\s*[。.!！]*$",
+    r"^(好的?|可以|要|行|嗯+|确认|创建吧|发吧|发|创建|写吧|就这样|ok|yes|y)"
+    r"(?:[，,。.!！\s]*(?:一下|创建|发送|执行|写入|吧|了)?)*"
+    r"\s*[。.!！]*$",
     re.I,
 )
 _CANCEL_RE = re.compile(
     r"^(不要|别|取消|算了|先不用|no|n)\s*[。.!！]*$",
     re.I,
 )
+_CONFIRM_SOFT = re.compile(r"(确认|可以发|发吧|创建吧|写吧|执行吧|\bok\b|\byes\b)", re.I)
+_CANCEL_SOFT = re.compile(r"(不要|别发|取消|算了|先不用|\bno\b)", re.I)
+
+
+def _clean_user_text(text: str) -> str:
+    """去掉飞书 @ 占位（群聊常为 @_user_1），否则硬确认整句匹配必挂。"""
+    from .conversation import normalize_query
+
+    return normalize_query(text or "")
+
+
+def _looks_like_confirm(text: str) -> bool:
+    q = _clean_user_text(text)
+    if not q:
+        return False
+    if _CONFIRM_RE.match(q):
+        return True
+    # 短句软确认：有 pending 时「@_user_1 确认发送」等
+    if len(q) <= 24 and _CONFIRM_SOFT.search(q) and not _CANCEL_SOFT.search(q):
+        return True
+    return False
+
+
+def _looks_like_cancel(text: str) -> bool:
+    q = _clean_user_text(text)
+    if not q:
+        return False
+    if _CANCEL_RE.match(q):
+        return True
+    if len(q) <= 24 and _CANCEL_SOFT.search(q):
+        return True
+    return False
 
 _SYSTEM_DECIDE = """你是 GeekPark 内部 AI 同事 Mesh 的「动作选择」层。
 只输出一个严格 JSON（双引号，不要 markdown，不要长文）：
@@ -225,13 +259,15 @@ def _sanitize_user_visible(text: str) -> str:
 
 def _decide(user_text: str, identity: Any, state: SessionContextState | None) -> tuple[dict[str, Any], dict[str, Any]]:
     meta: dict[str, Any] = {"llm_used": False, "model": None, "error": ""}
-    # 硬确认 / 取消：有 pending 时优先，避免模型漏判
-    qn = (user_text or "").strip()
+    # 硬确认 / 取消：有 pending 时优先，避免模型漏判（须先剥飞书 @）
+    qn = _clean_user_text(user_text)
     pending = getattr(state, "pending_write", None) if state else None
     if isinstance(pending, dict) and pending.get("tool"):
-        if _CONFIRM_RE.match(qn):
+        if _looks_like_confirm(qn):
+            meta["hard_confirm"] = True
             return {"action": "confirm_write"}, meta
-        if _CANCEL_RE.match(qn):
+        if _looks_like_cancel(qn):
+            meta["hard_cancel"] = True
             return {"action": "cancel_write"}, meta
 
     system = _SYSTEM_DECIDE + "\n\n## 对方\n" + _identity_block(identity)
@@ -416,9 +452,17 @@ def handle(
     invoke_tool,
     render_tool_result,
 ) -> ColleagueV3Result:
-    q = (user_text or "").strip()
+    q = _clean_user_text(user_text)
     decision, dmeta = _decide(q, identity, session)
     action = str(decision.get("action") or "speak").strip().lower()
+    log.info(
+        "colleague_v3 decide action=%s tool=%s pending=%s hard=%s q=%r",
+        action,
+        str(decision.get("tool") or "")[:40],
+        bool(isinstance(session.pending_write, dict) and (session.pending_write or {}).get("tool")),
+        bool(dmeta.get("hard_confirm") or dmeta.get("hard_cancel")),
+        (q or "")[:80],
+    )
     if action not in (
         "speak",
         "ask",
@@ -435,6 +479,8 @@ def handle(
         trace={
             "colleague_v3": True,
             "decide_error": dmeta.get("error") or "",
+            "hard_confirm": bool(dmeta.get("hard_confirm")),
+            "hard_cancel": bool(dmeta.get("hard_cancel")),
             "decision": {
                 "action": action,
                 "tool": str(decision.get("tool") or ""),

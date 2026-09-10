@@ -123,6 +123,14 @@ def parse_im_message(event: dict[str, Any]) -> dict[str, Any] | None:
         text = str(content.get("text") or content.get("content") or "").strip()
     else:
         text = _extract_text(str(content or ""))
+    # 群聊 @机器人 会留下 @_user_1；不剥掉则确认写整句匹配失败
+    if text:
+        try:
+            from .conversation import normalize_query
+
+            text = normalize_query(text)
+        except Exception:
+            pass
     if not text and not open_id:
         return None
     channel = "feishu_group" if chat_type == "group" else "feishu_dm"
@@ -346,10 +354,15 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
         finally:
             con.close()
 
+        tr = d.get("trace") if isinstance(d.get("trace"), dict) else {}
+        dec = tr.get("decision") if isinstance(tr.get("decision"), dict) else {}
         _elog(
-            "agent done open_id=%s intent=%s chars=%s",
+            "agent done open_id=%s intent=%s action=%s pending=%s q=%r chars=%s",
             payload.get("feishu_open_id"),
             d.get("intent"),
+            dec.get("action") or "",
+            tr.get("pending_write") or "",
+            str(payload.get("text") or "")[:60],
             len(reply),
         )
         log.info(
