@@ -24,8 +24,9 @@ Mesh 今天是两件事：
 | **Colleague Agent v1** | ✅ 薄壳已上 | 规则路由 + 闲聊 LLM + Session（决策路径已被 v2 Stage1 取代） |
 | **Colleague Agent v2 Stage 1–2A** | ⚠ **旁路** | 组件化路径归档；见 `COLLEAGUE_AGENT_V3.md` |
 | **Colleague Agent v3 Wave 1** | → **主路径** | Safety → 一张嘴 Colleague；Ask 当工具 |
+| **Feishu Hands** | 📋 计划已定 | MCP 为主 / CLI 为辅；见 `COLLEAGUE_FEISHU_HANDS.md` |
 | 全谱 Canary | ✅ CONDITIONAL GO | Follow-up/模糊 PASS；A 残留先不抠 |
-| **当前主战场** | → **V3 Wave 1** | 飞书里先是一个人；`MESH_COLLEAGUE_V3=1` |
+| **当前主战场** | → **Phase 0 收口 → Hands Phase 1/2** | Brain 盲测后接 `feishu.search(doc)` |
 
 ```
 Colleague Agent v3
