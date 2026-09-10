@@ -1,8 +1,9 @@
-# GeekPark Mesh · 项目现状一页纸
+# GeekPark Mesh · 现状与后续计划（完整）
 
 > **日期：** 2026-09-10  
-> **读者：** 任何要快速上手的同事（产品 / 工程 / 对接方）  
-> **原则：** 只写「现在真的怎样」，不写愿景。细节文档见文末索引。
+> **读者：** 产品 / 工程 / 对接方  
+> **原则：** 只写「现在真的怎样」+「下一步做什么」；不写愿景空话。  
+> **镜像锚点：** `geekpark-mesh:2026-09-10-2fc80f3884a7`（tmesh + prod 已对齐）
 
 ---
 
@@ -10,28 +11,22 @@
 
 Mesh 今天是两件事：
 
-1. **周报生产线**：各部门素材 → 抽取 → 要点卡 → 草稿/关系 → Owner 确认上线  
-2. **已上线语料上的问答（Agent/Ask）**：只能答 Published；要 Evidence / 期次
-
-**当前主战场（2026-09-10 切换）：**
-
-```
-✅ Phase 1 [P0] 飞书 Bot 基础闭环  — Done
-  · 入站/解密/Verification · 出站 · 思考卡 → Patch 终答
-  · tmesh 私聊+群聊冒烟；prod 镜像已上（2fc80f3884a7）
-✅ 关系召回工程刀  — 封存够用
-  · card_bridge + 实体 key 规范化 + 徽章去重
-  · 不再扩 Decision/Ranking/Claim；「尚未接触」不硬造双边
-→ Phase 2 [P1] Agent 工程化（Canary / 可观测 / 群边界）
-  · 小规模真人 · 失败归因 · 不回头开质量微补丁
-Phase 3 [P2] 性能与产线微调（按需）
-```
+1. **周报生产线**：素材 → 抽取 → 要点卡 → 草稿/关系 → Owner 上线  
+2. **已上线语料上的问答（Agent / 飞书）**：只读 Published；回答要 Evidence / 期次
 
 | 轨道 | 状态 | 一句话 |
 |------|------|--------|
-| **质量（答得对不对）** | ✅ **已冻结** v3.0 | Ranking v1.4 + Claim Support v2.4c-2；禁止回头开质量小版本 |
-| **运行时 / 飞书** | ✅ **Phase 1 Done** | 入站+出站+思考卡；下一刀 Canary |
-| **关系召回** | ✅ **够用封存** | card_bridge 已上；Gap 仍可 partial，产品停刀 |
+| Mesh v1 质量 | ✅ **冻结** v3.0 | Ranking v1.4 + Claim Support v2.4c-2；禁止质量微补丁 |
+| Mesh v1 生产链 | ✅ **候选 Go** | 可作 Agent 底座（见 `MESH_V1_AGENT_GO_NOGO.md`） |
+| 关系召回工程刀 | ✅ **够用封存** | `card_bridge` 已上；不再扩 Decision/Ranking/Claim |
+| 飞书 Agent Phase 1 | ✅ **Done** | 入站+解密+出站思考卡→终答；tmesh 冒烟 + prod 已上 |
+| **当前主战场** | → **Agent Phase 2** | 真人 Canary · 可观测 · 群边界 · 失败归因 |
+
+```
+已完成：质量封存 → 飞书 Phase 1 → 关系召回够用 → prod 镜像对齐 → 事件钥同步
+下一步：Agent Phase 2 工程化（Canary）→ 按真实 failure 再开刀
+不做：质量小版本回头改 / ReAct / 新检索架构 / 硬造双边关系
+```
 
 ---
 
@@ -40,7 +35,7 @@ Phase 3 [P2] 性能与产线微调（按需）
 ### 是
 - 固定流水线 + 若干次 LLM（抽取、出卡、草稿、关系决策、问答）
 - 真相源 = **已 publish** 的 items / relations / evidence
-- 部署：Docker 镜像路径（commit → build → digest → recreate）；测试环境 tmesh，再生产
+- 部署：Docker 镜像路径（commit → build → digest → recreate）；**先 tmesh 再 prod**
 
 ### 不是
 - 通用知识库 / Wiki / ES / 图谱主路径  
@@ -49,137 +44,183 @@ Phase 3 [P2] 性能与产线微调（按需）
 
 ---
 
-## 2. 两条环境
+## 2. 两条环境（当前事实）
 
-| | tmesh（测试） | prod（生产） |
+| | tmesh | prod |
 |--|--|--|
 | URL | https://tmesh.geekpark.net | https://mesh.geekpark.ai |
-| 用途 | 联调、压测、飞书 Bot 自测 | 正式周报与读者 |
-| 纪律 | 改动先上这里 | **必须 tmesh 过了再上**；默认不瞎 Publish / 不跑全量 Ask |
+| 镜像 | `2026-09-10-2fc80f3884a7` | 同左 |
+| REPRO | PASS | PASS |
+| Claim Check | `enforce` | `enforce` |
+| 密码登录 | ✅ 可开（staging） | ❌ 关（`MESH_ENV=production`） |
+| 飞书事件钥 | ✅ | ✅ **已与 tmesh 同步**（2026-09-10） |
+| 纪律 | 联调 / 冒烟 | 默认不 Publish、不跑全量 Preview/Ask |
 
-环境可复现规范：`docs/ENVIRONMENT_REPRODUCIBILITY.md`  
-发布脚本：`deploy/ship_image.ps1`（禁止把 `docker cp` 当正式发布）
+发布：`deploy/ship_image.ps1 -Target tmesh|prod`  
+规范：`docs/ENVIRONMENT_REPRODUCIBILITY.md`
 
 ---
 
-## 3. 阶段看板（清晰对勾）
+## 3. 能力看板（现在）
 
 ### A. 周报生产
 
 | 能力 | 状态 | 备注 |
 |------|------|------|
 | 建期 / 上传 / RSS | ✅ | |
-| Pipeline 抽取（含并行 extract） | ✅ | ⑤区/L3 硬拦 |
-| Preview 渐进开门 | ✅ | 骨架可先进预览页 |
-| 要点卡生成 | ✅ | 默认 **串行**；`MESH_PREVIEW_CARD_CONCURRENCY` 可开并行（tmesh 已 A/B） |
-| 周报壳 + 关系 Decision→Gate→Writer | ✅ | Claim Check enforce；徽章实线/虚线去重 |
+| Pipeline 抽取 | ✅ | ⑤区/L3 硬拦 |
+| Preview 渐进开门 | ✅ | |
+| 要点卡 | ✅ | 默认串行；可开 `MESH_PREVIEW_CARD_CONCURRENCY` |
+| 关系 Decision→Gate→Writer | ✅ | Claim Check enforce；文案须过 grounding |
+| 关系候选 `card_bridge` | ✅ **封存** | 实体 key + 卡面桥接 + 海外已沟通→编辑部 |
+| 团队徽章 | ✅ | 同队不再「实线 + → 同队」 |
 | Owner 上线 / EDM | ✅ | |
-| 关系候选召回（card_bridge） | ✅ **够用封存** | 实体 key + 卡面桥接 + 海外已沟通→编辑部；不再开质量微刀 |
 
-### B. Agent / Ask 质量
+**论证口径：** 读者可见卡 = 有 evidence + body/detail 过闸 + claim 未越界（rule_v1.2）。  
+虚线「→ 队」= 建议关注，不声称该队已有一手记录。
 
-| 能力 | 状态 | 备注 |
-|------|------|------|
-| Identity / Permission / Scope | ✅ 冻结 | |
-| Retrieval + Ranking v1.4 | ✅ 冻结 | |
-| Claim Support v2.4c-2 | ✅ 冻结 | |
-| Evidence 必显（可验证事实） | ✅ 合同 | |
-| Vector / Embedding 热路径 | ✅ 默认 **OFF** | 与质量线一致 |
-| 质量微补丁 / 新质量版本 | ⛔ 禁止 | 未开新刀前不要动 |
+### B. Agent / Ask 质量（冻结）
 
-### C. Agent 性能 / 容量
+| 能力 | 状态 |
+|------|------|
+| Identity / Permission / Scope | ✅ 冻结 |
+| Retrieval + Ranking v1.4 | ✅ 冻结 |
+| Claim Support v2.4c-2 | ✅ 冻结 |
+| Evidence 必显 | ✅ 合同 |
+| Vector / Embedding 热路径 | ✅ 默认 OFF |
+| 质量微补丁 | ⛔ 禁止 |
+
+### C. 性能 / 容量
 
 | 能力 | 状态 | 大约数字（tmesh · Vector OFF · Sonnet） |
 |------|------|------|
-| 环境 Manifest / REPRO 门禁 | ✅ | |
-| 健康单请求基线 | ✅ | 简单 ~2.5–6s；普通检索 P50~13s / P95~17s；强 claim ~8s |
-| Capacity C_safe | ✅ 量过 | 约 C=8 量级（以报告为准） |
-| 流式首 token / 队列 UX | ❌ | 未做；10s+ 体感偏慢 |
-| Feishu 事件层压测 | ❌ | HTTP Agent 压测先做了 |
+| REPRO 门禁 | ✅ | |
+| 单请求基线 | ✅ | 普通检索 P50~13s / P95~17s |
+| Capacity C_safe | ✅ 量过 | 约 C=8 |
+| 流式首 token / 队列 UX | ❌ | 未做 |
+| 飞书事件层压测 | ❌ | HTTP 压测先做了 |
 
-### D. 飞书
+### D. 飞书 Agent
 
 | 能力 | 状态 | 备注 |
 |------|------|------|
-| OAuth 登录网页 | ✅ | `FEISHU_APP_ID/SECRET` |
-| 群 → 团队绑定 | ✅ | |
-| Bot 事件订阅（开发者服务器） | ✅ 接线 | `POST /api/feishu/bot/event` |
-| Encrypt Key 解密 + Verification Token | ✅ | tmesh 已配；**prod 需确认同钥**（见 §5） |
-| **Bot 出站 + 思考中卡片 → Patch 终答** | ✅ Phase 1 Done | tmesh 私聊+群聊冒烟；prod 镜像已对齐 |
-| Evidence 卡片交互 / 更细状态机 | ❌ | Canary 后按需 |
-| 小范围真人 Canary | 🔨 **下一刀** | Agent Phase 2 |
+| OAuth 登录网页 | ✅ | |
+| Bot 事件订阅 | ✅ | `POST /api/feishu/bot/event` |
+| Encrypt + Verification | ✅ | tmesh + **prod 已同步** |
+| 出站 + 思考卡 → Patch 终答 | ✅ **Phase 1 Done** | 私聊 + 群（CCC技术组）冒烟过 |
+| 小范围真人 Canary | 🔨 **Phase 2** | 下一刀 |
+| Evidence 卡片交互增强 | ❌ | Canary 后按需 |
 
-### E. 明确不做（冻结禁止项）
+### E. 明确不做
 
-新 Planner · 新 Retrieval 架构 · Wiki · ES · Neo4j 主路径 · Agentic RAG · Memory 架构 · 写回业务库 · 自动扩能力 · 大规模 Ontology · **质量小版本回头改**
-
----
-
-## 4. 最近刚做完的工程刀（别和「质量」混谈）
-
-| 刀 | 结果 | 默认是否打开 |
-|----|------|----------------|
-| 环境可复现 + ship_image | REPRO_STATUS 硬门禁 | ✅ 流程强制 |
-| Answer/Semantic packing | 压 token；普通问仍 ~10s+ | ✅ 已在运行时 |
-| Weekly Preview Job Profile | 总墙钟约数分钟级；Cards 曾是 Preview 主瓶颈 | 测量脚本 |
-| Cards 受控并行 A/B | conc=2 卡片阶段约 **1.7×**；retry=0；输出因 LLM 非确定会变 | **默认仍 concurrency=1** |
-| Relation Recall Gap 诊断 | 曾 raw≈1；现 card_bridge 补召回 | ✅ 代码已上；报告可留档 |
-| Feishu Phase 1 | 入站+出站+思考卡 | ✅ tmesh 冒烟 + prod `2fc80f3884a7` |
-| 团队徽章去重 | 同队不再实线+→并存 | ✅ |
+新 Planner · 新 Retrieval · Wiki · ES · Neo4j 主路径 · Agentic RAG · Memory 架构 · 写回业务库 · 自动扩能力 · 大规模 Ontology · **质量小版本回头改** · 放宽 provenance 造假双边
 
 ---
 
-## 5. 你现在若要接手：建议顺序
+## 4. 2026-09-10 收口记录（本轮）
+
+| 项 | 结果 |
+|----|------|
+| tmesh 冒烟 | Preview ✅ · 飞书私聊 ✅ · 飞书群聊 ✅ · 关系卡 ✅ · REPRO PASS |
+| prod ship | `2fc80f3884a7` · REPRO PASS |
+| prod 最小验收 | healthz ✅ · webhook ✅ · Agent 问答 ✅ · 关系卡展示 ✅ · 无全量 Preview/Publish |
+| 飞书事件钥 | prod ← tmesh 已同步并 recreate |
+| 关系召回 | **够用封存**（Gap 仍可 partial；「尚未接触」不硬造） |
+| 飞书 Phase 1 | **Done** |
+
+关键 commit（工程）：`c1b60c8` / `c5f5ad9`（card_bridge）· `e02bc14`（staging 密码登录）· `2fc80f3`（徽章去重）· 文档 `f9eed33`+本文
+
+---
+
+## 5. 后续计划（按优先级）
+
+### P0 · 现在就做：Agent Phase 2 工程化
+
+**目标：** 小范围真人能稳定用，失败可归因；**不改大脑质量线**。
+
+| # | 工作项 | 验收 |
+|---|--------|------|
+| 2.1 | 真人 Canary（私聊 ≥3 人 + 已拉测试群） | 问事实 / 关系 / 拒答各至少 1 通；有 Evidence |
+| 2.2 | 可观测固化 | 每次请求可查：`request_id` / latency / intent / refuse / evidence count / model |
+| 2.3 | 群边界实战 | 群绑定团队生效；不越权答外队内部事实 |
+| 2.4 | 失败手册 | 超时 / 解密失败 / 无证据 / 权限拒答 → 标准处置 |
+
+**不做（Phase 2）：** Ranking/Claim 改版 · 新 Tool · 自动写回 · 全员放开
+
+### P1 · Canary 稳定后按需
+
+| # | 工作项 | 触发条件 |
+|---|--------|----------|
+| 3.1 | 飞书事件层压测 | Canary 无 P0 通道故障后 |
+| 3.2 | 队列 / 超时 UX | 用户抱怨「卡住」或并发撞墙 |
+| 3.3 | Evidence 卡片交互 | 真人反馈「看不清出处」 |
+| 3.4 | Cards concurrency=2 默认化 | 再跑一轮 A/B 无质量回退 |
+
+### P2 · 明确延后 / 不排期
+
+| 项 | 原因 |
+|----|------|
+| 关系召回再深挖（别名图谱、尚未接触造卡） | 产品已够用封存 |
+| Ask E2E LLM 全量重跑 | 非阻塞；择机补 |
+| T13 段边界白名单 | Known limitation |
+| 统一 Entity 大图 / Neo4j | 架构远期，不在周报层硬补 |
+| ReAct / LLM Planner | 架构禁止 |
+
+### 决策闸门
+
+- **质量解冻：** 仅当 Canary 出现可复现的「答错 / 无证据乱答」且规则层无法修  
+- **关系再开刀：** 仅当 Owner 明确「缺卡影响上线」且能指出漏召回类型  
+- **prod 发布：** 必须 tmesh 冒烟过；默认不 Publish、不迁数据
+
+---
+
+## 6. 接手顺序（给下一个人）
 
 ```
-① 读本页（你在这里）
+① 读本文（完整现状 + 计划）
         ↓
-② 确认 prod 飞书事件钥（VERIFICATION_TOKEN / ENCRYPT_KEY）与 tmesh 一致
-   （url_verification 已过；加密入站缺钥会静默失败）
+② 打开 tmesh / prod healthz，确认 REPRO_STATUS=PASS、镜像 tag 一致
         ↓
-③ Agent Phase 2：小范围真人 Canary（私聊 + 已拉群）
+③ 飞书私聊 + 群各问 1 句（真实 Bot，不经 harness）
         ↓
-④ 可观测：request_id / latency / refuse / evidence count 固化看板
+④ 开始 Phase 2.1 Canary 名单与问题集
         ↓
-⑤ 质量线继续冻；有真实 failure 再决定是否解冻
+⑤ 每日扫 observability / 日志失败类
 ```
 
 ---
 
-## 6. 关键入口（给会看代码的人）
+## 7. 关键入口
 
 | 事 | 入口 |
 |----|------|
 | HTTP 编排 | `app/main.py` |
-| 挖掘 Job | `app/pipeline.py` |
-| 预览 Job（含 cards 并行开关） | `app/preview_job.py` |
+| 预览 Job | `app/preview_job.py` |
 | 关系候选 | `app/relation_candidates.py` |
+| 关系闸门 / Claim | `app/relation_gate.py` · `app/relation_claim_check.py` |
 | Agent 大脑 | `app/agent/runtime.py` → `handle_message` |
-| 飞书事件 | `app/agent/feishu_bot.py` · `POST /api/feishu/bot/event` |
-| 飞书展示文案 | `app/agent/feishu_reply.py` |
+| 飞书 Bot | `app/agent/feishu_bot.py` · `feishu_api.py` · `feishu_cards.py` |
 | 发布 | `deploy/ship_image.ps1 -Target tmesh\|prod` |
 
 ---
 
-## 7. 文档索引（按需下钻）
+## 8. 文档索引
 
 | 文档 | 用途 |
 |------|------|
-| **本文 `PROJECT_STATUS.md`** | **阶段与缺口总览（先看这个）** |
-| `CURRENT_SYSTEM.md` | 周报/Ask 流水线细节（部分段落可能略旧，飞书以本文为准） |
-| `FEISHU_AGENT_V1.md` | 飞书产品硬边界与路线顺序 |
-| `AGENT_ARCHITECTURE_V1.md` | Agent ①–⑧ 架构冻结稿 |
-| `ENVIRONMENT_REPRODUCIBILITY.md` | 镜像 / digest / REPRO 门禁 |
-| `RUNTIME_EXECUTION.md` | Vector OFF、Answer/Semantic 运行时默认 |
-| `AGENT_QUALITY_V2.md` / Go-NoGo | 质量基线与门禁 |
+| **本文 `PROJECT_STATUS.md`** | **现状 + 后续计划（先看）** |
+| `FEISHU_AGENT_V1.md` | 飞书产品硬边界与路线 |
+| `AGENT_ARCHITECTURE_V1.md` | Agent ①–⑧ 架构冻结 |
+| `MESH_V1_AGENT_GO_NOGO.md` | Mesh v1 候选 Go |
+| `ENVIRONMENT_REPRODUCIBILITY.md` | 镜像 / REPRO |
+| `RUNTIME_EXECUTION.md` | Vector OFF 等运行时默认 |
+| `eval/reports/RELATION_RECALL_GAP.2026-09-08.*` | 召回缺口留档 |
 | `eval/reports/AGENT_PERF_BASELINE_V1.tmesh.*` | 性能数字 |
-| `eval/reports/CARDS_PARALLEL_AB.2026-09-08.*` | Cards 并行 A/B |
-| `eval/reports/RELATION_RECALL_GAP.2026-09-08.*` | 关系召回缺口 |
 
 ---
 
-## 8. 一句话给外人
+## 9. 一句话给外人
 
-> Mesh 周报生产与「有证据的问答」已经能在 tmesh/prod 跑；**答案质量基线已冻**。  
-> 工程上正在收口体验与通道：**飞书能收到消息但还不能自动回复**；关系卡偏少是候选召回问题，已诊断未修。  
-> 下一步优先 Bot 出站闭环与可预期等待，而不是改 Ranking/Claim。
+> Mesh 周报与「有证据的问答」已在 tmesh/prod 可跑；**答案质量基线已冻**。  
+> **飞书 Bot Phase 1 已完成**（能收、能回、有思考卡）；关系召回工程刀**够用封存**。  
+> **下一步不是改质量，而是 Agent Phase 2：真人 Canary + 可观测 + 群边界。**
