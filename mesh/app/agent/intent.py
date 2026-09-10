@@ -1,6 +1,7 @@
-"""规则 Intent：经 Conversation Route；不可靠 → refuse。禁止 LLM 自由选 Tool。"""
+"""规则 Intent：经 Colleague Controller；不可靠 → refuse。禁止 LLM 自由选 Tool。"""
 from __future__ import annotations
 
+from . import colleague_controller as ctrl
 from . import conversation as conv
 from .models import AgentContext, PermissionDecision
 from .permission import tool_allowed
@@ -18,9 +19,9 @@ def rule_classify_intent(
     *,
     session: SessionContextState | None = None,
 ) -> str:
-    """优先级：Conversation Route（含 casual/clarify/followup）→ ACL。"""
-    decision = conv.route_message(text, session)
-    intent = decision.intent
+    """优先级：Colleague Controller → ACL。"""
+    decision = ctrl.decide(text, session)
+    intent = decision.to_route_decision().intent
 
     if intent in ("help", "whoami", "casual", "clarify", "refuse"):
         return intent
@@ -41,7 +42,14 @@ def classify_route(
     text: str,
     session: SessionContextState | None = None,
 ) -> conv.RouteDecision:
-    return conv.route_message(text, session)
+    return ctrl.decide(text, session).to_route_decision()
+
+
+def classify_controller(
+    text: str,
+    session: SessionContextState | None = None,
+) -> ctrl.ControllerDecision:
+    return ctrl.decide(text, session)
 
 
 def intent_to_tool(intent: str) -> str | None:

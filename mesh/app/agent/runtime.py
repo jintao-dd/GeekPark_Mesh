@@ -8,6 +8,7 @@ from typing import Any
 
 from . import context as ctxmod
 from . import conversation as conv
+from . import colleague_controller as ctrl
 from . import fingerprint as fp
 from . import identity as idmod
 from . import intent as intentmod
@@ -94,6 +95,7 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
         route: conv.RouteDecision,
         payload: dict[str, Any] | None = None,
         user_for_state: str = "",
+        controller: ctrl.ControllerDecision | None = None,
     ) -> AgentAnswer:
         issue = ""
         if payload and payload.get("issue"):
@@ -123,6 +125,22 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
             answer.trace["rewritten_query"] = route.rewritten_query
         if route.resolved_entity:
             answer.trace["resolved_entity"] = route.resolved_entity
+        if controller is not None:
+            answer.trace["controller"] = {
+                "mode": controller.mode,
+                "intent": controller.intent,
+                "entities": list(controller.entities or []),
+                "topic": controller.topic,
+                "needs_grounding": controller.needs_grounding,
+                "needs_clarification": controller.needs_clarification,
+                "response_mode": controller.response_mode,
+                "context_refs": list(controller.context_refs or []),
+                "source": controller.source,
+                "router_llm_used": bool(controller.router_llm_used),
+                "router_model": controller.router_model,
+                "confidence": controller.confidence,
+            }
+            answer.trace["router_llm_used"] = bool(controller.router_llm_used)
         return enrich_answer_for_display(answer, payload=payload)
 
     if not permission.agent_access:
@@ -147,16 +165,16 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
             route=route,
         )
 
-    route = intentmod.classify_route(envelope.text, session)
+    controller = intentmod.classify_controller(envelope.text, session)
+    route = controller.to_route_decision()
     intent = route.intent
-    # ACL overlay for data intents
+    # ACL overlay for data intents（不再二次 decide，避免双倍 Router LLM）
     if intent in ("list_issues", "ask_relations", "ask_published"):
-        intent = intentmod.rule_classify_intent(
-            envelope.text, context, permission, session=session
-        )
-        # keep route rewrite if still data path
-        if intent != route.intent and intent == "refuse":
+        tool = intentmod.intent_to_tool(intent)
+        if not tool or not permmod.tool_allowed(permission, tool):
+            intent = "refuse"
             route = conv.RouteDecision(route="refuse", intent="refuse", notes="acl_data")
+            controller = ctrl.from_route_decision(route, envelope.text or "", session)
 
     tool_id = intentmod.intent_to_tool(intent)
 
@@ -178,6 +196,7 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
                 **base_kwargs,
             ),
             route=route,
+            controller=controller,
         )
 
     # Meta：Conversation LLM（不走 system.help 说明书 / 不进 Retrieval）
@@ -211,6 +230,7 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
                 **base_kwargs,
             ),
             route=route,
+            controller=controller,
         )
 
     # General conversation：必须 1× Answer LLM，不进 Published Retrieval
@@ -244,6 +264,7 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
                 **base_kwargs,
             ),
             route=route,
+            controller=controller,
         )
 
     if intent == "clarify":
@@ -264,6 +285,7 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
                 **base_kwargs,
             ),
             route=route,
+            controller=controller,
         )
 
     if intent == "refuse" or tool_id is None:
@@ -286,6 +308,7 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
                 **base_kwargs,
             ),
             route=route,
+            controller=controller,
         )
 
     if not permmod.tool_allowed(permission, tool_id):
@@ -314,6 +337,7 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
                     **base_kwargs,
                 ),
                 route=route,
+                controller=controller,
             )
         return _finish(
             AgentAnswer(
@@ -333,6 +357,7 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
                 **base_kwargs,
             ),
             route=route,
+            controller=controller,
         )
 
     data_count = 1 if tool_id in DATA_TOOLS else 0
@@ -375,7 +400,7 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
         deny_reason=result.error if result.denied else "",
         **base_kwargs,
     )
-    return _finish(answer, route=route, payload=payload, user_for_state=ask_q)
+    return _finish(answer, route=route, payload=payload, user_for_state=ask_q, controller=controller)
 
 
 def _whoami_text(identity) -> str:

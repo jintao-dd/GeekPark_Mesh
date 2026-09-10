@@ -21,19 +21,20 @@ Mesh 今天是两件事：
 | 关系召回工程刀 | ✅ **够用封存** | `card_bridge` 已上；不再扩 Decision/Ranking/Claim |
 | 飞书 Agent Phase 1 | ✅ **Done** | 入站+解密+出站思考卡→终答 |
 | Conversation Runtime | ✅ **Done** | Session Context + Route + Failure UX；`e8c6eb8` |
-| **Colleague Agent v1** | → **本轮上线** | Conversation Intelligence + 闲聊 LLM；Brain 冻结 |
+| **Colleague Agent v1** | ✅ 薄壳已上 | 规则路由 + 闲聊 LLM + Session |
+| **Colleague Agent v2 Stage 1** | → **当前** | `Colleague Controller` 统一决策；见 `COLLEAGUE_AGENT_V2_STAGE1.md` |
 | 全谱 Canary | ✅ CONDITIONAL GO | Follow-up/模糊 PASS；A 残留先不抠 |
-| **当前主战场** | → **真人 Canary 2.0** | 在 Colleague v1 上续跑四指标 |
+| **当前主战场** | → **Stage 1 Gate** | wrong_route / 不该查却查 / 该查未查 / clarify |
 
 ```
-Colleague Agent v1 ← 现在（docs/COLLEAGUE_AGENT_V1.md）
-     ↓
-真人 Canary 2.0（docs/AGENT_CANARY_2.md）
-     ↓
-Top 2～3 共性 → 一次集中修 → 再 Canary
-     ↓
-小规模稳定 →【放量门槛】多实例 Session 外置或 sticky
-不做：Wiki / 长期 Memory / ReAct / Graph / ES / 解冻质量 / 为单 case 打补丁
+Colleague Agent v2
+  Stage 1 Controller ← 现在
+  Stage 2 Conversation / Persona
+  Stage 3 Session Memory v2
+  Stage 4 Collaboration
+  Stage 5 Enterprise Memory
+  Stage 6 Production Runtime
+不做：Wiki / 长期 Memory 抢跑 / ReAct / Multi-Agent / 解冻质量 / 为单 case 打补丁
 ```
 
 ---

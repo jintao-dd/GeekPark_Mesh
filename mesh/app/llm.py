@@ -102,10 +102,11 @@ def model_for_task(task: str = "default") -> str | None:
     """任务级固定模型配置（非动态 router）。
 
     环境变量（可选）：
-      MESH_LLM_MODEL_SEMANTIC  — Claim semantic judge
-      MESH_LLM_MODEL_ANSWER    — Answer 成文
-      MESH_LLM_MODEL_SENSITIVE — 敏感/对外成文（未设则回落 ANSWER / MODEL）
-      MESH_LLM_MODEL           — 默认回落
+      MESH_LLM_MODEL_SEMANTIC    — Claim semantic judge
+      MESH_LLM_MODEL_ANSWER      — Answer 成文
+      MESH_LLM_MODEL_SENSITIVE   — 敏感/对外成文（未设则回落 ANSWER / MODEL）
+      MESH_LLM_MODEL_CONTROLLER  — Colleague Controller（未设则回落 SEMANTIC / MODEL）
+      MESH_LLM_MODEL             — 默认回落
     """
     import os
 
@@ -114,6 +115,11 @@ def model_for_task(task: str = "default") -> str | None:
         "semantic": ("MESH_LLM_MODEL_SEMANTIC",),
         "answer": ("MESH_LLM_MODEL_ANSWER",),
         "sensitive": ("MESH_LLM_MODEL_SENSITIVE", "MESH_LLM_MODEL_ANSWER"),
+        "controller": (
+            "MESH_LLM_MODEL_CONTROLLER",
+            "MESH_LLM_MODEL_SEMANTIC",
+            "MESH_LLM_MODEL",
+        ),
         "default": ("MESH_LLM_MODEL",),
     }.get(t, ("MESH_LLM_MODEL",))
     for k in keys:
@@ -131,6 +137,7 @@ def provider_info() -> dict:
             "semantic": model_for_task("semantic"),
             "answer": model_for_task("answer"),
             "sensitive": model_for_task("sensitive"),
+            "controller": model_for_task("controller"),
             "default": model_for_task("default"),
         }
         return info
