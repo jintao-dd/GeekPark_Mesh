@@ -99,20 +99,30 @@ def _extract_text(content: str) -> str:
 
 def parse_im_message(event: dict[str, Any]) -> dict[str, Any] | None:
     """从飞书 im.message 事件抽出 harness payload。失败返回 None。"""
-    msg = (event or {}).get("message") or {}
-    sender = (event or {}).get("sender") or {}
+    event = event or {}
+    # 兼容少数把 message 摊平在 event 根上的形态
+    msg = event.get("message") or {}
+    if not msg and event.get("message_type") and (event.get("chat_id") or event.get("content") is not None):
+        msg = event
+    sender = event.get("sender") or {}
     sender_id = sender.get("sender_id") or {}
-    sender_type = str(sender.get("sender_type") or "").strip().lower()
+    if not sender_id and event.get("open_id"):
+        sender_id = {"open_id": event.get("open_id")}
+    sender_type = str(sender.get("sender_type") or event.get("sender_type") or "user").strip().lower()
     if sender_type and sender_type not in ("user",):
         return None
-    open_id = str(sender_id.get("open_id") or "").strip()
-    chat_id = str(msg.get("chat_id") or "").strip()
-    chat_type = str(msg.get("chat_type") or "").strip().lower()
-    msg_type = str(msg.get("message_type") or "").strip().lower()
-    message_id = str(msg.get("message_id") or "").strip()
+    open_id = str(sender_id.get("open_id") or event.get("open_id") or "").strip()
+    chat_id = str(msg.get("chat_id") or event.get("chat_id") or "").strip()
+    chat_type = str(msg.get("chat_type") or event.get("chat_type") or "").strip().lower()
+    msg_type = str(msg.get("message_type") or event.get("message_type") or "").strip().lower()
+    message_id = str(msg.get("message_id") or event.get("message_id") or "").strip()
     if msg_type and msg_type != "text":
         return None
-    text = _extract_text(str(msg.get("content") or ""))
+    content = msg.get("content") if "content" in msg else event.get("content")
+    if isinstance(content, dict):
+        text = str(content.get("text") or content.get("content") or "").strip()
+    else:
+        text = _extract_text(str(content or ""))
     if not text and not open_id:
         return None
     channel = "feishu_group" if chat_type == "group" else "feishu_dm"
@@ -122,7 +132,7 @@ def parse_im_message(event: dict[str, Any]) -> dict[str, Any] | None:
         "feishu_open_id": open_id,
         "chat_id": chat_id,
         "thread_id": str(msg.get("thread_id") or msg.get("root_id") or "").strip(),
-        "session_id": str(msg.get("chat_id") or "").strip(),
+        "session_id": str(chat_id or "").strip(),
         "inbound_message_id": message_id,
     }
 
@@ -288,10 +298,24 @@ def handle_feishu_event(con, body: dict[str, Any], *, sync: bool = False) -> dic
     header = body.get("header") or {}
     event_type = str(header.get("event_type") or body.get("type") or "").strip()
     event = body.get("event") or {}
+    # 旧版：event.type == message / im.message*
+    if not event_type and isinstance(event, dict):
+        event_type = str(event.get("type") or event.get("event_type") or "").strip()
 
-    if event_type in ("im.message.receive_v1", "im.message.receive_v2") or (
-        event.get("message") and event.get("sender")
-    ):
+    _elog(
+        "parsed keys=%s event_type=%s has_event=%s",
+        list(body.keys())[:10],
+        event_type or "unknown",
+        bool(event),
+    )
+
+    if event_type in (
+        "im.message.receive_v1",
+        "im.message.receive_v2",
+        "event_callback",
+        "message",
+        "im.message.receive",
+    ) or (isinstance(event, dict) and (event.get("message") or event.get("message_type"))):
         payload = parse_im_message(event)
         if not payload:
             return {"ok": True, "skipped": True, "reason": "unsupported_or_empty"}
@@ -333,4 +357,5 @@ def handle_feishu_event(con, body: dict[str, Any], *, sync: bool = False) -> dic
         }
 
     log.info("feishu_bot skipped event_type=%s keys=%s", event_type or "unknown", list(body.keys())[:8])
+    _elog("skipped event_type=%s keys=%s", event_type or "unknown", list(body.keys())[:8])
     return {"ok": True, "skipped": True, "reason": f"unhandled_event:{event_type or 'unknown'}"}

@@ -904,17 +904,31 @@ async def api_feishu_bot_event(request: Request):
 
     - url_verification：回 challenge（支持 Encrypt Key）
     - im.message：立刻 accepted，后台发「思考中」卡片 → Agent → Patch 最终回答
-
-    注意：密文包只 handle 一次。重复调用会触发 message_id 去重，导致第二次被 skip、
-    且第一次若在「仅探测 challenge」路径里已占用 dedup，会表现为「没反应」。
     """
     try:
         body = await request.json()
     except Exception:
         raise HTTPException(400, "invalid json")
     from .agent.feishu_bot import handle_feishu_event
+    import logging
 
-    out = handle_feishu_event(None, body or {})
+    raw = body or {}
+    logging.getLogger("uvicorn.error").info(
+        "[feishu_bot] inbound keys=%s encrypt=%s type=%s",
+        list(raw.keys())[:12],
+        bool(raw.get("encrypt")),
+        raw.get("type") or (raw.get("header") or {}).get("event_type"),
+    )
+    out = handle_feishu_event(None, raw)
+    logging.getLogger("uvicorn.error").info(
+        "[feishu_bot] outbound ok=%s challenge=%s accepted=%s skipped=%s reason=%s error=%s",
+        out.get("ok"),
+        bool(out.get("challenge")),
+        out.get("accepted"),
+        out.get("skipped"),
+        out.get("reason"),
+        out.get("error"),
+    )
     if out.get("error") == "bad_verification_token":
         raise HTTPException(403, "bad_verification_token")
     if out.get("error") == "decrypt_failed":
