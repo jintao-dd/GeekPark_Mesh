@@ -90,9 +90,10 @@ def tool_help(
     if blocked:
         return blocked
     text = (
-        "我是 Mesh Agent v1（只读已上线周报）。\n"
-        "可以：查看帮助、列出已上线期次、问已上线内容、问团队关系摘要。\n"
+        "我是 **GeekPark Mesh Agent**（只读已上线周报问答）。\n"
+        "可以：回答「你是谁 / 帮助」、列出已上线期次、问已上线事实、问团队关系摘要。\n"
         "不能：读草稿/原文、发布、改权限、多步自主调用。\n"
+        "问法示例：「编辑部关注了哪些公司」「本期有哪些可同步的关系」「有哪些期次」。\n"
         f"当前身份状态：{identity.status}；Query Scope：{permission.query_scope}。"
     )
     return ToolResult(

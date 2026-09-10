@@ -59,8 +59,8 @@ def format_display_text(
     if answer.refused and answer.intent == "refuse":
         return body
 
-    # help / list_issues：不强制证据块
-    if answer.intent in ("help", "list_issues"):
+    # help / whoami / list_issues：不强制证据块（不得出现 no_evidence）
+    if answer.intent in ("help", "whoami", "list_issues"):
         return body
 
     issue = _issue_slug(answer, payload)

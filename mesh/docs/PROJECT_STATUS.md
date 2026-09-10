@@ -20,12 +20,16 @@ Mesh 今天是两件事：
 | Mesh v1 生产链 | ✅ **候选 Go** | 可作 Agent 底座（见 `MESH_V1_AGENT_GO_NOGO.md`） |
 | 关系召回工程刀 | ✅ **够用封存** | `card_bridge` 已上；不再扩 Decision/Ranking/Claim |
 | 飞书 Agent Phase 1 | ✅ **Done** | 入站+解密+出站思考卡→终答；tmesh 冒烟 + prod 已上 |
-| **当前主战场** | → **Agent Phase 2** | 真人 Canary · 可观测 · 群边界 · 失败归因 |
+| **当前主战场** | → **P0.0→Canary** | 基础行为 short-circuit 后立即真人 Canary |
 
 ```
-已完成：质量封存 → 飞书 Phase 1 → 关系召回够用 → prod 镜像对齐 → 事件钥同步
-下一步：Agent Phase 2 工程化（Canary）→ 按真实 failure 再开刀
-不做：质量小版本回头改 / ReAct / 新检索架构 / 硬造双边关系
+P0.0 Agent 基础行为修正（meta 不进 Retrieval）→ 本刀
+P0.1 真人 Canary（私聊≥3 / 群 / 事实 / 关系 / 拒答）
+P0.2 可观测固化
+P0.3 群边界
+P0.4 失败手册
+→ Phase 2 完成
+不做：因「你是谁」开大改 Agent；不回头动 Ranking/Claim/Retrieval
 ```
 
 ---
@@ -134,18 +138,17 @@ Mesh 今天是两件事：
 
 ## 5. 后续计划（按优先级）
 
-### P0 · 现在就做：Agent Phase 2 工程化
-
-**目标：** 小范围真人能稳定用，失败可归因；**不改大脑质量线**。
+### P0 · 现在就做（严格顺序）
 
 | # | 工作项 | 验收 |
 |---|--------|------|
-| 2.1 | 真人 Canary（私聊 ≥3 人 + 已拉测试群） | 问事实 / 关系 / 拒答各至少 1 通；有 Evidence |
-| 2.2 | 可观测固化 | 每次请求可查：`request_id` / latency / intent / refuse / evidence count / model |
-| 2.3 | 群边界实战 | 群绑定团队生效；不越权答外队内部事实 |
-| 2.4 | 失败手册 | 超时 / 解密失败 / 无证据 / 权限拒答 → 标准处置 |
+| **0.0** | **Agent 基础行为**：你是谁 / 你能干什么 / 帮助 / greeting / 我是谁 → Retrieval 前 short-circuit | 不得出现 no_evidence；事实/关系问法不受影响 |
+| 0.1 | 真人 Canary（私聊 ≥3 + 群 + 事实 + 关系 + 拒答） | 各至少 1 通；有 Evidence（事实/关系） |
+| 0.2 | 可观测固化 | request_id / intent / latency / evidence / refuse / model |
+| 0.3 | 群边界实战 | 群绑定团队生效；不越权 |
+| 0.4 | 失败手册 | 超时 / 解密 / 无证据 / 拒答处置 |
 
-**不做（Phase 2）：** Ranking/Claim 改版 · 新 Tool · 自动写回 · 全员放开
+**P0.0 完成后立刻进 0.1，不再抠 meta 文案。**
 
 ### P1 · Canary 稳定后按需
 

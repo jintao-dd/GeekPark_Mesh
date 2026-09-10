@@ -28,6 +28,7 @@ ALL_TOOLS = frozenset({
 
 INTENTS = frozenset({
     "help",
+    "whoami",
     "list_issues",
     "ask_relations",
     "ask_published",

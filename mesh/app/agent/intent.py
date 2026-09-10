@@ -6,8 +6,24 @@ import re
 from .models import AgentContext, PermissionDecision
 from .permission import tool_allowed
 
+# Agent meta / greeting：必须在 Retrieval 前 short-circuit → help
 _HELP = re.compile(
-    r"(帮助|怎么用|你能做什么|使用说明|\bhelp\b|\bcommands?\b)",
+    r"("
+    r"帮助|怎么用|使用说明|问法|怎么问|如何提问|怎么提问|"
+    r"你能做什么|你能干什么|你可以做什么|你可以干什么|"
+    r"你是谁|你是什么|你是啥|你是哪位|介绍一下你(?:自己)?|"
+    r"what\s+are\s+you|who\s+are\s+you|"
+    r"\bhelp\b|\bcommands?\b|"
+    r"你好|您好|hello|\bhi\b|嗨|在吗|早安|午安|晚安"
+    r")",
+    re.I,
+)
+# 极短自我介绍问法（「你是?」「你是」）
+_HELP_SHORT = re.compile(r"^你是[?？!\s]*$", re.I)
+
+# 用户自身份：不进 Published 检索
+_WHOAMI = re.compile(
+    r"(我是谁|我是什么身份|我的身份|我叫什么|who\s+am\s+i)",
     re.I,
 )
 _LIST = re.compile(
@@ -30,26 +46,42 @@ _DRAFT_RAW = re.compile(
 _ASKISH = re.compile(r".{2,}", re.S)
 
 
+def normalize_query(text: str) -> str:
+    """去掉飞书 @提及与多余空白，便于 meta 规则匹配。"""
+    q = (text or "").strip()
+    q = re.sub(r"@_user_\d+", " ", q)
+    q = re.sub(r"@[^\s@]+", " ", q)
+    q = re.sub(r"\s+", " ", q).strip()
+    # @GEEKPARK Mesh … → 剥 @token 后可能剩开头的 Mesh
+    q = re.sub(r"(?i)^(?:geekpark\s+)?mesh\s+", "", q).strip()
+    return q
+
+
 def rule_classify_intent(
     text: str,
     context: AgentContext,
     permission: PermissionDecision,
 ) -> str:
-    """优先级：refuse > help > list_issues > ask_relations > ask_published。"""
-    q = (text or "").strip()
+    """优先级：refuse > help > whoami > list_issues > ask_relations > ask_published。
+
+    help / whoami 不得落入 ask_*（避免进 Retrieval / Claim / no_evidence）。
+    """
+    q = normalize_query(text)
     if not q:
         return "refuse"
 
     # 越权探测：明确要 draft/raw → refuse（即使后面会被 Tool 再拦）
     if _DRAFT_RAW.search(q) and not _HELP.search(q):
-        # 「帮我看草稿」类
         if re.search(r"(看|读|查|打开|给我|导出).*(草稿|draft|原文|raw|未上线)", q, re.I) or \
            re.search(r"(草稿|draft|原文|raw|未上线).*(内容|全文|json)", q, re.I) or \
            re.search(r"直接查库|查\s*sources", q, re.I):
             return "refuse"
 
-    if _HELP.search(q):
+    if _HELP.search(q) or _HELP_SHORT.match(q):
         return "help"
+
+    if _WHOAMI.search(q):
+        return "whoami"
 
     if _LIST.search(q):
         if tool_allowed(permission, "context.list_issues"):
@@ -73,6 +105,7 @@ def rule_classify_intent(
 def intent_to_tool(intent: str) -> str | None:
     return {
         "help": "system.help",
+        "whoami": None,  # runtime 直出身份，不调数据 Tool
         "list_issues": "context.list_issues",
         "ask_relations": "ask.relations_summary",
         "ask_published": "ask.published",

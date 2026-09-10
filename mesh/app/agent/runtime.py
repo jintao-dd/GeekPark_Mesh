@@ -68,6 +68,26 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
     intent = intentmod.rule_classify_intent(envelope.text, context, permission)
     tool_id = intentmod.intent_to_tool(intent)
 
+    # Agent meta / 自身份：Retrieval 前 short-circuit（不进 Published / Claim）
+    if intent == "whoami":
+        return enrich_answer_for_display(
+            AgentAnswer(
+                text=_whoami_text(identity, permission),
+                intent="whoami",
+                tools_called=[],
+                fingerprint=fp.build_fingerprint(
+                    context=context, permission=permission, tool_result=None
+                ),
+                trace=fp.build_trace(
+                    intent="whoami",
+                    tool_id=None,
+                    context=context,
+                    identity_status=identity.status,
+                ),
+                **base_kwargs,
+            )
+        )
+
     if intent == "refuse" or tool_id is None:
         text = _refuse_text(identity.status, envelope.text, permission.deny_reason)
         return enrich_answer_for_display(
@@ -178,6 +198,37 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
         ),
         payload=payload,
     )
+
+
+def _whoami_text(identity, permission) -> str:
+    person = getattr(identity, "person", None) or {}
+    if not isinstance(person, dict):
+        person = {}
+    display = (
+        str(getattr(identity, "display_hint", None) or "").strip()
+        or str(person.get("display") or person.get("name") or "").strip()
+    )
+    team = str(getattr(identity, "primary_team", None) or "").strip()
+    role = str(getattr(identity, "mesh_role", None) or "").strip()
+    status = str(getattr(identity, "status", "") or "")
+    scope = getattr(permission, "query_scope", None)
+    if display:
+        name = display
+    elif status.startswith("bound"):
+        name = "（已绑定，无显示名）"
+    else:
+        name = "（未识别显示名）"
+    lines = [
+        f"你是 **{name}**。",
+        f"身份状态：`{status}`"
+        + (f"；角色：{role}" if role else "")
+        + (f"；团队：{team}" if team else "；团队：未绑定"),
+    ]
+    if scope:
+        lines.append(f"当前 Query Scope：`{scope}`。")
+    lines.append("我只能查询已上线（Published）周报，不能读草稿、原文或未上线素材。")
+    lines.append("发送「帮助」可看我能做什么。")
+    return "\n".join(lines)
 
 
 def _refuse_text(status: str, text: str, deny_reason: str) -> str:
