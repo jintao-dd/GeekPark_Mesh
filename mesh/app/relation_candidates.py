@@ -387,9 +387,42 @@ def _build_card_bridge_candidates(
                 team_map = by_key[key]
                 other_teams = sorted(t for t in team_map.keys() if t != card_team)
                 if not other_teams:
-                    continue
+                    # 实体仅在卡方：若行内点名他队，或已沟通/对接类叙事，发弱路由
+                    named = [
+                        t
+                        for t in _KNOWN_TEAMS
+                        if t != card_team and t in line
+                    ]
+                    if named:
+                        other_teams = named
+                    elif (
+                        card_team in _OVERSEAS_TEAMS
+                        and re.search(r"已沟通|已接触|对接|牵线|专访|用得上|对照", line)
+                        and "尚未接触" not in line
+                    ):
+                        other_teams = ["编辑部"]
+                    else:
+                        continue
+                    # 无对侧 item 时仍可用卡方 item 作证据
+                    if card_team not in team_map:
+                        continue
                 b = _ensure_bucket(card_team, key, other_teams, snippet)
                 _attach_other(b, team_map, other_teams)
+                # 卡方自身 item 也挂上（onesided 时尤其需要）
+                if card_team in team_map:
+                    tf0 = b["team_facts"][0]
+                    for row in team_map[card_team][:_MAX_SNIPPETS]:
+                        iid = row.get("id")
+                        if iid is not None and iid not in b["item_ids"]:
+                            b["item_ids"].append(iid)
+                        if iid is not None and iid not in tf0["item_ids"]:
+                            tf0["item_ids"].append(iid)
+                        if row["text"] and row["text"] not in tf0["snippets"]:
+                            tf0["snippets"].append(row["text"][:_SNIP_LEN])
+                        if row["source_label"] and row["source_label"] not in tf0["sources"]:
+                            tf0["sources"].append(row["source_label"])
+                            if row["source_label"] not in b["sources"]:
+                                b["sources"].append(row["source_label"])
 
     out = []
     for b in buckets.values():

@@ -234,6 +234,39 @@ def test_card_bridge_weak_candidate():
     assert 42 in (b.get("item_ids") or [])
 
 
+def test_card_bridge_onesided_overseas_followup():
+    """实体只在卡方：已沟通叙事 → 弱桥接到编辑部。"""
+    items = [
+        {
+            "id": 7,
+            "source_id": 3,
+            "owner_team": "硅谷 BD 团队",
+            "pointer": "rev",
+            "entities": '["Reverie AI"]',
+            "text": "BD 已沟通 Reverie AI",
+            "source_label": "硅谷周报",
+            "blocked": 0,
+        },
+    ]
+    cards = [
+        {
+            "team": "硅谷 BD 团队",
+            "sections": [
+                {
+                    "title": "在跟进的合作与团队",
+                    "lines": ["已沟通两次：Reverie AI（实时交互），已约下一步"],
+                }
+            ],
+        }
+    ]
+    cands = build_relation_candidates(items, team_cards=cards)
+    bridges = [c for c in cands if c.get("candidate_kind") == "card_bridge"]
+    assert len(bridges) == 1
+    assert bridges[0]["teams"][0] == "硅谷 BD 团队"
+    assert "→ 编辑部" in bridges[0]["teams"]
+    assert 7 in (bridges[0].get("item_ids") or [])
+
+
 def test_no_bridge_or_cooc_from_bare_ai_substring():
     """裸 AI / 仅子串不得造共现或桥接。"""
     items = [
