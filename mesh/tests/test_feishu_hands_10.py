@@ -472,18 +472,26 @@ def test_create_doc_intro_yourself_uses_utterance_as_brief():
     assert "确认" in r.text
 
 
-def test_decide_json_fail_soft_prepares_create_doc():
-    """decide JSON 挂掉时不得虚晃 speak，应 soft prepare 创建文档。"""
+def test_decide_json_fail_salvages_via_llm_not_keyword_enum():
+    """decide JSON 挂掉后应再请 LLM 判一次，而不是靠关键词枚举。"""
     os.environ["MESH_FEISHU_HANDS"] = "1"
     os.environ["MESH_FEISHU_HANDS_WRITE"] = "1"
     os.environ["MESH_FEISHU_HANDS_BACKEND"] = "mock"
     st = SessionContextState()
+    modes = []
 
     def fake_llm(system, user, max_tokens=4000, json_mode=False, task="default"):
+        modes.append(bool(json_mode))
         if json_mode:
             raise RuntimeError("模型返回的 JSON 无法解析：Unterminated string")
-        # salvage 也烂掉 / 或落到 speak 文案——soft prepare 仍应兜住
-        return "好的我正在创建文档，稍等。"
+        if "JSON" in (user or "") or "action" in (system or "")[:80] or "动作选择" in (system or ""):
+            # salvage decide：仍由模型按上下文给出 prepare（测试里模拟）
+            if "创建" in user and "文档" in user:
+                return (
+                    '{"action":"prepare_write","tool":"feishu.doc.create",'
+                    '"args":{"title":"Mesh 自我介绍","content":""}}'
+                )
+        return "我是 Mesh，GeekPark 内部 AI 同事。"
 
     with mock.patch("app.llm.call", side_effect=fake_llm):
         with mock.patch("app.llm.model_for_task", return_value="mock"):
@@ -497,10 +505,11 @@ def test_decide_json_fail_soft_prepares_create_doc():
                 invoke_tool=toolsmod.invoke_tool,
                 render_tool_result=lambda r, i, s: ("ok", [], []),
             )
+    assert modes[0] is True
+    assert False in modes  # salvage 走 json_mode=False
     assert r.intent == "feishu_write"
     assert st.pending_write and st.pending_write["tool"] == "feishu.doc.create"
     assert "确认" in r.text
-    assert bool((r.trace or {}).get("pending_write"))
 
 
 def test_parse_im_ignores_root_id():

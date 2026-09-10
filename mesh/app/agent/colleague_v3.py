@@ -306,30 +306,8 @@ def _sanitize_user_visible(text: str) -> str:
     return "刚才格式乱了一下。你要我说啥，直接再说一遍。"
 
 
-_CREATE_DOC_INTENT_RE = re.compile(
-    r"(?:创建|新建|建一?[个篇]?|写一?[个篇]?).{0,20}文档"
-    r"|(?:把|将).{0,24}(?:写成|写入|放到).{0,10}文档",
-    re.I,
-)
-
-
-def _soft_prepare_doc_decide(qn: str) -> dict[str, Any] | None:
-    """decide JSON 挂掉时的安全网：明显「创建文档」意图 → prepare，勿虚晃 speak。"""
-    if not _CREATE_DOC_INTENT_RE.search(qn or ""):
-        return None
-    if ("介绍" in qn) and (("自己" in qn) or ("你" in qn)):
-        title = "Mesh 自我介绍"
-    else:
-        title = ((qn or "").strip()[:24] or "新建文档")
-    return {
-        "action": "prepare_write",
-        "tool": "feishu.doc.create",
-        "args": {"title": title, "content": ""},
-    }
-
-
 def _normalize_decide(decision: dict[str, Any]) -> dict[str, Any]:
-    """丢掉 decide 里过长的 content，避免下游/重试再次炸 JSON。"""
+    """丢掉 decide 里过长的 content（模型爱塞正文导致 JSON 截断）；意图仍由 LLM 决定。"""
     out = dict(decision or {})
     args = out.get("args")
     if isinstance(args, dict) and len(str(args.get("content") or "")) > 120:
@@ -343,7 +321,7 @@ def _decide(user_text: str, identity: Any, state: SessionContextState | None) ->
     meta: dict[str, Any] = {"llm_used": False, "model": None, "error": ""}
     qn = _clean_user_text(user_text)
     pending = getattr(state, "pending_write", None) if state else None
-    # 仅短句硬确认/取消：防模型 JSON 炸掉；复合意图一律交给上下文 LLM
+    # 仅短句硬确认/取消：防模型 JSON 炸掉；复合意图一律交给上下文 LLM（禁止枚举用户句式）
     if isinstance(pending, dict) and pending.get("tool"):
         if _looks_like_confirm(qn):
             meta["hard_confirm"] = True
@@ -375,13 +353,15 @@ def _decide(user_text: str, identity: Any, state: SessionContextState | None) ->
     except Exception as e:
         log.warning("colleague_v3 decide failed: %s", e)
         meta["error"] = str(e)[:120]
-        # 再救一次：不要 json_mode，用宽松解析抠 action/tool
+        # 再请 LLM 判一次（仍是上下文判断，不是关键词枚举）；强制极短 JSON
         try:
             from .. import llm
 
             raw2 = llm.call(
                 system,
-                user + "\n\n只输出极短 JSON，args.content 必须是 \"\"。",
+                user
+                + "\n\n上次 JSON 非法。按对话上下文重新选 action；"
+                "只输出一个极短 JSON；prepare_write 时 args.content 必须是 \"\"。",
                 max_tokens=256,
                 json_mode=False,
                 task="answer",
@@ -395,13 +375,7 @@ def _decide(user_text: str, identity: Any, state: SessionContextState | None) ->
             meta["error"] = (meta.get("error") or "") + "|" + str(e2)[:80]
             decision = {"action": "speak"}
 
-    decision = _normalize_decide(decision if isinstance(decision, dict) else {"action": "speak"})
-    if str(decision.get("action") or "").lower() == "speak":
-        soft = _soft_prepare_doc_decide(qn)
-        if soft is not None:
-            meta["soft_prepare"] = True
-            return soft, meta
-    return decision, meta
+    return _normalize_decide(decision if isinstance(decision, dict) else {"action": "speak"}), meta
 
 
 def _speak_plain(
