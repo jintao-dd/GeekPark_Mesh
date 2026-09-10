@@ -20,18 +20,21 @@ _TOOLS = {
     "ask.published",
     "ask.relations_summary",
     "context.list_issues",
+    "feishu.search",
 }
 
 _SYSTEM_DECIDE = """你是 GeekPark 内部 AI 同事 Mesh 的「动作选择」层。
 只输出一个严格 JSON（双引号，不要 markdown，不要长文）：
 
 {"action":"speak"}
-{"action":"ask","tool":"ask.published|ask.relations_summary|context.list_issues","query":"..."}
+{"action":"ask","tool":"ask.published|ask.relations_summary|context.list_issues|feishu.search","query":"..."}
 {"action":"refuse","text":"一句短拒"}
 
 规则：
 - 闲聊/吐槽/情绪/观点/写稿润色/改写/自我反馈/用户让你直接做事 → speak（正文稍后生成，JSON 里不要写正文）
-- 明确要查已上线周报事实（某人跟谁聊过、关系、期次）→ ask，query 写成完整问句
+- 明确要查已上线周报事实（某人跟谁聊过、关系、期次）→ ask + ask.published / ask.relations_summary，query 写成完整问句
+- 明确要查飞书云文档/知识库标题与链接（不是周报）→ ask + feishu.search，query 写成检索词；不要假装已经读过飞书
+- 若工具表里没有 feishu.search 权限、或用户要的是「飞书实时聊天记录」而当前只能搜文档 → speak，诚实说能力边界，不要编造聊天内容
 - 改权限/发布/读草稿原文 → refuse
 - 写文章、直接写、不要问 → 必须 speak，不要 ask 周报
 - 对象不清且确实是查周报 → 用 speak（稍后用嘴问一句），不要瞎 ask
@@ -256,17 +259,33 @@ def _synthesize(
     fact_text: str,
     identity: Any,
     state: SessionContextState | None,
+    *,
+    source_tier: str = "published",
 ) -> tuple[str, dict[str, Any]]:
     meta: dict[str, Any] = {"llm_used": False, "model": None}
+    tier = (source_tier or "published").strip().lower()
+    if tier == "feishu_live":
+        material_note = (
+            "下面是飞书 live_context 材料（文档检索），不是已上线周报。"
+            "用同事口吻转述；必须标明来自飞书文档/讨论侧；"
+            "禁止说成「周报里记录」或企业已发布事实；"
+            "若材料空或失败，就自然说没查到，不要编造标题或链接。"
+        )
+    else:
+        material_note = (
+            "下面是已从已上线周报查到的事实材料。"
+            "用同事口吻转述：自然、清楚；不要编造材料没有的事实；不要客服腔；不要输出 JSON。"
+        )
     system = (
-        "你是 GeekPark 内部同事 Mesh。下面是已从已上线周报查到的事实材料。"
-        "用同事口吻转述：自然、清楚；不要编造材料没有的事实；不要客服腔；不要输出 JSON。\n\n"
+        "你是 GeekPark 内部同事 Mesh。"
+        + material_note
+        + "不要输出 JSON。\n\n"
         + _identity_block(identity)
     )
     hist = _history_block(state)
     user = (
         (hist + "\n\n" if hist else "")
-        + f"用户问：{(user_text or '').strip()}\n\n事实材料：\n{(fact_text or '').strip()}\n\nMesh："
+        + f"用户问：{(user_text or '').strip()}\n\n材料：\n{(fact_text or '').strip()}\n\nMesh："
     )
     try:
         from .. import llm
@@ -289,6 +308,7 @@ def _intent_for(action: str, tool_id: str) -> str:
             "ask.published": "ask_published",
             "ask.relations_summary": "ask_relations",
             "context.list_issues": "list_issues",
+            "feishu.search": "feishu_search",
         }.get(tool_id, "ask_published")
     return "casual"
 
@@ -346,7 +366,10 @@ def handle(
             out.intent = "casual"
             return out
         query = str(decision.get("query") or q).strip() or q
-        result = invoke_tool(tool, con, identity, permission, context, {"q": query})
+        tool_args: dict[str, Any] = {"q": query}
+        if tool == "feishu.search":
+            tool_args["resource_type"] = "doc"
+        result = invoke_tool(tool, con, identity, permission, context, tool_args)
         out.tools_called = [tool]
         intent = _intent_for("ask", tool)
         out.intent = intent
@@ -360,13 +383,27 @@ def handle(
             out.text = _sanitize_user_visible(fact_text)
             out.action = "ask"
             return out
-        spoken, smeta = _synthesize(q, fact_text, identity, session)
+        # 工具失败或空：仍走合成，但材料里已是诚实表述；禁止 Brain 另编飞书结果
+        if tool == "feishu.search" and not getattr(result, "ok", True):
+            err = str(getattr(result, "error", "") or "")
+            if err in ("hands_disabled", "mcp_not_configured", "cli_not_configured"):
+                fact_text = (
+                    "飞书 Hands 这轮还没接通（或未开启）。"
+                    "不要编造文档标题或链接；可以请用户稍后再试，或改问已上线周报。"
+                )
+            elif not fact_text:
+                fact_text = "飞书文档这边这轮没查到 / 超时了。不要编造。"
+        source_tier = "feishu_live" if tool == "feishu.search" else "published"
+        spoken, smeta = _synthesize(
+            q, fact_text, identity, session, source_tier=source_tier
+        )
         out.synthesize_llm_used = bool(smeta.get("llm_used"))
         out.llm_used = bool(out.llm_used or smeta.get("llm_used"))
         out.text = _sanitize_user_visible(spoken)
         out.action = "ask"
         out.trace["synthesize"] = bool(smeta.get("llm_used"))
         out.trace["ask_query"] = query
+        out.trace["source_tier"] = source_tier
         return out
 
     # speak：明文成文（协议与正文分离）

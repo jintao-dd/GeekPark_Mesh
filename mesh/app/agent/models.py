@@ -18,12 +18,14 @@ DATA_TOOLS = frozenset({
     "ask.published",
     "ask.relations_summary",
     "context.list_issues",
+    "feishu.search",
 })
 ALL_TOOLS = frozenset({
     "system.help",
     "context.list_issues",
     "ask.published",
     "ask.relations_summary",
+    "feishu.search",
 })
 
 INTENTS = frozenset({
@@ -34,6 +36,7 @@ INTENTS = frozenset({
     "list_issues",
     "ask_relations",
     "ask_published",
+    "feishu_search",
     "refuse",
 })
 

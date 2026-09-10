@@ -559,10 +559,16 @@ def _handle_colleague_v3(
 
     # 映射 route 供 Session 更新
     if result.action == "ask":
+        if result.intent == "ask_published":
+            route_name = "ask"
+        elif result.intent == "ask_relations":
+            route_name = "relations"
+        elif result.intent == "feishu_search":
+            route_name = "feishu"
+        else:
+            route_name = "list"
         route = conv.RouteDecision(
-            route="ask"
-            if result.intent == "ask_published"
-            else ("relations" if result.intent == "ask_relations" else "list"),
+            route=route_name,
             intent=result.intent,
             rewritten_query=str((result.trace or {}).get("ask_query") or text_in),
             notes="colleague_v3_ask",
@@ -682,6 +688,14 @@ def _render(
             return "当前没有已上线期次。", visible_bindings, list(result.evidence_refs or [])
         lines = [f"- {i.get('slug')} {i.get('period_label') or ''}".strip() for i in issues[:30]]
         return "已上线期次：\n" + "\n".join(lines), visible_bindings, list(result.evidence_refs or [])
+    if intent == "feishu_search":
+        answer = str(payload.get("answer") or "").strip()
+        if not answer:
+            if payload.get("empty") or not result.ok:
+                answer = "飞书文档这边这轮没查到相关结果。"
+            else:
+                answer = "飞书文档这边这轮没查到相关结果。"
+        return answer, visible_bindings, list(result.evidence_refs or [])
     answer = str(payload.get("answer") or "").strip()
     if not answer:
         answer = "我目前没查到已发布的内容能确认这件事。"

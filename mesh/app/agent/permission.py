@@ -24,6 +24,19 @@ _BOUND_TOOLS = [
 _FORBIDDEN_MY_TEAM = "ask.published.my_team"
 
 
+def _bound_tools() -> list[str]:
+    """Hands 开才把 feishu.search 放进 ACL；关则 Brain 选了也会被 tool_allowed 挡住。"""
+    tools = list(_BOUND_TOOLS)
+    try:
+        from .feishu_hands import hands_enabled
+
+        if hands_enabled() and "feishu.search" not in tools:
+            tools.append("feishu.search")
+    except Exception:
+        pass
+    return tools
+
+
 def decide_permission(
     identity: IdentityResult,
     *,
@@ -92,7 +105,7 @@ def decide_permission(
 
     return PermissionDecision(
         agent_access=True,
-        tool_acl=list(_BOUND_TOOLS),
+        tool_acl=_bound_tools(),
         data_visibility=published_vis,
         query_scope={"mode": mode, "team_focus": team_focus},
         deny_reason=deny,

@@ -529,10 +529,11 @@ def update_state_after_turn(
         state.last_query = route.rewritten_query
 
     # mode + topic stack
-    if route.route in ("ask", "relations", "followup", "list") or intent in (
+    if route.route in ("ask", "relations", "followup", "list", "feishu") or intent in (
         "ask_published",
         "ask_relations",
         "list_issues",
+        "feishu_search",
     ):
         new_mode = "enterprise"
     elif route.route in ("general_conversation",) or intent == "casual":

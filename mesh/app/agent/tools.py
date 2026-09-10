@@ -219,11 +219,90 @@ def tool_ask_relations(
     return adapter(con, identity, permission, context, args)
 
 
+def tool_feishu_search(
+    con,
+    identity: IdentityResult,
+    permission: PermissionDecision,
+    context: AgentContext,
+    args: dict[str, Any] | None = None,
+) -> ToolResult:
+    """feishu.search — live_context；不进 Published 事实池。"""
+    args = args or {}
+    blocked = _guard_common("feishu.search", identity, permission, context, args=args)
+    if blocked:
+        return blocked
+
+    from . import feishu_hands
+    from .tool_contract import SourceTier, TruthLevel, speech_hint
+
+    if not feishu_hands.hands_enabled():
+        return _deny("feishu.search", "hands_disabled")
+
+    query = str(args.get("q") or args.get("query") or "").strip()
+    resource_type = str(args.get("resource_type") or "doc").strip() or "doc"
+    user_token = str(args.get("user_access_token") or "").strip()
+
+    env = feishu_hands.feishu_search(
+        query,
+        resource_type=resource_type,
+        identity=identity,
+        user_access_token=user_token,
+        phase="2",
+    )
+    payload = {
+        "source_tier": SourceTier.FEISHU_LIVE.value,
+        "truth_level": TruthLevel.LIVE_CONTEXT.value,
+        "speech_hint": speech_hint(SourceTier.FEISHU_LIVE),
+        "resource_type": resource_type,
+        "items": list(env.items or []),
+        "empty": bool(env.empty),
+        "n_hits": len(env.items or []),
+    }
+    if not env.ok:
+        # 失败：不编造；Brain 合成时用诚实空话
+        payload["error"] = env.error
+        return ToolResult(
+            ok=False,
+            tool_id="feishu.search",
+            payload=payload,
+            error=env.error or "feishu_search_failed",
+            denied=False,
+        )
+    # 空结果也 ok：让合成层说「没查到」
+    lines = []
+    refs = []
+    for it in env.items or []:
+        title = str(it.get("title") or "").strip()
+        url = str(it.get("url") or "").strip()
+        snip = str(it.get("snippet") or "").strip()
+        bit = title
+        if snip:
+            bit += f" — {snip[:120]}"
+        if url:
+            bit += f" ({url})"
+            refs.append(f"feishu_doc:{url}")
+        lines.append(f"- {bit}")
+    if lines:
+        hint = speech_hint(SourceTier.FEISHU_LIVE)
+        answer = f"【{hint}】\n" + "\n".join(lines)
+    else:
+        answer = "飞书文档这边这轮没查到相关结果。"
+    payload["answer"] = answer
+    return ToolResult(
+        ok=True,
+        tool_id="feishu.search",
+        payload=payload,
+        evidence_refs=refs[:12],
+        claim_bindings=[],  # live 不进 enterprise claim
+    )
+
+
 _REGISTRY: dict[str, Callable[..., ToolResult]] = {
     "system.help": tool_help,
     "context.list_issues": tool_list_issues,
     "ask.published": tool_ask_published,
     "ask.relations_summary": tool_ask_relations,
+    "feishu.search": tool_feishu_search,
 }
 
 

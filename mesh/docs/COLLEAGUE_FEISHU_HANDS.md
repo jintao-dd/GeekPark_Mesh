@@ -1,9 +1,12 @@
 # Colleague × Feishu Hands · 接入计划
 
 > **日期：** 2026-09-10  
-> **状态：** 路线已定，可按 Phase 执行  
+> **状态：** Phase 0～1 契约已落地；**Phase 2 骨架已合入**（默认 `MESH_FEISHU_HANDS=0`）  
 > **目标态：** 飞书 → Colleague Brain →（Mesh Ask | Feishu MCP/CLI | Org）→ 一张嘴  
-> **原则：** 官方当手脚；不自研全套飞书 Tool；**绝不混级**；**绝不越权**。
+> **原则：** 官方当手脚；不自研全套飞书 Tool；**绝不混级**；**绝不越权**。  
+>
+> Phase 2 代码：`app/agent/feishu_hands/` + `tools.tool_feishu_search`；仅 `resource_type=doc`。  
+> 接 MCP：设 `MESH_FEISHU_HANDS=1` + `MESH_FEISHU_HANDS_MCP_URL=...` 后测。  
 
 ---
 
