@@ -22,7 +22,7 @@ Mesh 今天是两件事：
 | 飞书 Agent Phase 1 | ✅ **Done** | 入站+解密+出站思考卡→终答 |
 | Conversation Runtime | ✅ **Done** | Session Context + Route + Failure UX；`e8c6eb8` |
 | **Colleague Agent v1** | ✅ 薄壳已上 | 规则路由 + 闲聊 LLM + Session |
-| **Colleague Agent v2 Stage 1** | → **当前** | `Colleague Controller` 统一决策；见 `COLLEAGUE_AGENT_V2_STAGE1.md` |
+| **Colleague Agent v2 Stage 1** | → **Semantic Controller** | 规则守边界，模型理解语言；见 `COLLEAGUE_AGENT_V2_STAGE1.md` |
 | 全谱 Canary | ✅ CONDITIONAL GO | Follow-up/模糊 PASS；A 残留先不抠 |
 | **当前主战场** | → **Stage 1 Gate** | wrong_route / 不该查却查 / 该查未查 / clarify |
 
