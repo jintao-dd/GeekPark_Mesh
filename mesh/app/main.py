@@ -902,7 +902,7 @@ def api_agent_v1_message(request: Request, payload: dict):
 async def api_feishu_bot_event(request: Request):
     """⑧ 飞书 Bot 事件入口：只接线 handle_message，不扩大脑。
 
-    - url_verification：回 challenge
+    - url_verification：回 challenge（支持 Encrypt Key 密文）
     - im.message：组 Envelope → Agent → display_text（含 Evidence/期次）
     回发消息可后续接 tenant_access_token；本接口先返回 reply_text 供联调。
     """
@@ -912,22 +912,40 @@ async def api_feishu_bot_event(request: Request):
         raise HTTPException(400, "invalid json")
     from .agent.feishu_bot import handle_feishu_event
 
-    # URL 校验不需要 DB
-    if (body or {}).get("type") == "url_verification" or (
-        "challenge" in (body or {}) and not (body or {}).get("event")
+    # 仅 challenge / 解密失败时不需要 DB；消息事件需要 DB
+    needs_db = True
+    raw = body or {}
+    if raw.get("type") == "url_verification" or (
+        "challenge" in raw and not raw.get("event") and "encrypt" not in raw
     ):
-        out = handle_feishu_event(None, body or {})
+        needs_db = False
+    # 纯密文包：先尝试无 DB 解密（多为 URL 校验）
+    if "encrypt" in raw and not raw.get("event") and not raw.get("header"):
+        out0 = handle_feishu_event(None, raw)
+        if "challenge" in out0:
+            return {"challenge": out0["challenge"]}
+        if out0.get("error") in ("bad_verification_token", "decrypt_failed"):
+            raise HTTPException(403 if out0.get("error") == "bad_verification_token" else 400, out0.get("error"))
+        # 解密后是业务事件 → 走 DB
+        needs_db = True
+
+    if not needs_db:
+        out = handle_feishu_event(None, raw)
         if "challenge" in out:
             return {"challenge": out["challenge"]}
         raise HTTPException(403, out.get("error") or "verification_failed")
 
     con = db.connect()
     try:
-        out = handle_feishu_event(con, body or {})
+        out = handle_feishu_event(con, raw)
     finally:
         con.close()
     if out.get("error") == "bad_verification_token":
         raise HTTPException(403, "bad_verification_token")
+    if out.get("error") == "decrypt_failed":
+        raise HTTPException(400, "decrypt_failed")
+    if "challenge" in out:
+        return {"challenge": out["challenge"]}
     return out
 
 

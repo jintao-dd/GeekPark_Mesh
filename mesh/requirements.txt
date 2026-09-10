@@ -10,3 +10,5 @@ feedparser==6.0.11
 python-docx==1.1.2
 requests==2.32.3
 psycopg2-binary==2.9.10
+pycryptodome==3.21.0
+

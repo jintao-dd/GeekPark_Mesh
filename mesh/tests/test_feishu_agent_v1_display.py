@@ -91,3 +91,39 @@ def test_parse_im_message_dm():
 def test_url_verification_challenge():
     out = handle_feishu_event(None, {"type": "url_verification", "challenge": "abc", "token": ""})
     assert out.get("challenge") == "abc"
+
+
+def test_feishu_encrypt_decrypt_official_sample():
+    from app.agent.feishu_bot import decrypt_feishu_encrypt
+
+    # 飞书文档示例
+    plain = decrypt_feishu_encrypt(
+        "P37w+VZImNgPEO1RBhJ6RtKl7n6zymIbEG1pReEzghk=",
+        encrypt_key="test key",
+    )
+    assert plain == "hello world"
+
+
+def test_encrypted_url_verification(monkeypatch):
+    import base64
+    import hashlib
+    import json
+    from Crypto.Cipher import AES
+    from app.agent import feishu_bot
+
+    monkeypatch.setenv("FEISHU_ENCRYPT_KEY", "mesh")
+    monkeypatch.setenv("FEISHU_VERIFICATION_TOKEN", "tok123")
+    payload = json.dumps(
+        {"challenge": "chal-9", "token": "tok123", "type": "url_verification"},
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    key = hashlib.sha256(b"mesh").digest()
+    iv = b"0123456789abcdef"
+    bs = 16
+    pad = bs - len(payload) % bs
+    payload_padded = payload + bytes([pad] * pad)
+    ct = AES.new(key, AES.MODE_CBC, iv).encrypt(payload_padded)
+    enc = base64.b64encode(iv + ct).decode("ascii")
+    out = feishu_bot.handle_feishu_event(None, {"encrypt": enc})
+    assert out.get("challenge") == "chal-9"

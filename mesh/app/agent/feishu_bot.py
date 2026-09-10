@@ -1,9 +1,11 @@
 """⑧ 飞书 Bot 事件接线（只接线，不扩大脑）。
 
-飞书事件 → Envelope → handle_message → display_text →（可选）回发。
+飞书事件 →（可选）解密 → Envelope → handle_message → display_text →（可选）回发。
 """
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import logging
 import os
@@ -17,6 +19,54 @@ log = logging.getLogger("mesh.feishu_bot")
 
 def _verification_token() -> str:
     return (os.environ.get("FEISHU_VERIFICATION_TOKEN") or "").strip()
+
+
+def _encrypt_key() -> str:
+    return (os.environ.get("FEISHU_ENCRYPT_KEY") or "").strip()
+
+
+def decrypt_feishu_encrypt(encrypt_b64: str, encrypt_key: str | None = None) -> str:
+    """解密飞书 Encrypt Key 密文（AES-256-CBC · SHA256(key) · PKCS7）。
+
+    官方约定：密文 = base64(iv[16] + ciphertext)。
+    """
+    key_s = (encrypt_key if encrypt_key is not None else _encrypt_key()).strip()
+    if not key_s:
+        raise ValueError("FEISHU_ENCRYPT_KEY missing")
+    try:
+        from Crypto.Cipher import AES  # pycryptodome
+    except ImportError as e:
+        raise RuntimeError("pycryptodome required for Feishu encrypt decrypt") from e
+
+    blob = base64.b64decode(encrypt_b64)
+    if len(blob) < 16:
+        raise ValueError("ciphertext too short")
+    iv, ct = blob[:16], blob[16:]
+    key = hashlib.sha256(key_s.encode("utf-8")).digest()
+    plain = AES.new(key, AES.MODE_CBC, iv).decrypt(ct)
+    pad = plain[-1]
+    if isinstance(pad, str):  # py2 safety; unused on 3
+        pad = ord(pad)
+    if pad < 1 or pad > 16:
+        raise ValueError("bad pkcs7 padding")
+    plain = plain[:-pad]
+    return plain.decode("utf-8")
+
+
+def unwrap_feishu_body(body: dict[str, Any]) -> dict[str, Any]:
+    """若推送为 Encrypt Key 密文包（通常仅含 encrypt），则解密为业务 JSON。"""
+    body = body or {}
+    enc = body.get("encrypt")
+    if not enc:
+        return body
+    # 明文业务体不应再走 decrypt；飞书加密推送时顶层通常只有 encrypt
+    if body.get("event") or body.get("header") or body.get("type") == "url_verification" or "challenge" in body:
+        return body
+    raw = decrypt_feishu_encrypt(str(enc))
+    obj = json.loads(raw)
+    if not isinstance(obj, dict):
+        raise ValueError("decrypted feishu body is not object")
+    return obj
 
 
 def _extract_text(content: str) -> str:
@@ -60,13 +110,19 @@ def parse_im_message(event: dict[str, Any]) -> dict[str, Any] | None:
 def handle_feishu_event(con, body: dict[str, Any]) -> dict[str, Any]:
     """处理飞书事件回调。
 
-    - url_verification → 回 challenge
+    - url_verification → 回 challenge（支持 Encrypt Key 密文包）
     - im.message.receive_v1 → handle_message；回发由调用方决定（本函数返回 reply_text）
     """
     body = body or {}
-    # 明文 challenge（URL 校验）
+    try:
+        body = unwrap_feishu_body(body)
+    except Exception as e:
+        log.warning("feishu decrypt failed: %s", e)
+        return {"ok": False, "error": "decrypt_failed", "detail": str(e)[:200]}
+
+    # 明文 / 解密后的 challenge（URL 校验）
     if body.get("type") == "url_verification" or (
-        "challenge" in body and "encrypt" not in body and not body.get("event")
+        "challenge" in body and not body.get("event") and not body.get("header")
     ):
         token = _verification_token()
         if token and body.get("token") and body.get("token") != token:
@@ -75,7 +131,8 @@ def handle_feishu_event(con, body: dict[str, Any]) -> dict[str, Any]:
 
     # 可选：校验 event token（header 或 body.token）
     token = _verification_token()
-    if token and body.get("token") and body.get("token") != token:
+    body_token = body.get("token") or (body.get("header") or {}).get("token")
+    if token and body_token and body_token != token:
         return {"ok": False, "error": "bad_verification_token"}
 
     header = body.get("header") or {}
@@ -110,4 +167,5 @@ def handle_feishu_event(con, body: dict[str, Any]) -> dict[str, Any]:
             },
         }
 
+    log.info("feishu_bot skipped event_type=%s keys=%s", event_type or "unknown", list(body.keys())[:8])
     return {"ok": True, "skipped": True, "reason": f"unhandled_event:{event_type or 'unknown'}"}
