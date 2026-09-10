@@ -251,7 +251,7 @@ def route_message(
                 intent="clarify",
                 clarify_text=(
                     f"你想了解「{who}」最近的沟通对象，还是最近负责/推进的事情？"
-                    "也可以直接说，比如：「张三最近跟谁聊过？」或「张三这周有啥动作？」"
+                    "也可以直接说，比如：「小鹏最近跟谁接触过？」或「小鹏这周有啥动作？」"
                 ),
                 notes="how_is_clarify",
                 resolved_entity=who,
@@ -401,7 +401,7 @@ def _casual_reply(q: str) -> str:
     if re.search(r"你好|您好|hello|\bhi\b|嗨|在吗", q, re.I):
         return (
             "你好，我是 Mesh，可以帮你查已上线周报里的人和事。"
-            "比如：「张三最近跟谁聊过？」「这个项目是谁在跟？」"
+            "直接问就行，比如「小鹏最近有接触吗」「本期有哪些可同步的关系」。"
         )
     return "嗯，我在。有关于已上线周报的问题可以直接问。"
 
@@ -420,7 +420,7 @@ def _clarify_bare(q: str, st: SessionContextState) -> str:
         )
     return (
         "我还不太确定你指的是哪个人、哪家公司或哪件事。"
-        "可以说具体一点，例如：「张三最近跟谁聊过？」「小鹏和编辑部有什么关系？」"
+        "可以说具体一点，例如：「小鹏最近有接触吗？」「高德和编辑部有什么关系？」"
     )
 
 

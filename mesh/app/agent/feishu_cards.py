@@ -33,22 +33,11 @@ def stage_copy(stage: int, *, query: str = "") -> str:
 
 
 def followup_suggestions(query: str = "") -> list[str]:
-    q = (query or "").strip()
-    out: list[str] = []
-    if re.search(r"硅谷|湾区|SF|San\s*Francisco", q, re.I):
-        out.append("硅谷团队还有别的关键触点吗？")
-    if re.search(r"谁|哪些人|沟通", q):
-        out.append("这些人分别处于什么合作阶段？")
-    out.append("相关证据在哪一期？")
-    out.append("还有哪些值得跟进的关系？")
-    # 去重保序
-    seen: set[str] = set()
-    uniq: list[str] = []
-    for s in out:
-        if s and s not in seen and s != q:
-            seen.add(s)
-            uniq.append(s)
-    return uniq[:3]
+    """默认不塞固定「还可以问」——同事不会每句甩同一套话术。
+
+    需要时由上层按上下文传入；勿再用「谁/沟通」关键词拼万能三连。
+    """
+    return []
 
 
 def streaming_config() -> dict[str, Any]:

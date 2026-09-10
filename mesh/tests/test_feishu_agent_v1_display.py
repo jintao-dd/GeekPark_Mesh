@@ -160,7 +160,7 @@ def test_thinking_and_answer_cards():
     assert a["config"]["update_multi"] is True
     assert "答案" in a["elements"][0]["text"]["content"]
     assert "**问：**" not in a["elements"][0]["text"]["content"]
-    assert "还可以问" in a["elements"][0]["text"]["content"]
+    assert "还可以问" not in a["elements"][0]["text"]["content"]
 
 
 def test_cardkit_v2_and_stream_prefixes():
@@ -176,7 +176,7 @@ def test_cardkit_v2_and_stream_prefixes():
         streaming=False,
     )
     assert ans["config"]["streaming_mode"] is False
-    assert any(e.get("tag") == "action" for e in ans["body"]["elements"])
+    assert not any(e.get("tag") == "action" for e in ans["body"]["elements"])
     prefs = feishu_cards.fake_stream_prefixes("第一段。第二段内容比较长用于切分。" * 3)
     assert prefs[-1].startswith(prefs[0][:10]) or len(prefs) >= 1
     assert prefs[-1].endswith("切分。") or "第一段" in prefs[-1]
