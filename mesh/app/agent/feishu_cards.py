@@ -52,10 +52,10 @@ def followup_suggestions(query: str = "") -> list[str]:
 
 
 def streaming_config() -> dict[str, Any]:
-    # 略加快：约 50ms × ceil(n/6) 上屏时长
+    # 快打字机：约 30ms × ceil(n/20)，长答也不拖
     return {
-        "print_frequency_ms": {"default": 50, "android": 50, "ios": 50, "pc": 50},
-        "print_step": {"default": 6, "android": 6, "ios": 6, "pc": 6},
+        "print_frequency_ms": {"default": 30, "android": 30, "ios": 30, "pc": 30},
+        "print_step": {"default": 20, "android": 20, "ios": 20, "pc": 20},
         "print_strategy": "fast",
     }
 
@@ -219,9 +219,9 @@ def error_card(*, message: str, query: str = "") -> dict[str, Any]:
 def estimate_typewriter_seconds(text: str) -> float:
     """粗估打字机上屏秒数（与 streaming_config 对齐）。"""
     n = max(1, len(text or ""))
-    step = 6
-    freq_ms = 50
-    return min(8.0, max(0.4, (n / step) * (freq_ms / 1000.0)))
+    step = 20
+    freq_ms = 30
+    return min(1.2, max(0.15, (n / step) * (freq_ms / 1000.0)))
 
 
 def fake_stream_prefixes(text: str, *, min_chunk: int = 48) -> list[str]:

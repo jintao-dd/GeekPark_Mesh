@@ -175,14 +175,14 @@ def _schedule_stage_ticker(
     card_id: str = "",
     seq: feishu_api.CardSeq | None = None,
 ) -> None:
-    """等待中推进阶段文案：~3.2s stage1，~7.5s stage2。"""
+    """等待中只推一次阶段文案（~3.5s），避免频繁刷新显得卡。"""
 
-    def _tick(stage: int, wait_s: float) -> None:
-        if done.wait(wait_s):
+    def _run() -> None:
+        if done.wait(3.5):
             return
         if done.is_set():
             return
-        body = feishu_cards.stage_copy(stage, query=query)
+        body = feishu_cards.stage_copy(1, query=query)
         try:
             with card_lock:
                 if done.is_set():
@@ -197,15 +197,11 @@ def _schedule_stage_ticker(
                 elif message_id:
                     feishu_api.patch_message(
                         message_id=message_id,
-                        content=feishu_cards.thinking_card(query=query, stage=stage),
+                        content=feishu_cards.thinking_card(query=query, stage=1),
                     )
-            _elog("stage tick stage=%s mode=%s", stage, mode)
+            _elog("stage tick stage=1 mode=%s", mode)
         except Exception as e:
             log.debug("feishu stage tick skip: %s", e)
-
-    def _run() -> None:
-        _tick(1, 3.2)
-        _tick(2, 4.3)  # 距开始约 7.5s
 
     threading.Thread(target=_run, name="feishu-stage-tick", daemon=True).start()
 
@@ -218,22 +214,18 @@ def _finalize_cardkit(
     query: str,
     card_lock: threading.Lock,
 ) -> None:
-    """假流式：推递增前缀 → 稍等打字机 → 关流式并挂追问按钮。"""
-    prefixes = feishu_cards.fake_stream_prefixes(display_text, min_chunk=56)
+    """假流式：一次推全文，交给客户端打字机；很快挂上追问按钮。"""
+    body = (display_text or "").strip() or "这期没捞到可引用的证据。"
     with card_lock:
-        # 第一段立刻上屏；后续节流，让客户端打字机有空间
-        for i, pref in enumerate(prefixes):
-            feishu_api.stream_card_text(
-                card_id=card_id,
-                element_id=feishu_cards.BODY_ELEMENT_ID,
-                content=pref,
-                sequence=seq.next(),
-            )
-            if i < len(prefixes) - 1:
-                time.sleep(0.35)
-    # 给客户端一点打字机时间（上限短，避免拖慢）
-    time.sleep(min(2.2, feishu_cards.estimate_typewriter_seconds(prefixes[-1] if prefixes else "")))
-    final = feishu_cards.answer_card_v2(display_text=display_text, query=query, streaming=False)
+        feishu_api.stream_card_text(
+            card_id=card_id,
+            element_id=feishu_cards.BODY_ELEMENT_ID,
+            content=body,
+            sequence=seq.next(),
+        )
+    # 只等一小段打字机，避免「答完了还卡很久才出按钮」
+    time.sleep(feishu_cards.estimate_typewriter_seconds(body))
+    final = feishu_cards.answer_card_v2(display_text=body, query=query, streaming=False)
     with card_lock:
         feishu_api.update_card_entity(card_id=card_id, card=final, sequence=seq.next())
         try:
@@ -243,7 +235,7 @@ def _finalize_cardkit(
                     "config": {
                         "streaming_mode": False,
                         "summary": {
-                            "content": (display_text or "Mesh").strip()[:36] or "Mesh"
+                            "content": body.strip()[:36] or "Mesh"
                         },
                     }
                 },
@@ -262,16 +254,10 @@ def _finalize_legacy(
     receive_id: str = "",
     rid_type: str = "chat_id",
 ) -> str:
-    """无 CardKit：分段 patch 假流式。"""
-    prefixes = feishu_cards.fake_stream_prefixes(display_text, min_chunk=72)
+    """无 CardKit：一次到位，不做分段假流式（分段会显得卡）。"""
     mid = message_id
+    final = feishu_cards.answer_card(display_text=display_text, query=query)
     with card_lock:
-        for i, pref in enumerate(prefixes[:-1]):
-            card = feishu_cards.answer_card(display_text=pref + " ▍", query="")
-            if mid:
-                feishu_api.patch_message(message_id=mid, content=card)
-            time.sleep(0.28)
-        final = feishu_cards.answer_card(display_text=display_text, query=query)
         if mid:
             feishu_api.patch_message(message_id=mid, content=final)
         elif receive_id:
