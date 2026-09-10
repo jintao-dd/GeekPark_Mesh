@@ -134,12 +134,14 @@ _SYSTEM_DECIDE = """你是 GeekPark 内部 AI 同事 Mesh 的「动作选择」�
 - 读某篇文档要点 → ask + feishu.doc.get
 - 整理成文但不写入飞书 → speak（直接成文）
 - 用户要「创建/新建飞书文档」且一句话说了写什么（如「创建新文档详细介绍你自己」）
-  → prepare_write + feishu.doc.create；args.title 起个短标题；args.content 可先写要点或留空（系统会按用户原话生成正文）
-- 要发消息 / 建日程 → prepare_write，填齐 receive_id/text 或 title/start/end
+  → prepare_write + feishu.doc.create；args 只放短字段：title≤20字；
+  **args.content 必须是空字符串 ""**（正文由系统按用户原话生成；禁止在 JSON 里写长文，否则会截断坏掉）
+- 要发消息 / 建日程 → prepare_write；im 的 text / calendar 字段保持短；长文不要塞进 decide JSON
 - 系统提示「有待确认写操作」时：用户同意/确认 → confirm_write；明确取消 → cancel_write；
   若用户确认时又补充内容 → 仍 confirm_write（系统会合并）
 - 只有改权限/读草稿原文 → refuse；「创建文档」本身绝不 refuse
 - 不要编造飞书内容；Hands 不可用时用 speak 诚实说边界
+- JSON 必须极短（通常 <150 字符）；不要 markdown、不要解释、不要尾逗号
 """
 
 _SYSTEM_SPEAK = """你是 GeekPark（极客公园）内部的 AI 同事「Mesh」，在飞书里和员工说话。
@@ -304,6 +306,39 @@ def _sanitize_user_visible(text: str) -> str:
     return "刚才格式乱了一下。你要我说啥，直接再说一遍。"
 
 
+_CREATE_DOC_INTENT_RE = re.compile(
+    r"(?:创建|新建|建一?[个篇]?|写一?[个篇]?).{0,20}文档"
+    r"|(?:把|将).{0,24}(?:写成|写入|放到).{0,10}文档",
+    re.I,
+)
+
+
+def _soft_prepare_doc_decide(qn: str) -> dict[str, Any] | None:
+    """decide JSON 挂掉时的安全网：明显「创建文档」意图 → prepare，勿虚晃 speak。"""
+    if not _CREATE_DOC_INTENT_RE.search(qn or ""):
+        return None
+    if ("介绍" in qn) and (("自己" in qn) or ("你" in qn)):
+        title = "Mesh 自我介绍"
+    else:
+        title = ((qn or "").strip()[:24] or "新建文档")
+    return {
+        "action": "prepare_write",
+        "tool": "feishu.doc.create",
+        "args": {"title": title, "content": ""},
+    }
+
+
+def _normalize_decide(decision: dict[str, Any]) -> dict[str, Any]:
+    """丢掉 decide 里过长的 content，避免下游/重试再次炸 JSON。"""
+    out = dict(decision or {})
+    args = out.get("args")
+    if isinstance(args, dict) and len(str(args.get("content") or "")) > 120:
+        args = dict(args)
+        args["content"] = ""
+        out["args"] = args
+    return out
+
+
 def _decide(user_text: str, identity: Any, state: SessionContextState | None) -> tuple[dict[str, Any], dict[str, Any]]:
     meta: dict[str, Any] = {"llm_used": False, "model": None, "error": ""}
     qn = _clean_user_text(user_text)
@@ -320,26 +355,53 @@ def _decide(user_text: str, identity: Any, state: SessionContextState | None) ->
     system = _SYSTEM_DECIDE + "\n\n## 对方\n" + _identity_block(identity)
     hist = _history_block(state)
     user = (hist + "\n\n" if hist else "") + f"用户：{qn}\nJSON："
+    decision: dict[str, Any] = {"action": "speak"}
     try:
         from .. import llm
 
         raw = llm.call(
             system,
             user,
-            max_tokens=320,
+            max_tokens=256,
             json_mode=True,
             task="answer",
         )
         meta["llm_used"] = True
         meta["model"] = llm.model_for_task("answer")
-        return _parse_decision(str(raw or "")), meta
+        if isinstance(raw, dict):
+            decision = raw
+        else:
+            decision = _parse_decision(str(raw or ""))
     except Exception as e:
         log.warning("colleague_v3 decide failed: %s", e)
         meta["error"] = str(e)[:120]
-        # pending 在且模型挂了：宁可再问一句，不要瞎 confirm
-        if isinstance(pending, dict) and pending.get("tool"):
-            return {"action": "speak"}, meta
-        return {"action": "speak"}, meta
+        # 再救一次：不要 json_mode，用宽松解析抠 action/tool
+        try:
+            from .. import llm
+
+            raw2 = llm.call(
+                system,
+                user + "\n\n只输出极短 JSON，args.content 必须是 \"\"。",
+                max_tokens=256,
+                json_mode=False,
+                task="answer",
+            )
+            meta["llm_used"] = True
+            meta["salvage"] = True
+            meta["model"] = llm.model_for_task("answer")
+            decision = _parse_decision(str(raw2 or ""))
+        except Exception as e2:
+            log.warning("colleague_v3 decide salvage failed: %s", e2)
+            meta["error"] = (meta.get("error") or "") + "|" + str(e2)[:80]
+            decision = {"action": "speak"}
+
+    decision = _normalize_decide(decision if isinstance(decision, dict) else {"action": "speak"})
+    if str(decision.get("action") or "").lower() == "speak":
+        soft = _soft_prepare_doc_decide(qn)
+        if soft is not None:
+            meta["soft_prepare"] = True
+            return soft, meta
+    return decision, meta
 
 
 def _speak_plain(

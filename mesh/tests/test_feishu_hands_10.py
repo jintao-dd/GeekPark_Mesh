@@ -472,6 +472,37 @@ def test_create_doc_intro_yourself_uses_utterance_as_brief():
     assert "确认" in r.text
 
 
+def test_decide_json_fail_soft_prepares_create_doc():
+    """decide JSON 挂掉时不得虚晃 speak，应 soft prepare 创建文档。"""
+    os.environ["MESH_FEISHU_HANDS"] = "1"
+    os.environ["MESH_FEISHU_HANDS_WRITE"] = "1"
+    os.environ["MESH_FEISHU_HANDS_BACKEND"] = "mock"
+    st = SessionContextState()
+
+    def fake_llm(system, user, max_tokens=4000, json_mode=False, task="default"):
+        if json_mode:
+            raise RuntimeError("模型返回的 JSON 无法解析：Unterminated string")
+        # salvage 也烂掉 / 或落到 speak 文案——soft prepare 仍应兜住
+        return "好的我正在创建文档，稍等。"
+
+    with mock.patch("app.llm.call", side_effect=fake_llm):
+        with mock.patch("app.llm.model_for_task", return_value="mock"):
+            r = colleague_v3.handle(
+                con=None,
+                user_text="我让你创建个文档 详细介绍一下你自己，你怎么这么多废话？？？？",
+                identity=_ident(),
+                permission=_perm_all(),
+                context=_ctx(),
+                session=st,
+                invoke_tool=toolsmod.invoke_tool,
+                render_tool_result=lambda r, i, s: ("ok", [], []),
+            )
+    assert r.intent == "feishu_write"
+    assert st.pending_write and st.pending_write["tool"] == "feishu.doc.create"
+    assert "确认" in r.text
+    assert bool((r.trace or {}).get("pending_write"))
+
+
 def test_parse_im_ignores_root_id():
     from app.agent.feishu_bot import parse_im_message
 
