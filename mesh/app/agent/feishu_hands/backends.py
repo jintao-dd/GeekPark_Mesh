@@ -375,9 +375,13 @@ def _mock_call(tool: str, arguments: dict[str, Any]) -> ToolResultEnvelope:
             return envelope_fail("confirmation_required", tool=tool)
         title = str(args.get("title") or "未命名")
         return envelope_ok(
-            [{"title": title, "url": "https://feishu.cn/docx/mock_created", "snippet": "已创建"}],
+            [{"title": title, "url": "https://feishu.cn/docx/mock_created", "snippet": "已创建；公司内获链接可读"}],
             tool=tool,
-            meta={"url": "https://feishu.cn/docx/mock_created"},
+            meta={
+                "url": "https://feishu.cn/docx/mock_created",
+                "doc_token": "mock_created",
+                "tenant_share": True,
+            },
         )
     if tool == "feishu.im.send":
         if not args.get("confirmed"):

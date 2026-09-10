@@ -367,13 +367,49 @@ def _doc_create(args: dict[str, Any], *, user_access_token: str) -> ToolResultEn
             except Exception as e:
                 log.warning("doc body write failed: %s", e)
         url = f"https://feishu.cn/docx/{doc_id}"
+        share_ok = False
+        share_err = ""
+        try:
+            _set_tenant_link_share(doc_id, docs_type="docx", user_access_token=user_access_token)
+            share_ok = True
+        except Exception as e:
+            share_err = str(e)[:160]
+            log.warning("doc tenant share failed token=%s: %s", doc_id, e)
+        snippet = "已创建；公司内获链接可读" if share_ok else "已创建（公司内链接权限未设上，请手动开「组织内获得链接可阅读」）"
         return envelope_ok(
-            [{"title": title, "url": url, "snippet": "已创建", "docs_token": doc_id}],
+            [{"title": title, "url": url, "snippet": snippet, "docs_token": doc_id}],
             tool="feishu.doc.create",
-            meta={"url": url, "doc_token": doc_id},
+            meta={
+                "url": url,
+                "doc_token": doc_id,
+                "tenant_share": share_ok,
+                "tenant_share_error": share_err,
+            },
         )
     except Exception as e:
         return _fail("feishu.doc.create", e)
+
+
+def _set_tenant_link_share(
+    token: str,
+    *,
+    docs_type: str = "docx",
+    user_access_token: str = "",
+) -> dict[str, Any]:
+    """创建后默认：公司内部获得链接可阅读（tenant_readable）。docx / sheet / bitable 通用。"""
+    dtype = (docs_type or "docx").strip() or "docx"
+    return _api(
+        "PATCH",
+        f"/open-apis/drive/v2/permissions/{token}/public",
+        params={"type": dtype},
+        payload={"link_share_entity": "tenant_readable"},
+        user_access_token=user_access_token,
+    )
+
+
+def open_tenant_readable(token: str, *, docs_type: str = "docx") -> dict[str, Any]:
+    """对外：把已有云文档/表格设为组织内获链可读。"""
+    return _set_tenant_link_share(token, docs_type=docs_type)
 
 
 def _im_send(args: dict[str, Any]) -> ToolResultEnvelope:

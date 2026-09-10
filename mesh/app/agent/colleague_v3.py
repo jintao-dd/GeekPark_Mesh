@@ -110,38 +110,33 @@ def _merge_confirm_args(tool: str, args: dict[str, Any], user_text: str) -> dict
             out["text"] = extra
     return out
 
-_SYSTEM_DECIDE = """你是 GeekPark 内部 AI 同事 Mesh 的「动作选择」层。
-只输出一个严格 JSON（双引号，不要 markdown，不要长文）：
+_SYSTEM_DECIDE = """你是 GeekPark 内部 AI 同事 Mesh 的「调度」层。
+只输出一个极短严格 JSON（双引号，无 markdown，无长文）。必须含 situation + action：
 
-{"action":"speak"}
-{"action":"ask","tool":"<tool>","query":"...","resource_type":"doc|message|group|wiki|folder|calendar","args":{}}
-{"action":"prepare_write","tool":"feishu.doc.create|feishu.im.send|feishu.calendar.create","args":{...}}
-{"action":"confirm_write"}
-{"action":"cancel_write"}
-{"action":"refuse","text":"一句短拒"}
+{"situation":"chat","action":"speak"}
+{"situation":"need_published","action":"ask","tool":"ask.published","query":"..."}
+{"situation":"need_feishu_read","action":"ask","tool":"feishu.search","query":"...","resource_type":"doc|message|wiki|folder|calendar","args":{}}
+{"situation":"want_feishu_write","action":"prepare_write","tool":"feishu.doc.create|feishu.im.send|feishu.calendar.create","args":{"title":"短","content":""}}
+{"situation":"confirm_pending","action":"confirm_write"}
+{"situation":"cancel_pending","action":"cancel_write"}
+{"situation":"refuse","action":"refuse","text":"一句短拒"}
+
+数据隔离（硬）：
+- published 周报事实 ↔ feishu_live 飞书 live ↔ speak 草稿，三桶禁止混成一条事实
+- 写飞书只能 prepare_write→confirm_write，禁止用 speak 假装「正在创建/已创建」
 
 可读 tool：ask.published | ask.relations_summary | context.list_issues |
   feishu.search | feishu.doc.get | feishu.calendar.list | feishu.discuss.summary
-可写 tool（必须先 prepare_write，等用户确认后再 confirm_write）：
-  feishu.doc.create | feishu.im.send | feishu.calendar.create
+可写 tool：feishu.doc.create | feishu.im.send | feishu.calendar.create
 
-规则（按上下文判断，不要死抠字面）：
-- 闲聊/情绪/观点/写稿润色（不写入飞书）→ speak
-- 已上线周报事实 → ask + ask.published / ask.relations_summary
-- 搜飞书文档/Wiki/文件夹 → ask + feishu.search，resource_type=doc|wiki|folder
-- 搜聊天/「跟谁聊过」消息侧 → ask + feishu.search resource_type=message，或 feishu.discuss.summary
-- 查日程 → ask + feishu.calendar.list（或 search calendar）
-- 读某篇文档要点 → ask + feishu.doc.get
-- 整理成文但不写入飞书 → speak（直接成文）
-- 用户要「创建/新建飞书文档」且一句话说了写什么（如「创建新文档详细介绍你自己」）
-  → prepare_write + feishu.doc.create；args 只放短字段：title≤20字；
-  **args.content 必须是空字符串 ""**（正文由系统按用户原话生成；禁止在 JSON 里写长文，否则会截断坏掉）
-- 要发消息 / 建日程 → prepare_write；im 的 text / calendar 字段保持短；长文不要塞进 decide JSON
-- 系统提示「有待确认写操作」时：用户同意/确认 → confirm_write；明确取消 → cancel_write；
-  若用户确认时又补充内容 → 仍 confirm_write（系统会合并）
-- 只有改权限/读草稿原文 → refuse；「创建文档」本身绝不 refuse
-- 不要编造飞书内容；Hands 不可用时用 speak 诚实说边界
-- JSON 必须极短（通常 <150 字符）；不要 markdown、不要解释、不要尾逗号
+规则（看「系统工作记忆」+ 对话，不要枚举用户句式）：
+- 有待确认写操作 + 用户同意 → confirm_write
+- 有待确认 + 用户取消 → cancel_write
+- 有未完成 active_goal（family=feishu_write）且用户在催/继续要写 → prepare_write 或 confirm_write，禁止闲聊搪塞
+- 有 last_block=scope_denied：可诚实说权限；若用户说已开权限 → 再 prepare_write，不要只道歉
+- 闲聊/成文不落飞书 → speak
+- 周报事实 → ask.published；飞书搜读 → feishu.*（feishu_live）
+- prepare_write 的 args.content 必须是 ""；title≤20 字；JSON 通常 <150 字符
 """
 
 _SYSTEM_SPEAK = """你是 GeekPark（极客公园）内部的 AI 同事「Mesh」，在飞书里和员工说话。
@@ -162,6 +157,7 @@ _SYSTEM_SPEAK = """你是 GeekPark（极客公园）内部的 AI 同事「Mesh�
 4) 观点用「我觉得」可以，并标明是看法。
 5) 只输出对用户说的话，不要输出 JSON、不要输出 action/tool 字段。
 6) 飞书 live 材料与周报事实必须分开说，禁止把飞书讨论说成「周报里记录」。
+7) **禁止谎称**：本轮若没有真正调用飞书写入，严禁说「已创建 / 正在创建 / 写入成功 / 已经写进飞书」。没有工具结果就老实说还没写入，或给出可粘贴正文让用户自己建。
 """
 
 
@@ -220,20 +216,140 @@ def _identity_block(identity: Any) -> str:
 
 def _history_block(state: SessionContextState | None) -> str:
     if not state or not state.recent_turns:
-        return ""
+        mem = _working_memory_block(state)
+        return mem
     lines = []
     for t in (state.recent_turns or [])[-8:]:
         role = "用户" if t.get("role") == "user" else "Mesh"
         raw = str(t.get("text") or "")
         lines.append(f"{role}：{_sanitize_user_visible(raw)}")
+    mem = _working_memory_block(state)
+    body = "最近对话：\n" + "\n".join(lines)
+    return body + (("\n" + mem) if mem else "")
+
+
+def _working_memory_block(state: SessionContextState | None) -> str:
+    if not state:
+        return ""
+    bits: list[str] = []
     pending = getattr(state, "pending_write", None)
-    extra = ""
     if isinstance(pending, dict) and pending.get("tool"):
-        extra = (
-            f"\n（系统：有待确认写操作 tool={pending.get('tool')} "
-            f"title={str(pending.get('args') or {}).get('title') or ''}）"
+        bits.append(
+            f"- 待确认写操作 tool={pending.get('tool')} "
+            f"title={str((pending.get('args') or {}).get('title') or '')}"
         )
-    return "最近对话：\n" + "\n".join(lines) + extra
+    goal = getattr(state, "active_goal", None)
+    if isinstance(goal, dict) and goal.get("summary"):
+        bits.append(
+            f"- 未完成目标 family={goal.get('family') or ''} "
+            f"tool={goal.get('tool') or ''} summary={str(goal.get('summary') or '')[:80]}"
+        )
+    block = getattr(state, "last_block", None)
+    if isinstance(block, dict) and block.get("code"):
+        bits.append(
+            f"- 上一刀失败 code={block.get('code')} tool={block.get('tool') or ''} "
+            f"msg={str(block.get('message') or '')[:100]}"
+        )
+    if not bits:
+        return ""
+    return "系统工作记忆（短期，非长期记忆）：\n" + "\n".join(bits)
+
+
+def _set_active_goal(
+    session: SessionContextState,
+    *,
+    summary: str,
+    family: str,
+    tool: str = "",
+    utterance: str = "",
+) -> None:
+    import time
+
+    session.active_goal = {
+        "summary": (summary or "")[:160],
+        "family": family,
+        "tool": tool or "",
+        "utterance": (utterance or "")[:200],
+        "updated_at": time.time(),
+    }
+
+
+def _clear_active_goal(session: SessionContextState) -> None:
+    session.active_goal = None
+
+
+def _set_last_block(
+    session: SessionContextState,
+    *,
+    code: str,
+    tool: str = "",
+    message: str = "",
+) -> None:
+    import time
+
+    session.last_block = {
+        "code": code,
+        "tool": tool or "",
+        "message": (message or "")[:200],
+        "at": time.time(),
+    }
+
+
+def _clear_last_block(session: SessionContextState) -> None:
+    session.last_block = None
+
+
+def _classify_block(err: str, *, tool: str = "") -> dict[str, str]:
+    s = (err or "").lower()
+    raw = err or ""
+    if (
+        "99991672" in raw
+        or "scope" in s
+        or "permission" in s
+        or "access denied" in s
+        or "docx:document" in s
+        or "权限" in raw
+    ):
+        code = "scope_denied"
+    elif any(x in s for x in ("hands_disabled", "write_disabled", "mcp_not_configured", "cli_not_configured")):
+        code = "hands_off"
+    elif any(x in s for x in ("empty", "not_found", "no_result")):
+        code = "empty"
+    elif s.startswith("feishu_api_") or "feishu_api_" in s:
+        code = "feishu_api"
+    else:
+        code = "other"
+    return {"code": code, "tool": tool, "message": raw[:200]}
+
+
+_FAKE_HANDS_CLAIM_RE = re.compile(
+    r"(已创建|正在创建|创建成功|写入成功|已经写进飞书|已发到飞书|日程已建好|调用\s*feishu)",
+    re.I,
+)
+
+
+def _strip_fake_hands_claims(text: str) -> str:
+    t = (text or "").strip()
+    if not t or not _FAKE_HANDS_CLAIM_RE.search(t):
+        return t
+    log.warning("colleague_v3 blocked fake Hands claim in speak")
+    return (
+        "这轮我还没有真正写入飞书，不能假装已经创建成功。"
+        "要落飞书文档的话直接说「创建文档…」；我先准备预览，你确认后再写。"
+    )
+
+
+def _block_user_text(code: str, err: str) -> str:
+    if code == "scope_denied":
+        return (
+            f"没写进去：应用缺权限（{err[:120]}）。"
+            "请在开放平台勾选并**发布版本**后说「再试」；我不会假装已创建。"
+        )
+    if code == "hands_off":
+        return "飞书 Hands / 写入开关没开，这轮写不了。打开后再让我确认写入。"
+    if code == "empty":
+        return "飞书侧这轮没返回可用结果，我没编造。"
+    return f"没写进去（{err or '失败'}）。我不会假装已经创建成功。"
 
 
 def _parse_decision(raw: str) -> dict[str, Any]:
@@ -588,6 +704,7 @@ def handle(
 
     if action == "cancel_write":
         _clear_pending(session, context, identity)
+        _clear_active_goal(session)
         out.action = "speak"
         out.text = "好，已取消，不会写入飞书。"
         out.intent = "casual"
@@ -650,6 +767,13 @@ def handle(
             args["text"] = q
         session.pending_write = {"tool": tool, "args": args}
         _persist_pending(session, context, identity)
+        _set_active_goal(
+            session,
+            summary=f"写入 {tool}" + (f"：{args.get('title')}" if args.get("title") else ""),
+            family="feishu_write",
+            tool=tool,
+            utterance=q,
+        )
         out.action = "speak"
         out.intent = "feishu_write"
         out.tool_id = tool
@@ -661,6 +785,7 @@ def handle(
         else:
             out.text = _prepare_write_text(tool, args)
         out.trace["pending_write"] = tool
+        out.trace["active_goal"] = session.active_goal
         return out
 
     if action == "confirm_write":
@@ -683,13 +808,14 @@ def handle(
         from . import feishu_hands
 
         if not feishu_hands.write_enabled():
-            _clear_pending(session, context, identity)
+            _set_last_block(session, code="hands_off", tool=tool, message="write_disabled")
             out.action = "speak"
             out.text = "写入开关关着（MESH_FEISHU_HANDS_WRITE），我不能真正写入飞书。预览还在，打开开关后再说「确认」。"
             out.intent = "feishu_write"
             return out
         if not permmod.tool_allowed(permission, tool):
             _clear_pending(session, context, identity)
+            _set_last_block(session, code="scope_denied", tool=tool, message="tool_acl")
             out.action = "speak"
             out.text = "你当前没有这项飞书写入权限。"
             out.intent = "casual"
@@ -706,6 +832,8 @@ def handle(
         out.payload = result.payload if isinstance(getattr(result, "payload", None), dict) else {}
         _clear_pending(session, context, identity)
         if getattr(result, "ok", False):
+            _clear_active_goal(session)
+            _clear_last_block(session)
             spoken, smeta = _synthesize(
                 q,
                 fact_text or "写入已完成。",
@@ -716,11 +844,26 @@ def handle(
             out.synthesize_llm_used = bool(smeta.get("llm_used"))
             out.llm_used = bool(out.llm_used or smeta.get("llm_used"))
             out.text = _sanitize_user_visible(spoken)
+            # 公司内可读：native 已尽力设置；回传 meta
+            meta = out.payload.get("meta") if isinstance(out.payload, dict) else None
+            if isinstance(meta, dict) and meta.get("tenant_share") is False:
+                out.text = (
+                    out.text.rstrip()
+                    + "\n\n（提醒：公司内链接权限这次没设上，同事可能打不开；可手动开「组织内获得链接可阅读」。）"
+                )
         else:
             err = str(getattr(result, "error", "") or "")
-            out.text = f"没写进去（{err or '失败'}）。我不会假装已经创建成功。"
+            classified = _classify_block(err, tool=tool)
+            _set_last_block(
+                session,
+                code=classified["code"],
+                tool=tool,
+                message=classified["message"],
+            )
+            out.text = _block_user_text(classified["code"], err)
         out.trace["write_confirmed"] = tool
         out.trace["source_tier"] = "feishu_live"
+        out.trace["last_block"] = session.last_block
         return out
 
     if action == "ask":
@@ -770,6 +913,14 @@ def handle(
         is_feishu = tool in FEISHU_ALL_TOOLS
         if is_feishu and not getattr(result, "ok", True):
             err = str(getattr(result, "error", "") or "")
+            classified = _classify_block(err, tool=tool)
+            _set_last_block(
+                session,
+                code=classified["code"],
+                tool=tool,
+                message=classified["message"],
+            )
+            out.trace["last_block"] = session.last_block
             if err in (
                 "hands_disabled",
                 "mcp_not_configured",
@@ -797,9 +948,10 @@ def handle(
 
     spoken, smeta = _speak_plain(q, identity, session)
     out.action = "speak"
-    out.text = _sanitize_user_visible(spoken)
+    out.text = _strip_fake_hands_claims(_sanitize_user_visible(spoken))
     out.intent = "casual"
     out.llm_used = bool(out.llm_used or smeta.get("llm_used"))
     out.synthesize_llm_used = bool(smeta.get("llm_used"))
     out.trace["speak_plain"] = True
+    out.trace["source_tier"] = "model"
     return out

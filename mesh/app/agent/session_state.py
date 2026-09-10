@@ -62,6 +62,12 @@ class SessionContextState:
     colleague_goal: str = ""
     # Feishu Hands：待确认写操作（非企业事实）
     pending_write: dict[str, Any] | None = None
+    # 短期工作记忆（会话级；非长期向量记忆）
+    # active_goal: {summary, family, tool, utterance, updated_at}
+    # family: feishu_write|ask_published|ask_feishu|speak
+    active_goal: dict[str, Any] | None = None
+    # last_block: {code, tool, message, at}  code=scope_denied|hands_off|empty|feishu_api|other
+    last_block: dict[str, Any] | None = None
     updated_at: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
