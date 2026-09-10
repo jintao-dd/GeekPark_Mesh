@@ -165,71 +165,188 @@ def _receive_target(payload: dict[str, Any]) -> tuple[str, str]:
     raise ValueError("no chat_id/open_id to reply")
 
 
-def _schedule_thinking_nudge(
+def _schedule_stage_ticker(
     *,
-    message_id: str,
+    mode: str,
     query: str,
     done: threading.Event,
     card_lock: threading.Lock,
+    message_id: str = "",
+    card_id: str = "",
+    seq: feishu_api.CardSeq | None = None,
 ) -> None:
-    """等待超过几秒仍未出终答时，轻推一次文案，避免「死板一张卡」。"""
+    """等待中推进阶段文案：~3.2s stage1，~7.5s stage2。"""
 
-    def _run() -> None:
-        if done.wait(4.5):
+    def _tick(stage: int, wait_s: float) -> None:
+        if done.wait(wait_s):
             return
-        if not message_id or done.is_set():
+        if done.is_set():
             return
+        body = feishu_cards.stage_copy(stage, query=query)
         try:
             with card_lock:
                 if done.is_set():
                     return
-                feishu_api.patch_message(
-                    message_id=message_id,
-                    content=feishu_cards.thinking_card(query=query, stage=1),
-                )
-            _elog("thinking nudge patched message_id=%s", message_id)
+                if mode == "cardkit" and card_id and seq is not None:
+                    feishu_api.stream_card_text(
+                        card_id=card_id,
+                        element_id=feishu_cards.BODY_ELEMENT_ID,
+                        content=body,
+                        sequence=seq.next(),
+                    )
+                elif message_id:
+                    feishu_api.patch_message(
+                        message_id=message_id,
+                        content=feishu_cards.thinking_card(query=query, stage=stage),
+                    )
+            _elog("stage tick stage=%s mode=%s", stage, mode)
         except Exception as e:
-            log.debug("feishu thinking nudge skip: %s", e)
+            log.debug("feishu stage tick skip: %s", e)
 
-    threading.Thread(target=_run, name="feishu-think-nudge", daemon=True).start()
+    def _run() -> None:
+        _tick(1, 3.2)
+        _tick(2, 4.3)  # 距开始约 7.5s
+
+    threading.Thread(target=_run, name="feishu-stage-tick", daemon=True).start()
 
 
-def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
-    """后台任务：发思考卡 → Agent → Patch 最终卡。"""
-    from .. import db
+def _finalize_cardkit(
+    *,
+    card_id: str,
+    seq: feishu_api.CardSeq,
+    display_text: str,
+    query: str,
+    card_lock: threading.Lock,
+) -> None:
+    """假流式：推递增前缀 → 稍等打字机 → 关流式并挂追问按钮。"""
+    prefixes = feishu_cards.fake_stream_prefixes(display_text, min_chunk=56)
+    with card_lock:
+        # 第一段立刻上屏；后续节流，让客户端打字机有空间
+        for i, pref in enumerate(prefixes):
+            feishu_api.stream_card_text(
+                card_id=card_id,
+                element_id=feishu_cards.BODY_ELEMENT_ID,
+                content=pref,
+                sequence=seq.next(),
+            )
+            if i < len(prefixes) - 1:
+                time.sleep(0.35)
+    # 给客户端一点打字机时间（上限短，避免拖慢）
+    time.sleep(min(2.2, feishu_cards.estimate_typewriter_seconds(prefixes[-1] if prefixes else "")))
+    final = feishu_cards.answer_card_v2(display_text=display_text, query=query, streaming=False)
+    with card_lock:
+        feishu_api.update_card_entity(card_id=card_id, card=final, sequence=seq.next())
+        try:
+            feishu_api.update_card_settings(
+                card_id=card_id,
+                settings={
+                    "config": {
+                        "streaming_mode": False,
+                        "summary": {
+                            "content": (display_text or "Mesh").strip()[:36] or "Mesh"
+                        },
+                    }
+                },
+                sequence=seq.next(),
+            )
+        except Exception as e:
+            log.debug("feishu close streaming skip: %s", e)
 
-    query = str(payload.get("text") or "")
-    card_message_id = ""
-    done = threading.Event()
-    card_lock = threading.Lock()
-    d: dict[str, Any] = {}
-    try:
-        if feishu_api.bot_reply_enabled():
-            receive_id, rid_type = _receive_target(payload)
+
+def _finalize_legacy(
+    *,
+    message_id: str,
+    display_text: str,
+    query: str,
+    card_lock: threading.Lock,
+    receive_id: str = "",
+    rid_type: str = "chat_id",
+) -> str:
+    """无 CardKit：分段 patch 假流式。"""
+    prefixes = feishu_cards.fake_stream_prefixes(display_text, min_chunk=72)
+    mid = message_id
+    with card_lock:
+        for i, pref in enumerate(prefixes[:-1]):
+            card = feishu_cards.answer_card(display_text=pref + " ▍", query="")
+            if mid:
+                feishu_api.patch_message(message_id=mid, content=card)
+            time.sleep(0.28)
+        final = feishu_cards.answer_card(display_text=display_text, query=query)
+        if mid:
+            feishu_api.patch_message(message_id=mid, content=final)
+        elif receive_id:
             sent = feishu_api.send_message(
                 receive_id=receive_id,
                 receive_id_type=rid_type,
                 msg_type="interactive",
-                content=feishu_cards.thinking_card(query=query, stage=0),
+                content=final,
             )
-            card_message_id = str(sent.get("message_id") or "")
+            mid = str(sent.get("message_id") or "")
+    return mid
+
+
+def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
+    """后台任务：阶段态思考卡 → Agent → 假流式终答（CardKit 优先）。"""
+    from .. import db
+
+    query = str(payload.get("text") or "")
+    card_message_id = ""
+    card_id = ""
+    mode = "legacy"
+    seq = feishu_api.CardSeq(1)
+    done = threading.Event()
+    card_lock = threading.Lock()
+    d: dict[str, Any] = {}
+    reply = ""
+    try:
+        if feishu_api.bot_reply_enabled():
+            receive_id, rid_type = _receive_target(payload)
+            if feishu_api.cardkit_enabled():
+                try:
+                    entity = feishu_cards.thinking_card_v2(query=query, stage=0)
+                    card_id = feishu_api.create_card_entity(entity)
+                    sent = feishu_api.send_card_entity(
+                        receive_id=receive_id,
+                        receive_id_type=rid_type,
+                        card_id=card_id,
+                    )
+                    card_message_id = str(sent.get("message_id") or "")
+                    mode = "cardkit"
+                except Exception as e:
+                    log.warning("feishu cardkit unavailable, fallback legacy: %s", e)
+                    _elog("cardkit fallback: %s", e)
+                    card_id = ""
+            if mode != "cardkit":
+                sent = feishu_api.send_message(
+                    receive_id=receive_id,
+                    receive_id_type=rid_type,
+                    msg_type="interactive",
+                    content=feishu_cards.thinking_card(query=query, stage=0),
+                )
+                card_message_id = str(sent.get("message_id") or "")
+                mode = "legacy"
+
             log.info(
-                "feishu thinking card sent message_id=%s chat=%s",
+                "feishu thinking sent mode=%s message_id=%s card_id=%s",
+                mode,
                 card_message_id,
-                payload.get("chat_id"),
+                card_id,
             )
             _elog(
-                "thinking card sent message_id=%s chat=%s",
+                "thinking sent mode=%s message_id=%s card_id=%s",
+                mode,
                 card_message_id,
-                payload.get("chat_id"),
+                card_id,
             )
-            if card_message_id:
-                _schedule_thinking_nudge(
-                    message_id=card_message_id,
-                    query=query,
-                    done=done,
-                    card_lock=card_lock,
-                )
+            _schedule_stage_ticker(
+                mode=mode,
+                query=query,
+                done=done,
+                card_lock=card_lock,
+                message_id=card_message_id,
+                card_id=card_id,
+                seq=seq if mode == "cardkit" else None,
+            )
         else:
             log.warning("feishu bot reply disabled; skip outbound")
             _elog("bot reply disabled; skip outbound")
@@ -250,33 +367,40 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
             len(reply),
         )
         log.info(
-            "feishu_bot reply open_id=%s intent=%s chars=%s",
+            "feishu_bot reply open_id=%s intent=%s chars=%s mode=%s",
             payload.get("feishu_open_id"),
             d.get("intent"),
             len(reply),
+            mode,
         )
 
         if feishu_api.bot_reply_enabled():
-            final = feishu_cards.answer_card(display_text=reply, query=query)
-            # 先 done，再 patch：避免 nudge 盖掉终答
             done.set()
-            with card_lock:
-                if card_message_id:
-                    feishu_api.patch_message(message_id=card_message_id, content=final)
-                else:
-                    receive_id, rid_type = _receive_target(payload)
-                    sent2 = feishu_api.send_message(
-                        receive_id=receive_id,
-                        receive_id_type=rid_type,
-                        msg_type="interactive",
-                        content=final,
-                    )
-                    card_message_id = str(sent2.get("message_id") or "")
+            if mode == "cardkit" and card_id:
+                _finalize_cardkit(
+                    card_id=card_id,
+                    seq=seq,
+                    display_text=reply,
+                    query=query,
+                    card_lock=card_lock,
+                )
+            else:
+                receive_id, rid_type = _receive_target(payload)
+                card_message_id = _finalize_legacy(
+                    message_id=card_message_id,
+                    display_text=reply,
+                    query=query,
+                    card_lock=card_lock,
+                    receive_id=receive_id,
+                    rid_type=rid_type,
+                )
 
         return {
             "ok": True,
             "reply_text": reply,
             "card_message_id": card_message_id,
+            "card_id": card_id,
+            "mode": mode,
             "answer": d,
         }
     except Exception as e:
@@ -285,21 +409,41 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
         done.set()
         if feishu_api.bot_reply_enabled():
             try:
-                err_card = feishu_cards.error_card(message=str(e)[:300], query=query)
                 with card_lock:
-                    if card_message_id:
-                        feishu_api.patch_message(message_id=card_message_id, content=err_card)
-                    else:
-                        receive_id, rid_type = _receive_target(payload)
-                        feishu_api.send_message(
-                            receive_id=receive_id,
-                            receive_id_type=rid_type,
-                            msg_type="interactive",
-                            content=err_card,
+                    if mode == "cardkit" and card_id:
+                        err = feishu_cards.error_card_v2(message=str(e)[:300], query=query)
+                        feishu_api.update_card_entity(
+                            card_id=card_id, card=err, sequence=seq.next()
                         )
+                        try:
+                            feishu_api.update_card_settings(
+                                card_id=card_id,
+                                settings={"config": {"streaming_mode": False}},
+                                sequence=seq.next(),
+                            )
+                        except Exception:
+                            pass
+                    else:
+                        err_card = feishu_cards.error_card(message=str(e)[:300], query=query)
+                        if card_message_id:
+                            feishu_api.patch_message(message_id=card_message_id, content=err_card)
+                        else:
+                            receive_id, rid_type = _receive_target(payload)
+                            feishu_api.send_message(
+                                receive_id=receive_id,
+                                receive_id_type=rid_type,
+                                msg_type="interactive",
+                                content=err_card,
+                            )
             except Exception as e2:
                 log.warning("feishu error card failed: %s", e2)
-        return {"ok": False, "error": str(e)[:300], "card_message_id": card_message_id}
+        return {
+            "ok": False,
+            "error": str(e)[:300],
+            "card_message_id": card_message_id,
+            "card_id": card_id,
+            "mode": mode,
+        }
     finally:
         done.set()
 
@@ -314,11 +458,51 @@ def _spawn_message_job(payload: dict[str, Any]) -> None:
     t.start()
 
 
+def _parse_card_action(event: dict[str, Any]) -> dict[str, Any] | None:
+    """卡片按钮回传 → 伪造一条用户提问 payload。"""
+    action = event.get("action") or {}
+    value = action.get("value") if isinstance(action, dict) else None
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except Exception:
+            value = {"q": value}
+    if not isinstance(value, dict):
+        value = {}
+    q = str(value.get("q") or value.get("text") or "").strip()
+    if not q:
+        return None
+    open_id = ""
+    operator = event.get("operator") or {}
+    if isinstance(operator, dict):
+        open_id = str(operator.get("open_id") or "").strip()
+    sender = event.get("sender") or {}
+    if not open_id and isinstance(sender, dict):
+        sid = sender.get("sender_id") or sender.get("id") or {}
+        if isinstance(sid, dict):
+            open_id = str(sid.get("open_id") or "").strip()
+    ctx = event.get("context") or {}
+    chat_id = ""
+    if isinstance(ctx, dict):
+        chat_id = str(ctx.get("open_chat_id") or ctx.get("chat_id") or "").strip()
+    if not chat_id:
+        chat_id = str(event.get("open_chat_id") or event.get("chat_id") or "").strip()
+    return {
+        "text": q,
+        "feishu_open_id": open_id,
+        "chat_id": chat_id,
+        "chat_type": "p2p",
+        "inbound_message_id": f"card_action:{q[:40]}:{int(time.time())}",
+        "channel": "feishu",
+    }
+
+
 def handle_feishu_event(con, body: dict[str, Any], *, sync: bool = False) -> dict[str, Any]:
     """处理飞书事件回调。
 
     - url_verification → 回 challenge
     - im.message → 默认异步（立刻 accepted）；sync=True 时同步跑完（单测/联调）
+    - card.action.trigger → 追问按钮
     - con 在异步路径可忽略（后台自开连接）
     """
     body = body or {}
@@ -354,6 +538,19 @@ def handle_feishu_event(con, body: dict[str, Any], *, sync: bool = False) -> dic
         event_type or "unknown",
         bool(event),
     )
+
+    if event_type in ("card.action.trigger", "card.action.trigger_v1"):
+        payload = _parse_card_action(event if isinstance(event, dict) else {})
+        if not payload:
+            return {"ok": True, "skipped": True, "reason": "empty_card_action"}
+        _elog("card action ask q=%s", payload.get("text"))
+        if sync:
+            out = process_feishu_message_job(payload)
+            out["accepted"] = True
+            out["mode"] = "sync"
+            return out
+        _spawn_message_job(payload)
+        return {"ok": True, "accepted": True, "mode": "async", "source": "card_action"}
 
     if event_type in (
         "im.message.receive_v1",

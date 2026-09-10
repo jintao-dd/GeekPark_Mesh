@@ -106,3 +106,110 @@ def patch_message(*, message_id: str, content: dict[str, Any] | str) -> dict[str
         log.warning("feishu patch_message failed status=%s body=%s", r.status_code, str(data)[:400])
         raise RuntimeError(f"feishu patch_message failed: {data or r.text[:300]}")
     return data.get("data") or data
+
+
+def _api_json(method: str, url: str, *, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    r = requests.request(method, url, headers=_auth_headers(), json=payload, timeout=20)
+    data = r.json() if r.content else {}
+    if r.status_code >= 400 or int(data.get("code") or 0) != 0:
+        raise RuntimeError(f"feishu {method} {url} failed: {data or r.text[:300]}")
+    return data
+
+
+def create_card_entity(card: dict[str, Any]) -> str:
+    """POST /open-apis/cardkit/v1/cards → card_id。需 cardkit:card:write。"""
+    payload = {
+        "type": "card_json",
+        "data": json.dumps(card, ensure_ascii=False),
+    }
+    data = _api_json("POST", "https://open.feishu.cn/open-apis/cardkit/v1/cards", payload=payload)
+    card_id = str((data.get("data") or {}).get("card_id") or "").strip()
+    if not card_id:
+        raise RuntimeError(f"feishu create_card empty id: {data}")
+    return card_id
+
+
+def send_card_entity(
+    *,
+    receive_id: str,
+    receive_id_type: str,
+    card_id: str,
+) -> dict[str, Any]:
+    """用卡片实体 ID 发 interactive 消息。"""
+    content = {"type": "card", "data": {"card_id": card_id}}
+    return send_message(
+        receive_id=receive_id,
+        receive_id_type=receive_id_type,
+        msg_type="interactive",
+        content=content,
+    )
+
+
+def stream_card_text(
+    *,
+    card_id: str,
+    element_id: str,
+    content: str,
+    sequence: int,
+) -> None:
+    """PUT …/elements/:id/content — 全量文本，前缀增量则打字机。"""
+    url = (
+        f"https://open.feishu.cn/open-apis/cardkit/v1/cards/{card_id}"
+        f"/elements/{element_id}/content"
+    )
+    _api_json(
+        "PUT",
+        url,
+        payload={
+            "content": content if content else " ",
+            "sequence": int(sequence),
+        },
+    )
+
+
+def update_card_settings(*, card_id: str, settings: dict[str, Any], sequence: int) -> None:
+    """PATCH …/cards/:id/settings"""
+    url = f"https://open.feishu.cn/open-apis/cardkit/v1/cards/{card_id}/settings"
+    _api_json(
+        "PATCH",
+        url,
+        payload={
+            "settings": json.dumps(settings, ensure_ascii=False),
+            "sequence": int(sequence),
+        },
+    )
+
+
+def update_card_entity(*, card_id: str, card: dict[str, Any], sequence: int) -> None:
+    """PUT …/cards/:id 全量更新实体。"""
+    url = f"https://open.feishu.cn/open-apis/cardkit/v1/cards/{card_id}"
+    _api_json(
+        "PUT",
+        url,
+        payload={
+            "card": {
+                "type": "card_json",
+                "data": json.dumps(card, ensure_ascii=False),
+            },
+            "sequence": int(sequence),
+        },
+    )
+
+
+class CardSeq:
+    """同一 card_id 上严格递增的 sequence。"""
+
+    def __init__(self, start: int = 1):
+        self._n = int(start) - 1
+        self._lock = threading.Lock()
+
+    def next(self) -> int:
+        with self._lock:
+            self._n += 1
+            return self._n
+
+
+def cardkit_enabled() -> bool:
+    """FEISHU_CARDKIT=0 可关；默认开（失败时业务层回退旧卡）。"""
+    flag = (os.environ.get("FEISHU_CARDKIT") or "1").strip().lower()
+    return flag not in ("0", "false", "no", "off")
