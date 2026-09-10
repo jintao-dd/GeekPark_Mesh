@@ -70,7 +70,7 @@ def test_ambiguous_clarify_not_ask():
 def test_how_is_person_clarifies():
     d = conv.route_message("张三最近怎么样？")
     assert d.route == "clarify"
-    assert "沟通对象" in d.clarify_text or "负责" in d.clarify_text
+    assert "沟通对象" in d.clarify_text or "推进" in d.clarify_text or "跟谁" in d.clarify_text
 
 
 # --- Follow-up ---
@@ -134,7 +134,9 @@ def test_failure_ux_no_hit_not_no_evidence_token():
         payload={"n_hits": 0, "claim_support": {"support": "insufficient", "reason": "no_evidence"}},
     )
     assert "no_evidence" not in text.lower()
-    assert "没查到已发布" in text or "暂无直接命中" in text
+    assert "没找到" in text or "没查" in text
+    assert "no_evidence" not in text.lower()
+    assert "依据：暂无直接命中" not in text
 
 
 def test_failure_ux_insufficient_distinct():

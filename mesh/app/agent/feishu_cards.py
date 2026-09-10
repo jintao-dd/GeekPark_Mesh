@@ -32,12 +32,43 @@ def stage_copy(stage: int, *, query: str = "") -> str:
     return f"在整理可引用的依据，马上好…{quote}"
 
 
-def followup_suggestions(query: str = "") -> list[str]:
-    """默认不塞固定「还可以问」——同事不会每句甩同一套话术。
-
-    需要时由上层按上下文传入；勿再用「谁/沟通」关键词拼万能三连。
-    """
-    return []
+def followup_suggestions(query: str = "", *, display_text: str = "") -> list[str]:
+    """仅在业务答得上时给轻量续问；meta/闲聊/没查到不加「还可以问」。"""
+    body = display_text or ""
+    if any(
+        k in body
+        for k in (
+            "没找到",
+            "没查到",
+            "不太确定",
+            "我是 Mesh",
+            "不客气",
+            "哈哈",
+            "好。",
+            "我在。",
+            "换个说法",
+            "说名字",
+        )
+    ):
+        return []
+    q = (query or "").strip()
+    out: list[str] = []
+    if re.search(r"硅谷|湾区|SF|San\s*Francisco", q, re.I):
+        out.append("硅谷还有别的触点吗？")
+    if re.search(r"谁|哪些人|沟通|接触", q):
+        out.append("还有别人吗？")
+    for name in ("小鹏", "高德", "英伟达", "阿里"):
+        if name in q:
+            out.append(f"那{name}后来怎么样了？")
+            break
+    # 去重保序
+    seen: set[str] = set()
+    uniq: list[str] = []
+    for s in out:
+        if s and s not in seen and s != q:
+            seen.add(s)
+            uniq.append(s)
+    return uniq[:2]
 
 
 def streaming_config() -> dict[str, Any]:
@@ -133,7 +164,7 @@ def answer_card_v2(
         body_md=_clip(display_text, 10000) or "这期没捞到可引用的证据。",
         template="green",
         streaming=streaming,
-        followups=followup_suggestions(query),
+        followups=followup_suggestions(query, display_text=display_text),
         summary=_clip(display_text, 36) or "Mesh 回答",
     )
 
@@ -177,7 +208,7 @@ def answer_card(
     query: str = "",
 ) -> dict[str, Any]:
     body = _clip(display_text, 6000) or "这期没捞到可引用的证据。"
-    tips = followup_suggestions(query)
+    tips = followup_suggestions(query, display_text=display_text)
     if tips:
         body = body + "\n\n还可以问：\n" + "\n".join(f"· {t}" for t in tips)
     return {

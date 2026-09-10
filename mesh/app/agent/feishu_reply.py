@@ -17,13 +17,13 @@ _NO_HIT_MARKERS = (
     "我目前没查到已发布的内容能确认这件事",
 )
 
-_NO_HIT_UX = "我目前没查到已发布的内容能确认这件事。可以换个关键词，或确认相关内容是否已上线。"
+_NO_HIT_UX = "这期周报里我没找到能直接回答的内容。你可以换个人名/公司名，或换个说法再问一次。"
 _INSUFFICIENT_UX = (
-    "我找到了一些相关内容，但它们还不足以支撑一个更强的结论。"
-    "如果你愿意，可以缩小问题（比如点名人/公司，或问「是哪一期」）。"
+    "我看到一些相关记录，但还不足以把话说死。"
+    "如果你愿意，可以再具体一点（人名、公司，或问是哪一期）。"
 )
-_CONTRADICTED_UX = "已上线记录里存在与该说法不一致的内容，我不能按原说法下结论。"
-_SYSTEM_UX = "刚才检索没成功，你可以再试一次。"
+_CONTRADICTED_UX = "周报里有和这个说法不太一致的记录，我先不按原说法下结论。"
+_SYSTEM_UX = "刚才没查顺，你再发一次我就好。"
 
 
 def _issue_slug(answer: AgentAnswer, payload: dict[str, Any] | None = None) -> str:
@@ -153,29 +153,26 @@ def format_display_text(
     blocks: list[str] = [body]
     meta_lines: list[str] = []
 
-    if issue:
-        meta_lines.append(f"期次：{issue}")
+    # no_hit / system_error：只留人话，不甩期次/依据技术块
+    if kind in ("no_hit", "system_error"):
+        return body
 
-    # 人话判定，禁止甩 no_evidence 英文腔
-    if kind == "no_hit":
-        meta_lines.append("依据：暂无直接命中")
-    elif kind == "insufficient":
-        meta_lines.append("依据：有相关内容，但不足以支撑更强结论")
+    if issue and kind == "supported":
+        meta_lines.append(f"来源：{issue} 已上线周报")
+    elif issue and kind not in ("",):
+        meta_lines.append(f"来源期次：{issue}")
+
+    if kind == "insufficient":
+        meta_lines.append("说明：有相关内容，但还不够下强结论")
     elif kind == "contradicted":
-        meta_lines.append("依据：存在不一致记录")
-    elif support == "supported":
-        meta_lines.append("依据：有已上线内容支持")
-    elif support:
-        meta_lines.append(f"依据：{support}")
+        meta_lines.append("说明：存在不一致记录")
 
     if uniq_refs and kind not in ("no_hit", "system_error"):
         meta_lines.append("可核对：")
-        for r in uniq_refs[:8]:
+        for r in uniq_refs[:6]:
             meta_lines.append(f"· {_humanize_ref(r)}")
-    elif kind == "insufficient" and not uniq_refs:
-        meta_lines.append("可核对：当前可见内容还不够直接。")
 
-    if meta_lines and kind != "system_error":
+    if meta_lines:
         blocks.append("")
         blocks.append("——")
         blocks.extend(meta_lines)

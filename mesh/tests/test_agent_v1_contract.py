@@ -148,7 +148,7 @@ def test_help_no_data_tool(db_ready):
     r = _run("帮助", feishu_open_id="ou_bound")
     assert r["intent"] == "help"
     assert r["data_tools_called"] == []
-    assert r["tools_called"] == ["system.help"]
+    assert r["tools_called"] == []
     assert r["fingerprint"]
     assert r["trace"]["intent"] == "help"
 

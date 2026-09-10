@@ -57,7 +57,7 @@ def test_meta_queries_are_help_not_ask():
     for q in cases:
         intent = rule_classify_intent(q, _ctx(), _perm())
         assert intent == "help", q
-        assert intent_to_tool(intent) == "system.help"
+        # Colleague Behavior：help 在 runtime 短接，不强制 system.help tool
         assert intent_to_tool(intent) not in (
             "ask.published",
             "ask.relations_summary",

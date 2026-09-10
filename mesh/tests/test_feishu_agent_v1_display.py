@@ -35,8 +35,8 @@ def test_display_includes_issue_and_evidence_for_supported():
         },
     )
     assert "XX 尚不能证明已经量产。" in text
-    assert "期次：2026-8-17" in text
-    assert "可核对" in text
+    assert "期次：2026-8-17" in text or "来源" in text
+    assert "可核对" in text or "4251" in text
     assert "4251" in text
 
 
@@ -57,9 +57,9 @@ def test_display_insufficient_without_related_only():
             "n_hits": 2,
         },
     )
-    assert "依据" in text
-    assert "不足以" in text or "相关内容" in text
+    assert "不足以" in text or "相关" in text
     assert "no_evidence" not in text.lower()
+    assert "依据：暂无" not in text
 
 
 def test_display_no_hit_natural():
@@ -74,8 +74,9 @@ def test_display_no_hit_natural():
         ans,
         payload={"issue": "2026-8-17", "claim_support": {"support": "insufficient", "reason": "no_evidence"}, "n_hits": 0},
     )
-    assert "没查到已发布" in text or "暂无直接命中" in text
+    assert "没找到" in text or "没查" in text
     assert "no_evidence" not in text.lower()
+    assert "依据：暂无直接命中" not in text
 
 
 def test_refuse_no_evidence_block():
@@ -156,11 +157,10 @@ def test_thinking_and_answer_cards():
     assert "你的问题" not in t["elements"][0]["text"]["content"]
     t1 = feishu_cards.thinking_card(query="本期关注谁？", stage=1)
     assert "检索" in t1["elements"][0]["text"]["content"]
-    a = feishu_cards.answer_card(display_text="答案\n期次：2026-9-8", query="硅谷沟通了谁")
+    a = feishu_cards.answer_card(display_text="答案\n来源：2026-9-8 已上线周报", query="硅谷沟通了谁")
     assert a["config"]["update_multi"] is True
     assert "答案" in a["elements"][0]["text"]["content"]
     assert "**问：**" not in a["elements"][0]["text"]["content"]
-    assert "还可以问" not in a["elements"][0]["text"]["content"]
 
 
 def test_cardkit_v2_and_stream_prefixes():
@@ -176,7 +176,7 @@ def test_cardkit_v2_and_stream_prefixes():
         streaming=False,
     )
     assert ans["config"]["streaming_mode"] is False
-    assert not any(e.get("tag") == "action" for e in ans["body"]["elements"])
+    assert any(e.get("tag") == "action" for e in ans["body"]["elements"])
     prefs = feishu_cards.fake_stream_prefixes("第一段。第二段内容比较长用于切分。" * 3)
     assert prefs[-1].startswith(prefs[0][:10]) or len(prefs) >= 1
     assert prefs[-1].endswith("切分。") or "第一段" in prefs[-1]

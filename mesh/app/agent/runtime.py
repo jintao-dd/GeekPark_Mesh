@@ -157,6 +157,27 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
             route=route,
         )
 
+    # Meta：短人话，不走 system.help 说明书
+    if intent == "help":
+        return _finish(
+            AgentAnswer(
+                text=route.casual_text or conv._meta_reply(envelope.text or ""),
+                intent="help",
+                tools_called=[],
+                fingerprint=fp.build_fingerprint(
+                    context=context, permission=permission, tool_result=None
+                ),
+                trace=fp.build_trace(
+                    intent="help",
+                    tool_id=None,
+                    context=context,
+                    identity_status=identity.status,
+                ),
+                **base_kwargs,
+            ),
+            route=route,
+        )
+
     if intent == "casual":
         return _finish(
             AgentAnswer(
@@ -319,16 +340,11 @@ def _whoami_text(identity) -> str:
     )
     team = str(getattr(identity, "primary_team", None) or "").strip()
     if display:
-        name = display
-    elif str(getattr(identity, "status", "") or "").startswith("bound"):
-        name = "（已绑定，无显示名）"
-    else:
-        name = "（还没认出你的显示名）"
-    lines = [f"你是 **{name}**。"]
-    if team:
-        lines.append(f"当前团队视角：{team}。")
-    lines.append("我只能查已上线周报；想接着问谁或哪家公司，直接说就行。")
-    return "\n".join(lines)
+        bit = f"你是 {display}"
+        if team:
+            bit += f"（{team}）"
+        return bit + "。想查周报直接说人名或公司就行。"
+    return "我这边还没认出你的名字。想查周报的话，直接说人名或公司就行。"
 
 
 def _refuse_text(status: str, text: str, deny_reason: str) -> str:

@@ -28,14 +28,22 @@ _WHOAMI = re.compile(r"(我是谁|我是什么身份|我的身份|我叫什么|w
 
 _CASUAL = re.compile(
     r"^("
-    r"你好|您好|hello|\bhi\b|嗨|在吗|早安|午安|晚安|"
+    r"你好|您好|hello|\bhi\b|嗨|在吗|"
+    r"早|早安|早上好|早啊|午安|晚安|"
     r"谢谢(?:你|啦|了)?|感谢|thanks|thank\s*you|"
     r"哈哈+[^\u4e00-\u9fff]{0,8}|呵呵+[^\u4e00-\u9fff]{0,8}|嘿+|"
-    r"(?:哈哈+|呵呵+)?\s*(?:在忙吗|忙吗)|"
+    r"(?:哈哈+|呵呵+)?\s*(?:在忙吗|忙吗|最近忙吗)|"
+    r"最近忙吗|忙吗|"
     r"好的?(?:明白了?|知道了?)?|好哒|好呀|行|可以|"
     r"收到|明白了?|了解|知道了|嗯嗯|嗯+|哦+|喔+|ok|okay|"
     r"没事|算了|不用了|先这样"
     r")[!！。.?？\s]*$",
+    re.I,
+)
+
+_REPAIR = re.compile(
+    r"(不是这个意思|我说的不是这个|我说的不是|你没听懂|我不是问这个|不对[,，]?\s*我|"
+    r"重新查|你理解错了)",
     re.I,
 )
 
@@ -208,7 +216,12 @@ def route_message(
             return RouteDecision(route="refuse", intent="refuse", notes="draft_raw")
 
     if _META.search(q) or _META_SHORT.match(q):
-        return RouteDecision(route="meta", intent="help", notes="meta")
+        return RouteDecision(
+            route="meta",
+            intent="help",
+            casual_text=_meta_reply(q),  # runtime may use as short-circuit text
+            notes="meta",
+        )
 
     if _WHOAMI.search(q):
         return RouteDecision(route="meta", intent="whoami", notes="whoami")
@@ -219,6 +232,14 @@ def route_message(
             intent="casual",
             casual_text=_casual_reply(q),
             notes="casual",
+        )
+
+    if _REPAIR.search(q):
+        return RouteDecision(
+            route="clarify",
+            intent="clarify",
+            clarify_text=_repair_reply(st),
+            notes="repair",
         )
 
     if _CAPABILITY_REFUSE.search(q):
@@ -250,8 +271,7 @@ def route_message(
                 route="clarify",
                 intent="clarify",
                 clarify_text=(
-                    f"你想了解「{who}」最近的沟通对象，还是最近负责/推进的事情？"
-                    "也可以直接说，比如：「小鹏最近跟谁接触过？」或「小鹏这周有啥动作？」"
+                    f"「{who}」你更想听：最近跟谁聊过，还是最近在推进什么？"
                 ),
                 notes="how_is_clarify",
                 resolved_entity=who,
@@ -388,40 +408,53 @@ def _try_followup(q: str, st: SessionContextState) -> RouteDecision | None:
     return None
 
 
-def _casual_reply(q: str) -> str:
-    ql = q.lower()
-    if re.search(r"谢谢|感谢|thanks", q, re.I):
-        return "不客气。还想继续问谁、哪家公司，或「那××呢」，直接说就行。"
-    if re.search(r"好的|收到|明白|了解|知道了|ok|行|可以", q, re.I):
-        return "好。需要的话可以接着问。"
-    if re.search(r"算了|不用了|没事|先这样", q):
-        return "好，需要再问随时叫我。"
-    if re.search(r"哈哈|呵呵", q):
-        return "🙂 有事直接问就行。"
-    if re.search(r"你好|您好|hello|\bhi\b|嗨|在吗", q, re.I):
+def _meta_reply(q: str) -> str:
+    if re.search(r"你能做|你可以做|你能干|能干|能查|能力|怎么问|帮助|help", q, re.I):
         return (
-            "你好，我是 Mesh，可以帮你查已上线周报里的人和事。"
-            "直接问就行，比如「小鹏最近有接触吗」「本期有哪些可同步的关系」。"
+            "我可以帮你查已经上线的周报：谁接触过谁、某家公司进展、团队之间的关系。"
+            "平常怎么问同事就怎么问我就行，比如点个名字或公司名。"
         )
-    return "嗯，我在。有关于已上线周报的问题可以直接问。"
+    return (
+        "我是 Mesh，GeekPark 的周报助手。"
+        "你问我已上线周报里的人或事就行，不用学固定句式。"
+    )
+
+
+def _repair_reply(st: SessionContextState) -> str:
+    if st.active_entities:
+        hint = "、".join(st.active_entities[:3])
+        return (
+            f"好，我可能理解偏了。你是想接着问「{hint}」里的哪一个，"
+            "还是另有人名/公司？直接说就行。"
+        )
+    return "好，那换个说法——你具体想问哪个人或哪家公司？把名字发我就行。"
+
+
+def _casual_reply(q: str) -> str:
+    if re.search(r"谢谢|感谢|thanks", q, re.I):
+        return "不客气～"
+    if re.search(r"好的|收到|明白|了解|知道了|ok|行|可以", q, re.I):
+        return "好。"
+    if re.search(r"算了|不用了|没事|先这样", q):
+        return "行，有需要再叫我。"
+    if re.search(r"哈哈|呵呵", q):
+        return "哈哈，有事直接说。"
+    if re.search(r"忙吗|最近忙", q):
+        return "还行，有周报相关的随时问我。"
+    if re.search(r"早", q):
+        return "早。今天想查谁或哪家公司？"
+    if re.search(r"你好|您好|hello|\bhi\b|嗨|在吗", q, re.I):
+        return "你好，我是 Mesh。想查周报里的人或事，直接说就行。"
+    return "嗯，我在。"
 
 
 def _clarify_bare(q: str, st: SessionContextState) -> str:
     if st.active_entities:
         hint = "、".join(st.active_entities[:3])
-        return (
-            f"你想接着问哪一个？刚才提到过：{hint}。"
-            "也可以说「那××呢」「后来呢」，或换成完整一句。"
-        )
+        return f"你是想接着问 {hint} 里的哪个？或者说个具体名字。"
     if "最近怎么样" in q or "这周有啥" in q:
-        return (
-            "范围有点宽。你想了解某个人/公司的沟通对象，还是最近在推进的事？"
-            "可以说名字，例如：「小鹏最近有接触吗」。"
-        )
-    return (
-        "我还不太确定你指的是哪个人、哪家公司或哪件事。"
-        "可以说具体一点，例如：「小鹏最近有接触吗？」「高德和编辑部有什么关系？」"
-    )
+        return "你更想听沟通对象，还是最近在推进的事？说个人名或公司名会更准。"
+    return "你指的是哪个人或哪家公司？说名字就行。"
 
 
 def update_state_after_turn(
@@ -471,7 +504,7 @@ def update_state_after_turn(
 
 def intent_to_tool(intent: str) -> str | None:
     return {
-        "help": "system.help",
+        "help": None,  # runtime 短接人话，不调 system.help
         "whoami": None,
         "casual": None,
         "clarify": None,
