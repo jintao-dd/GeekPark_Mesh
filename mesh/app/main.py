@@ -904,6 +904,9 @@ async def api_feishu_bot_event(request: Request):
 
     - url_verification：回 challenge（支持 Encrypt Key）
     - im.message：立刻 accepted，后台发「思考中」卡片 → Agent → Patch 最终回答
+
+    注意：密文包只 handle 一次。重复调用会触发 message_id 去重，导致第二次被 skip、
+    且第一次若在「仅探测 challenge」路径里已占用 dedup，会表现为「没反应」。
     """
     try:
         body = await request.json()
@@ -911,29 +914,7 @@ async def api_feishu_bot_event(request: Request):
         raise HTTPException(400, "invalid json")
     from .agent.feishu_bot import handle_feishu_event
 
-    raw = body or {}
-    # 纯密文 / URL 校验：无需 DB
-    if raw.get("type") == "url_verification" or (
-        "challenge" in raw and not raw.get("event") and "encrypt" not in raw
-    ):
-        out = handle_feishu_event(None, raw)
-        if "challenge" in out:
-            return {"challenge": out["challenge"]}
-        raise HTTPException(403, out.get("error") or "verification_failed")
-
-    if "encrypt" in raw and not raw.get("event") and not raw.get("header"):
-        out0 = handle_feishu_event(None, raw)
-        if "challenge" in out0:
-            return {"challenge": out0["challenge"]}
-        if out0.get("error") in ("bad_verification_token", "decrypt_failed"):
-            raise HTTPException(
-                403 if out0.get("error") == "bad_verification_token" else 400,
-                out0.get("error"),
-            )
-        # 解密后若是业务事件：下方 handle 会再 unwrap 并异步 accepted
-
-    # 消息事件：异步 accepted，秒回飞书；不阻塞 HTTP
-    out = handle_feishu_event(None, raw)
+    out = handle_feishu_event(None, body or {})
     if out.get("error") == "bad_verification_token":
         raise HTTPException(403, "bad_verification_token")
     if out.get("error") == "decrypt_failed":

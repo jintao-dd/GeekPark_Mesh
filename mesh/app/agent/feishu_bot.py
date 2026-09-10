@@ -19,6 +19,19 @@ from .harness import envelope_from_payload
 from .runtime import handle_message
 
 log = logging.getLogger("mesh.feishu_bot")
+# 保证 docker logs 能看到（uvicorn 下未单独配 handler 时也可能丢）
+_uv = logging.getLogger("uvicorn.error")
+
+
+def _elog(msg: str, *args: Any) -> None:
+    try:
+        log.info(msg, *args)
+    except Exception:
+        pass
+    try:
+        _uv.info("[feishu_bot] " + msg, *args)
+    except Exception:
+        print("[feishu_bot]", msg % args if args else msg, flush=True)
 
 _DEDUP_LOCK = threading.Lock()
 _DEDUP: dict[str, float] = {}
@@ -163,8 +176,14 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                 card_message_id,
                 payload.get("chat_id"),
             )
+            _elog(
+                "thinking card sent message_id=%s chat=%s",
+                card_message_id,
+                payload.get("chat_id"),
+            )
         else:
             log.warning("feishu bot reply disabled; skip outbound")
+            _elog("bot reply disabled; skip outbound")
 
         con = db.connect()
         try:
@@ -175,6 +194,12 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
         finally:
             con.close()
 
+        _elog(
+            "agent done open_id=%s intent=%s chars=%s",
+            payload.get("feishu_open_id"),
+            d.get("intent"),
+            len(reply),
+        )
         log.info(
             "feishu_bot reply open_id=%s intent=%s chars=%s",
             payload.get("feishu_open_id"),
@@ -204,6 +229,7 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
         }
     except Exception as e:
         log.exception("feishu message job failed: %s", e)
+        _elog("message job failed: %s", e)
         if feishu_api.bot_reply_enabled():
             try:
                 err_card = feishu_cards.error_card(message=str(e)[:300], query=query)
@@ -271,6 +297,7 @@ def handle_feishu_event(con, body: dict[str, Any], *, sync: bool = False) -> dic
             return {"ok": True, "skipped": True, "reason": "unsupported_or_empty"}
         inbound_id = str(payload.get("inbound_message_id") or "")
         if _dedup_seen(inbound_id):
+            _elog("dedup skip message_id=%s", inbound_id)
             log.info("feishu dedup skip message_id=%s", inbound_id)
             return {"ok": True, "skipped": True, "reason": "duplicate_event", "inbound_message_id": inbound_id}
 
@@ -286,6 +313,12 @@ def handle_feishu_event(con, body: dict[str, Any], *, sync: bool = False) -> dic
             out["mode"] = "sync"
             return out
 
+        _elog(
+            "accept async open_id=%s chat=%s text_len=%s",
+            payload.get("feishu_open_id"),
+            payload.get("chat_id"),
+            len(str(payload.get("text") or "")),
+        )
         _spawn_message_job(payload)
         return {
             "ok": True,
