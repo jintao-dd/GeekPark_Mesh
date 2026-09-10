@@ -7,16 +7,17 @@ from collections import defaultdict
 
 from .aggregator import sanitize_owner_team
 from .owner_guard import (
-    cross_team_provenance_ok,
     filter_draft_relations,
     normalize_relation_team_badges,
     normalize_pointer,
+    provenance_key,
     _title_entities,
     _DETAIL_TEAM,
 )
 from .relation_verify import editorial_weak
 
 _MIN_ENTITY_LEN = 2
+_MIN_BRIDGE_NAME_LEN = 3
 _MAX_SNIPPETS = 3
 _SNIP_LEN = 120
 
@@ -29,6 +30,22 @@ _OVERSEAS_TEAMS = frozenset({"Global Partnership 团队", "硅谷 BD 团队"})
 _ROUTE_PHRASE = re.compile(
     r"用得上|可供|对照|承接|联动|采访池|嘉宾|路由|值得关注|可对齐|国内谁用|谁用得上",
 )
+_CARD_ACTION_HINT = re.compile(
+    r"在跟进的合作|已沟通|尚未接触|对接|采访|合作|投资|路由|用得上|对照|牵线|已接触",
+)
+_BRIDGE_NAME_NOISE = frozenset({
+    "已沟通", "尚未接触", "已约下一步", "在聊", "等", "可对接", "拟", "对方",
+    "长期", "定期", "进展", "投资人", "专访", "湾区", "客户", "团队", "国内",
+    "海外", "会议", "判断", "非事实", "AI", "Infra", "Tech", "Week", "Demo",
+    "Lab", "Fund", "Global", "Agency", "在跟进的合作与团队", "在跟进的合作与合作方",
+    "在跟进的合作与相关方",
+})
+
+
+def _entity_key(name: str) -> str:
+    """轻归一：折空白 + casefold。不做子串/别名库。"""
+    s = re.sub(r"\s+", "", (name or "").strip())
+    return s.casefold()
 
 
 def _parse_entities(raw) -> list[str]:
@@ -105,10 +122,33 @@ def _routing_suggest_label(owner: str, target: str) -> str:
     return "（参考：若仅一方有记录，可用「一方接触，另一方用得上」）"
 
 
+def _provenance_ok_from_team_map(team_map: dict[str, list[dict]], teams: list[str]) -> bool:
+    """用已按 entity_key 归桶的 rows 做同源校验（避免归一后 display 名对不上 provenance）。"""
+    if len(teams) < 2:
+        return True
+    team_buckets: dict[str, set[tuple[str, str]]] = {t: set() for t in teams}
+    for t in teams:
+        for row in team_map.get(t) or []:
+            sid = str(row.get("source_id") or "")
+            pk = provenance_key(row)
+            team_buckets[t].add((sid, pk))
+    present = [t for t in teams if team_buckets[t]]
+    if len(present) < 2:
+        return True
+    for i, a in enumerate(present):
+        for b in present[i + 1 :]:
+            shared = team_buckets[a] & team_buckets[b]
+            if shared and team_buckets[a] == shared and team_buckets[b] == shared:
+                return False
+    return True
+
+
 def _build_entity_cooccurrence_candidates(items: list[dict]) -> list[dict]:
-    """entity 跨团队共现候选（原 raw 路径）。"""
+    """entity 跨团队共现候选（原 raw 路径；索引走 _entity_key）。"""
     active = [dict(x) for x in items if not x.get("blocked")]
+    # key -> team -> rows；另记 display 名
     by_entity: dict[str, dict[str, list[dict]]] = defaultdict(lambda: defaultdict(list))
+    display_of: dict[str, str] = {}
     for it in active:
         ot = sanitize_owner_team(it.get("owner_team"))
         if not ot or ot == "外部媒体":
@@ -117,14 +157,25 @@ def _build_entity_cooccurrence_candidates(items: list[dict]) -> list[dict]:
         for name in row["entities"]:
             if len(name) < _MIN_ENTITY_LEN:
                 continue
-            by_entity[name][ot].append(row)
+            key = _entity_key(name)
+            if not key:
+                continue
+            by_entity[key][ot].append(row)
+            # 偏好更长/含空格的展示名（Field AI > FieldAI）
+            prev = display_of.get(key) or ""
+            if len(name) > len(prev) or (len(name) == len(prev) and " " in name and " " not in prev):
+                display_of[key] = name
+            elif key not in display_of:
+                display_of[key] = name
 
     raw_cands: list[dict] = []
-    for entity, team_map in by_entity.items():
+    for key, team_map in by_entity.items():
         teams = sorted(team_map.keys())
         if len(teams) < 2:
             continue
-        if not cross_team_provenance_ok(active, entity, teams):
+        entity = display_of.get(key) or key
+        # 优先用归桶 rows 校验；同时保留原 API（title=display）作兜底
+        if not _provenance_ok_from_team_map(team_map, teams):
             continue
         all_items: list[dict] = []
         for t in teams:
@@ -163,8 +214,192 @@ def _build_entity_cooccurrence_candidates(items: list[dict]) -> list[dict]:
             "sources": sources[:6],
             "item_ids": item_ids,
             "provenance_ok": True,
+            "entity_key": key,
         })
     return raw_cands
+
+
+def _card_action_lines(card: dict) -> list[tuple[str, str]]:
+    """返回 (section_title, line) actionable 行。"""
+    out: list[tuple[str, str]] = []
+    for sec in card.get("sections") or card.get("blocks") or []:
+        if not isinstance(sec, dict):
+            continue
+        st = (sec.get("title") or "").strip()
+        for line in sec.get("lines") or []:
+            t = (line or "").strip()
+            if not t:
+                continue
+            blob = f"{st} {t}"
+            if _CARD_ACTION_HINT.search(blob):
+                out.append((st, t))
+    return out
+
+
+def _extract_bridge_names(text: str) -> list[str]:
+    """从卡面行粗抽专名；生产路径仅作候选，最终必须命中 item entities key。"""
+    names: list[str] = []
+    for m in re.finditer(r"[A-Za-z][A-Za-z0-9][A-Za-z0-9+.\-]{1,}", text or ""):
+        names.append(m.group(0))
+    for m in re.finditer(r"[\u4e00-\u9fff]{2,12}(?:[A-Za-z0-9+.\-]{2,})?", text or ""):
+        names.append(m.group(0))
+    # 连续英文词拼接：Reverie + AI → Reverie AI / ReverieAI
+    latin = re.findall(r"[A-Za-z][A-Za-z0-9+.\-]*", text or "")
+    for i in range(len(latin)):
+        for j in range(i + 2, min(i + 4, len(latin)) + 1):
+            names.append(" ".join(latin[i:j]))
+            names.append("".join(latin[i:j]))
+    clean: list[str] = []
+    seen: set[str] = set()
+    for n in names:
+        if n in _BRIDGE_NAME_NOISE or len(n) < _MIN_BRIDGE_NAME_LEN:
+            continue
+        if n.casefold() == "ai":
+            continue
+        k = _entity_key(n)
+        if not k or k in seen or k == "ai":
+            continue
+        seen.add(k)
+        clean.append(n)
+    return clean
+
+
+def _line_hits_entity_key(line: str, key: str) -> bool:
+    """白名单：折叠后的行是否包含完整 entity_key（短 key 不用包含匹配）。"""
+    if not key or key == "ai" or len(key) < _MIN_BRIDGE_NAME_LEN:
+        return False
+    folded = _entity_key(line)
+    if key not in folded:
+        return False
+    # 短 key（3–4）易误伤，要求前后非英文数字
+    if len(key) <= 4:
+        return bool(re.search(rf"(?<![a-z0-9]){re.escape(key)}(?![a-z0-9])", folded))
+    return True
+
+
+def _build_card_bridge_candidates(
+    items: list[dict],
+    team_cards: list[dict] | None,
+) -> list[dict]:
+    """卡面 actionable 线索 → 他队 item 实体：弱 routing 形态桥接。"""
+    if not team_cards:
+        return []
+
+    # entity_key → rows by team
+    by_key: dict[str, dict[str, list[dict]]] = defaultdict(lambda: defaultdict(list))
+    display_of: dict[str, str] = {}
+    for it in items:
+        if it.get("blocked"):
+            continue
+        ot = sanitize_owner_team(it.get("owner_team")) or ""
+        if not ot or ot == "外部媒体":
+            continue
+        row = _item_row(it)
+        for name in row["entities"]:
+            if len(name) < _MIN_ENTITY_LEN:
+                continue
+            key = _entity_key(name)
+            if not key or key == "ai":
+                continue
+            by_key[key][ot].append(row)
+            prev = display_of.get(key) or ""
+            if len(name) > len(prev):
+                display_of[key] = name
+            elif key not in display_of:
+                display_of[key] = name
+
+    if not by_key:
+        return []
+
+    buckets: dict[tuple[str, str], dict] = {}
+
+    def _ensure_bucket(card_team: str, key: str, other_teams: list[str], snippet: str) -> dict:
+        display = display_of.get(key) or key
+        bkey = (card_team, key)
+        if bkey not in buckets:
+            buckets[bkey] = {
+                "title": display,
+                "teams": [card_team],
+                "weak": True,
+                "candidate_kind": "card_bridge",
+                "routing_targets": [],
+                "suggested_label": _routing_suggest_label(card_team, other_teams[0]),
+                "team_facts": [{
+                    "team": card_team,
+                    "item_ids": [],
+                    "snippets": [],
+                    "sources": [f"{card_team}要点卡"],
+                }],
+                "sources": [f"{card_team}要点卡"],
+                "item_ids": [],
+                "provenance_ok": True,
+                "entity_key": key,
+            }
+        b = buckets[bkey]
+        tf0 = b["team_facts"][0]
+        if snippet and snippet not in tf0["snippets"]:
+            tf0["snippets"].append(snippet[:_SNIP_LEN])
+        return b
+
+    def _attach_other(b: dict, team_map: dict[str, list[dict]], other_teams: list[str]) -> None:
+        for ot in other_teams:
+            badge = f"→ {ot}"
+            if ot not in b["routing_targets"]:
+                b["routing_targets"].append(ot)
+            if badge not in b["teams"]:
+                b["teams"].append(badge)
+            for row in team_map[ot][:_MAX_SNIPPETS]:
+                iid = row.get("id")
+                if iid is not None and iid not in b["item_ids"]:
+                    b["item_ids"].append(iid)
+                tf_ot = next((x for x in b["team_facts"] if x["team"] == ot), None)
+                if tf_ot is None:
+                    tf_ot = {"team": ot, "item_ids": [], "snippets": [], "sources": []}
+                    b["team_facts"].append(tf_ot)
+                if iid is not None and iid not in tf_ot["item_ids"]:
+                    tf_ot["item_ids"].append(iid)
+                if row["text"] and row["text"] not in tf_ot["snippets"]:
+                    tf_ot["snippets"].append(row["text"])
+                if row["source_label"] and row["source_label"] not in tf_ot["sources"]:
+                    tf_ot["sources"].append(row["source_label"])
+                    if row["source_label"] not in b["sources"]:
+                        b["sources"].append(row["source_label"])
+
+    for card in team_cards:
+        if not isinstance(card, dict):
+            continue
+        card_team = sanitize_owner_team(card.get("team") or card.get("owner_team") or "") or ""
+        if not card_team or card_team == "外部媒体":
+            continue
+        for sec_title, line in _card_action_lines(card):
+            snippet = f"[{sec_title}] {line}" if sec_title else line
+            hit_keys: set[str] = set()
+            for raw_name in _extract_bridge_names(line):
+                key = _entity_key(raw_name)
+                if key in by_key:
+                    hit_keys.add(key)
+            for key in by_key:
+                if key in hit_keys:
+                    continue
+                if _line_hits_entity_key(line, key):
+                    hit_keys.add(key)
+            for key in hit_keys:
+                team_map = by_key[key]
+                other_teams = sorted(t for t in team_map.keys() if t != card_team)
+                if not other_teams:
+                    continue
+                b = _ensure_bucket(card_team, key, other_teams, snippet)
+                _attach_other(b, team_map, other_teams)
+
+    out = []
+    for b in buckets.values():
+        for tf in b["team_facts"]:
+            tf["snippets"] = tf["snippets"][:_MAX_SNIPPETS]
+            tf["sources"] = tf["sources"][:3]
+        b["sources"] = b["sources"][:6]
+        b["item_ids"] = sorted({i for i in b["item_ids"] if i is not None})
+        out.append(b)
+    return out
 
 
 def _build_routing_candidates(items: list[dict]) -> list[dict]:
@@ -236,27 +471,39 @@ def _build_routing_candidates(items: list[dict]) -> list[dict]:
     return out
 
 
-def _build_raw_candidates(items: list[dict]) -> list[dict]:
-    """共现 + 路由两路召回；不在此阶段去重或截断。"""
+def _build_raw_candidates(
+    items: list[dict],
+    team_cards: list[dict] | None = None,
+) -> list[dict]:
+    """共现 + 路由 + 卡面桥接；不在此阶段去重或截断。"""
     cooc = _build_entity_cooccurrence_candidates(items)
     route = _build_routing_candidates(items)
-    return cooc + route
+    bridge = _build_card_bridge_candidates(items, team_cards)
+    return cooc + route + bridge
 
 
-def build_relation_candidates(items: list[dict]) -> list[dict]:
-    """从 items 算出跨团队候选（宽召回；去重/分级留给 Decision）。"""
-    return _build_raw_candidates(items)
+def build_relation_candidates(
+    items: list[dict],
+    team_cards: list[dict] | None = None,
+) -> list[dict]:
+    """从 items（+可选要点卡）算出跨团队候选（宽召回；去重/分级留给 Decision）。"""
+    return _build_raw_candidates(items, team_cards=team_cards)
 
 
-def candidate_build_stats(items: list[dict]) -> dict[str, int]:
+def candidate_build_stats(
+    items: list[dict],
+    team_cards: list[dict] | None = None,
+) -> dict[str, int]:
     """候选构建各阶段数量（审计用）。"""
     cooc = _build_entity_cooccurrence_candidates(items)
     route = _build_routing_candidates(items)
-    raw = cooc + route
+    bridge = _build_card_bridge_candidates(items, team_cards)
+    raw = cooc + route + bridge
     return {
         "raw": len(raw),
         "raw_cooccurrence": len(cooc),
         "raw_routing": len(route),
+        "raw_card_bridge": len(bridge),
         "for_llm": len(raw),
         # 兼容旧审计字段：Candidate 不再 dedupe/cap
         "deduped": len(raw),
@@ -715,7 +962,11 @@ def prepare_draft_bundle(con, issue_id: int, slug: str) -> dict:
         ).fetchone()
         if row and row["card_json"]:
             try:
-                team_cards.append(json.loads(row["card_json"]))
+                card = json.loads(row["card_json"])
+                if isinstance(card, dict):
+                    if not (card.get("team") or card.get("owner_team")):
+                        card["team"] = team
+                    team_cards.append(card)
             except json.JSONDecodeError:
                 pass
     external = [
@@ -736,7 +987,7 @@ def prepare_draft_bundle(con, issue_id: int, slug: str) -> dict:
     names = list(dict.fromkeys(names))[:40]
     from .relation_continue import annotate_candidates_with_continuity, load_recent_relation_fingerprints
 
-    candidates = build_relation_candidates(item_rows)
+    candidates = build_relation_candidates(item_rows, team_cards=team_cards)
     prior = load_recent_relation_fingerprints(con, before_slug=slug, limit_issues=8)
     annotate_candidates_with_continuity(candidates, prior)
     return {

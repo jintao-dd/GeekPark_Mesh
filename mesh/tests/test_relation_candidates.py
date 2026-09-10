@@ -166,10 +166,125 @@ def test_routing_kept_alongside_cooccurrence():
     assert len(cands) >= 2
 
 
+def test_entity_key_cooccurrence_normalizes_spaces_case():
+    """FieldAI ↔ Field AI 不同 source → 一条共现。"""
+    items = [
+        {
+            "id": 1,
+            "source_id": 10,
+            "owner_team": "编辑部",
+            "pointer": "f1",
+            "entities": '["FieldAI"]',
+            "text": "编辑部提到 FieldAI",
+            "source_label": "编辑部",
+            "blocked": 0,
+        },
+        {
+            "id": 2,
+            "source_id": 11,
+            "owner_team": "Global Partnership 团队",
+            "pointer": "f2",
+            "entities": '["Field AI"]',
+            "text": "GP 跟进 Field AI",
+            "source_label": "GP",
+            "blocked": 0,
+        },
+    ]
+    cands = build_relation_candidates(items)
+    cooc = [c for c in cands if c.get("candidate_kind") == "cooccurrence"]
+    assert len(cooc) == 1
+    assert set(cooc[0]["teams"]) == {"编辑部", "Global Partnership 团队"}
+
+
+def test_card_bridge_weak_candidate():
+    """卡面写已沟通 Reverie AI，他队 item 有同实体 → card_bridge。"""
+    items = [
+        {
+            "id": 42,
+            "source_id": 7,
+            "owner_team": "编辑部",
+            "pointer": "rev",
+            "entities": '["Reverie AI"]',
+            "text": "编辑部侧提到 Reverie AI",
+            "source_label": "编辑部记录",
+            "blocked": 0,
+        },
+    ]
+    cards = [
+        {
+            "team": "硅谷 BD 团队",
+            "sections": [
+                {
+                    "title": "在跟进的合作与团队",
+                    "lines": [
+                        "已沟通两次：Reverie AI（实时交互模型），已约下一步",
+                    ],
+                }
+            ],
+        }
+    ]
+    cands = build_relation_candidates(items, team_cards=cards)
+    bridges = [c for c in cands if c.get("candidate_kind") == "card_bridge"]
+    assert len(bridges) == 1
+    b = bridges[0]
+    assert b["weak"] is True
+    assert b["teams"][0] == "硅谷 BD 团队"
+    assert "→ 编辑部" in b["teams"]
+    assert "Reverie" in (b.get("title") or "")
+    assert 42 in (b.get("item_ids") or [])
+
+
+def test_no_bridge_or_cooc_from_bare_ai_substring():
+    """裸 AI / 仅子串不得造共现或桥接。"""
+    items = [
+        {
+            "id": 1,
+            "source_id": 1,
+            "owner_team": "编辑部",
+            "pointer": "a",
+            "entities": '["AI"]',
+            "text": "泛谈 AI",
+            "source_label": "编辑部",
+            "blocked": 0,
+        },
+        {
+            "id": 2,
+            "source_id": 2,
+            "owner_team": "视频号团队",
+            "pointer": "b",
+            "entities": '["FieldAI"]',
+            "text": "FieldAI 线索",
+            "source_label": "视频号",
+            "blocked": 0,
+        },
+    ]
+    cards = [
+        {
+            "team": "硅谷 BD 团队",
+            "sections": [
+                {
+                    "title": "在跟进的合作与团队",
+                    "lines": ["尚未接触·大模型/AI Infra：xAI"],
+                }
+            ],
+        }
+    ]
+    cands = build_relation_candidates(items, team_cards=cards)
+    # AI vs FieldAI 不得因归一或子串共现
+    cooc = [c for c in cands if c.get("candidate_kind") == "cooccurrence"]
+    assert cooc == []
+    # 卡面抽到 AI 不得桥到 FieldAI；xAI 也没有对侧 item
+    bridges = [c for c in cands if c.get("candidate_kind") == "card_bridge"]
+    assert bridges == []
+
+
 if __name__ == "__main__":
     test_no_candidate_same_source()
     test_candidate_different_sources()
     test_merge_strips_hallucinated_relation()
     test_merge_preserves_evidence_assets()
     test_routing_merges_multiple_targets_one_card()
+    test_entity_key_cooccurrence_normalizes_spaces_case()
+    test_card_bridge_weak_candidate()
+    test_no_bridge_or_cooc_from_bare_ai_substring()
     print("ok")
