@@ -1,78 +1,68 @@
 # Colleague Agent v2 · Stage 1 — Semantic Decision Layer
 
-> **原则：规则定义边界，模型理解语言。**  
-> 不是：规则定义语言，模型负责执行。
+> **原则：规则定义边界，模型理解语言。**
 
 ## 成功标准
 
-不是「枚举了多少说法」，而是：
+> 开发人员没写过这句话，Controller 还能不能听懂。
 
-> 即使用户用了一句开发人员没有提前想到的话，Controller 仍能正确理解他在做什么，并选择自然的处理路径。
-
-## 架构
+## 路径
 
 ```
-message + SessionContext
-        │
-        ▼
- hard boundary? ──yes──► 0 Controller LLM → schema
-        │ no
-        ▼
- 1× Controller LLM (Sonnet / task=controller)
-        │
-        ▼
- fixed schema → runtime
+Hard boundary（仅安全且确定）
+  ├─ 命中 → 0 Controller LLM
+  └─ 未命中 → 1× Sonnet Controller → fixed schema
+         → Conversation | Enterprise Ask | Clarify
 ```
 
-Controller **只决策**：不回答、不 Retrieval、不造公司事实、不把上轮答案当 Truth。
+Controller **只决策**，不生成最终回答。
 
-## Schema
+## Hard boundary（克制）
 
-```json
-{
-  "mode": "conversation|enterprise|followup|clarify|meta|system",
-  "intent": "...",
-  "entities": [],
-  "topic": "",
-  "needs_grounding": true,
-  "needs_clarification": false,
-  "response_mode": "conversational|direct|clarify|opinion|rewrite|explain|abstain|followup",
-  "context_refs": [],
-  "confidence": "high|medium|low"
-}
-```
-
-`needs_grounding=true` → Existing Ask；`false` → Conversation LLM。
-
-## Hard boundary（极少）
+只保留：
 
 - permission / system / draft / capability
 - meta / whoami
-- 协议级短确认（谢谢/哈哈/好的…）
-- Session 足够时的结构 follow-up（那X呢 / 他后来 / 还有吗）
-- 明确企业问法（跟谁聊过 / 有哪些关系 / 期次列表）
-- 「X最近怎么样」结构歧义 → clarify
+- 极低风险协议闭集：`谢谢` / `好的` / `收到` / `明白` / `ok`（**不含**「哈哈」）
+- Session 已明确且结构完整的 follow-up（那X呢 / 还有吗 / 他后来…）
 
-**禁止**继续加 soft phrase regex（忙死了 / 靠谱吗 / 我想看看…那边）。
+**不在 Hard：**
 
-## 性能
+- 「哈哈」「今天忙死了」等口语
+- 「跟谁聊过」「有哪些关系」「期次列表」
+- 「X最近怎么样」
 
-| 路径 | Controller LLM |
-|------|----------------|
-| hard | 0 |
-| semantic / ambiguous | ≤1 |
-| 禁止多层 LLM pipeline | |
+以上一律 Controller。
 
-## Gate
+## 双门验收
+
+### Gate A — CI deterministic
 
 ```bash
-python -m eval.run_colleague_controller_stage1
+python -m eval.run_colleague_controller_stage1 --gate A
 ```
 
-看：wrong_route / retrieval_when_unneeded / missed_grounding / clarification / response_mode / context_error / hard 路径不得打 Controller LLM。
+看：schema / hard-boundary / wiring / fallback / mock LLM  
+指标：`controller_decision_accuracy` / `mode_accuracy` / `needs_grounding_accuracy` / `response_mode_accuracy` + runtime 行为。
 
-场景含：自然语言、未见表达、≥5 组上下文多轮（mock LLM 保证 CI 可复现）。
+### Gate B — tmesh semantic（真实 Sonnet）
 
-## 冻结
+```bash
+# 镜像需含 eval runner；或在宿主机：
+python -m eval.run_colleague_controller_stage1 --gate B
+# 或 deploy/_tmesh_controller_gate_b.sh（docker cp eval 后 exec）
+```
 
-Retrieval / Ranking v1.4 / Claim v2.4c-2 / Ontology / Gold / Multi-Agent / ReAct / 长期 Memory / Wiki·ES·Graph
+验证：未见自然语言 + 上下文多轮，Controller 真理解。
+
+## 通过条件（同时）
+
+| 层 | 条件 |
+|----|------|
+| Controller | decision / mode / grounding 准确 |
+| Runtime | retrieval_when_unneeded↓、missed_grounding 不升 |
+| 性能 | 明确路径 0 Controller LLM；ambiguous ≤1 |
+| 质量 | Canonical / Unseen / S01–S05 / REPRO 不回退 |
+| 泛化 | Gate B 未见表达仍能判对 |
+
+通过后 **停止打 Stage 1**，进入 Stage 2 · Persona / Conversation。

@@ -1,40 +1,41 @@
 {
   "summary": {
-    "n": 22,
-    "pass": 22,
+    "gate": "A",
+    "n": 10,
+    "pass": 10,
     "pass_rate": 1.0,
+    "controller_decision_accuracy": 1.0,
+    "mode_accuracy": 1.0,
+    "needs_grounding_accuracy": 1.0,
+    "response_mode_accuracy": 1.0,
     "wrong_route": 0,
     "wrong_route_rate": 0.0,
     "retrieval_when_unneeded": 0,
     "missed_grounding": 0,
-    "clarification_accuracy": 1.0,
     "context_error": 0,
     "router_budget_violations": 0,
     "hard_path_controller_llm_calls": 0,
-    "gate": {
-      "wrong_route_rate_max": 0.1,
-      "retrieval_when_unneeded_max": 0,
-      "missed_grounding_max": 0,
-      "clarification_accuracy_min": 0.85,
-      "context_error_max": 0,
-      "router_budget_violations_max": 0,
-      "hard_path_controller_llm_max": 0
-    },
+    "controller_latency_ms_avg": 0,
     "gate_pass": true
   },
   "cases": [
     {
-      "id": "h_ack_01",
+      "id": "a_hard_ack_01",
       "text": "谢谢",
       "ok": true,
+      "decision_ok": true,
+      "runtime_ok": true,
+      "mode_ok": true,
+      "needs_grounding_ok": true,
+      "response_mode_ok": true,
       "wrong_route": false,
       "retrieval_when_unneeded": false,
       "missed_grounding": false,
       "clarification_ok": true,
-      "response_mode_ok": true,
       "context_error": false,
       "router_budget_ok": true,
       "controller_calls": 0,
+      "controller_latency_ms": 0.0,
       "got": {
         "mode": "conversation",
         "needs_grounding": false,
@@ -49,7 +50,8 @@
         "mode": "conversation",
         "grounding": false,
         "router_llm": false,
-        "response_mode": "conversational"
+        "response_mode": "conversational",
+        "source": "hard"
       },
       "tags": [
         "hard",
@@ -57,17 +59,22 @@
       ]
     },
     {
-      "id": "h_ack_02",
-      "text": "哈哈",
+      "id": "a_hard_ack_02",
+      "text": "好的",
       "ok": true,
+      "decision_ok": true,
+      "runtime_ok": true,
+      "mode_ok": true,
+      "needs_grounding_ok": true,
+      "response_mode_ok": true,
       "wrong_route": false,
       "retrieval_when_unneeded": false,
       "missed_grounding": false,
       "clarification_ok": true,
-      "response_mode_ok": true,
       "context_error": false,
       "router_budget_ok": true,
       "controller_calls": 0,
+      "controller_latency_ms": 0.0,
       "got": {
         "mode": "conversation",
         "needs_grounding": false,
@@ -82,7 +89,8 @@
         "mode": "conversation",
         "grounding": false,
         "router_llm": false,
-        "response_mode": null
+        "response_mode": null,
+        "source": "hard"
       },
       "tags": [
         "hard",
@@ -90,17 +98,22 @@
       ]
     },
     {
-      "id": "h_meta_01",
+      "id": "a_hard_meta_01",
       "text": "你是谁",
       "ok": true,
+      "decision_ok": true,
+      "runtime_ok": true,
+      "mode_ok": true,
+      "needs_grounding_ok": true,
+      "response_mode_ok": true,
       "wrong_route": false,
       "retrieval_when_unneeded": false,
       "missed_grounding": false,
       "clarification_ok": true,
-      "response_mode_ok": true,
       "context_error": false,
       "router_budget_ok": true,
       "controller_calls": 0,
+      "controller_latency_ms": 0.0,
       "got": {
         "mode": "meta",
         "needs_grounding": false,
@@ -115,7 +128,8 @@
         "mode": "meta",
         "grounding": false,
         "router_llm": false,
-        "response_mode": null
+        "response_mode": null,
+        "source": "hard"
       },
       "tags": [
         "hard",
@@ -123,17 +137,22 @@
       ]
     },
     {
-      "id": "h_sys_01",
+      "id": "a_hard_sys_01",
       "text": "帮我改一下周报权限",
       "ok": true,
+      "decision_ok": true,
+      "runtime_ok": true,
+      "mode_ok": true,
+      "needs_grounding_ok": true,
+      "response_mode_ok": true,
       "wrong_route": false,
       "retrieval_when_unneeded": false,
       "missed_grounding": false,
       "clarification_ok": true,
-      "response_mode_ok": true,
       "context_error": false,
       "router_budget_ok": true,
       "controller_calls": 0,
+      "controller_latency_ms": 0.0,
       "got": {
         "mode": "system",
         "needs_grounding": false,
@@ -148,7 +167,8 @@
         "mode": "system",
         "grounding": false,
         "router_llm": false,
-        "response_mode": null
+        "response_mode": null,
+        "source": "hard"
       },
       "tags": [
         "hard",
@@ -156,116 +176,22 @@
       ]
     },
     {
-      "id": "h_ent_01",
-      "text": "张三最近跟谁聊过",
-      "ok": true,
-      "wrong_route": false,
-      "retrieval_when_unneeded": false,
-      "missed_grounding": false,
-      "clarification_ok": true,
-      "response_mode_ok": true,
-      "context_error": false,
-      "router_budget_ok": true,
-      "controller_calls": 0,
-      "got": {
-        "mode": "enterprise",
-        "needs_grounding": true,
-        "needs_clarification": false,
-        "response_mode": "direct",
-        "source": "hard",
-        "router_llm_used": false,
-        "rewritten_query": "张三最近跟谁聊过",
-        "confidence": "high"
-      },
-      "expect": {
-        "mode": "enterprise",
-        "grounding": true,
-        "router_llm": false,
-        "response_mode": "direct"
-      },
-      "tags": [
-        "hard",
-        "enterprise"
-      ]
-    },
-    {
-      "id": "h_rel_01",
-      "text": "编辑部和商务有哪些关系",
-      "ok": true,
-      "wrong_route": false,
-      "retrieval_when_unneeded": false,
-      "missed_grounding": false,
-      "clarification_ok": true,
-      "response_mode_ok": true,
-      "context_error": false,
-      "router_budget_ok": true,
-      "controller_calls": 0,
-      "got": {
-        "mode": "enterprise",
-        "needs_grounding": true,
-        "needs_clarification": false,
-        "response_mode": "direct",
-        "source": "hard",
-        "router_llm_used": false,
-        "rewritten_query": "编辑部和商务有哪些关系",
-        "confidence": "high"
-      },
-      "expect": {
-        "mode": "enterprise",
-        "grounding": true,
-        "router_llm": false,
-        "response_mode": null
-      },
-      "tags": [
-        "hard",
-        "enterprise"
-      ]
-    },
-    {
-      "id": "h_cl_01",
-      "text": "张三最近怎么样",
-      "ok": true,
-      "wrong_route": false,
-      "retrieval_when_unneeded": false,
-      "missed_grounding": false,
-      "clarification_ok": true,
-      "response_mode_ok": true,
-      "context_error": false,
-      "router_budget_ok": true,
-      "controller_calls": 0,
-      "got": {
-        "mode": "clarify",
-        "needs_grounding": false,
-        "needs_clarification": true,
-        "response_mode": "clarify",
-        "source": "hard",
-        "router_llm_used": false,
-        "rewritten_query": "",
-        "confidence": "high"
-      },
-      "expect": {
-        "mode": "clarify",
-        "grounding": false,
-        "router_llm": false,
-        "response_mode": null
-      },
-      "tags": [
-        "hard",
-        "clarify"
-      ]
-    },
-    {
-      "id": "h_fu_01",
+      "id": "a_hard_fu_01",
       "text": "那高德呢",
       "ok": true,
+      "decision_ok": true,
+      "runtime_ok": true,
+      "mode_ok": true,
+      "needs_grounding_ok": true,
+      "response_mode_ok": true,
       "wrong_route": false,
       "retrieval_when_unneeded": false,
       "missed_grounding": false,
       "clarification_ok": true,
-      "response_mode_ok": true,
       "context_error": false,
       "router_budget_ok": true,
       "controller_calls": 0,
+      "controller_latency_ms": 0.0,
       "got": {
         "mode": "followup",
         "needs_grounding": true,
@@ -280,7 +206,8 @@
         "mode": "followup",
         "grounding": true,
         "router_llm": false,
-        "response_mode": "followup"
+        "response_mode": "followup",
+        "source": "hard"
       },
       "tags": [
         "hard",
@@ -289,17 +216,22 @@
       ]
     },
     {
-      "id": "h_fu_02",
+      "id": "a_hard_fu_02",
       "text": "还有吗",
       "ok": true,
+      "decision_ok": true,
+      "runtime_ok": true,
+      "mode_ok": true,
+      "needs_grounding_ok": true,
+      "response_mode_ok": true,
       "wrong_route": false,
       "retrieval_when_unneeded": false,
       "missed_grounding": false,
       "clarification_ok": true,
-      "response_mode_ok": true,
       "context_error": false,
       "router_budget_ok": true,
       "controller_calls": 0,
+      "controller_latency_ms": 0.0,
       "got": {
         "mode": "followup",
         "needs_grounding": true,
@@ -314,7 +246,8 @@
         "mode": "followup",
         "grounding": true,
         "router_llm": false,
-        "response_mode": null
+        "response_mode": null,
+        "source": "hard"
       },
       "tags": [
         "hard",
@@ -323,445 +256,158 @@
       ]
     },
     {
-      "id": "h_fu_03",
-      "text": "他后来呢",
+      "id": "a_wire_01",
+      "text": "哈哈",
       "ok": true,
+      "decision_ok": true,
+      "runtime_ok": true,
+      "mode_ok": true,
+      "needs_grounding_ok": true,
+      "response_mode_ok": true,
       "wrong_route": false,
       "retrieval_when_unneeded": false,
       "missed_grounding": false,
       "clarification_ok": true,
+      "context_error": false,
+      "router_budget_ok": true,
+      "controller_calls": 1,
+      "controller_latency_ms": 0.0,
+      "got": {
+        "mode": "conversation",
+        "needs_grounding": false,
+        "needs_clarification": false,
+        "response_mode": "conversational",
+        "source": "llm",
+        "router_llm_used": true,
+        "rewritten_query": "",
+        "confidence": "high"
+      },
+      "expect": {
+        "mode": "conversation",
+        "grounding": false,
+        "router_llm": true,
+        "response_mode": "conversational",
+        "source": "llm"
+      },
+      "tags": [
+        "semantic",
+        "wiring"
+      ]
+    },
+    {
+      "id": "a_wire_02",
+      "text": "张三最近跟谁聊过",
+      "ok": true,
+      "decision_ok": true,
+      "runtime_ok": true,
+      "mode_ok": true,
+      "needs_grounding_ok": true,
       "response_mode_ok": true,
+      "wrong_route": false,
+      "retrieval_when_unneeded": false,
+      "missed_grounding": false,
+      "clarification_ok": true,
+      "context_error": false,
+      "router_budget_ok": true,
+      "controller_calls": 1,
+      "controller_latency_ms": 0.0,
+      "got": {
+        "mode": "enterprise",
+        "needs_grounding": true,
+        "needs_clarification": false,
+        "response_mode": "direct",
+        "source": "llm",
+        "router_llm_used": true,
+        "rewritten_query": "张三最近跟谁聊过",
+        "confidence": "high"
+      },
+      "expect": {
+        "mode": "enterprise",
+        "grounding": true,
+        "router_llm": true,
+        "response_mode": "direct",
+        "source": "llm"
+      },
+      "tags": [
+        "semantic",
+        "wiring"
+      ]
+    },
+    {
+      "id": "a_wire_03",
+      "text": "张三最近怎么样",
+      "ok": true,
+      "decision_ok": true,
+      "runtime_ok": true,
+      "mode_ok": true,
+      "needs_grounding_ok": true,
+      "response_mode_ok": true,
+      "wrong_route": false,
+      "retrieval_when_unneeded": false,
+      "missed_grounding": false,
+      "clarification_ok": true,
+      "context_error": false,
+      "router_budget_ok": true,
+      "controller_calls": 1,
+      "controller_latency_ms": 0.0,
+      "got": {
+        "mode": "clarify",
+        "needs_grounding": false,
+        "needs_clarification": true,
+        "response_mode": "clarify",
+        "source": "llm",
+        "router_llm_used": true,
+        "rewritten_query": "",
+        "confidence": "high"
+      },
+      "expect": {
+        "mode": "clarify",
+        "grounding": false,
+        "router_llm": true,
+        "response_mode": "clarify",
+        "source": "llm"
+      },
+      "tags": [
+        "semantic",
+        "wiring"
+      ]
+    },
+    {
+      "id": "a_fb_01",
+      "text": "某种从未见过的含糊表达xyz",
+      "ok": true,
+      "decision_ok": true,
+      "runtime_ok": true,
+      "mode_ok": true,
+      "needs_grounding_ok": true,
+      "response_mode_ok": true,
+      "wrong_route": false,
+      "retrieval_when_unneeded": false,
+      "missed_grounding": false,
+      "clarification_ok": true,
       "context_error": false,
       "router_budget_ok": true,
       "controller_calls": 0,
+      "controller_latency_ms": 0.0,
       "got": {
-        "mode": "followup",
-        "needs_grounding": true,
+        "mode": "conversation",
+        "needs_grounding": false,
         "needs_clarification": false,
-        "response_mode": "followup",
-        "source": "hard",
+        "response_mode": "conversational",
+        "source": "fallback",
         "router_llm_used": false,
-        "rewritten_query": "张三最近跟谁聊过或有过接触",
-        "confidence": "high"
-      },
-      "expect": {
-        "mode": "followup",
-        "grounding": true,
-        "router_llm": false,
-        "response_mode": null
-      },
-      "tags": [
-        "hard",
-        "followup",
-        "context"
-      ]
-    },
-    {
-      "id": "s_nat_01",
-      "text": "今天忙死了",
-      "ok": true,
-      "wrong_route": false,
-      "retrieval_when_unneeded": false,
-      "missed_grounding": false,
-      "clarification_ok": true,
-      "response_mode_ok": true,
-      "context_error": false,
-      "router_budget_ok": true,
-      "controller_calls": 1,
-      "got": {
-        "mode": "conversation",
-        "needs_grounding": false,
-        "needs_clarification": false,
-        "response_mode": "conversational",
-        "source": "llm",
-        "router_llm_used": true,
-        "rewritten_query": "",
-        "confidence": "high"
-      },
-      "expect": {
-        "mode": "conversation",
-        "grounding": false,
-        "router_llm": true,
-        "response_mode": "conversational"
-      },
-      "tags": [
-        "semantic",
-        "unseen"
-      ]
-    },
-    {
-      "id": "s_nat_02",
-      "text": "我有点纠结这个事",
-      "ok": true,
-      "wrong_route": false,
-      "retrieval_when_unneeded": false,
-      "missed_grounding": false,
-      "clarification_ok": true,
-      "response_mode_ok": true,
-      "context_error": false,
-      "router_budget_ok": true,
-      "controller_calls": 1,
-      "got": {
-        "mode": "conversation",
-        "needs_grounding": false,
-        "needs_clarification": false,
-        "response_mode": "conversational",
-        "source": "llm",
-        "router_llm_used": true,
-        "rewritten_query": "",
-        "confidence": "medium"
-      },
-      "expect": {
-        "mode": "conversation",
-        "grounding": false,
-        "router_llm": true,
-        "response_mode": "conversational"
-      },
-      "tags": [
-        "semantic",
-        "unseen"
-      ]
-    },
-    {
-      "id": "s_nat_03",
-      "text": "你觉得这个靠谱不",
-      "ok": true,
-      "wrong_route": false,
-      "retrieval_when_unneeded": false,
-      "missed_grounding": false,
-      "clarification_ok": true,
-      "response_mode_ok": true,
-      "context_error": false,
-      "router_budget_ok": true,
-      "controller_calls": 1,
-      "got": {
-        "mode": "clarify",
-        "needs_grounding": false,
-        "needs_clarification": true,
-        "response_mode": "clarify",
-        "source": "llm",
-        "router_llm_used": true,
-        "rewritten_query": "",
-        "confidence": "medium"
-      },
-      "expect": {
-        "mode": "clarify",
-        "grounding": false,
-        "router_llm": true,
-        "response_mode": "clarify"
-      },
-      "tags": [
-        "semantic",
-        "unseen",
-        "boundary"
-      ]
-    },
-    {
-      "id": "s_nat_04",
-      "text": "这个怎么说更自然",
-      "ok": true,
-      "wrong_route": false,
-      "retrieval_when_unneeded": false,
-      "missed_grounding": false,
-      "clarification_ok": true,
-      "response_mode_ok": true,
-      "context_error": false,
-      "router_budget_ok": true,
-      "controller_calls": 1,
-      "got": {
-        "mode": "conversation",
-        "needs_grounding": false,
-        "needs_clarification": false,
-        "response_mode": "rewrite",
-        "source": "llm",
-        "router_llm_used": true,
-        "rewritten_query": "",
-        "confidence": "high"
-      },
-      "expect": {
-        "mode": "conversation",
-        "grounding": false,
-        "router_llm": true,
-        "response_mode": "rewrite"
-      },
-      "tags": [
-        "semantic",
-        "unseen",
-        "content"
-      ]
-    },
-    {
-      "id": "s_nat_05",
-      "text": "这个事情到底怎么样",
-      "ok": true,
-      "wrong_route": false,
-      "retrieval_when_unneeded": false,
-      "missed_grounding": false,
-      "clarification_ok": true,
-      "response_mode_ok": true,
-      "context_error": false,
-      "router_budget_ok": true,
-      "controller_calls": 1,
-      "got": {
-        "mode": "clarify",
-        "needs_grounding": false,
-        "needs_clarification": true,
-        "response_mode": "clarify",
-        "source": "llm",
-        "router_llm_used": true,
         "rewritten_query": "",
         "confidence": "low"
       },
       "expect": {
-        "mode": "clarify",
-        "grounding": false,
-        "router_llm": true,
-        "response_mode": null
-      },
-      "tags": [
-        "semantic",
-        "unseen",
-        "boundary"
-      ]
-    },
-    {
-      "id": "s_nat_06",
-      "text": "你怎么看最近行业这波节奏",
-      "ok": true,
-      "wrong_route": false,
-      "retrieval_when_unneeded": false,
-      "missed_grounding": false,
-      "clarification_ok": true,
-      "response_mode_ok": true,
-      "context_error": false,
-      "router_budget_ok": true,
-      "controller_calls": 1,
-      "got": {
-        "mode": "conversation",
-        "needs_grounding": false,
-        "needs_clarification": false,
-        "response_mode": "opinion",
-        "source": "llm",
-        "router_llm_used": true,
-        "rewritten_query": "",
-        "confidence": "high"
-      },
-      "expect": {
         "mode": "conversation",
         "grounding": false,
-        "router_llm": true,
-        "response_mode": "opinion"
+        "router_llm": false,
+        "response_mode": null,
+        "source": "fallback"
       },
       "tags": [
-        "semantic",
-        "unseen",
-        "opinion"
-      ]
-    },
-    {
-      "id": "s_nat_07",
-      "text": "帮我把口吻收得专业一点",
-      "ok": true,
-      "wrong_route": false,
-      "retrieval_when_unneeded": false,
-      "missed_grounding": false,
-      "clarification_ok": true,
-      "response_mode_ok": true,
-      "context_error": false,
-      "router_budget_ok": true,
-      "controller_calls": 1,
-      "got": {
-        "mode": "conversation",
-        "needs_grounding": false,
-        "needs_clarification": false,
-        "response_mode": "rewrite",
-        "source": "llm",
-        "router_llm_used": true,
-        "rewritten_query": "",
-        "confidence": "high"
-      },
-      "expect": {
-        "mode": "conversation",
-        "grounding": false,
-        "router_llm": true,
-        "response_mode": "rewrite"
-      },
-      "tags": [
-        "semantic",
-        "unseen"
-      ]
-    },
-    {
-      "id": "s_ctx_01",
-      "text": "先别查了，我先跟你聊聊思路",
-      "ok": true,
-      "wrong_route": false,
-      "retrieval_when_unneeded": false,
-      "missed_grounding": false,
-      "clarification_ok": true,
-      "response_mode_ok": true,
-      "context_error": false,
-      "router_budget_ok": true,
-      "controller_calls": 1,
-      "got": {
-        "mode": "conversation",
-        "needs_grounding": false,
-        "needs_clarification": false,
-        "response_mode": "conversational",
-        "source": "llm",
-        "router_llm_used": true,
-        "rewritten_query": "",
-        "confidence": "high"
-      },
-      "expect": {
-        "mode": "conversation",
-        "grounding": false,
-        "router_llm": true,
-        "response_mode": null
-      },
-      "tags": [
-        "semantic",
-        "context",
-        "multi"
-      ]
-    },
-    {
-      "id": "s_ctx_02",
-      "text": "回头再说高德那边",
-      "ok": true,
-      "wrong_route": false,
-      "retrieval_when_unneeded": false,
-      "missed_grounding": false,
-      "clarification_ok": true,
-      "response_mode_ok": true,
-      "context_error": false,
-      "router_budget_ok": true,
-      "controller_calls": 1,
-      "got": {
-        "mode": "followup",
-        "needs_grounding": true,
-        "needs_clarification": false,
-        "response_mode": "followup",
-        "source": "llm",
-        "router_llm_used": true,
-        "rewritten_query": "高德最近跟谁聊过或有过接触",
-        "confidence": "medium"
-      },
-      "expect": {
-        "mode": "followup",
-        "grounding": true,
-        "router_llm": true,
-        "response_mode": null
-      },
-      "tags": [
-        "semantic",
-        "context",
-        "multi",
-        "unseen"
-      ]
-    },
-    {
-      "id": "s_ctx_03",
-      "text": "不是查周报，就普通聊聊",
-      "ok": true,
-      "wrong_route": false,
-      "retrieval_when_unneeded": false,
-      "missed_grounding": false,
-      "clarification_ok": true,
-      "response_mode_ok": true,
-      "context_error": false,
-      "router_budget_ok": true,
-      "controller_calls": 1,
-      "got": {
-        "mode": "conversation",
-        "needs_grounding": false,
-        "needs_clarification": false,
-        "response_mode": "conversational",
-        "source": "llm",
-        "router_llm_used": true,
-        "rewritten_query": "",
-        "confidence": "high"
-      },
-      "expect": {
-        "mode": "conversation",
-        "grounding": false,
-        "router_llm": true,
-        "response_mode": null
-      },
-      "tags": [
-        "semantic",
-        "context",
-        "unseen"
-      ]
-    },
-    {
-      "id": "s_ctx_04",
-      "text": "顺着刚才那个人，还有没有别人",
-      "ok": true,
-      "wrong_route": false,
-      "retrieval_when_unneeded": false,
-      "missed_grounding": false,
-      "clarification_ok": true,
-      "response_mode_ok": true,
-      "context_error": false,
-      "router_budget_ok": true,
-      "controller_calls": 1,
-      "got": {
-        "mode": "followup",
-        "needs_grounding": true,
-        "needs_clarification": false,
-        "response_mode": "followup",
-        "source": "llm",
-        "router_llm_used": true,
-        "rewritten_query": "刘先明还有其他相关记录或接触对象吗",
-        "confidence": "high"
-      },
-      "expect": {
-        "mode": "followup",
-        "grounding": true,
-        "router_llm": true,
-        "response_mode": null
-      },
-      "tags": [
-        "semantic",
-        "context",
-        "multi",
-        "unseen"
-      ]
-    },
-    {
-      "id": "s_ctx_05",
-      "text": "换成理想那边继续看",
-      "ok": true,
-      "wrong_route": false,
-      "retrieval_when_unneeded": false,
-      "missed_grounding": false,
-      "clarification_ok": true,
-      "response_mode_ok": true,
-      "context_error": false,
-      "router_budget_ok": true,
-      "controller_calls": 1,
-      "got": {
-        "mode": "followup",
-        "needs_grounding": true,
-        "needs_clarification": false,
-        "response_mode": "followup",
-        "source": "llm",
-        "router_llm_used": true,
-        "rewritten_query": "理想最近跟谁聊过或有过接触",
-        "confidence": "high"
-      },
-      "expect": {
-        "mode": "followup",
-        "grounding": true,
-        "router_llm": true,
-        "response_mode": null
-      },
-      "tags": [
-        "semantic",
-        "context",
-        "multi",
-        "unseen"
+        "fallback"
       ]
     }
   ]

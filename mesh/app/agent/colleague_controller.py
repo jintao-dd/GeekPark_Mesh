@@ -35,13 +35,12 @@ RESPONSE_MODES = frozenset(
     }
 )
 
-# 硬边界：明确企业事实问法（产品能力契约，不是口语枚举）
-_EXPLICIT_ENTERPRISE = re.compile(
-    r"("
-    r"跟谁聊过|和谁聊过|跟谁接触|有过接触|"
-    r"有哪些关系|谁见了谁|双边关系|"
-    r"有哪些期|哪些周报|期次列表"
-    r")",
+# 极低风险协议闭集（禁止继续扩张）
+_PROTOCOL_ACK = re.compile(
+    r"^("
+    r"谢谢(?:你|啦|了)?|感谢|thanks|thank\s*you|"
+    r"好的|收到|明白了?|了解|知道了|ok|okay"
+    r")[!！。.?？\s]*$",
     re.I,
 )
 
@@ -64,10 +63,10 @@ _SYSTEM_CTRL = """你是 GeekPark Mesh 的 Colleague Controller（语义决策�
 }
 
 判定：
-- conversation：闲聊/吐槽/观点/润色改写/内容讨论；needs_grounding=false
+- conversation：闲聊/吐槽/观点/润色改写/内容讨论（含「哈哈」「今天忙死了」）；needs_grounding=false
 - enterprise：要查已上线周报里的人/公司/接触/进展；needs_grounding=true
-- followup：承接当前话题的续问（那X呢/还有吗/他后来…），上下文够则 rewrite 后 grounding
-- clarify：缺主体、多解、说不清要什么；needs_clarification=true，needs_grounding=false
+- followup：承接当前话题的续问，上下文够则 rewrite 后 grounding
+- clarify：缺主体、多解、说不清；needs_clarification=true，needs_grounding=false
 - meta：你是谁/能干什么
 - system：改权限/发布/草稿原文等越权
 
@@ -305,7 +304,7 @@ def from_route_decision(
 def try_hard_path(
     text: str, state: SessionContextState | None = None
 ) -> ControllerDecision | None:
-    """极少量硬边界。不覆盖口语/观点/闲聊自然语言。"""
+    """仅安全且确定的硬边界。自然语言一律不在这里判。"""
     st = state or SessionContextState()
     q = conv.normalize_query(text)
     if not q:
@@ -333,7 +332,7 @@ def try_hard_path(
             st,
         )
 
-    # meta / whoami
+    # meta / capability identity
     if conv._META.search(q) or conv._META_SHORT.match(q):
         return from_route_decision(
             conv.RouteDecision(
@@ -352,8 +351,8 @@ def try_hard_path(
             st,
         )
 
-    # 协议级短确认（边界，非口语枚举扩张）
-    if conv._CASUAL.match(q):
+    # 极低风险协议闭集（谢谢/好的…）——不加「哈哈」等口语
+    if _PROTOCOL_ACK.match(q):
         return from_route_decision(
             conv.RouteDecision(
                 route="general_conversation",
@@ -365,20 +364,8 @@ def try_hard_path(
             st,
         )
 
-    # 用户纠正 → clarify
-    if conv._REPAIR.search(q):
-        return from_route_decision(
-            conv.RouteDecision(
-                route="clarify",
-                intent="clarify",
-                clarify_text=conv._repair_reply(st),
-                notes="repair",
-            ),
-            q,
-            st,
-        )
-
-    # 话题恢复结构：「对了，…」
+    # Session 已明确 + 结构完整的 follow-up → 0 Controller LLM
+    # （无上下文的指代澄清交给 Controller，不算 hard）
     m_res = conv._RESUME.match(q)
     if m_res:
         rest = (m_res.group("rest") or "").strip()
@@ -386,85 +373,20 @@ def try_hard_path(
             if not st.active_entities:
                 st.restore_topic()
             fu = conv._try_followup(rest, st)
-            if fu is not None and fu.route == "followup" and fu.rewritten_query:
+            if (
+                fu is not None
+                and fu.route == "followup"
+                and fu.rewritten_query
+                and (st.active_entities or fu.resolved_entity)
+            ):
                 fu.notes = "resume_" + (fu.notes or "followup")
                 return from_route_decision(fu, q, st)
-            if len(rest) >= 2 and _EXPLICIT_ENTERPRISE.search(rest):
-                return from_route_decision(
-                    conv.RouteDecision(
-                        route="followup",
-                        intent="ask_published",
-                        rewritten_query=rest,
-                        topic_frame=st.last_topic_frame or "about",
-                        notes="resume_explicit",
-                    ),
-                    q,
-                    st,
-                )
-            # 恢复后仍非硬边界 → 交给语义层（带已 restore 的 session）
             return None
 
-    # 明确 follow-up（依赖 Session，不是口语词典）
-    fu = conv._try_followup(q, st)
-    if fu is not None:
-        if fu.route == "followup" and fu.rewritten_query:
+    if st.active_entities or st.last_topic_frame or st.topic_stack:
+        fu = conv._try_followup(q, st)
+        if fu is not None and fu.route == "followup" and fu.rewritten_query:
             return from_route_decision(fu, q, st)
-        if fu.route == "clarify":
-            # 指代无上下文：结构上必须澄清
-            return from_route_decision(fu, q, st)
-
-    # 列表 / 关系（显式产品问法）
-    if conv._LIST.search(q):
-        return from_route_decision(
-            conv.RouteDecision(route="list", intent="list_issues", notes="list"),
-            q,
-            st,
-        )
-    if conv._REL.search(q) or conv._REL_CONTACT.search(q):
-        return from_route_decision(
-            conv.RouteDecision(
-                route="relations",
-                intent="ask_relations",
-                rewritten_query=q,
-                topic_frame="relations",
-                notes="relations",
-            ),
-            q,
-            st,
-        )
-
-    # 明确 enterprise 模板
-    if _EXPLICIT_ENTERPRISE.search(q):
-        return from_route_decision(
-            conv.RouteDecision(
-                route="ask",
-                intent="ask_published",
-                rewritten_query=q,
-                topic_frame=conv._topic_frame_from_query(q),
-                notes="explicit_enterprise",
-            ),
-            q,
-            st,
-        )
-
-    # 「X最近怎么样」结构歧义 → clarify（产品已知多解）
-    m_how = conv._HOW_IS.match(q)
-    if m_how:
-        who = m_how.group(1).strip()
-        if who and who not in conv._STOP:
-            return from_route_decision(
-                conv.RouteDecision(
-                    route="clarify",
-                    intent="clarify",
-                    clarify_text=(
-                        f"「{who}」你更想听：最近跟谁聊过，还是最近在推进什么？"
-                    ),
-                    notes="how_is_clarify",
-                    resolved_entity=who,
-                ),
-                q,
-                st,
-            )
 
     return None
 
