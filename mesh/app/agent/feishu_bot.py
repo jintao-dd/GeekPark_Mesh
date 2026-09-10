@@ -165,12 +165,44 @@ def _receive_target(payload: dict[str, Any]) -> tuple[str, str]:
     raise ValueError("no chat_id/open_id to reply")
 
 
+def _schedule_thinking_nudge(
+    *,
+    message_id: str,
+    query: str,
+    done: threading.Event,
+    card_lock: threading.Lock,
+) -> None:
+    """等待超过几秒仍未出终答时，轻推一次文案，避免「死板一张卡」。"""
+
+    def _run() -> None:
+        if done.wait(4.5):
+            return
+        if not message_id or done.is_set():
+            return
+        try:
+            with card_lock:
+                if done.is_set():
+                    return
+                feishu_api.patch_message(
+                    message_id=message_id,
+                    content=feishu_cards.thinking_card(query=query, stage=1),
+                )
+            _elog("thinking nudge patched message_id=%s", message_id)
+        except Exception as e:
+            log.debug("feishu thinking nudge skip: %s", e)
+
+    threading.Thread(target=_run, name="feishu-think-nudge", daemon=True).start()
+
+
 def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
     """后台任务：发思考卡 → Agent → Patch 最终卡。"""
     from .. import db
 
     query = str(payload.get("text") or "")
     card_message_id = ""
+    done = threading.Event()
+    card_lock = threading.Lock()
+    d: dict[str, Any] = {}
     try:
         if feishu_api.bot_reply_enabled():
             receive_id, rid_type = _receive_target(payload)
@@ -178,7 +210,7 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                 receive_id=receive_id,
                 receive_id_type=rid_type,
                 msg_type="interactive",
-                content=feishu_cards.thinking_card(query=query),
+                content=feishu_cards.thinking_card(query=query, stage=0),
             )
             card_message_id = str(sent.get("message_id") or "")
             log.info(
@@ -191,6 +223,13 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                 card_message_id,
                 payload.get("chat_id"),
             )
+            if card_message_id:
+                _schedule_thinking_nudge(
+                    message_id=card_message_id,
+                    query=query,
+                    done=done,
+                    card_lock=card_lock,
+                )
         else:
             log.warning("feishu bot reply disabled; skip outbound")
             _elog("bot reply disabled; skip outbound")
@@ -219,17 +258,20 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
 
         if feishu_api.bot_reply_enabled():
             final = feishu_cards.answer_card(display_text=reply, query=query)
-            if card_message_id:
-                feishu_api.patch_message(message_id=card_message_id, content=final)
-            else:
-                receive_id, rid_type = _receive_target(payload)
-                sent2 = feishu_api.send_message(
-                    receive_id=receive_id,
-                    receive_id_type=rid_type,
-                    msg_type="interactive",
-                    content=final,
-                )
-                card_message_id = str(sent2.get("message_id") or "")
+            # 先 done，再 patch：避免 nudge 盖掉终答
+            done.set()
+            with card_lock:
+                if card_message_id:
+                    feishu_api.patch_message(message_id=card_message_id, content=final)
+                else:
+                    receive_id, rid_type = _receive_target(payload)
+                    sent2 = feishu_api.send_message(
+                        receive_id=receive_id,
+                        receive_id_type=rid_type,
+                        msg_type="interactive",
+                        content=final,
+                    )
+                    card_message_id = str(sent2.get("message_id") or "")
 
         return {
             "ok": True,
@@ -240,22 +282,26 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
     except Exception as e:
         log.exception("feishu message job failed: %s", e)
         _elog("message job failed: %s", e)
+        done.set()
         if feishu_api.bot_reply_enabled():
             try:
                 err_card = feishu_cards.error_card(message=str(e)[:300], query=query)
-                if card_message_id:
-                    feishu_api.patch_message(message_id=card_message_id, content=err_card)
-                else:
-                    receive_id, rid_type = _receive_target(payload)
-                    feishu_api.send_message(
-                        receive_id=receive_id,
-                        receive_id_type=rid_type,
-                        msg_type="interactive",
-                        content=err_card,
-                    )
+                with card_lock:
+                    if card_message_id:
+                        feishu_api.patch_message(message_id=card_message_id, content=err_card)
+                    else:
+                        receive_id, rid_type = _receive_target(payload)
+                        feishu_api.send_message(
+                            receive_id=receive_id,
+                            receive_id_type=rid_type,
+                            msg_type="interactive",
+                            content=err_card,
+                        )
             except Exception as e2:
                 log.warning("feishu error card failed: %s", e2)
         return {"ok": False, "error": str(e)[:300], "card_message_id": card_message_id}
+    finally:
+        done.set()
 
 
 def _spawn_message_job(payload: dict[str, Any]) -> None:

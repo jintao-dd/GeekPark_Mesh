@@ -132,12 +132,17 @@ def test_encrypted_url_verification(monkeypatch):
 def test_thinking_and_answer_cards():
     from app.agent import feishu_cards
 
-    t = feishu_cards.thinking_card(query="本期关注谁？")
+    t = feishu_cards.thinking_card(query="本期关注谁？", stage=0)
     assert t["config"]["update_multi"] is True
-    assert "思考中" in t["header"]["title"]["content"]
+    assert t["header"]["title"]["content"] == "Mesh"
+    assert "收到" in t["elements"][0]["text"]["content"]
+    assert "你的问题" not in t["elements"][0]["text"]["content"]
+    t1 = feishu_cards.thinking_card(query="本期关注谁？", stage=1)
+    assert "还在检索" in t1["elements"][0]["text"]["content"]
     a = feishu_cards.answer_card(display_text="答案\n期次：2026-9-8", query="q")
     assert a["config"]["update_multi"] is True
     assert "答案" in a["elements"][0]["text"]["content"]
+    assert "问：" not in a["elements"][0]["text"]["content"]
 
 
 def test_async_accept_spawns_and_dedups(monkeypatch):
