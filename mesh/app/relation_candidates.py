@@ -816,16 +816,44 @@ def _details_from_evidence(evidence: list[dict], *, limit: int = 8) -> list[str]
     return out
 
 
+def _suggested_badge_name(badge: str) -> str:
+    s = str(badge or "").strip()
+    if s.startswith("→") or s.startswith("->"):
+        s = s.lstrip("→").lstrip("->").strip()
+    return sanitize_owner_team(s) or s
+
+
 def _align_relation_from_evidence(rel: dict, *, suggested: list[str] | None = None) -> dict:
-    """事实 teams/sources 来自 evidence；保留 → 建议团队（虚线 dep）。"""
+    """事实 teams/sources 来自 evidence；保留 → 建议团队（虚线 dep）。
+
+    同队已有实线时不再保留「→ 同队」。
+    """
     rel = dict(rel)
     evidence = list(rel.get("evidence") or [])
     suggested = list(suggested or [])
+    solid = _teams_from_evidence(evidence) if evidence else _solid_teams(rel)
+    solid_set = set(solid)
+
+    def _keep_suggested(badge: str) -> bool:
+        name = _suggested_badge_name(badge)
+        return bool(name) and name not in solid_set
+
+    kept_sug = [t for t in suggested if _keep_suggested(t)]
+    # 去重虚线队名
+    seen_sug: set[str] = set()
+    uniq_sug: list[str] = []
+    for t in kept_sug:
+        name = _suggested_badge_name(t)
+        if name in seen_sug:
+            continue
+        seen_sug.add(name)
+        uniq_sug.append(t if str(t).strip().startswith("→") else f"→ {name}")
+
     if not evidence:
-        rel["teams"] = _solid_teams(rel) + [t for t in suggested if t not in rel.get("teams", [])]
+        rel["teams"] = solid + uniq_sug
         return rel
-    allowed = set(_teams_from_evidence(evidence))
-    rel["teams"] = _teams_from_evidence(evidence) + [t for t in suggested if t not in _teams_from_evidence(evidence)]
+    allowed = solid_set
+    rel["teams"] = solid + uniq_sug
     rel["sources"] = _sources_from_evidence(evidence)
     kept: list[str] = []
     for d in rel.get("details") or []:

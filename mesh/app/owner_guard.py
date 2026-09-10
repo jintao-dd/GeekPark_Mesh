@@ -174,7 +174,11 @@ def normalize_relation_team_badges(rel: dict, *, suggest_extra_solid: bool = Fal
         if not raw:
             continue
         if is_suggested_team_badge(raw):
-            sug = raw if raw.startswith("→") else "→ " + raw.lstrip("->").strip()
+            name = sanitize_owner_team(raw.lstrip("→").lstrip("->").strip()) or raw.lstrip("→").lstrip("->").strip()
+            # 已有实线/证据的同队不再挂虚线
+            if name and (name in seen_solid or name in evidence_teams):
+                continue
+            sug = f"→ {name}" if name else raw
             if sug not in seen_sug:
                 out.append(sug)
                 seen_sug.add(sug)
@@ -182,12 +186,19 @@ def normalize_relation_team_badges(rel: dict, *, suggest_extra_solid: bool = Fal
         name = sanitize_owner_team(raw) or raw
         if evidence_teams and name not in evidence_teams:
             sug = f"→ {name}"
+            if name in seen_solid or sug in seen_sug:
+                continue
             if sug not in seen_sug:
                 out.append(sug)
                 seen_sug.add(sug)
         elif name not in seen_solid:
             out.append(name)
             seen_solid.add(name)
+            # 实线出现后清掉同名虚线（列表里 → 可能更早）
+            sug = f"→ {name}"
+            if sug in seen_sug:
+                out = [x for x in out if x != sug]
+                seen_sug.discard(sug)
     rel["teams"] = out
     rel["weak"] = bool(seen_sug)
     return rel
