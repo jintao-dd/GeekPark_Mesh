@@ -265,10 +265,6 @@ def call_tool(
     if _injected_ops is not None:
         return _injected_ops(tool, args)
 
-    backend = flags.backend_name()
-    if backend == "mock":
-        return _mock_call(tool, args)
-
     if tool == "feishu.search" and _injected_search is not None:
         return _injected_search(
             str(args.get("query") or ""),
@@ -276,6 +272,22 @@ def call_tool(
             timeout_sec=to,
             user_access_token=user_access_token,
             open_id=open_id,
+        )
+
+    backend = flags.backend_name()
+    if backend == "mock":
+        return _mock_call(tool, args)
+
+    if backend == "native" or (backend == "mcp" and not flags.mcp_endpoint()):
+        # 无 MCP 侧车时走真实 OpenAPI，避免「开启了却全是 mcp_not_configured」
+        from . import native as native_mod
+
+        return native_mod.call_native(
+            tool,
+            args,
+            user_access_token=user_access_token,
+            open_id=open_id,
+            timeout_sec=to,
         )
 
     if backend == "openapi" and tool == "feishu.search":

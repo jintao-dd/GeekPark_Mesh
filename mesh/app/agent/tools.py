@@ -268,6 +268,14 @@ def _feishu_tool_result(tool_id: str, env, *, empty_msg: str) -> ToolResult:
     )
 
 
+def _with_chat(args: dict[str, Any], context: AgentContext) -> dict[str, Any]:
+    out = dict(args or {})
+    cid = str(getattr(context, "chat_id", None) or "").strip()
+    if cid:
+        out.setdefault("chat_id", cid)
+    return out
+
+
 def tool_feishu_search(
     con,
     identity: IdentityResult,
@@ -275,7 +283,7 @@ def tool_feishu_search(
     context: AgentContext,
     args: dict[str, Any] | None = None,
 ) -> ToolResult:
-    args = args or {}
+    args = _with_chat(args or {}, context)
     blocked = _guard_common("feishu.search", identity, permission, context, args=args)
     if blocked:
         return blocked
@@ -290,6 +298,7 @@ def tool_feishu_search(
         resource_type=resource_type,
         identity=identity,
         user_access_token=str(args.get("user_access_token") or ""),
+        chat_id=str(args.get("chat_id") or ""),
         phase="full",
     )
     tr = _feishu_tool_result(
@@ -302,7 +311,7 @@ def tool_feishu_search(
 
 
 def tool_feishu_doc_get(con, identity, permission, context, args=None):
-    args = args or {}
+    args = _with_chat(args or {}, context)
     blocked = _guard_common("feishu.doc.get", identity, permission, context, args=args)
     if blocked:
         return blocked
@@ -319,7 +328,7 @@ def tool_feishu_doc_get(con, identity, permission, context, args=None):
 
 
 def tool_feishu_calendar_list(con, identity, permission, context, args=None):
-    args = args or {}
+    args = _with_chat(args or {}, context)
     blocked = _guard_common(
         "feishu.calendar.list", identity, permission, context, args=args
     )
@@ -339,7 +348,7 @@ def tool_feishu_calendar_list(con, identity, permission, context, args=None):
 
 
 def tool_feishu_discuss_summary(con, identity, permission, context, args=None):
-    args = args or {}
+    args = _with_chat(args or {}, context)
     blocked = _guard_common(
         "feishu.discuss.summary", identity, permission, context, args=args
     )
@@ -362,7 +371,7 @@ def tool_feishu_discuss_summary(con, identity, permission, context, args=None):
 
 
 def tool_feishu_doc_create(con, identity, permission, context, args=None):
-    args = args or {}
+    args = _with_chat(args or {}, context)
     blocked = _guard_common("feishu.doc.create", identity, permission, context, args=args)
     if blocked:
         return blocked
@@ -381,14 +390,15 @@ def tool_feishu_doc_create(con, identity, permission, context, args=None):
 
 
 def tool_feishu_im_send(con, identity, permission, context, args=None):
-    args = args or {}
+    args = _with_chat(args or {}, context)
     blocked = _guard_common("feishu.im.send", identity, permission, context, args=args)
     if blocked:
         return blocked
     from . import feishu_hands
 
+    rid = str(args.get("receive_id") or args.get("chat_id") or "").strip()
     env = feishu_hands.im_send(
-        receive_id=str(args.get("receive_id") or "").strip(),
+        receive_id=rid,
         text=str(args.get("text") or args.get("q") or ""),
         receive_id_type=str(args.get("receive_id_type") or "chat_id"),
         confirmed=bool(args.get("confirmed")),
@@ -399,7 +409,7 @@ def tool_feishu_im_send(con, identity, permission, context, args=None):
 
 
 def tool_feishu_calendar_create(con, identity, permission, context, args=None):
-    args = args or {}
+    args = _with_chat(args or {}, context)
     blocked = _guard_common(
         "feishu.calendar.create", identity, permission, context, args=args
     )

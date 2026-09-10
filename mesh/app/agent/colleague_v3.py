@@ -356,7 +356,7 @@ def _default_resource_type(tool: str, decision: dict[str, Any]) -> str:
     return rt2 or "doc"
 
 
-def _build_ask_args(tool: str, query: str, decision: dict[str, Any]) -> dict[str, Any]:
+def _build_ask_args(tool: str, query: str, decision: dict[str, Any], context: Any = None) -> dict[str, Any]:
     args: dict[str, Any] = {"q": query}
     raw = decision.get("args") if isinstance(decision.get("args"), dict) else {}
     for k, v in raw.items():
@@ -365,8 +365,16 @@ def _build_ask_args(tool: str, query: str, decision: dict[str, Any]) -> dict[str
     if tool == "feishu.search":
         args["resource_type"] = _default_resource_type(tool, decision)
     if tool == "feishu.discuss.summary" and "person" not in args:
-        # 粗抽：query 当前人名为 person
         args.setdefault("person", query[:40])
+    chat_id = ""
+    if context is not None:
+        chat_id = str(getattr(context, "chat_id", None) or "").strip()
+    if chat_id:
+        args.setdefault("chat_id", chat_id)
+        # 当前会话发消息默认目标
+        if tool == "feishu.im.send":
+            args.setdefault("receive_id", chat_id)
+            args.setdefault("receive_id_type", "chat_id")
     return args
 
 
@@ -478,6 +486,12 @@ def handle(
             return out
         args = decision.get("args") if isinstance(decision.get("args"), dict) else {}
         args = dict(args)
+        chat_id = str(getattr(context, "chat_id", None) or "").strip()
+        if chat_id:
+            args.setdefault("chat_id", chat_id)
+            if tool == "feishu.im.send":
+                args.setdefault("receive_id", chat_id)
+                args.setdefault("receive_id_type", "chat_id")
         # 缺正文时用 speak 生成一版 content（文档）
         if tool == "feishu.doc.create" and not str(args.get("content") or "").strip():
             draft, smeta = _speak_plain(
@@ -514,6 +528,12 @@ def handle(
         tool = str(pending.get("tool") or "")
         args = dict(pending.get("args") or {})
         args["confirmed"] = True
+        chat_id = str(getattr(context, "chat_id", None) or "").strip()
+        if chat_id:
+            args.setdefault("chat_id", chat_id)
+            if tool == "feishu.im.send":
+                args.setdefault("receive_id", chat_id)
+                args.setdefault("receive_id_type", "chat_id")
         from . import permission as permmod
         from . import feishu_hands
 
@@ -587,7 +607,7 @@ def handle(
             out.intent = "casual"
             return out
         query = str(decision.get("query") or q).strip() or q
-        tool_args = _build_ask_args(tool, query, decision)
+        tool_args = _build_ask_args(tool, query, decision, context)
         result = invoke_tool(tool, con, identity, permission, context, tool_args)
         out.tools_called = [tool]
         intent = _intent_for("ask", tool)

@@ -18,6 +18,7 @@ def search(
     resource_type: str = "doc",
     identity: Any = None,
     user_access_token: str = "",
+    chat_id: str = "",
     phase: str = "full",
 ) -> ToolResultEnvelope:
     if not flags.hands_enabled():
@@ -35,10 +36,14 @@ def search(
     if identity is not None:
         open_id = str(getattr(identity, "feishu_open_id", None) or "").strip()
 
-    return backends.run_search(
-        q,
-        resource_type=rt,
-        max_results=FEISHU_SEARCH.max_results,
+    return backends.call_tool(
+        "feishu.search",
+        {
+            "query": q,
+            "resource_type": rt,
+            "max_results": FEISHU_SEARCH.max_results,
+            "chat_id": (chat_id or "").strip(),
+        },
         timeout_sec=FEISHU_SEARCH.timeout_sec,
         user_access_token=(user_access_token or "").strip(),
         open_id=open_id,

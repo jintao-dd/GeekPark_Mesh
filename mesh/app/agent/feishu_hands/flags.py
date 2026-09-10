@@ -20,8 +20,8 @@ def write_enabled() -> bool:
 
 
 def backend_name() -> str:
-    """mcp | openapi | cli | mock — 默认 mcp。"""
-    return (os.environ.get("MESH_FEISHU_HANDS_BACKEND") or "mcp").strip().lower()
+    """native | mcp | openapi | cli | mock — 默认 native（真实 OpenAPI）。"""
+    return (os.environ.get("MESH_FEISHU_HANDS_BACKEND") or "native").strip().lower()
 
 
 def mcp_endpoint() -> str:
