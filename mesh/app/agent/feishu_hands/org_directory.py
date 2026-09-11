@@ -180,7 +180,11 @@ def search_directory(
             )
             if len(items) >= int(max_results):
                 break
-        return envelope_ok(normalize_docs(items, kind="department"), tool="feishu.search")
+        return envelope_ok(
+            normalize_docs(items, kind="department"),
+            tool="feishu.search",
+            max_results=int(max_results),
+        )
 
     items = []
     for u in people:
@@ -209,4 +213,8 @@ def search_directory(
         )
         if len(items) >= int(max_results):
             break
-    return envelope_ok(normalize_docs(items, kind="user"), tool="feishu.search")
+    return envelope_ok(
+        normalize_docs(items, kind="user"),
+        tool="feishu.search",
+        max_results=int(max_results),
+    )

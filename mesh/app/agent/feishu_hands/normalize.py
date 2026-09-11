@@ -16,8 +16,10 @@ def envelope_ok(
     *,
     tool: str = "feishu.search",
     meta: dict[str, Any] | None = None,
+    max_results: int | None = None,
 ) -> ToolResultEnvelope:
-    capped = list(items or [])[: int(FEISHU_SEARCH.max_results)]
+    cap = int(max_results) if max_results is not None else int(FEISHU_SEARCH.max_results)
+    capped = list(items or [])[: max(1, cap)]
     return ToolResultEnvelope(
         ok=True,
         tool=tool,
