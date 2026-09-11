@@ -1,13 +1,13 @@
 # Colleague × Feishu Hands · 接入计划
 
-> **日期：** 2026-09-10  
-> **状态：** **10 项能力已接入代码**（联调：`MESH_FEISHU_HANDS=1` + WRITE；backend=`native|cli|mock`）  
-> **目标态：** 飞书 → Colleague Brain →（Mesh Ask | **官方 lark-cli / Skills** | Org）→ 一张嘴  
-> **原则：** 官方当手脚（[`larksuite/cli`](https://github.com/larksuite/cli) 的 26 个 Agent Skills + shortcuts）；不自研全套飞书 Tool；**绝不混级**；**绝不越权**。  
+> **日期：** 2026-09-10（2026-09-11 更新：CLI Adapter 生产就绪中）  
+> **状态：** **10 项能力已接入代码**；默认 backend=`native`；CLI 按 `docs/CLI_ADAPTER_READINESS.md` 金丝雀验收  
+> **目标态：** 飞书 → Colleague Brain →（Mesh Ask | **Hands Runtime → Adapter(native|cli|mcp)** | Org）→ 一张嘴  
+> **原则：** 官方 CLI/MCP **并入** Adapter，不替换 Runtime；**绝不混级**；**绝不越权**。  
 >
-> 官方 CLI Skills（`npx skills add larksuite/cli`）面向 Coding Agent；Mesh 运行时用同一命令面：  
-> `MESH_FEISHU_HANDS_BACKEND=cli` + `MESH_FEISHU_CLI_BIN=lark-cli`（需容器内已 login / 注入凭证）。  
-> `native` 是无 CLI 时的 OpenAPI 兜底，不是长期自研替代。  
+> CLI 热路径凭证：**env provider**（`LARKSUITE_CLI_APP_ID/SECRET`，可由 `FEISHU_APP_*` 映射），禁止依赖交互 `auth login`。  
+> 默认切换到 `cli` 前必须过 `CLI_ADAPTER_READINESS.md` 门禁 R1–R10。  
+> `native` 是当前生产停靠；MCP 另里程碑。  
 >
 > 十项：search(doc/message/wiki/folder/calendar) · doc.get · calendar.list · discuss.summary ·  
 > speak 成文 · doc.create / im.send / calendar.create（确认式写）  

@@ -130,9 +130,15 @@ def _cli_run(argv: list[str], *, timeout_sec: float, tool: str) -> ToolResultEnv
     import os
 
     bin_path = _cli_bin()
+    # Bot identity for headless env credentials (LARKSUITE_CLI_APP_ID/SECRET).
+    cmd = [bin_path, *argv]
+    if "--as" not in cmd:
+        cmd.extend(["--as", "bot"])
+    if "--format" not in cmd:
+        cmd.extend(["--format", "json"])
     try:
         proc = subprocess.run(
-            [bin_path, *argv, "--format", "json"],
+            cmd,
             capture_output=True,
             text=True,
             timeout=timeout_sec,
@@ -148,22 +154,61 @@ def _cli_run(argv: list[str], *, timeout_sec: float, tool: str) -> ToolResultEnv
     raw_out = (proc.stdout or "").strip()
     raw_err = (proc.stderr or "").strip()
     data: dict[str, Any] = {}
+    err_payload: dict[str, Any] = {}
     try:
         data = json.loads(raw_out) if raw_out else {}
     except Exception:
         data = {}
+    if not data and raw_err:
+        try:
+            err_payload = json.loads(raw_err)
+        except Exception:
+            err_payload = {}
     if proc.returncode != 0 or (isinstance(data, dict) and data.get("ok") is False):
-        err = ""
-        if isinstance(data, dict):
-            eobj = data.get("error") or {}
-            if isinstance(eobj, dict):
-                err = str(eobj.get("message") or eobj.get("hint") or "")
-            err = err or str(data.get("error") or "")
-        err = err or raw_err[:160] or f"cli_exit_{proc.returncode}"
-        return envelope_fail(f"cli:{err[:160]}", tool=tool)
+        src = data if isinstance(data, dict) and data.get("ok") is False else err_payload
+        err = _cli_error_message(src, raw_err, proc.returncode)
+        return envelope_fail(_cli_error_code(err, src), tool=tool)
     if not isinstance(data, dict):
         data = {"data": data}
     return envelope_ok([], tool=tool, meta={"cli": data})
+
+
+def _cli_error_message(src: dict[str, Any], raw_err: str, returncode: int) -> str:
+    err = ""
+    if isinstance(src, dict):
+        eobj = src.get("error") or {}
+        if isinstance(eobj, dict):
+            err = str(eobj.get("message") or eobj.get("hint") or "")
+            code = eobj.get("code")
+            if code is not None and str(code):
+                err = f"feishu_api_{code}:{err}".rstrip(":")
+        err = err or str(src.get("error") or "")
+    return err or raw_err[:160] or f"cli_exit_{returncode}"
+
+
+def _cli_error_code(err: str, src: dict[str, Any] | None = None) -> str:
+    """Map CLI failures into codes Brain / last_block can classify."""
+    s = (err or "").lower()
+    raw = err or ""
+    code = ""
+    if isinstance(src, dict):
+        eobj = src.get("error") or {}
+        if isinstance(eobj, dict) and eobj.get("code") is not None:
+            code = str(eobj.get("code"))
+    if (
+        "99991672" in raw
+        or code == "99991672"
+        or "scope" in s
+        or "permission" in s
+        or "access denied" in s
+        or "权限" in raw
+    ):
+        return f"cli:scope_denied:{raw[:140]}"
+    if "not_installed" in s or "cli_not_installed" in s:
+        return "cli_not_installed"
+    if raw.startswith("feishu_api_") or "feishu_api_" in raw:
+        return f"cli:{raw[:180]}"
+    return f"cli:{raw[:180]}"
 
 
 def _cli_call(tool: str, arguments: dict[str, Any], *, timeout_sec: float) -> ToolResultEnvelope:
@@ -222,7 +267,22 @@ def _cli_call(tool: str, arguments: dict[str, Any], *, timeout_sec: float) -> To
         )
 
     if tool == "feishu.calendar.list":
-        return _cli_run(["calendar", "+agenda"], timeout_sec=timeout_sec, tool=tool)
+        env = _cli_run(["calendar", "+agenda"], timeout_sec=timeout_sec, tool=tool)
+        if not env.ok:
+            return env
+        payload = (env.meta or {}).get("cli") or {}
+        data = payload.get("data") if isinstance(payload, dict) else {}
+        items: list[Any] = []
+        if isinstance(data, list):
+            items = data
+        elif isinstance(data, dict):
+            items = data.get("events") or data.get("items") or data.get("calendar_list") or []
+        if isinstance(payload, dict) and isinstance(payload.get("items"), list):
+            items = payload.get("items") or items
+        return envelope_ok(
+            normalize_docs(items if isinstance(items, list) else [], kind="calendar"),
+            tool=tool,
+        )
 
     if tool == "feishu.discuss.summary":
         chat_id = str(args.get("chat_id") or "").strip()
@@ -249,13 +309,36 @@ def _cli_call(tool: str, arguments: dict[str, Any], *, timeout_sec: float) -> To
         payload = (env.meta or {}).get("cli") or {}
         data = payload.get("data") if isinstance(payload, dict) else {}
         url = str((data or {}).get("url") or (data or {}).get("doc_url") or "")
-        token = str((data or {}).get("document_id") or (data or {}).get("doc_token") or "")
+        token = str(
+            (data or {}).get("document_id")
+            or (data or {}).get("doc_token")
+            or (data or {}).get("token")
+            or ""
+        )
         if not url and token:
             url = f"https://feishu.cn/docx/{token}"
+        share_ok = False
+        share_err = ""
+        if token:
+            try:
+                from . import native as native_mod
+
+                native_mod.open_tenant_readable(token, docs_type="docx")
+                share_ok = True
+            except Exception as e:
+                share_err = str(e)[:160]
+                log.warning("cli doc tenant share failed token=%s: %s", token, e)
+        snippet = "已创建；公司内获链接可读" if share_ok else "已创建（公司内链接权限未设上）"
         return envelope_ok(
-            [{"title": title, "url": url, "snippet": "已创建", "docs_token": token}],
+            [{"title": title, "url": url, "snippet": snippet, "docs_token": token}],
             tool=tool,
-            meta={"url": url, "doc_token": token},
+            meta={
+                "url": url,
+                "doc_token": token,
+                "tenant_share": share_ok,
+                "tenant_share_error": share_err,
+                "backend": "cli",
+            },
         )
 
     if tool == "feishu.im.send":

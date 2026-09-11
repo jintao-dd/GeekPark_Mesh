@@ -309,6 +309,7 @@ def _classify_block(err: str, *, tool: str = "") -> dict[str, str]:
         or "access denied" in s
         or "docx:document" in s
         or "权限" in raw
+        or "scope_denied" in s
     ):
         code = "scope_denied"
     elif any(x in s for x in ("hands_disabled", "write_disabled", "mcp_not_configured", "cli_not_configured")):
