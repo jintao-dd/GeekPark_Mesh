@@ -67,6 +67,7 @@ def test_judge_complex_canary():
         "列出我能访问的群聊和群聊人员详情还有人员日历详情，并梳理一下近期周报和这些人有关联的事情。"
     )
     assert j.band == "complex"
+    # build_plan 只是 LLM Planner 失败时的最小兜底，不再伪装完整多源 DAG
     plan = orch.build_plan(
         "列出我能访问的群聊和群聊人员详情还有人员日历详情，并梳理近期周报",
         j,
@@ -74,13 +75,23 @@ def test_judge_complex_canary():
     tools = [s.tool for s in plan.steps]
     assert "feishu.search" in tools
     assert "ask.published" in tools
-    assert "feishu.calendar.list" in tools
+
+
+def test_plan_steps_from_decision():
+    steps = orch.plan_steps_from_decision(
+        {"action": "work", "tool": "ask.published", "query": "张三最近跟谁聊过"},
+        goal="张三最近跟谁聊过",
+    )
+    assert len(steps) == 1
+    assert steps[0].tool == "ask.published"
+    assert "张三" in steps[0].args.get("query", "")
 
 
 def test_judge_simple_no_planner_noise():
     j = orch.judge_complexity("哈哈今天忙死了")
     assert j.band == "simple"
     assert not orch.should_orchestrate(j, "speak")
+    assert orch.should_orchestrate(j, "work")
 
 
 def test_columns_keep_tiers_separate():
@@ -155,11 +166,35 @@ def test_handle_orchestrates_complex_with_mock_tools():
         )
 
     def fake_render(result, intent, status):
-        return (f"- {getattr(result, 'text', '')}", [], [])
+        return (f"- {getattr(result, 'payload', {}).get('text') or 'hit'}", [], [])
 
     def fake_call(system, user, max_tokens=4000, json_mode=False, task="default"):
         if json_mode:
-            return '{"action":"ask","tool":"ask.published","query":"x"}'
+            if "Task Planner" in (system or "") or "steps" in (system or ""):
+                return {
+                    "band": "complex",
+                    "goal": "群成员日历周报",
+                    "steps": [
+                        {
+                            "id": "s1",
+                            "tool": "feishu.search",
+                            "args": {"resource_type": "group"},
+                        },
+                        {
+                            "id": "s2",
+                            "tool": "feishu.search",
+                            "args": {"resource_type": "member"},
+                            "depends_on": ["s1"],
+                        },
+                        {
+                            "id": "s3",
+                            "tool": "ask.published",
+                            "args": {"query": "近期协作"},
+                            "parallel_group": "fanout",
+                        },
+                    ],
+                }
+            return '{"action":"work"}'
         return "不应走到 speak"
 
     q = "列出我能访问的群聊和群成员，再看看日历，并关联近期周报里相关的事"
@@ -176,10 +211,26 @@ def test_handle_orchestrates_complex_with_mock_tools():
                 render_tool_result=fake_render,
             )
     assert out.trace.get("colleague_v4") is True
-    assert out.trace.get("complexity", {}).get("band") == "complex"
+    assert "planner" in out.trace
     assert "orchestrator" in out.trace
     assert calls  # tools ran
     assert "**我查到的**" in (out.text or "") or "我查到的" in (out.text or "")
+
+
+def test_normalize_plan_steps_rejects_write_tools():
+    steps = orch._normalize_plan_steps(
+        [
+            {"id": "s1", "tool": "feishu.doc.create", "args": {"title": "x"}},
+            {
+                "id": "s2",
+                "tool": "feishu.search",
+                "args": {"resource_type": "group"},
+            },
+        ],
+        goal="建文档并列群",
+    )
+    assert len(steps) == 1
+    assert steps[0].tool == "feishu.search"
 
 
 def test_sanitize_keeps_colleague_text_with_incidental_action():

@@ -219,41 +219,28 @@ _SYSTEM_DECIDE = """你是 GeekPark 内部 AI 同事 Mesh 的「调度」层。
 只输出一个极短严格 JSON（双引号，无 markdown，无长文）。必须含 situation + action：
 
 {"situation":"chat","action":"speak"}
-{"situation":"need_published","action":"ask","tool":"ask.published","query":"..."}
-{"situation":"need_feishu_read","action":"ask","tool":"feishu.search","query":"...","resource_type":"doc|message|group|wiki|folder|calendar|member|user|directory","args":{}}
+{"situation":"need_tools","action":"work"}
 {"situation":"want_feishu_write","action":"prepare_write","tool":"feishu.doc.create|feishu.im.send|feishu.calendar.create","args":{"title":"短","content":""}}
 {"situation":"confirm_pending","action":"confirm_write"}
 {"situation":"cancel_pending","action":"cancel_write"}
 {"situation":"refuse","action":"refuse","text":"一句短拒"}
 
+说明：
+- speak：纯闲聊/观点/写稿但不落飞书；不查工具
+- work：凡是要查飞书、周报、通讯录、群、日历、多人多源、梳理关联——一律 work（不要自己猜只用一个 tool）
+- 写飞书只能 prepare_write→confirm_write
+- 兼容：若你输出 action=ask，系统会当成 work 交给 Planner
+
 数据隔离（硬）：
 - published 周报事实 ↔ feishu_live 飞书 live ↔ speak 草稿，三桶禁止混成一条事实
-- 写飞书只能 prepare_write→confirm_write，禁止用 speak 假装「正在创建/已创建」
-
-可读 tool：ask.published | ask.relations_summary | context.list_issues |
-  feishu.search | feishu.doc.get | feishu.calendar.list | feishu.calendar.propose | feishu.discuss.summary
-可写 tool：feishu.doc.create | feishu.im.send | feishu.calendar.create
-
-飞书读路由提示（结构化，不要把用户整句当检索词）：
-- 列群 → tool=feishu.search, resource_type=group, query=""（或 args.keyword=群名）
-- 列本群成员 → feishu.search + member, query=""（需当前 chat_id；私聊无 chat 时先问要哪个群）
-- 找同事/通讯录/公司里谁叫X/组织架构里的人 → feishu.search + directory，args.keyword=姓名或工号短词
-- 帮这群人约时间/找共同空档 → tool=feishu.calendar.propose（受控多步，不直接建会）
-- @某人 / 他是谁（有 mentions.open_id）→ feishu.search + user，args.open_ids=[...]
-- 日程 → tool=feishu.calendar.list, query 可空；「我的日程」需个人授权
-- 会话消息 → feishu.search + message；关键词放 args.keyword / 短 query
-- 文档/Wiki → feishu.search + doc|wiki，短检索词
-- feishu.search 必须带 resource_type
-- 通讯录可见范围 = 飞书应用通讯录权限；有结果就报姓名+open_id，没结果如实说查不到
-- 若工具返回需要个人授权：如实转达授权链接，不要编造已查到
+- 写飞书禁止用 speak 假装「正在创建/已创建」
 
 规则（看「系统工作记忆」+ 对话，不要枚举用户句式）：
 - 有待确认写操作 + 用户同意 → confirm_write
 - 有待确认 + 用户取消 → cancel_write
-- 有未完成 active_goal（family=feishu_write）且用户在催/继续要写 → prepare_write 或 confirm_write，禁止闲聊搪塞
-- 有 last_block=scope_denied：可诚实说权限；若用户说已开权限 → 再 prepare_write，不要只道歉
+- 有未完成 active_goal（family=feishu_write）且用户在催/继续要写 → prepare_write 或 confirm_write
 - 闲聊/成文不落飞书 → speak
-- 周报事实 → ask.published；飞书搜读 → feishu.*（feishu_live）
+- 查任何企业/飞书信息 → work
 - prepare_write 的 args.content 必须是 ""；title≤20 字；JSON 通常 <150 字符
 """
 
@@ -560,8 +547,12 @@ def _sanitize_user_visible(text: str) -> str:
 
 
 def _normalize_decide(decision: dict[str, Any]) -> dict[str, Any]:
-    """丢掉 decide 里过长的 content（模型爱塞正文导致 JSON 截断）；意图仍由 LLM 决定。"""
+    """丢掉 decide 里过长的 content；ask 归一成 work（工具选择交给 Planner）。"""
     out = dict(decision or {})
+    action = str(out.get("action") or "speak").strip().lower()
+    if action == "ask":
+        out["action"] = "work"
+        out["_legacy_ask"] = True
     args = out.get("args")
     if isinstance(args, dict) and len(str(args.get("content") or "")) > 120:
         args = dict(args)
@@ -984,12 +975,15 @@ def handle(
     if action not in (
         "speak",
         "ask",
+        "work",
         "refuse",
         "prepare_write",
         "confirm_write",
         "cancel_write",
     ):
         action = "speak"
+    if action == "ask":
+        action = "work"
 
     out = ColleagueV3Result(
         llm_used=bool(dmeta.get("llm_used")),
@@ -1013,9 +1007,28 @@ def handle(
         },
     )
 
-    # Complex / Medium：走 Orchestrator（写/拒仍走下方原路径）
+    # work/ask：LLM Planner 选工具与依赖（禁止关键词穷举用户句式）
     if orch.should_orchestrate(judgment, action):
-        plan = orch.build_plan(q, judgment)
+        plan, pmeta = orch.plan_with_llm(
+            q,
+            company_block=company_block,
+            identity=identity,
+            session=session,
+            decision_hint=decision if isinstance(decision, dict) else None,
+        )
+        out.trace["planner"] = pmeta
+        out.trace["complexity"] = {
+            "band": plan.band,
+            "reason": "llm_planner",
+            "signals": judgment.signals,
+        }
+        if not plan.steps:
+            # Planner 认为无需工具 → 改口说话；若仍像查数失败则兜底模板
+            if pmeta.get("error"):
+                plan = orch.build_plan(q, judgment)
+            else:
+                action = "speak"
+                out.trace["planner_empty_to_speak"] = True
         if plan.steps:
             ores = orch.execute_plan(
                 plan,
@@ -1027,17 +1040,23 @@ def handle(
                 render_tool_result=render_tool_result,
             )
             out.action = "ask"
-            out.intent = "feishu_search" if judgment.band != "ordinary" or judgment.signals.get("chat_who") else "ask_published"
+            out.intent = (
+                "feishu_search"
+                if any(str(t).startswith("feishu.") for t in ores.tools_called)
+                else "ask_published"
+            )
             out.tools_called = list(ores.tools_called)
             out.text = _sanitize_user_visible(ores.synthesis_text)
             out.trace["orchestrator"] = ores.to_dict()
-            out.trace["source_tier"] = "feishu_live" if any(
-                str(t).startswith("feishu.") for t in ores.tools_called
-            ) else "published"
+            out.trace["source_tier"] = (
+                "feishu_live"
+                if any(str(t).startswith("feishu.") for t in ores.tools_called)
+                else "published"
+            )
             out.payload = {
                 "columns": ores.columns,
                 "partial": ores.partial,
-                "complexity": judgment.band,
+                "complexity": plan.band,
                 "source_tier": out.trace.get("source_tier") or "feishu_live",
                 "orchestrated": True,
             }

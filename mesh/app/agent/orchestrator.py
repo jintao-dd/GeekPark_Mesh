@@ -117,86 +117,318 @@ class TaskPlan:
         }
 
 
+ALLOWED_PLAN_TOOLS = frozenset(
+    {
+        "ask.published",
+        "ask.relations_summary",
+        "context.list_issues",
+        "feishu.search",
+        "feishu.doc.get",
+        "feishu.calendar.list",
+        "feishu.calendar.propose",
+        "feishu.discuss.summary",
+    }
+)
+
+_SPECIALIST_FOR_TOOL = {
+    "ask.published": "published",
+    "ask.relations_summary": "published",
+    "context.list_issues": "published",
+    "feishu.search": "research",
+    "feishu.doc.get": "research",
+    "feishu.discuss.summary": "research",
+    "feishu.calendar.list": "calendar",
+    "feishu.calendar.propose": "calendar",
+}
+
+_PLANNER_SYSTEM = """你是 Mesh 的 Task Planner（只规划，不回答用户，不做公司事实断言）。
+根据用户目标与公司先验，输出一个 JSON 任务图。系统会按预算执行。
+
+只输出 JSON：
+{
+  "band": "simple|ordinary|medium|complex",
+  "goal": "一句话目标",
+  "steps": [
+    {
+      "id": "s1",
+      "specialist": "org|research|calendar|published",
+      "tool": "工具名",
+      "args": {},
+      "depends_on": [],
+      "parallel_group": "",
+      "optional": false
+    }
+  ]
+}
+
+可用只读工具（写工具禁止出现在 steps）：
+- ask.published — 已上线周报企业事实；args.query 必填，短而具体
+- ask.relations_summary — 关系摘要；args.query
+- context.list_issues — 已上线期次列表
+- feishu.search — 飞书检索；args 必须含 resource_type=
+  doc|message|group|wiki|folder|calendar|member|user|directory；
+  列群用 group+query空；群成员用 member；通讯录用 directory+keyword；
+  聊天用 message+短 keyword；文档用 doc
+- feishu.doc.get — 取文档；args 需 token/url
+- feishu.calendar.list — 日程/忙闲列表
+- feishu.calendar.propose — 受控约时间（成员+空档）
+- feishu.discuss.summary — 讨论摘要
+
+规则：
+1) 闲聊/无需工具 → steps=[]，band=simple
+2) 单源够用 → 1 步；多源才多步；能并行的用同一 parallel_group
+3) 有依赖才写 depends_on（用 id）
+4) 步骤 ≤8；不要发明工具名；不要写飞书写入工具
+5) 周报事实只用 ask.*；飞书 live 用 feishu.*；禁止混成一个假事实源
+6) 按用户原意规划，不要假设他问了固定模板句
+"""
+
+
+def _parse_plan_json(raw: Any) -> dict[str, Any]:
+    if isinstance(raw, dict):
+        return raw
+    text = str(raw or "").strip()
+    if not text:
+        return {}
+    try:
+        import json
+
+        return json.loads(text)
+    except Exception:
+        pass
+    try:
+        import json
+        import re as _re
+
+        m = _re.search(r"\{[\s\S]*\}", text)
+        if m:
+            return json.loads(m.group(0))
+    except Exception:
+        return {}
+    return {}
+
+
+def _normalize_plan_steps(raw_steps: Any, *, goal: str) -> list[PlanStep]:
+    if not isinstance(raw_steps, list):
+        return []
+    out: list[PlanStep] = []
+    seen: set[str] = set()
+    for i, item in enumerate(raw_steps[: int(DEFAULT_BUDGET["plan_steps"])]):
+        if not isinstance(item, dict):
+            continue
+        tool = str(item.get("tool") or "").strip()
+        if tool not in ALLOWED_PLAN_TOOLS:
+            continue
+        sid = str(item.get("id") or f"s{i+1}").strip() or f"s{i+1}"
+        if sid in seen:
+            sid = f"{sid}_{i+1}"
+        seen.add(sid)
+        args = item.get("args") if isinstance(item.get("args"), dict) else {}
+        args = dict(args)
+        if tool == "feishu.search":
+            rt = str(args.get("resource_type") or item.get("resource_type") or "").strip().lower()
+            if not rt:
+                continue
+            args["resource_type"] = rt
+            args.setdefault("max_results", 12)
+        if tool.startswith("ask.") and not str(args.get("query") or "").strip():
+            args["query"] = goal[:160]
+        deps = item.get("depends_on") if isinstance(item.get("depends_on"), list) else []
+        deps = [str(d).strip() for d in deps if str(d).strip()]
+        specialist = str(item.get("specialist") or "").strip() or _SPECIALIST_FOR_TOOL.get(
+            tool, "research"
+        )
+        if tool == "feishu.search" and str(args.get("resource_type") or "") in (
+            "group",
+            "member",
+            "user",
+            "directory",
+        ):
+            specialist = "org"
+        out.append(
+            PlanStep(
+                id=sid,
+                specialist=specialist,
+                tool=tool,
+                args=args,
+                depends_on=deps,
+                parallel_group=str(item.get("parallel_group") or "").strip(),
+                optional=bool(item.get("optional")),
+            )
+        )
+    # 丢掉指向不存在 id 的依赖
+    ids = {s.id for s in out}
+    for s in out:
+        s.depends_on = [d for d in s.depends_on if d in ids and d != s.id]
+    return out
+
+
+def plan_with_llm(
+    user_text: str,
+    *,
+    company_block: str = "",
+    identity: Any = None,
+    session: Any = None,
+    decision_hint: dict[str, Any] | None = None,
+) -> tuple[TaskPlan, dict[str, Any]]:
+    """LLM Planner：模型选工具与依赖；失败时退回空 plan（由上游决定是否单工具兜底）。"""
+    meta: dict[str, Any] = {"llm_used": False, "model": None, "error": "", "source": "llm"}
+    q = (user_text or "").strip()
+    pending = getattr(session, "pending_write", None) if session is not None else None
+    if isinstance(pending, dict) and pending.get("tool"):
+        meta["source"] = "pending_write_skip"
+        return TaskPlan(goal=q[:200], band="ordinary", steps=[]), meta
+
+    hint = ""
+    if isinstance(decision_hint, dict) and decision_hint:
+        hint = (
+            f"Decide 提示（可忽略）：action={decision_hint.get('action')} "
+            f"tool={decision_hint.get('tool')} query={str(decision_hint.get('query') or '')[:80]}"
+        )
+    user = f"用户目标：{q}\n"
+    if hint:
+        user += hint + "\n"
+    user += "只输出任务 JSON："
+    system = _PLANNER_SYSTEM
+    if company_block:
+        system += "\n\n" + company_block
+    try:
+        from .. import llm
+
+        raw = llm.call(
+            system,
+            user,
+            max_tokens=700,
+            json_mode=True,
+            task="answer",
+        )
+        meta["llm_used"] = True
+        meta["model"] = llm.model_for_task("answer")
+        data = _parse_plan_json(raw)
+        band = str(data.get("band") or "ordinary").strip().lower()
+        if band not in ("simple", "ordinary", "medium", "complex"):
+            band = "ordinary"
+        goal = str(data.get("goal") or q)[:200]
+        steps = _normalize_plan_steps(data.get("steps"), goal=goal or q)
+        # 模型误输出 Decide 形态（action/tool/query）→ 收成单步
+        if not steps:
+            hinted = plan_steps_from_decision(data, goal=goal or q)
+            if hinted:
+                steps = hinted
+                meta["coerced_from_decide_shape"] = True
+        # 无步骤但 band 很复杂 → 再 salvage 一次更短提示
+        if not steps and band in ("medium", "complex"):
+            raw2 = llm.call(
+                system,
+                user + "\n上次 steps 为空或非法。若目标需要查数，至少给出 1～4 个合法只读 steps。",
+                max_tokens=700,
+                json_mode=True,
+                task="answer",
+            )
+            meta["salvage"] = True
+            data2 = _parse_plan_json(raw2)
+            steps = _normalize_plan_steps(data2.get("steps"), goal=goal or q)
+            if not steps:
+                steps = plan_steps_from_decision(data2, goal=goal or q)
+            if str(data2.get("band") or "").strip().lower() in (
+                "simple",
+                "ordinary",
+                "medium",
+                "complex",
+            ):
+                band = str(data2.get("band")).strip().lower()
+        # Decide 已点名合法只读工具 → 作单步兜底（非关键词穷举）
+        if not steps and isinstance(decision_hint, dict):
+            steps = plan_steps_from_decision(decision_hint, goal=goal or q)
+            if steps:
+                meta["source"] = "decision_hint"
+                band = "ordinary"
+        plan = TaskPlan(goal=goal or q[:200], band=band, steps=steps, budget=dict(DEFAULT_BUDGET))
+        meta["step_ids"] = [s.id for s in steps]
+        return plan, meta
+    except Exception as e:
+        log.warning("llm planner failed: %s", e)
+        meta["error"] = str(e)[:160]
+        meta["source"] = "llm_error"
+        # 规划炸了仍尽量用 Decide 提示单步，避免整轮变闲聊
+        steps: list[PlanStep] = []
+        if isinstance(decision_hint, dict):
+            steps = plan_steps_from_decision(decision_hint, goal=q)
+            if steps:
+                meta["source"] = "decision_hint_after_error"
+        return TaskPlan(goal=q[:200], band="ordinary", steps=steps, budget=dict(DEFAULT_BUDGET)), meta
+
+
+def plan_steps_from_decision(decision: dict[str, Any], *, goal: str) -> list[PlanStep]:
+    """把 Decide 的 tool/query 收成 Planner 单步；非法工具返回空。"""
+    if not isinstance(decision, dict):
+        return []
+    tool = str(decision.get("tool") or "").strip()
+    if tool not in ALLOWED_PLAN_TOOLS:
+        return []
+    args = decision.get("args") if isinstance(decision.get("args"), dict) else {}
+    args = dict(args)
+    q = str(decision.get("query") or goal or "").strip()[:160]
+    if tool.startswith("ask.") and not str(args.get("query") or "").strip():
+        args["query"] = q or goal[:160]
+    if tool == "feishu.search":
+        rt = str(args.get("resource_type") or decision.get("resource_type") or "").strip()
+        if not rt:
+            return []
+        args["resource_type"] = rt
+        args.setdefault("max_results", 12)
+    return _normalize_plan_steps(
+        [{"id": "s1", "tool": tool, "args": args}],
+        goal=goal or q,
+    )
+
+
 def build_plan(user_text: str, judgment: ComplexityJudgment) -> TaskPlan:
+    """兼容旧调用：仅作极端兜底模板，主路径请用 plan_with_llm。"""
     q = (user_text or "").strip()
     band = judgment.band
-    steps: list[PlanStep] = []
-    if band == "complex":
-        steps = [
-            PlanStep(
-                id="s1_groups",
-                specialist="org",
-                tool="feishu.search",
-                args={"resource_type": "group", "query": "", "max_results": 20},
-            ),
-            PlanStep(
-                id="s2_members",
-                specialist="org",
-                tool="feishu.search",
-                args={"resource_type": "member", "query": "", "max_results": 50},
-                depends_on=["s1_groups"],
-            ),
-            PlanStep(
-                id="s3_calendar",
-                specialist="calendar",
-                tool="feishu.calendar.list",
-                args={"query": q[:80], "max_results": 15},
-                depends_on=["s2_members"],
-                parallel_group="fanout",
-                optional=True,
-            ),
-            PlanStep(
-                id="s4_published",
-                specialist="published",
-                tool="ask.published",
-                args={"query": _published_query(q)},
-                depends_on=["s2_members"],
-                parallel_group="fanout",
-            ),
-        ]
-    elif band == "medium":
-        steps = [
-            PlanStep(
-                id="s1_messages",
-                specialist="research",
-                tool="feishu.search",
-                args={"resource_type": "message", "query": q[:80], "max_results": 12},
-            ),
-            PlanStep(
-                id="s2_published",
-                specialist="published",
-                tool="ask.published",
-                args={"query": q[:120]},
-                parallel_group="fanout",
-                optional=True,
-            ),
-        ]
-    elif band == "ordinary":
-        if judgment.signals.get("weekly") and not judgment.signals.get("chat_who"):
-            steps = [
+    # 最小兜底：少步骤，避免正则多源模板假装「懂了」
+    if band in ("complex", "medium"):
+        return TaskPlan(
+            goal=q[:200],
+            band=band,
+            steps=[
+                PlanStep(
+                    id="s1_groups",
+                    specialist="org",
+                    tool="feishu.search",
+                    args={"resource_type": "group", "query": "", "max_results": 20},
+                ),
+                PlanStep(
+                    id="s2_published",
+                    specialist="published",
+                    tool="ask.published",
+                    args={"query": _published_query(q)},
+                    parallel_group="fanout",
+                    optional=True,
+                ),
+            ],
+            budget=dict(DEFAULT_BUDGET),
+        )
+    if judgment.signals.get("weekly"):
+        return TaskPlan(
+            goal=q[:200],
+            band=band,
+            steps=[
                 PlanStep(
                     id="s1_ask",
                     specialist="published",
                     tool="ask.published",
                     args={"query": q[:160]},
                 )
-            ]
-        else:
-            steps = [
-                PlanStep(
-                    id="s1_search",
-                    specialist="research",
-                    tool="feishu.search",
-                    args={
-                        "resource_type": "message" if judgment.signals.get("chat_who") else "doc",
-                        "query": q[:80],
-                        "max_results": 10,
-                    },
-                )
-            ]
-    else:  # simple
-        if judgment.signals.get("who_is") or judgment.signals.get("dept"):
-            steps = [
+            ],
+            budget=dict(DEFAULT_BUDGET),
+        )
+    if judgment.signals.get("who_is") or judgment.signals.get("dept"):
+        return TaskPlan(
+            goal=q[:200],
+            band=band,
+            steps=[
                 PlanStep(
                     id="s1_dir",
                     specialist="org",
@@ -208,10 +440,10 @@ def build_plan(user_text: str, judgment: ComplexityJudgment) -> TaskPlan:
                         "max_results": 8,
                     },
                 )
-            ]
-        else:
-            steps = []
-    return TaskPlan(goal=q[:200], band=band, steps=steps, budget=dict(DEFAULT_BUDGET))
+            ],
+            budget=dict(DEFAULT_BUDGET),
+        )
+    return TaskPlan(goal=q[:200], band=band, steps=[], budget=dict(DEFAULT_BUDGET))
 
 
 def _keyword_name(q: str) -> str:
@@ -557,18 +789,12 @@ def format_columns(columns: dict[str, str]) -> str:
 
 
 def should_orchestrate(judgment: ComplexityJudgment, decision_action: str) -> bool:
+    """是否进入 Planner/执行：由 Decide 的 work/ask 决定，不再靠正则 band。"""
     if not orchestrator_enabled():
         return False
     action = (decision_action or "").strip().lower()
-    if action in ("prepare_write", "confirm_write", "cancel_write", "refuse"):
+    if action in ("prepare_write", "confirm_write", "cancel_write", "refuse", "speak"):
         return False
-    if judgment.band in ("medium", "complex"):
-        return True
-    if judgment.band == "ordinary" and judgment.reason in (
-        "single_enterprise_read",
-    ):
-        # ordinary 仍可用编排跑单步，便于统一分栏；也可走旧 ask
-        return True
-    if judgment.band == "simple" and judgment.signals.get("who_is"):
+    if action in ("work", "ask"):
         return True
     return False

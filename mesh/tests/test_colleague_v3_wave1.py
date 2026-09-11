@@ -112,7 +112,19 @@ def test_handle_ask_then_synthesize():
 
     def fake_call(system, user, max_tokens=4000, json_mode=False, task="default"):
         if json_mode:
-            return '{"action":"ask","tool":"ask.published","query":"张三最近跟谁聊过"}'
+            if "Task Planner" in (system or ""):
+                return {
+                    "band": "ordinary",
+                    "goal": "张三最近跟谁聊过",
+                    "steps": [
+                        {
+                            "id": "s1",
+                            "tool": "ask.published",
+                            "args": {"query": "张三最近跟谁聊过"},
+                        }
+                    ],
+                }
+            return '{"action":"work","tool":"ask.published","query":"张三最近跟谁聊过"}'
         return "张三这周主要在跟商务侧推进合作。"
 
     def invoke_tool(tool_id, con, identity, permission, context, args):
@@ -154,7 +166,8 @@ def test_handle_ask_then_synthesize():
             )
     assert out.action == "ask"
     assert "action" not in out.text
-    assert "张三" in out.text or "商务" in out.text
+    assert "张三" in out.text or "商务" in out.text or "A公司" in out.text
+    assert out.tools_called  # work → Planner → 工具
 
 
 def test_runtime_v3_bypasses_controller():

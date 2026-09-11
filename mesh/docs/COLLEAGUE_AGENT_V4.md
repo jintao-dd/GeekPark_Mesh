@@ -186,20 +186,23 @@ Grounding = Published Ask（+ Claim/Evidence 纪律）∪ 分桶后的 Hands liv
 
 ---
 
-## 3. Complexity Judge（何时上 Planner）
+## 3. Complexity / 何时上 Planner
+
+产品中轴：**Decide（要不要动手）→ LLM Planner（用什么工具、怎么拆）→ Bounded 执行**。
 
 | 档位 | 例 | 路径 |
 |------|----|------|
-| **Simple** | 「张三是谁？」 | Brain → Org Tool → Answer |
-| **Ordinary enterprise** | 「张三最近跟谁聊过？」 | Brain → 单一 Capability（Ask 或 Hands）→ Answer |
-| **Medium** | 「…跟谁聊过？哪条值得关注？」 | Brain → Planner（短 DAG）→ Search → Analysis → Answer |
-| **Complex** | 「列出我能访问的群 + 成员 + 日历 + 关联周报，哪些值得关注」 | Brain → Planner → 并行 Specialists → Correlation → Verify → Synthesis → Answer |
+| **Simple** | 「哈哈今天忙死了」 | Decide=`speak` → Brain 直接回 |
+| **Ordinary enterprise** | 「张三最近跟谁聊过？」 | Decide=`work` → Planner 出 1 步 Ask/Hands → Answer |
+| **Medium** | 「…跟谁聊过？哪条值得关注？」 | Planner 短 DAG → Search → Analysis → Answer |
+| **Complex** | 「列出我能访问的群 + 成员 + 日历 + 关联周报」 | Planner 多步并行 → Specialists → Synthesis → Answer |
 
-Judge 原则：
+原则：
 
-- 默认 **能直连则直连**（省延迟、省预算）  
-- 多源、多依赖、要并行、要跨桶关联 → 升 Complex  
-- Judge **不**编造公司事实；只选执行档位  
+- **禁止**用关键词/正则穷举用户话术当产品主路径；任意措辞由模型在工具白名单内判断  
+- 正则 Judge 仅作 trace / 极端兜底痕迹，**不**决定工具图  
+- Planner **不**编造公司事实；只出步骤图与 band  
+- 默认能直连则短图（1 步也是合法 plan）  
 
 ---
 
@@ -239,12 +242,15 @@ Plan
 
 ## 5. Planner 不是第二个大脑
 
+实现：`plan_with_llm()`（工具白名单 + 预算 + 依赖规范化）。`build_plan()` 仅 LLM 失败时的最小模板，不得伪装「已理解全部话术」。
+
 | Planner **只**做 | Planner **禁止**做 |
 |------------------|-------------------|
 | 目标澄清（结构化） | 公司事实断言 |
 | 步骤 / 依赖 / 并行组 | 最终用户回答 |
 | 预算与完成条件 | Persona / 口吻 |
-| 失败时有界补边 | 权限放行（权限属系统） |
+| 失败时有界补边 / Decide 单工具提示 | 权限放行（权限属系统） |
+| 按用户原意规划（任意措辞） | 关键词意图表 / 固定 canary DAG 当主路径 |
 
 权限 → Identity / Permission / IdentityPolicy。  
 事实 → Grounding（Published Ask + 分桶 Envelope）。  
@@ -412,7 +418,7 @@ Synthesis（一张嘴）
 | Synthesis 分栏 | FACT/ANALYSIS/OPINION/SUGGESTION |
 | Capacity | 实测校准预算，不拍脑袋 |
 
-Company Understanding **在架构上前置**（先验）；**在工程上**与 Orchestrator 可同一迭代里接线，只要 Complex 路径调用的是同一套 Context——而不是等「Simple 阶段结项」。
+Company Understanding **在架构上前置**（先验）；工具选择与任务拆解由 **LLM Planner** 完成（`plan_with_llm`），禁止用关键词穷举用户话术；正则 Judge 仅作痕迹/兜底，不是产品中轴。
 
 ---
 
