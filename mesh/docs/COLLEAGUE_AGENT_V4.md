@@ -332,48 +332,86 @@ S8  Synthesis → 一张嘴（FACT/ANALYSIS/OPINION/SUGGESTION）
 
 ---
 
-## 9. 与现有代码的落点（不推翻 Hands）
+## 9. 落点与实施序（Company Understanding 前置）
+
+### 9.1 运行时栈序（产品真理 — 以你的图为准）
+
+```
+Identity / Permission
+        ↓
+Company Ontology          ← 懂结构（先验）
+        ↓
+Company Wiki              ← 懂语境（先验）
+        ↓
+Grounding（Published + 分桶 live）  ← 知事实（按需拉取，不是一次性灌满）
+        ↓
+Session / Context
+        ↓
+Colleague Brain
+        ↓
+Orchestrator / Bounded ReAct / Specialists
+        ↓
+Synthesis（一张嘴）
+```
+
+**判定：** 若 Agent 不先经过公司理解层，它只是 **通用 Agent 穿 GeekPark 外套**。  
+Orchestrator / Specialist 再强，也只是「会调度的外人」。
+
+旧 §9「先 TaskPlan → 后 Ontology/Wiki」是 **工程师惯性**（先造执行器），与 §1.5 自相矛盾 — **作废**。
+
+### 9.2 已有代码落点
 
 | 已有 | v4 位置 |
 |------|---------|
-| `colleague_v3._decide` | Brain + 简易 Judge（后续显式化 Complexity） |
-| Hands Runtime + Adapters | ② Capability |
-| `identity_policy` / UAT / auth guide | Identity 门 |
-| `feishu.calendar.propose` | Orchestrator 雏形（受控多步） |
-| `pending_write` / confirm | Writer 闸 |
-| `active_goal` / `last_block` | ⑤ Session |
-| `tool_contract` 分桶 | Envelope / Verification 硬门 |
+| Identity / Permission / UAT | 栈顶门 |
+| Org directory / members / teams | **Company Ontology v0 原料**（尚未收成显式先验） |
+| Published Ask + Claim/Evidence | **Grounding**（已有；企业事实） |
+| Session：`pending` / `active_goal` / `last_block` | Session / Context |
+| `colleague_v3._decide` | Brain + 简易 Judge（尚无公司先验注入） |
+| Hands Runtime + Adapters | Capability（执行层，不替代先验） |
+| `feishu.calendar.propose` | Orchestrator 雏形 |
+| `tool_contract` 分桶 | Envelope / Verification |
 
-**待建（按序，禁止跳步把用户暴露给半成品 Multi-Agent）：**
+### 9.3 实施序（与栈序对齐；禁止「先空转 Multi-Agent」）
 
-1. `TaskPlan` schema + Orchestrator 只读执行器  
-2. Complexity Judge 显式档位 + 金丝雀 DAG  
-3. Bounded ReAct 预算与补步  
-4. Specialist 接口（同 Envelope，先 Org / Research / Calendar / Published）  
-5. Synthesis 分栏 FACT/ANALYSIS/OPINION/SUGGESTION  
-6. **Company Ontology v0**（从 Org + Published 实体/团队反推，只读喂 Brain/Judge）  
-7. **Company Wiki v0**（派生语境页 + `wiki_context`；禁冒充 FACT）  
-8. Capacity 校准预算数值  
+| # | 交付 | 完成定义（v0 够用即可，禁止理想化拖死） |
+|---|------|------------------------------------------|
+| **0** | Identity / Permission / UAT | 已有；缺口只补齐，不重开 |
+| **1** | **Company Ontology v0** | 显式只读结构包：团队/人/实体类型/关系粗类；从 Org+Published **反推**；注入 Brain/Judge |
+| **2** | **Company Wiki v0** | 一小撮 `wiki_context` 派生页（黑话/项目别名/协作惯例）；注入 Brain；**禁进 FACT** |
+| **3** | Session / Context 接线 | 先验 + 会话槽同一 Context 对象喂 Brain |
+| **4** | Colleague Brain 消费先验 | Decide/成文能引用 Ontology/Wiki；无先验时诚实说「结构/语境不足」 |
+| **5** | TaskPlan + 只读 Orchestrator | 步骤选择可依赖 Ontology（选 Org vs Ask） |
+| **6** | Complexity Judge 显式档位 | Judge 读先验再分档 |
+| **7** | Bounded ReAct + Specialist | Specialist **只消费**已注入先验 + Capability；不对用户说话 |
+| **8** | Synthesis 分栏 | FACT←Grounding；ANALYSIS 可借 Ontology/Wiki；OPINION/SUGGESTION←Brain |
+| **9** | Capacity 校准预算 | 测出来再定，不拍脑袋 |
+
+**并行允许：** Grounding 维护（质量轨冻结纪律下）与 #1–2 并行；**禁止**跳过 #1–4 直接上 #7 Specialist 对外表现。
+
+**v0 不等于百科全书：** Ontology/Wiki 先要 **契约 + 注入路径 + GeekPark 最小种子**；再随金丝雀加页，而不是先写完 Wiki 再开 Brain。
 
 ---
 
 ## 10. 测试梯子（必须多次梳理，禁止遗留「半档」）
 
-每一档 **本地 pytest + tmesh 真聊** 过了才开下一档。
+每一档 **本地 pytest + tmesh 真聊** 过了才开下一档。  
+**Company Understanding 档位前置**（与实施序一致）：
 
 | 档 | 用例 | 门禁 |
 |----|------|------|
-| L0 Simple | 「张三是谁？」 | 无 Planner；Org/Ask 单工具；无周报脚误挂 |
-| L1 Ordinary | 「张三最近跟谁聊过？」 | 单源；分桶 footer 正确 |
+| **C0 Ontology** | 「张三是谁/哪队？」 | 走结构先验/Org；不靠假 Wiki 事实；不改 Recall |
+| **C1 Wiki** | 黑话/项目别名消歧 | `wiki_context`；不得写入 FACT 当周报结论 |
+| **C2 Brain+先验** | 同句有无先验对比 | 无先验时不装懂；有先验时选对 Capability |
+| L0 Simple | 「张三是谁？」 | 无 Planner；单工具；无周报脚误挂 |
+| L1 Ordinary | 「张三最近跟谁聊过？」 | 单源 Grounding；分桶 footer 正确 |
 | L2 Medium | 「…哪条值得关注？」 | 短 Plan；ANALYSIS/OPINION 分栏；无混级 |
 | L3 Complex 金丝雀 | 群+人+日历+周报 | 并行可观测；UAT 缺则引导；部分完成诚实；一张嘴 |
 | L4 Write | 建日程/文档 | 仍确认闸；与 Plan 共存不偷写 |
 | L5 Budget | 人为压预算 | 触发部分完成，不假成功 |
 | L6 Identity | bot vs UAT 矩阵 | 与 `FEISHU_PERSONAL_AUTH.md` 一致 |
-| L7 Ontology | 「张三是谁/哪队」结构消歧 | 不经假 Wiki 事实；不改 Recall |
-| L8 Wiki | 黑话/项目别名消歧 | footer/`wiki_context`；不得写入 FACT 栏当周报结论 |
 
-回归：**不得**回退到关键词意图表、v2 Controller 中轴、无限 ReAct、用户可见多 Agent 话术、Wiki 冒充 Grounding。
+回归：**不得**回退到关键词意图表、v2 Controller 中轴、无限 ReAct、用户可见多 Agent 话术、Wiki 冒充 Grounding、**无公司先验的空转 Orchestrator 当「同事」验收**。
 
 ---
 

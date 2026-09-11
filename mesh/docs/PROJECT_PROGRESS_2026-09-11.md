@@ -311,17 +311,20 @@ https://feishu.cn/docx/BCQodMvgyokof1x1SIsccJ7Tnmc
 
 ## 7. 未决项总表（按优先级）
 
-### P0 · 近端 + v4 梯子（见 `COLLEAGUE_AGENT_V4.md` L0–L6）
+### P0 · 近端 + v4 梯子（Company Understanding 前置，见 `COLLEAGUE_AGENT_V4.md` §9）
 
 | 项 | 状态 | 说明 |
 |----|------|------|
-| 架构契约文档 v4 | ✅ | `COLLEAGUE_AGENT_V4.md`；废止 Stage 1–4 线性中轴 |
-| TaskPlan + 只读 Orchestrator | ❌ | 先只读多步，写路径不动 |
-| Complexity Judge 显式档位 | ❌ | 现 Decide 隐式 |
+| 架构契约文档 v4 | ✅ | 含公司理解三角；§9 实施序已按栈序改正 |
+| **Company Ontology v0** | ❌ | **先于** Orchestrator；结构先验注入 Brain/Judge |
+| **Company Wiki v0** | ❌ | **先于** Specialist 空转；`wiki_context`；禁冒充 FACT |
+| Session/Context 接线先验 | ❌ | Ontology+Wiki+Session 同一 Context |
+| Brain 消费先验 | ❌ | 无先验不装懂 |
+| TaskPlan + 只读 Orchestrator | ❌ | 在先验之后；写路径不动 |
+| Complexity Judge 显式档位 | ❌ | Judge 读先验再分档 |
 | Bounded ReAct 预算闸 | ❌ | 初值见 v4；Capacity 后校准 |
-| Specialist 接口 | ❌ | Org / Research / Calendar / Published |
+| Specialist 接口 | ❌ | 只消费先验 + Capability |
 | Synthesis 分栏 FACT/ANALYSIS/OPINION/SUGGESTION | ❌ | 「有思想」落点 |
-| Company Ontology v0 / Company Wiki v0 | ❌ | 懂结构+懂语境；见 v4 §1.5；禁冒充 FACT |
 | Complex 金丝雀 tmesh 真聊 | ❌ | 群+人+日历+周报 |
 | 开放平台 scopes **发版并生效** | ⚠ Ops | 勾选不够；须创建版本+发布 |
 | Hands 真人多轮（创建文档→确认→公司内可开） | 🔨 | 代码就绪；依赖 scopes + 现场验 |
