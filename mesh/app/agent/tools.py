@@ -302,6 +302,14 @@ def _feishu_tool_result(tool_id: str, env, *, empty_msg: str) -> ToolResult:
         title = str(it.get("title") or "").strip()
         url = str(it.get("url") or "").strip()
         snip = str(it.get("snippet") or "").strip()
+        dtype = str(it.get("docs_type") or it.get("type") or "").lower()
+        # 成员/用户：snippet 常是 open_id，不对同事展示
+        if dtype in ("member", "user", "person") and (
+            snip.startswith("ou_") or snip.startswith("oc_") or snip.startswith("on_")
+        ):
+            snip = ""
+        if dtype in ("group", "chat") and snip.startswith("oc_"):
+            snip = ""
         bit = title
         if snip:
             bit += f" — {snip[:160]}"

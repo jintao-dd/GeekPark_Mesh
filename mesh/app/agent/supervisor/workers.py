@@ -122,6 +122,7 @@ def enrich_args(
 
     if step.tool.startswith("ask."):
         q = str(args.get("query") or q_user or "").strip()
+        names = _names_from_prior(prior)
         if _ABOUT_ME_RE.search(q) or _ABOUT_ME_RE.search(q_user):
             bits = []
             if name:
@@ -132,6 +133,14 @@ def enrich_args(
             args["query"] = (
                 f"{who} 在近期已上线周报中的相关进展、触点、项目与活动"
                 f"（用户原话：{(q_user or q)[:80]}）"
+            )
+        elif names:
+            # 多源关联：把已查到的群成员姓名喂进周报检索
+            people = "、".join(names[:8])
+            base = q if q and "周报" in q else (q_user or q or "近期周报")
+            args["query"] = (
+                f"近期已上线周报中与以下同事相关的进展、触点、项目："
+                f"{people}。用户目标：{base[:100]}"
             )
         elif not q:
             args["query"] = q_user[:160]
@@ -194,14 +203,17 @@ def _render_intent(tool: str) -> str:
     }.get((tool or "").strip(), "ask_published")
 
 
-def _extract_ids(payload: dict[str, Any]) -> dict[str, list[str]]:
+def _extract_ids(payload: dict[str, Any]) -> dict[str, Any]:
     chat_ids: list[str] = []
     open_ids: list[str] = []
+    person_names: list[str] = []
+    group_titles: list[str] = []
     items = payload.get("items") if isinstance(payload.get("items"), list) else []
     for it in items[:40]:
         if not isinstance(it, dict):
             continue
         iid = str(it.get("id") or "").strip()
+        title = str(it.get("title") or "").strip()
         dtype = str(it.get("docs_type") or it.get("type") or "").lower()
         if iid.startswith("oc_") and iid not in chat_ids:
             chat_ids.append(iid)
@@ -210,10 +222,50 @@ def _extract_ids(payload: dict[str, Any]) -> dict[str, list[str]]:
         if "group" in dtype or "chat" in dtype:
             if iid.startswith("oc_") and iid not in chat_ids:
                 chat_ids.append(iid)
+            if title and title not in group_titles:
+                group_titles.append(title)
         if dtype in ("member", "user", "person"):
             if iid.startswith("ou_") and iid not in open_ids:
                 open_ids.append(iid)
-    return {"chat_ids": chat_ids, "open_ids": open_ids}
+            if title and not title.startswith("ou_") and title not in person_names:
+                person_names.append(title)
+        # 无 docs_type 时：标题像人名、snippet 像 open_id
+        snip = str(it.get("snippet") or "").strip()
+        if (
+            title
+            and snip.startswith("ou_")
+            and title not in person_names
+            and not title.startswith("ou_")
+        ):
+            person_names.append(title)
+    return {
+        "chat_ids": chat_ids,
+        "open_ids": open_ids,
+        "person_names": person_names,
+        "group_titles": group_titles,
+    }
+
+
+def _names_from_prior(prior: list[TieredEnvelope]) -> list[str]:
+    out: list[str] = []
+    for e in prior or []:
+        for n in e.payload.get("person_names") or []:
+            s = str(n or "").strip()
+            if s and s not in out and not s.startswith("ou_"):
+                out.append(s)
+        # 从成文里捞「- 张三」行
+        for m in re.finditer(r"(?m)^[\-\*]\s*([^\s—\-]{2,20})", e.text or ""):
+            name = m.group(1).strip()
+            if (
+                name
+                and name not in out
+                and not name.startswith("ou_")
+                and not name.startswith("oc_")
+                and "忙碌" not in name
+                and "群" not in name
+            ):
+                out.append(name)
+    return out[:12]
 
 
 def run_step(

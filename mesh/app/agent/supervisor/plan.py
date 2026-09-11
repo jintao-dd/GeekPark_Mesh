@@ -68,8 +68,9 @@ _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划�
    - user 仅在已知 open_id 时使用
 6) 周报事实用 ask.*；飞书 live 用 feishu.*；禁止混成一个假事实源
 7) 用户说「和我有关/我的周报」时：ask.published 的 query 必须写上对方姓名与团队（见下方身份），禁止让用户再报一遍部门
-8) 步骤 ≤8；有依赖才写 depends_on；可并行的标同一 parallel_group
-9) 只输出 JSON
+8) 若目标要「关联周报/这些人有关」：ask.published 必须 depends_on 列成员步骤，等拿到人名后再查周报（系统也会注入人名）
+9) 步骤 ≤8；有依赖才写 depends_on；可并行的标同一 parallel_group
+10) 只输出 JSON
 """
 
 

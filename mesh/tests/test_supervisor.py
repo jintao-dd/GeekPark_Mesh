@@ -220,6 +220,49 @@ def test_enrich_user_without_open_id_rewrites_directory():
     assert "张三" in (args.get("keyword") or args.get("query") or "")
 
 
+def test_enrich_ask_with_prior_member_names():
+    from app.agent.supervisor.types import PlanStep, TieredEnvelope
+
+    prior = [
+        TieredEnvelope(
+            step_id="m1",
+            worker="org",
+            tool="feishu.search",
+            ok=True,
+            tier="feishu_live",
+            text="- 杜锦涛\n- 张山山",
+            payload={"person_names": ["杜锦涛", "张山山", "彭康林"]},
+        )
+    ]
+    step = PlanStep(
+        id="s_ask",
+        worker="published",
+        tool="ask.published",
+        args={"query": "近期周报"},
+    )
+    args = workers.enrich_args(
+        step,
+        identity=IdentityResult(status="bound", display_hint="小王"),
+        context=None,
+        prior=prior,
+        user_text="关联这些人的周报",
+    )
+    assert "杜锦涛" in args["query"]
+    assert "张山山" in args["query"]
+
+
+def test_mouth_strips_open_ids():
+    from app.agent.supervisor import mouth
+
+    cleaned = mouth._clean_snippet(
+        "（组织/群）- 杜锦涛 — ou_fd65363b8ed1e5ddb93dd56e86a35b9b\n"
+        "- CCC技术组 oc_788f30e4deab02247b1a524629c5b387"
+    )
+    assert "ou_" not in cleaned
+    assert "oc_" not in cleaned
+    assert "杜锦涛" in cleaned
+
+
 def test_mouth_hides_protocol_noise():
     from app.agent.supervisor import mouth
     from app.agent.supervisor.types import TaskGraph, TieredEnvelope

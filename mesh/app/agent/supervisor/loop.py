@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable
@@ -14,6 +15,62 @@ from . import verify as verifymod
 from . import workers
 from . import write_gate
 from .types import DEFAULT_BUDGET, PlanStep, SupervisorResult, TaskGraph, TieredEnvelope
+
+
+def _published_looks_empty(text: str) -> bool:
+    t = (text or "").strip()
+    if not t:
+        return True
+    return bool(
+        re.search(
+            r"(没找到|没查到|没有.*记录|无可引用|没有可直接|未拿到|找不到)",
+            t,
+        )
+    )
+
+
+def _correlate_published_with_names(
+    envelopes: list[TieredEnvelope],
+    *,
+    con: Any,
+    identity: Any,
+    permission: Any,
+    context: Any,
+    invoke_tool: Callable[..., Any],
+    render_tool_result: Callable[..., Any],
+    user_text: str,
+) -> tuple[list[TieredEnvelope], list[str]]:
+    """飞书已拿到人名但周报空 → 用这些人名补一枪 ask.published。"""
+    names = workers._names_from_prior(envelopes)
+    if len(names) < 2:
+        return envelopes, []
+    pubs = [e for e in envelopes if str(e.tool).startswith("ask.")]
+    live_ok = any(e.ok and e.tier == "feishu_live" for e in envelopes)
+    if not live_ok:
+        return envelopes, []
+    if pubs and not any(_published_looks_empty(e.text) or not e.ok for e in pubs):
+        return envelopes, []
+    step = PlanStep(
+        id="s_corr_pub",
+        worker="published",
+        tool="ask.published",
+        args={"query": f"近期周报与 { '、'.join(names[:8]) } 相关的进展与触点"},
+    )
+    env = workers.run_step(
+        step,
+        con=con,
+        identity=identity,
+        permission=permission,
+        context=context,
+        invoke_tool=invoke_tool,
+        render_tool_result=render_tool_result,
+        prior=envelopes,
+        user_text=user_text,
+    )
+    # 替换旧 published 或追加
+    kept = [e for e in envelopes if not str(e.tool).startswith("ask.")]
+    kept.append(env)
+    return kept, [step.tool]
 
 log = logging.getLogger("uvicorn.error")
 
@@ -277,6 +334,24 @@ def handle_turn(
             k: verdict[k]
             for k in ("ok_count", "total", "tiers", "cross_bucket", "want_replan", "replan_reason")
         }
+
+    # 人名已在、周报空：补一轮关联 Ask（不依赖模型是否写对 depends_on）
+    envelopes2, extra_tools = _correlate_published_with_names(
+        envelopes,
+        con=con,
+        identity=identity,
+        permission=permission,
+        context=context,
+        invoke_tool=invoke_tool,
+        render_tool_result=render_tool_result,
+        user_text=q,
+    )
+    if extra_tools:
+        envelopes = envelopes2
+        out.tools_called.extend(extra_tools)
+        out.trace["correlate_published"] = True
+        if "正在查已上线周报" not in out.progress:
+            out.progress.append("正在查已上线周报")
 
     skipped = len(graph.steps or []) - len(envelopes)
     partial = bool(budget_hit) or skipped > 0 or any(not e.ok for e in envelopes)

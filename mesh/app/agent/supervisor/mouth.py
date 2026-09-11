@@ -57,6 +57,12 @@ def _clean_snippet(text: str) -> str:
     t = _TAG_RE.sub("", (text or "").strip())
     t = re.sub(r"【已上线周报\s*[·•]\s*published】", "【已上线周报】", t)
     t = re.sub(r"【飞书\s*live\s*[·•]\s*feishu_live】", "【飞书侧】", t)
+    # 不对同事甩 open_id / chat_id
+    t = re.sub(r"\s*[—\-]\s*ou_[a-zA-Z0-9]+", "", t)
+    t = re.sub(r"\bou_[a-zA-Z0-9]+\b", "", t)
+    t = re.sub(r"\boc_[a-zA-Z0-9]+\b", "", t)
+    t = re.sub(r"[（(]\s*[）)]", "", t)
+    t = re.sub(r"[ \t]{2,}", " ", t)
     return t.strip()
 
 
@@ -123,7 +129,11 @@ def format_columns(
     opinion = (
         "我会先盯「飞书协作里出现、周报里也有进展」的交叉项；只有单侧信号的先放一放。"
         if (facts_pub and facts_live)
-        else "交叉还不够，我暂时不硬排序。"
+        else (
+            "飞书侧已经有人和日程了；周报侧这轮没对齐上，点一个人名我可以按人再查一版周报。"
+            if facts_live and not facts_pub
+            else "交叉还不够，我暂时不硬排序。"
+        )
     )
     suggestion = (
         "你可以：①补个人日历授权；②点一个具体群名或人名，我把成员/日程/周报再收一版。"
