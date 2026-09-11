@@ -16,6 +16,8 @@ def test_cli_subprocess_env_maps_feishu_app(monkeypatch):
     assert env["LARKSUITE_CLI_APP_SECRET"] == "sec_test"
     assert env["LARKSUITE_CLI_BRAND"] == "feishu"
 
+
+def test_cli_error_code_scope_denied():
     err = backends._cli_error_code(
         "feishu_api_99991672: Access denied",
         {"ok": False, "error": {"code": 99991672, "message": "Access denied"}},
