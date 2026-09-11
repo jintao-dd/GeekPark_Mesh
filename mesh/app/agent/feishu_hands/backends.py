@@ -323,16 +323,38 @@ def _cli_call(
         q = str(args.get("query") or "").strip()
         mr = str(max(1, min(int(args.get("max_results") or 8), 20)))
         if rt in ("doc", "folder", "wiki"):
-            # docs +search 仅支持 --as user（官方 CLI）
-            if not uat:
-                return envelope_fail("cli:user_token_required:docs_search", tool=tool)
+            # drive +search 支持 bot；docs +search 仅 user。优先 bot（env TAT）。
+            doc_types = {
+                "doc": "doc,docx,sheet,bitable,file",
+                "folder": "folder",
+                "wiki": "wiki",
+            }.get(rt, "doc,docx,wiki")
+            argv = [
+                "drive",
+                "+search",
+                "--query",
+                q,
+                "--page-size",
+                mr,
+                "--doc-types",
+                doc_types,
+            ]
             env = _cli_run(
-                ["docs", "+search", "--query", q, "--page-size", mr],
+                argv,
                 timeout_sec=timeout_sec,
                 tool=tool,
-                as_identity="user",
+                as_identity="bot",
                 user_access_token=uat,
             )
+            if not env.ok and uat:
+                # 有 UAT 时再试 docs +search（user）
+                env = _cli_run(
+                    ["docs", "+search", "--query", q, "--page-size", mr],
+                    timeout_sec=timeout_sec,
+                    tool=tool,
+                    as_identity="user",
+                    user_access_token=uat,
+                )
             if not env.ok:
                 return env
             payload = (env.meta or {}).get("cli") or {}

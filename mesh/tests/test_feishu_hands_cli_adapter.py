@@ -69,13 +69,12 @@ def test_cli_run_injects_as_bot_and_format(monkeypatch):
     assert "--format" in captured["cmd"] and "json" in captured["cmd"]
 
 
-def test_cli_doc_search_uses_page_size_and_user(monkeypatch):
+def test_cli_doc_search_uses_drive_search_bot(monkeypatch):
     captured = {}
 
     def fake_run(argv, *, timeout_sec, tool, as_identity="bot", user_access_token="", confirm_yes=False):
         captured["argv"] = list(argv)
         captured["as"] = as_identity
-        captured["uat"] = user_access_token
         from app.agent.feishu_hands.normalize import envelope_ok
 
         return envelope_ok([], tool=tool, meta={"cli": {"ok": True, "data": {"items": []}}})
@@ -85,24 +84,37 @@ def test_cli_doc_search_uses_page_size_and_user(monkeypatch):
         "feishu.search",
         {"query": "周报", "resource_type": "doc", "max_results": 5},
         timeout_sec=5,
-        user_access_token="u-test",
+        user_access_token="",
     )
     assert env.ok
-    assert captured["as"] == "user"
+    assert captured["as"] == "bot"
+    assert captured["argv"][:2] == ["drive", "+search"]
     assert "--page-size" in captured["argv"]
     assert "--limit" not in captured["argv"]
-    assert captured["uat"] == "u-test"
 
 
-def test_cli_doc_search_requires_user_token():
+def test_cli_doc_search_fallback_docs_search_with_uat(monkeypatch):
+    calls = []
+
+    def fake_run(argv, *, timeout_sec, tool, as_identity="bot", user_access_token="", confirm_yes=False):
+        calls.append((list(argv), as_identity))
+        from app.agent.feishu_hands.normalize import envelope_fail, envelope_ok
+
+        if argv[:2] == ["drive", "+search"]:
+            return envelope_fail("cli:scope_denied:x", tool=tool)
+        return envelope_ok([], tool=tool, meta={"cli": {"ok": True, "data": {"items": []}}})
+
+    monkeypatch.setattr(backends, "_cli_run", fake_run)
     env = backends._cli_call(
         "feishu.search",
         {"query": "周报", "resource_type": "doc"},
         timeout_sec=5,
-        user_access_token="",
+        user_access_token="u-test",
     )
-    assert not env.ok
-    assert "user_token_required" in str(env.error or "")
+    assert env.ok
+    assert calls[0][0][:2] == ["drive", "+search"]
+    assert calls[1][0][:2] == ["docs", "+search"]
+    assert calls[1][1] == "user"
 
 
 def test_cli_doc_create_calls_cli_tenant_share(monkeypatch):
