@@ -121,29 +121,21 @@ def enrich_args(
     q_user = (user_text or "").strip()
 
     if step.tool.startswith("ask."):
-        q = str(args.get("query") or q_user or "").strip()
+        # 保留用户完整原话作主 query，只追加检索线索——禁止用短句替换原目标
+        q_plan = str(args.get("query") or "").strip()
+        q_full = q_user or q_plan
         names = _names_from_prior(prior)
-        if _ABOUT_ME_RE.search(q) or _ABOUT_ME_RE.search(q_user):
-            bits = []
-            if name:
-                bits.append(name)
-            if team:
-                bits.append(f"团队={team}")
-            who = "、".join(bits) if bits else "当前登录同事"
-            args["query"] = (
-                f"{who} 在近期已上线周报中的相关进展、触点、项目与活动"
-                f"（用户原话：{(q_user or q)[:80]}）"
-            )
-        elif names:
-            # 多源关联：把已查到的群成员姓名喂进周报检索
-            people = "、".join(names[:8])
-            base = q if q and "周报" in q else (q_user or q or "近期周报")
-            args["query"] = (
-                f"近期已上线周报中与以下同事相关的进展、触点、项目："
-                f"{people}。用户目标：{base[:100]}"
-            )
-        elif not q:
-            args["query"] = q_user[:160]
+        clues: list[str] = []
+        if _ABOUT_ME_RE.search(q_full) or _ABOUT_ME_RE.search(q_plan):
+            bits = [b for b in (name, f"团队={team}" if team else "") if b]
+            if bits:
+                clues.append("提问者身份：" + "、".join(bits))
+        if names:
+            clues.append("已查到的相关同事：" + "、".join(names[:12]))
+        if clues:
+            args["query"] = q_full + "\n\n【检索线索，勿当作用户原话弱化】\n" + "\n".join(clues)
+        else:
+            args["query"] = q_full
         return args
 
     if step.tool != "feishu.search":
@@ -329,7 +321,7 @@ def run_step(
             tool=step.tool,
             ok=ok,
             tier=tier,
-            text=text[:4000],
+            text=text[:12000],
             error=err,
             need_replan=need_replan,
             replan_reason=replan_reason,

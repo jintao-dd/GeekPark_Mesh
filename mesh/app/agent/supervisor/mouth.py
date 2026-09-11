@@ -1,4 +1,4 @@
-"""Single Mesh mouth — colleague voice; no protocol leakage."""
+"""Single Mesh mouth — preserve user intent; do not truncate model answers lightly."""
 from __future__ import annotations
 
 import logging
@@ -16,6 +16,10 @@ _FAKE_HANDS = re.compile(
 )
 _TAG_RE = re.compile(r"\[(?:published|feishu_live|wiki_prior|analysis|system)/[^\]]+\]\s*")
 
+# 成文材料上限：宁多勿砍；飞书卡片另有展示上限
+_MATERIAL_CAP = 14000
+_SNIPPET_CAP = 6000
+
 _ERROR_UX = {
     "open_id_required_for_user": "查同事档案时缺必要身份标识，已改用通讯录姓名检索（或请你点名具体同事）。",
     "chat_id_required_for_members": "列群成员需要先选定一个群；你可以点一个群名让我继续。",
@@ -26,6 +30,19 @@ _ERROR_UX = {
     "hands_disabled": "飞书 Hands 未开启，飞书侧查不了。",
     "scope_denied": "当前权限不够，这一侧被拦住了。",
 }
+
+_SYNTH_SYSTEM = """你是 GeekPark 内部同事 Mesh（唯一对外的一张嘴）。
+
+任务：按用户的**完整原话目标**，把下面分桶材料组织成完整、可执行的同事答复。
+
+硬规则：
+1) 不得弱化、改写用户目标；用户问了什么就答什么，材料不够就明说缺哪一块，不要假装答完。
+2) published = 已上线周报事实；feishu_live = 飞书现场；禁止把飞书讨论说成「周报里记录」。
+3) 不要输出 JSON、不要输出 action/tool、不要甩 open_id/chat_id/budget 等协议词。
+4) 材料里已有的人名、群、日程、周报条目必须尽量完整转述，禁止无故截短成口号。
+5) 可用结构：我查到的 / 怎么串起来看 / 我的判断 / 建议下一步——但内容要充实，不要套话。
+6) 禁止谎称已写入飞书。
+"""
 
 
 def sanitize(text: str) -> str:
@@ -49,7 +66,6 @@ def _human_error(err: str, tool: str) -> str:
             return v
     if e.startswith("feishu_api_") or "feishu_api_" in e:
         return "飞书接口这一侧暂时失败，我先跳过。"
-    # 绝不把裸错误码甩给同事
     return "这一侧暂时查不全，我先用已拿到的材料往下说。"
 
 
@@ -57,13 +73,45 @@ def _clean_snippet(text: str) -> str:
     t = _TAG_RE.sub("", (text or "").strip())
     t = re.sub(r"【已上线周报\s*[·•]\s*published】", "【已上线周报】", t)
     t = re.sub(r"【飞书\s*live\s*[·•]\s*feishu_live】", "【飞书侧】", t)
-    # 不对同事甩 open_id / chat_id
     t = re.sub(r"\s*[—\-]\s*ou_[a-zA-Z0-9]+", "", t)
     t = re.sub(r"\bou_[a-zA-Z0-9]+\b", "", t)
     t = re.sub(r"\boc_[a-zA-Z0-9]+\b", "", t)
     t = re.sub(r"[（(]\s*[）)]", "", t)
     t = re.sub(r"[ \t]{2,}", " ", t)
     return t.strip()
+
+
+def materials_block(envelopes: list[TieredEnvelope]) -> str:
+    """拼完整材料给 LLM；只做展示清洗，不做语义弱化。"""
+    parts: list[str] = []
+    blockers: list[str] = []
+    for r in envelopes:
+        if not r.ok:
+            blockers.append(_human_error(r.error, r.tool))
+            continue
+        snippet = _clean_snippet(r.text or "")
+        if not snippet:
+            continue
+        if len(snippet) > _SNIPPET_CAP:
+            snippet = snippet[: _SNIPPET_CAP - 20] + "\n…（单条材料过长，已保留前段）"
+        bucket = {
+            "published": "已上线周报",
+            "feishu_live": "飞书侧",
+        }.get(r.tier, r.tier or "其他")
+        worker = r.worker or ""
+        parts.append(f"### {bucket}" + (f" · {worker}" if worker else "") + f"\n{snippet}")
+    if blockers:
+        seen: set[str] = set()
+        uniq = []
+        for b in blockers:
+            if b not in seen:
+                seen.add(b)
+                uniq.append(b)
+        parts.append("### 这轮没查全的地方\n" + "\n".join(f"- {b}" for b in uniq[:8]))
+    body = "\n\n".join(parts).strip()
+    if len(body) > _MATERIAL_CAP:
+        body = body[: _MATERIAL_CAP - 40] + "\n\n…（材料总量过大，已保留前段完整内容）"
+    return body or "（本轮没有可用材料）"
 
 
 def format_columns(
@@ -73,6 +121,7 @@ def format_columns(
     partial: bool,
     budget_hit: str,
 ) -> dict[str, str]:
+    """规则分栏：仅作 LLM 失败兜底 / trace，不再当默认成文。"""
     facts_pub: list[str] = []
     facts_live: list[str] = []
     facts_other: list[str] = []
@@ -82,31 +131,31 @@ def format_columns(
             blockers.append(_human_error(r.error, r.tool))
             continue
         snippet = _clean_snippet(r.text or "") or "有返回但摘要为空"
-        # 去掉工具渲染里可能自带的技术前缀
         snippet = re.sub(r"^\[(?:published|feishu_live)/[^\]]+\]\s*", "", snippet)
+        if len(snippet) > _SNIPPET_CAP:
+            snippet = snippet[:_SNIPPET_CAP]
         if r.tier == "published":
-            facts_pub.append(snippet[:900])
+            facts_pub.append(snippet)
         elif r.tier == "feishu_live":
             label = {
                 "org": "组织/群",
                 "calendar": "日历",
                 "research": "飞书资料",
             }.get(r.worker, "飞书")
-            facts_live.append(f"（{label}）{snippet[:900]}")
+            facts_live.append(f"（{label}）{snippet}")
         else:
-            facts_other.append(snippet[:600])
+            facts_other.append(snippet)
 
     fact_parts: list[str] = []
     if facts_pub:
-        fact_parts.append("【已上线周报】\n" + "\n".join(facts_pub[:4]))
+        fact_parts.append("【已上线周报】\n" + "\n".join(facts_pub[:8]))
     if facts_live:
-        fact_parts.append("【飞书侧】\n" + "\n".join(facts_live[:5]))
+        fact_parts.append("【飞书侧】\n" + "\n".join(facts_live[:10]))
     if facts_other:
-        fact_parts.append("【其他】\n" + "\n".join(facts_other[:2]))
+        fact_parts.append("【其他】\n" + "\n".join(facts_other[:4]))
     if not fact_parts:
         fact_parts.append("这轮还没拿到能直接引用的材料（可能是权限、授权或结果为空）。")
     if blockers:
-        # 去重保序
         seen: set[str] = set()
         uniq = []
         for b in blockers:
@@ -118,27 +167,24 @@ def format_columns(
     analysis_bits: list[str] = []
     if facts_pub and facts_live:
         analysis_bits.append("周报和飞书侧我分开列了，不会把群聊讨论写成「周报里记过」。")
-    if graph.band == "complex":
-        analysis_bits.append("多源任务我已尽量对齐；哪些最值得盯，还要结合你手头在推的事。")
     if budget_hit:
-        analysis_bits.append("时间/步数预算到了，下面是已完成步骤的结果；你可以指定一个群或人名让我继续收窄。")
+        analysis_bits.append("时间/步数预算到了；下面是已完成步骤，你可以点名让我继续补。")
     elif partial and blockers:
-        analysis_bits.append("有几步没跑通，我按已拿到的材料先给你一版，缺的可以点名让我补。")
+        analysis_bits.append("有几步没跑通，我按已拿到的材料先给你一版。")
     analysis = "\n".join(analysis_bits) if analysis_bits else "材料有限，关联还偏弱。"
-
     opinion = (
-        "我会先盯「飞书协作里出现、周报里也有进展」的交叉项；只有单侧信号的先放一放。"
+        "交叉项优先；单侧信号先放一放。"
         if (facts_pub and facts_live)
         else (
-            "飞书侧已经有人和日程了；周报侧这轮没对齐上，点一个人名我可以按人再查一版周报。"
+            "飞书侧已经有人和日程；周报侧若空，点人名我可以再查。"
             if facts_live and not facts_pub
-            else "交叉还不够，我暂时不硬排序。"
+            else "交叉还不够，暂不硬排序。"
         )
     )
     suggestion = (
-        "你可以：①补个人日历授权；②点一个具体群名或人名，我把成员/日程/周报再收一版。"
+        "补个人日历授权，或点一个群/人名继续收窄。"
         if graph.band == "complex"
-        else "要继续深挖的话，直接丢人名或项目别名就行。"
+        else "继续深挖直接丢人名或项目别名即可。"
     )
     return {
         "FACT": "\n\n".join(fact_parts),
@@ -161,6 +207,64 @@ def render_work_answer(columns: dict[str, str]) -> str:
         if v:
             blocks.append(f"**{labels[k]}**\n{v}")
     return sanitize("\n\n".join(blocks).strip())
+
+
+def synthesize_work(
+    user_text: str,
+    envelopes: list[TieredEnvelope],
+    *,
+    identity: Any = None,
+    session: Any = None,
+    company_block: str = "",
+    graph: TaskGraph | None = None,
+    partial: bool = False,
+    budget_hit: str = "",
+) -> tuple[str, dict[str, Any], dict[str, str]]:
+    """默认：LLM 按用户完整原话 + 完整材料成文；失败才回落规则分栏。"""
+    graph = graph or TaskGraph(goal=(user_text or "")[:200], mode="work")
+    columns = format_columns(
+        envelopes, graph=graph, partial=partial, budget_hit=budget_hit
+    )
+    meta: dict[str, Any] = {"llm_used": False, "model": None, "source": "rule_columns"}
+    material = materials_block(envelopes)
+    notes = []
+    if budget_hit:
+        notes.append(f"执行备注：预算触顶（{budget_hit}），材料可能不完整。")
+    elif partial:
+        notes.append("执行备注：部分步骤未成功，请据此如实说明缺口。")
+    system = _SYNTH_SYSTEM
+    if company_block:
+        system += "\n\n" + company_block
+    user = (
+        f"用户完整原话（不得弱化）：\n{(user_text or '').strip()}\n\n"
+        f"分桶材料：\n{material}\n"
+    )
+    if notes:
+        user += "\n" + "\n".join(notes) + "\n"
+    user += "\nMesh 完整答复："
+    try:
+        from ... import llm
+
+        out = llm.call(system, user, max_tokens=4000, json_mode=False, task="answer")
+        meta["llm_used"] = True
+        meta["model"] = llm.model_for_task("answer")
+        meta["source"] = "llm_mouth"
+        text = sanitize(str(out or "").strip())
+        if not text:
+            text = render_work_answer(columns)
+            meta["source"] = "rule_columns_empty_llm"
+        # 有实质材料却被说成全空：回落材料正文
+        if material and len(material) > 80 and re.search(
+            r"(完全没|什么都没|全都没查到|没有任何材料)", text or ""
+        ):
+            log.warning("supervisor mouth contradicted non-empty materials")
+            text = render_work_answer(columns)
+            meta["source"] = "rule_columns_contradiction"
+        return text, meta, columns
+    except Exception as e:
+        log.warning("supervisor mouth synthesize failed: %s", e)
+        meta["error"] = str(e)[:160]
+        return render_work_answer(columns), meta, columns
 
 
 def speak(

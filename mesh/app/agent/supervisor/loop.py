@@ -355,10 +355,21 @@ def handle_turn(
 
     skipped = len(graph.steps or []) - len(envelopes)
     partial = bool(budget_hit) or skipped > 0 or any(not e.ok for e in envelopes)
-    columns = mouth.format_columns(
-        envelopes, graph=graph, partial=partial, budget_hit=budget_hit
+    text, mouth_meta, columns = mouth.synthesize_work(
+        q,
+        envelopes,
+        identity=identity,
+        session=session,
+        company_block=company_block,
+        graph=graph,
+        partial=partial,
+        budget_hit=budget_hit,
     )
-    text = mouth.render_work_answer(columns)
+    out.llm_used = bool(out.llm_used or mouth_meta.get("llm_used"))
+    if mouth_meta.get("model"):
+        out.model = mouth_meta.get("model")
+    out.synthesize_llm_used = bool(mouth_meta.get("llm_used"))
+    out.trace["mouth"] = mouth_meta
     out.action = "ask"
     out.intent = (
         "feishu_search"
@@ -378,6 +389,7 @@ def handle_turn(
         "orchestrated": True,
         "supervised": True,
         "progress": list(out.progress),
+        "mouth_source": mouth_meta.get("source") or "",
     }
     out.trace["source_tier"] = out.payload["source_tier"]
     out.trace["progress"] = list(out.progress)

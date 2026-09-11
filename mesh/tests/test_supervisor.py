@@ -101,7 +101,14 @@ def test_supervisor_complex_work_path():
                     },
                 ],
             }
-        return "不应走到 speak"
+        if "分桶材料" in (user or "") or "完整原话" in (user or ""):
+            return (
+                "**我查到的**\n"
+                "飞书侧有群与成员；周报侧见材料。\n\n"
+                "**我的判断**\n"
+                "先盯交叉项。"
+            )
+        return "闲聊兜底"
 
     q = "帮我看看我能进哪些群、群里有谁、他们日历怎样，再关联近两期周报里相关的事，哪些值得盯"
     with mock.patch("app.llm.call", side_effect=fake_call):
@@ -197,6 +204,7 @@ def test_enrich_about_me_query_uses_identity():
         context=None,
         user_text="列出最近周报和我有关的内容",
     )
+    assert "列出最近周报和我有关的内容" in args["query"]
     assert "杜锦涛" in args["query"]
     assert "编辑部" in args["query"]
 
@@ -247,6 +255,7 @@ def test_enrich_ask_with_prior_member_names():
         prior=prior,
         user_text="关联这些人的周报",
     )
+    assert "关联这些人的周报" in args["query"]
     assert "杜锦涛" in args["query"]
     assert "张山山" in args["query"]
 
