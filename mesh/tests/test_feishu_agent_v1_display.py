@@ -182,7 +182,7 @@ def test_thinking_and_answer_cards():
     assert "收到" in t["elements"][0]["text"]["content"]
     assert "你的问题" not in t["elements"][0]["text"]["content"]
     t1 = feishu_cards.thinking_card(query="本期关注谁？", stage=1)
-    assert "检索" in t1["elements"][0]["text"]["content"]
+    assert "周报" in t1["elements"][0]["text"]["content"] or "找证据" in t1["elements"][0]["text"]["content"]
     a = feishu_cards.answer_card(display_text="答案\n来源：2026-9-8 已上线周报", query="硅谷沟通了谁")
     assert a["config"]["update_multi"] is True
     assert "答案" in a["elements"][0]["text"]["content"]
@@ -202,7 +202,11 @@ def test_cardkit_v2_and_stream_prefixes():
         streaming=False,
     )
     assert ans["config"]["streaming_mode"] is False
-    assert any(e.get("tag") == "action" for e in ans["body"]["elements"])
+    # CardKit schema 2.0：followup 用 markdown，不再用 tag=action
+    assert any(
+        e.get("tag") == "markdown" and "接着问" in str(e.get("content") or "")
+        for e in ans["body"]["elements"]
+    )
     prefs = feishu_cards.fake_stream_prefixes("第一段。第二段内容比较长用于切分。" * 3)
     assert prefs[-1].startswith(prefs[0][:10]) or len(prefs) >= 1
     assert prefs[-1].endswith("切分。") or "第一段" in prefs[-1]

@@ -723,5 +723,5 @@ def _render(
         return answer, visible_bindings, list(result.evidence_refs or [])
     answer = str(payload.get("answer") or "").strip()
     if not answer:
-        answer = "我目前没查到已发布的内容能确认这件事。"
+        answer = "周报侧这轮没有可直接对齐的条目（不等于飞书侧也没有）。"
     return answer, visible_bindings, list(result.evidence_refs or [])

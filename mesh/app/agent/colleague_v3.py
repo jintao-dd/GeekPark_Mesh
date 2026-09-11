@@ -1038,6 +1038,8 @@ def handle(
                 "columns": ores.columns,
                 "partial": ores.partial,
                 "complexity": judgment.band,
+                "source_tier": out.trace.get("source_tier") or "feishu_live",
+                "orchestrated": True,
             }
             if ores.partial:
                 _set_last_block(

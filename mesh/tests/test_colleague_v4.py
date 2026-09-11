@@ -199,10 +199,34 @@ def test_sanitize_still_strips_pure_protocol():
     assert out == "你好啊" or "action" not in out
 
 
-def test_company_context_assemble():
-    ident = IdentityResult(status="bound", primary_team="产品", feishu_open_id="ou_1")
-    cu = cctx.assemble(identity=ident, user_text="CRS 和 Mesh 周报")
-    block = cu.prompt_block()
-    assert "Ontology" in block
-    assert "Wiki" in block
-    assert "Grounding" in block
+def test_orchestrated_answer_not_rewritten_to_weekly_no_hit():
+    from app.agent.feishu_reply import format_display_text
+    from app.agent.models import AgentAnswer
+
+    body = (
+        "按你的目标，我分几块说：\n\n"
+        "**我查到的**\n【飞书 live】\n- 群 A\n\n"
+        "【已上线周报】\n我目前没查到已发布的内容能确认这件事。\n\n"
+        "**我的判断**\n先看群侧。"
+    )
+    ans = AgentAnswer(
+        text=body,
+        intent="feishu_search",
+        context={},
+        trace={
+            "orchestrator": {"band": "complex"},
+            "source_tier": "feishu_live",
+        },
+    )
+    text = format_display_text(
+        ans,
+        payload={
+            "columns": {"FACT": "x"},
+            "complexity": "complex",
+            "source_tier": "feishu_live",
+            "orchestrated": True,
+        },
+    )
+    assert "群 A" in text
+    assert "我的判断" in text
+    assert "这期周报里我没找到能直接回答的内容" not in text

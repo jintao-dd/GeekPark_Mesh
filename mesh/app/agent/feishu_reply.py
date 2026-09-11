@@ -54,6 +54,25 @@ def _support_label(answer: AgentAnswer, payload: dict[str, Any] | None = None) -
     return "", ""
 
 
+def _is_orchestrated(answer: AgentAnswer, payload: dict[str, Any] | None) -> bool:
+    """多源编排 / Hands 成文：禁止被 Published no_hit 模板整段替换。"""
+    tr = answer.trace or {}
+    if isinstance(tr.get("orchestrator"), dict):
+        return True
+    p = payload or {}
+    if isinstance(p.get("columns"), dict) and p.get("columns"):
+        return True
+    if str(p.get("complexity") or "").lower() in ("complex", "medium"):
+        return True
+    tier = str(p.get("source_tier") or tr.get("source_tier") or "").lower()
+    text = answer.text or ""
+    if tier == "feishu_live" and (
+        "我查到的" in text or "飞书 live" in text or "按你的目标" in text
+    ):
+        return True
+    return False
+
+
 def _failure_kind(
     answer: AgentAnswer,
     payload: dict[str, Any] | None,
@@ -67,6 +86,27 @@ def _failure_kind(
             return "permission"
         return "permission" if "无权" in (answer.text or "") else "ok"
     if answer.intent in ("help", "whoami", "casual", "clarify", "list_issues"):
+        return "ok"
+    # Orchestrator / 多源 Hands：即使某一步 Published 空，也不能整段盖成周报 no_hit
+    if _is_orchestrated(answer, payload):
+        body = (answer.text or "").strip()
+        if "超时" in body or "timeout" in body.lower():
+            return "timeout"
+        return "ok"
+    if answer.intent in (
+        "feishu_search",
+        "feishu_doc_get",
+        "feishu_calendar_list",
+        "feishu_calendar_propose",
+        "feishu_discuss",
+        "feishu_write",
+    ):
+        body = (answer.text or "").strip()
+        if "超时" in body or "timeout" in body.lower():
+            return "timeout"
+        # Hands 单工具：不要用周报 no_hit 话术
+        if any(m in body for m in _NO_HIT_MARKERS):
+            return "ok"
         return "ok"
     body = (answer.text or "").strip()
     if "超时" in body or "timeout" in body.lower() or reason == "timeout":
