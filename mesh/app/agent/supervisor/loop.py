@@ -192,11 +192,27 @@ def handle_turn(
     )
     company_block = company.prompt_block()
 
+    from .. import person_resolve as pr
+
+    people_res = pr.resolve_people_in_text(q, session=session)
+    pr.remember_hits(session, people_res.hits)
+    q_tools = people_res.expanded_query or q
+    if people_res.hits:
+        company_block += (
+            "\n\n## 人名解析（检索线索 · 非事实）\n"
+            + "\n".join(
+                f"- {h.alias} → {h.canonical}"
+                + (f" · {h.source}" if h.source else "")
+                for h in people_res.hits[:12]
+            )
+        )
+
     out = SupervisorResult(
         llm_used=False,
         trace={
             "supervisor": True,
             "colleague_v4": True,
+            "person_resolve": people_res.to_dict(),
             "company_understanding": {
                 "ontology_team": company.ontology.primary_team,
                 "wiki_matched": [p.slug for p in company.wiki.matched],
@@ -224,7 +240,7 @@ def handle_turn(
         return wr
 
     graph, pmeta = planmod.plan_turn(
-        q,
+        q_tools,
         company_block=company_block,
         identity=identity,
         session=session,
@@ -287,7 +303,7 @@ def handle_turn(
         context=context,
         invoke_tool=invoke_tool,
         render_tool_result=render_tool_result,
-        user_text=q,
+        user_text=q_tools,
     )
     out.progress = list(progress)
     out.tools_called = list(tools_called)
@@ -301,7 +317,7 @@ def handle_turn(
         replans_left -= 1
         out.trace.setdefault("replans", []).append(verdict.get("replan_reason") or "replan")
         graph2, pmeta2 = planmod.plan_turn(
-            q,
+            q_tools,
             company_block=company_block,
             identity=identity,
             session=session,
@@ -323,7 +339,7 @@ def handle_turn(
             context=context,
             invoke_tool=invoke_tool,
             render_tool_result=render_tool_result,
-            user_text=q,
+            user_text=q_tools,
         )
         out.tools_called.extend(tools_called2)
         for p in progress2:
@@ -344,7 +360,7 @@ def handle_turn(
         context=context,
         invoke_tool=invoke_tool,
         render_tool_result=render_tool_result,
-        user_text=q,
+        user_text=q_tools,
     )
     if extra_tools:
         envelopes = envelopes2
