@@ -126,9 +126,31 @@ def _cli_bin() -> str:
     return flags.cli_bin() or "lark-cli"
 
 
-def _cli_subprocess_env() -> dict[str, str]:
-    """Headless CLI creds: prefer LARKSUITE_CLI_*; else map FEISHU_APP_* (same bot app)."""
+def _cli_items_from_payload(payload: dict[str, Any]) -> list[Any]:
+    if not isinstance(payload, dict):
+        return []
+    data = payload.get("data")
+    if isinstance(payload.get("items"), list):
+        return list(payload.get("items") or [])
+    if isinstance(data, list):
+        return list(data)
+    if isinstance(data, dict):
+        for k in ("items", "events", "docs_entities", "messages", "calendar_list"):
+            v = data.get(k)
+            if isinstance(v, list):
+                return list(v)
+    return []
+
+
+def _cli_subprocess_env(*, user_access_token: str = "") -> dict[str, str]:
+    """Headless CLI env provider.
+
+    lark-cli 1.0.x env provider 不会仅凭 APP_ID/SECRET 自动换 TAT；
+    必须注入 LARKSUITE_CLI_TENANT_ACCESS_TOKEN，bot 身份才可用。
+    """
     import os
+
+    from .. import feishu_api
 
     env = {k: str(v) for k, v in os.environ.items() if v is not None}
     if not env.get("LARKSUITE_CLI_APP_ID") and env.get("FEISHU_APP_ID"):
@@ -136,17 +158,37 @@ def _cli_subprocess_env() -> dict[str, str]:
     if not env.get("LARKSUITE_CLI_APP_SECRET") and env.get("FEISHU_APP_SECRET"):
         env["LARKSUITE_CLI_APP_SECRET"] = env["FEISHU_APP_SECRET"]
     env.setdefault("LARKSUITE_CLI_BRAND", "feishu")
+    uat = (user_access_token or env.get("LARKSUITE_CLI_USER_ACCESS_TOKEN") or "").strip()
+    if uat:
+        env["LARKSUITE_CLI_USER_ACCESS_TOKEN"] = uat
+    if not (env.get("LARKSUITE_CLI_TENANT_ACCESS_TOKEN") or "").strip():
+        try:
+            env["LARKSUITE_CLI_TENANT_ACCESS_TOKEN"] = feishu_api.get_tenant_access_token()
+        except Exception as e:
+            log.warning("cli: mint tenant_access_token failed: %s", e)
     return env
 
 
-def _cli_run(argv: list[str], *, timeout_sec: float, tool: str) -> ToolResultEnvelope:
+def _cli_run(
+    argv: list[str],
+    *,
+    timeout_sec: float,
+    tool: str,
+    as_identity: str = "bot",
+    user_access_token: str = "",
+    confirm_yes: bool = False,
+) -> ToolResultEnvelope:
     bin_path = _cli_bin()
-    # Bot identity for headless env credentials (LARKSUITE_CLI_APP_ID/SECRET).
     cmd = [bin_path, *argv]
+    identity = (as_identity or "bot").strip().lower()
+    if identity not in ("bot", "user"):
+        identity = "bot"
     if "--as" not in cmd:
-        cmd.extend(["--as", "bot"])
+        cmd.extend(["--as", identity])
     if "--format" not in cmd:
         cmd.extend(["--format", "json"])
+    if confirm_yes and "--yes" not in cmd:
+        cmd.append("--yes")
     try:
         proc = subprocess.run(
             cmd,
@@ -154,7 +196,7 @@ def _cli_run(argv: list[str], *, timeout_sec: float, tool: str) -> ToolResultEnv
             text=True,
             timeout=timeout_sec,
             check=False,
-            env=_cli_subprocess_env(),
+            env=_cli_subprocess_env(user_access_token=user_access_token),
         )
     except FileNotFoundError:
         return envelope_fail("cli_not_installed", tool=tool)
@@ -178,6 +220,7 @@ def _cli_run(argv: list[str], *, timeout_sec: float, tool: str) -> ToolResultEnv
     if proc.returncode != 0 or (isinstance(data, dict) and data.get("ok") is False):
         src = data if isinstance(data, dict) and data.get("ok") is False else err_payload
         err = _cli_error_message(src, raw_err, proc.returncode)
+        log.warning("cli fail tool=%s identity=%s err=%s cmd=%s", tool, identity, err[:160], " ".join(cmd[1:6]))
         return envelope_fail(_cli_error_code(err, src), tool=tool)
     if not isinstance(data, dict):
         data = {"data": data}
@@ -202,10 +245,22 @@ def _cli_error_code(err: str, src: dict[str, Any] | None = None) -> str:
     s = (err or "").lower()
     raw = err or ""
     code = ""
+    etype = ""
     if isinstance(src, dict):
         eobj = src.get("error") or {}
-        if isinstance(eobj, dict) and eobj.get("code") is not None:
-            code = str(eobj.get("code"))
+        if isinstance(eobj, dict):
+            if eobj.get("code") is not None:
+                code = str(eobj.get("code"))
+            etype = str(eobj.get("type") or eobj.get("subtype") or "")
+    if (
+        "no access token" in s
+        or "token_missing" in s
+        or etype in ("authentication", "token_missing")
+        or "user_token_required" in s
+    ):
+        return f"cli:auth_token:{raw[:140]}"
+    if "only supports: user" in s or "only supports user" in s:
+        return f"cli:user_identity_required:{raw[:140]}"
     if (
         "99991672" in raw
         or code == "99991672"
@@ -217,42 +272,96 @@ def _cli_error_code(err: str, src: dict[str, Any] | None = None) -> str:
         return f"cli:scope_denied:{raw[:140]}"
     if "not_installed" in s or "cli_not_installed" in s:
         return "cli_not_installed"
+    if "unknown flag" in s:
+        return f"cli:bad_flag:{raw[:140]}"
     if raw.startswith("feishu_api_") or "feishu_api_" in raw:
         return f"cli:{raw[:180]}"
     return f"cli:{raw[:180]}"
 
 
-def _cli_call(tool: str, arguments: dict[str, Any], *, timeout_sec: float) -> ToolResultEnvelope:
+def _cli_tenant_share(token: str, *, timeout_sec: float, user_access_token: str = "") -> tuple[bool, str]:
+    """公司内获链可读：走 lark-cli drive permission.public.patch（已确认写路径的后续步）。"""
+    tok = (token or "").strip()
+    if not tok:
+        return False, "missing_token"
+    env = _cli_run(
+        [
+            "drive",
+            "permission.public",
+            "patch",
+            "--token",
+            tok,
+            "--type",
+            "docx",
+            "--data",
+            json.dumps({"link_share_entity": "tenant_readable"}, ensure_ascii=False),
+        ],
+        timeout_sec=timeout_sec,
+        tool="feishu.doc.create",
+        as_identity="bot",
+        user_access_token=user_access_token,
+        confirm_yes=True,
+    )
+    if env.ok:
+        return True, ""
+    return False, str(env.error or "share_failed")[:160]
+
+
+def _cli_call(
+    tool: str,
+    arguments: dict[str, Any],
+    *,
+    timeout_sec: float,
+    user_access_token: str = "",
+) -> ToolResultEnvelope:
     """官方 lark-cli shortcuts（与 larksuite/cli Skills 同源命令面）。"""
     args = dict(arguments or {})
+    uat = (user_access_token or str(args.get("user_access_token") or "")).strip()
+
     if tool == "feishu.search":
         rt = str(args.get("resource_type") or "doc").lower()
         q = str(args.get("query") or "").strip()
-        mr = str(int(args.get("max_results") or 8))
+        mr = str(max(1, min(int(args.get("max_results") or 8), 20)))
         if rt in ("doc", "folder", "wiki"):
-            env = _cli_run(["docs", "+search", "--query", q, "--limit", mr], timeout_sec=timeout_sec, tool=tool)
+            # docs +search 仅支持 --as user（官方 CLI）
+            if not uat:
+                return envelope_fail("cli:user_token_required:docs_search", tool=tool)
+            env = _cli_run(
+                ["docs", "+search", "--query", q, "--page-size", mr],
+                timeout_sec=timeout_sec,
+                tool=tool,
+                as_identity="user",
+                user_access_token=uat,
+            )
             if not env.ok:
                 return env
             payload = (env.meta or {}).get("cli") or {}
-            items = payload.get("data") if isinstance(payload, dict) else []
-            if isinstance(payload, dict) and isinstance(payload.get("items"), list):
-                items = payload.get("items")
-            if not isinstance(items, list):
-                items = []
+            items = _cli_items_from_payload(payload if isinstance(payload, dict) else {})
             return envelope_ok(normalize_docs(items, kind=rt), tool=tool)
         if rt == "message":
             chat_id = str(args.get("chat_id") or "").strip()
-            argv = ["im", "+messages-search", "--query", q]
+            argv = ["im", "+messages-search", "--query", q, "--page-size", str(min(int(mr), 50))]
             if chat_id:
                 argv += ["--chat-id", chat_id]
-            env = _cli_run(argv, timeout_sec=timeout_sec, tool=tool)
+            env = _cli_run(
+                argv,
+                timeout_sec=timeout_sec,
+                tool=tool,
+                as_identity="bot",
+                user_access_token=uat,
+            )
             if not env.ok:
                 return env
             payload = (env.meta or {}).get("cli") or {}
-            items = payload.get("data") if isinstance(payload, dict) else []
-            if isinstance(payload, dict) and isinstance(payload.get("items"), list):
-                items = payload.get("items")
-            return envelope_ok(normalize_docs(items if isinstance(items, list) else [], kind="message"), tool=tool)
+            items = _cli_items_from_payload(payload if isinstance(payload, dict) else {})
+            return envelope_ok(normalize_docs(items, kind="message"), tool=tool)
+        if rt == "calendar":
+            return _cli_call(
+                "feishu.calendar.list",
+                {"query": q, "max_results": int(mr)},
+                timeout_sec=timeout_sec,
+                user_access_token=uat,
+            )
         return envelope_fail(f"cli_resource_unsupported:{rt}", tool=tool)
 
     if tool == "feishu.doc.get":
@@ -265,7 +374,14 @@ def _cli_call(tool: str, arguments: dict[str, Any], *, timeout_sec: float) -> To
             argv += ["--doc", url]
         else:
             return envelope_fail("doc_token_or_url_required", tool=tool)
-        env = _cli_run(argv, timeout_sec=timeout_sec, tool=tool)
+        # fetch 通常 bot/user 均可；无 UAT 用 bot
+        env = _cli_run(
+            argv,
+            timeout_sec=timeout_sec,
+            tool=tool,
+            as_identity="user" if uat else "bot",
+            user_access_token=uat,
+        )
         if not env.ok:
             return env
         payload = (env.meta or {}).get("cli") or {}
@@ -278,18 +394,17 @@ def _cli_call(tool: str, arguments: dict[str, Any], *, timeout_sec: float) -> To
         )
 
     if tool == "feishu.calendar.list":
-        env = _cli_run(["calendar", "+agenda"], timeout_sec=timeout_sec, tool=tool)
+        env = _cli_run(
+            ["calendar", "+agenda"],
+            timeout_sec=timeout_sec,
+            tool=tool,
+            as_identity="bot",
+            user_access_token=uat,
+        )
         if not env.ok:
             return env
         payload = (env.meta or {}).get("cli") or {}
-        data = payload.get("data") if isinstance(payload, dict) else {}
-        items: list[Any] = []
-        if isinstance(data, list):
-            items = data
-        elif isinstance(data, dict):
-            items = data.get("events") or data.get("items") or data.get("calendar_list") or []
-        if isinstance(payload, dict) and isinstance(payload.get("items"), list):
-            items = payload.get("items") or items
+        items = _cli_items_from_payload(payload if isinstance(payload, dict) else {})
         return envelope_ok(
             normalize_docs(items if isinstance(items, list) else [], kind="calendar"),
             tool=tool,
@@ -302,18 +417,20 @@ def _cli_call(tool: str, arguments: dict[str, Any], *, timeout_sec: float) -> To
             "feishu.search",
             {"resource_type": "message", "query": q, "chat_id": chat_id, "max_results": 10},
             timeout_sec=timeout_sec,
+            user_access_token=uat,
         )
 
     if tool == "feishu.doc.create":
         if not args.get("confirmed"):
             return envelope_fail("confirmation_required", tool=tool)
         title = str(args.get("title") or "未命名文档")
-        content = str(args.get("content") or "")
-        md = f"<title>{title}</title>\n{content}"
+        content = str(args.get("content") or "") or " "
         env = _cli_run(
-            ["docs", "+create", "--doc-format", "markdown", "--content", md],
+            ["docs", "+create", "--title", title, "--doc-format", "markdown", "--content", content],
             timeout_sec=timeout_sec,
             tool=tool,
+            as_identity="bot",
+            user_access_token=uat,
         )
         if not env.ok:
             return env
@@ -331,14 +448,11 @@ def _cli_call(tool: str, arguments: dict[str, Any], *, timeout_sec: float) -> To
         share_ok = False
         share_err = ""
         if token:
-            try:
-                from . import native as native_mod
-
-                native_mod.open_tenant_readable(token, docs_type="docx")
-                share_ok = True
-            except Exception as e:
-                share_err = str(e)[:160]
-                log.warning("cli doc tenant share failed token=%s: %s", token, e)
+            share_ok, share_err = _cli_tenant_share(
+                token, timeout_sec=timeout_sec, user_access_token=uat
+            )
+            if not share_ok:
+                log.warning("cli doc tenant share failed token=%s: %s", token, share_err)
         snippet = "已创建；公司内获链接可读" if share_ok else "已创建（公司内链接权限未设上）"
         return envelope_ok(
             [{"title": title, "url": url, "snippet": snippet, "docs_token": token}],
@@ -359,10 +473,17 @@ def _cli_call(tool: str, arguments: dict[str, Any], *, timeout_sec: float) -> To
         text = str(args.get("text") or "").strip()
         if not rid or not text:
             return envelope_fail("receive_id_and_text_required", tool=tool)
+        # open_id 用 --user-id；chat 用 --chat-id
+        if rid.startswith("ou_"):
+            send_argv = ["im", "+messages-send", "--user-id", rid, "--text", text]
+        else:
+            send_argv = ["im", "+messages-send", "--chat-id", rid, "--text", text]
         env = _cli_run(
-            ["im", "+messages-send", "--chat-id", rid, "--text", text],
+            send_argv,
             timeout_sec=timeout_sec,
             tool=tool,
+            as_identity="bot",
+            user_access_token=uat,
         )
         if not env.ok:
             return env
@@ -382,7 +503,13 @@ def _cli_call(tool: str, arguments: dict[str, Any], *, timeout_sec: float) -> To
             argv += ["--start", start]
         if end:
             argv += ["--end", end]
-        env = _cli_run(argv, timeout_sec=timeout_sec, tool=tool)
+        env = _cli_run(
+            argv,
+            timeout_sec=timeout_sec,
+            tool=tool,
+            as_identity="bot",
+            user_access_token=uat,
+        )
         if not env.ok:
             return env
         return envelope_ok(
@@ -393,11 +520,12 @@ def _cli_call(tool: str, arguments: dict[str, Any], *, timeout_sec: float) -> To
     return envelope_fail(f"cli_unknown_tool:{tool}", tool=tool)
 
 
-def _cli_search(query: str, *, max_results: int, timeout_sec: float) -> ToolResultEnvelope:
+def _cli_search(query: str, *, max_results: int, timeout_sec: float, user_access_token: str = "") -> ToolResultEnvelope:
     return _cli_call(
         "feishu.search",
         {"query": query, "resource_type": "doc", "max_results": max_results},
         timeout_sec=timeout_sec,
+        user_access_token=user_access_token,
     )
 
 
@@ -558,7 +686,12 @@ def call_tool(
         )
 
     if backend == "cli":
-        return _cli_call(tool, args, timeout_sec=to)
+        return _cli_call(
+            tool,
+            args,
+            timeout_sec=to,
+            user_access_token=user_access_token,
+        )
 
     return _mcp_post(
         tool,

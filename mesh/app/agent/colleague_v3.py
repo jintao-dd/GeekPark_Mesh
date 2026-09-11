@@ -312,6 +312,17 @@ def _classify_block(err: str, *, tool: str = "") -> dict[str, str]:
         or "scope_denied" in s
     ):
         code = "scope_denied"
+    elif any(
+        x in s
+        for x in (
+            "auth_token",
+            "token_missing",
+            "no access token",
+            "user_token_required",
+            "user_identity_required",
+        )
+    ):
+        code = "feishu_api"
     elif any(x in s for x in ("hands_disabled", "write_disabled", "mcp_not_configured", "cli_not_configured")):
         code = "hands_off"
     elif any(x in s for x in ("empty", "not_found", "no_result")):

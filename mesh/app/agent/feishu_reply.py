@@ -165,6 +165,24 @@ def format_display_text(
     if kind in ("no_hit", "system_error", "timeout", "permission"):
         return body
 
+    # feishu_live Hands 回答禁止刷「已上线周报」归因
+    tier = ""
+    if isinstance(payload, dict):
+        tier = str(payload.get("source_tier") or "").strip().lower()
+    if not tier:
+        tier = str((answer.trace or {}).get("source_tier") or "").strip().lower()
+    if tier == "feishu_live":
+        if uniq_refs and kind not in ("no_hit", "system_error", "timeout", "permission"):
+            meta_lines.append("可核对：")
+            for r in uniq_refs[:6]:
+                meta_lines.append(f"· {_humanize_ref(r)}")
+        if meta_lines:
+            blocks.append("")
+            blocks.append("——")
+            blocks.extend(meta_lines)
+            return "\n".join(blocks).strip()
+        return body
+
     if issue and kind in ("ok", "supported", ""):
         meta_lines.append(f"来源：{issue} 已上线周报")
     elif issue and kind not in ("",):

@@ -93,3 +93,4 @@ Prod **不**默认开 cli，直到 R1–R10 全绿 + tmesh 观察通过。
 | 日期 | 说明 |
 |------|------|
 | 2026-09-11 | 首版契约；与 Phase 1/2 落地同步启动 |
+| 2026-09-11 | **硬修复**：env 注入 `LARKSUITE_CLI_TENANT_ACCESS_TOKEN`（lark-cli 不会单凭 APP_SECRET 换 TAT）；`docs +search` 用 `--page-size` + `--as user`；公司内分享改走 `drive permission.public patch`；live 回答不再刷「已上线周报」 |
