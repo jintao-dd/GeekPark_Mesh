@@ -364,6 +364,102 @@ def test_cli_group_list_no_local_utterance_filter(monkeypatch):
     assert env.items[0]["title"] == "CCC Tech"
 
 
+def test_cli_member_list(monkeypatch):
+    def fake_run(argv, *, timeout_sec, tool, as_identity="bot", user_access_token="", confirm_yes=False):
+        from app.agent.feishu_hands.normalize import envelope_ok
+
+        assert argv[:2] == ["im", "+chat-members-list"]
+        assert "--chat-id" in argv
+        assert argv[argv.index("--chat-id") + 1] == "oc_1"
+        return envelope_ok(
+            [],
+            tool=tool,
+            meta={
+                "cli": {
+                    "ok": True,
+                    "data": {
+                        "users": [
+                            {"member_id": "ou_a", "name": "Alice"},
+                            {"member_id": "ou_b", "name": "Bob"},
+                        ]
+                    },
+                }
+            },
+        )
+
+    monkeypatch.setattr(backends, "_cli_run", fake_run)
+    env = backends._cli_call(
+        "feishu.search",
+        {"query": "", "resource_type": "member", "chat_id": "oc_1", "max_results": 8},
+        timeout_sec=5,
+    )
+    assert env.ok
+    assert len(env.items) == 2
+    assert env.items[0]["title"] == "Alice"
+    assert env.items[0]["docs_type"] == "member"
+
+
+def test_cli_user_get(monkeypatch):
+    def fake_run(argv, *, timeout_sec, tool, as_identity="bot", user_access_token="", confirm_yes=False):
+        from app.agent.feishu_hands.normalize import envelope_ok
+
+        assert argv[:2] == ["contact", "+get-user"]
+        assert "--user-id" in argv
+        uid = argv[argv.index("--user-id") + 1]
+        return envelope_ok(
+            [],
+            tool=tool,
+            meta={
+                "cli": {
+                    "ok": True,
+                    "data": {
+                        "user": {
+                            "name": "杜锦涛",
+                            "employee_no": "G-356",
+                            "enterprise_email": "dujintao@geekpark.net",
+                            "mobile": "+8617600000000",
+                            "open_id": uid,
+                        }
+                    },
+                }
+            },
+        )
+
+    monkeypatch.setattr(backends, "_cli_run", fake_run)
+    env = backends._cli_call(
+        "feishu.search",
+        {"query": "", "resource_type": "user", "open_ids": ["ou_x"], "max_results": 3},
+        timeout_sec=5,
+    )
+    assert env.ok
+    assert env.items[0]["title"] == "杜锦涛"
+    assert "G-356" in env.items[0]["snippet"]
+    assert "+86176" not in env.items[0]["snippet"]
+
+
+def test_build_ask_args_user_injects_mentions():
+    from app.agent.colleague_v3 import _build_ask_args
+    from app.agent.models import AgentContext, IssueRef
+    from app.agent.session_state import SessionContextState
+
+    ctx = AgentContext(
+        scope_key="s",
+        channel="feishu_group",
+        chat_id="oc_1",
+        issue_ref=IssueRef(mode="none"),
+        mentions=[{"open_id": "ou_m", "name": "张三"}],
+    )
+    a = _build_ask_args(
+        "feishu.search",
+        "他是谁",
+        {"tool": "feishu.search", "resource_type": "user", "query": ""},
+        ctx,
+        SessionContextState(),
+    )
+    assert a.get("resource_type") == "user"
+    assert a.get("open_ids") == ["ou_m"]
+
+
 def test_build_ask_args_does_not_stuff_full_utterance_into_calendar_q():
     from app.agent.colleague_v3 import _build_ask_args
 

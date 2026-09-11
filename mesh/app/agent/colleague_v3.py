@@ -115,7 +115,7 @@ _SYSTEM_DECIDE = """你是 GeekPark 内部 AI 同事 Mesh 的「调度」层。
 
 {"situation":"chat","action":"speak"}
 {"situation":"need_published","action":"ask","tool":"ask.published","query":"..."}
-{"situation":"need_feishu_read","action":"ask","tool":"feishu.search","query":"...","resource_type":"doc|message|group|wiki|folder|calendar","args":{}}
+{"situation":"need_feishu_read","action":"ask","tool":"feishu.search","query":"...","resource_type":"doc|message|group|wiki|folder|calendar|member|user","args":{}}
 {"situation":"want_feishu_write","action":"prepare_write","tool":"feishu.doc.create|feishu.im.send|feishu.calendar.create","args":{"title":"短","content":""}}
 {"situation":"confirm_pending","action":"confirm_write"}
 {"situation":"cancel_pending","action":"cancel_write"}
@@ -131,10 +131,13 @@ _SYSTEM_DECIDE = """你是 GeekPark 内部 AI 同事 Mesh 的「调度」层。
 
 飞书读路由提示（结构化，不要把用户整句当检索词）：
 - 列群 → tool=feishu.search, resource_type=group, query=""（或 args.keyword=群名）
+- 列本群成员 → feishu.search + member, query=""（需当前 chat_id；私聊无 chat 时先问要哪个群）
+- @某人 / 他是谁（有 mentions.open_id）→ feishu.search + user，args.open_ids=[...]
 - 日程 → tool=feishu.calendar.list, query 可空；不要塞整句
 - 会话消息 → feishu.search + message；关键词放 args.keyword / 短 query
 - 文档/Wiki → feishu.search + doc|wiki，短检索词
 - feishu.search 必须带 resource_type
+- 不要假装已有全公司组织架构树；没有 open_id / 成员列表结果时如实说查不到
 
 规则（看「系统工作记忆」+ 对话，不要枚举用户句式）：
 - 有待确认写操作 + 用户同意 → confirm_write
@@ -452,7 +455,32 @@ def _normalize_decide(decision: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def _decide(user_text: str, identity: Any, state: SessionContextState | None) -> tuple[dict[str, Any], dict[str, Any]]:
+def _mentions_block(context: Any = None, state: SessionContextState | None = None) -> str:
+    mentions: list[Any] = []
+    if context is not None:
+        mentions = list(getattr(context, "mentions", None) or [])
+    if not mentions and state is not None:
+        mentions = list(getattr(state, "last_mentions", None) or [])
+    rows = []
+    for m in mentions:
+        if not isinstance(m, dict):
+            continue
+        name = str(m.get("name") or "").strip()
+        oid = str(m.get("open_id") or "").strip()
+        if not name and not oid:
+            continue
+        rows.append(f"- @{name or '同事'} open_id={oid or '未知'}")
+    if not rows:
+        return ""
+    return "本轮/@最近提及的人（结构化，可查 user）：\n" + "\n".join(rows[:12])
+
+
+def _decide(
+    user_text: str,
+    identity: Any,
+    state: SessionContextState | None,
+    context: Any = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
     meta: dict[str, Any] = {"llm_used": False, "model": None, "error": ""}
     qn = _clean_user_text(user_text)
     pending = getattr(state, "pending_write", None) if state else None
@@ -467,7 +495,11 @@ def _decide(user_text: str, identity: Any, state: SessionContextState | None) ->
 
     system = _SYSTEM_DECIDE + "\n\n## 对方\n" + _identity_block(identity)
     hist = _history_block(state)
-    user = (hist + "\n\n" if hist else "") + f"用户：{qn}\nJSON："
+    ment = _mentions_block(context, state)
+    user = (hist + "\n\n" if hist else "")
+    if ment:
+        user += ment + "\n\n"
+    user += f"用户：{qn}\nJSON："
     decision: dict[str, Any] = {"action": "speak"}
     try:
         from .. import llm
@@ -629,11 +661,12 @@ def _infer_search_resource_type(query: str) -> str:
     q = (query or "").strip()
     if not q:
         return "doc"
-    allowed = ("doc", "message", "group", "wiki", "folder", "calendar")
+    allowed = ("doc", "message", "group", "wiki", "folder", "calendar", "member", "user")
     system = (
         "你给飞书搜索选 resource_type。"
-        "只输出其中一个单词：doc / message / group / wiki / folder / calendar。"
-        "列群/群聊→group；日程/开会/周会→calendar；聊天消息→message；知识库→wiki；文件夹→folder；云文档→doc。"
+        "只输出其中一个单词：doc / message / group / wiki / folder / calendar / member / user。"
+        "列群/群聊→group；列群成员/谁在群里→member；@某人/他是谁/查此人→user；"
+        "日程/开会/周会→calendar；聊天消息→message；知识库→wiki；文件夹→folder；云文档→doc。"
         "不要解释。"
     )
     try:
@@ -648,7 +681,13 @@ def _infer_search_resource_type(query: str) -> str:
     return "doc"
 
 
-def _build_ask_args(tool: str, query: str, decision: dict[str, Any], context: Any = None) -> dict[str, Any]:
+def _build_ask_args(
+    tool: str,
+    query: str,
+    decision: dict[str, Any],
+    context: Any = None,
+    session: SessionContextState | None = None,
+) -> dict[str, Any]:
     """组装工具参数：用户原话只作 Decide 输入；工具侧只用结构化字段。"""
     args: dict[str, Any] = {}
     raw = decision.get("args") if isinstance(decision.get("args"), dict) else {}
@@ -674,8 +713,34 @@ def _build_ask_args(tool: str, query: str, decision: dict[str, Any], context: An
             decide_q = str(decision.get("query") or "").strip()
             args["q"] = decide_q if decide_q and decide_q != (query or "").strip() else ""
             # 若 Decide 把整句放进 query，搜索词也清空，由 resource_type 决定 list/search
-            if args["q"] == (query or "").strip() and rt in ("group", "calendar"):
+            if args["q"] == (query or "").strip() and rt in ("group", "calendar", "member"):
                 args["q"] = ""
+        # @人 / 查人：从 args 或上下文 mentions 注入 open_ids
+        if rt == "user":
+            oids: list[str] = []
+            for x in args.get("open_ids") or []:
+                s = str(x or "").strip()
+                if s and s not in oids:
+                    oids.append(s)
+            one = str(args.get("open_id") or args.get("user_id") or "").strip()
+            if one and one not in oids:
+                oids.insert(0, one)
+            if not oids:
+                mention_sources = []
+                if context is not None:
+                    mention_sources.append(getattr(context, "mentions", None) or [])
+                if session is not None:
+                    mention_sources.append(getattr(session, "last_mentions", None) or [])
+                for src in mention_sources:
+                    for m in src or []:
+                        if not isinstance(m, dict):
+                            continue
+                        s = str(m.get("open_id") or "").strip()
+                        if s and s not in oids:
+                            oids.append(s)
+            if oids:
+                args["open_ids"] = oids
+                args.setdefault("open_id", oids[0])
     elif tool == "feishu.calendar.list":
         args["q"] = keyword
         if keyword:
@@ -736,7 +801,19 @@ def handle(
 ) -> ColleagueV3Result:
     q = _clean_user_text(user_text)
     _sync_pending_from_store(session, context, identity)
-    decision, dmeta = _decide(q, identity, session)
+    # 本轮 @ 进会话，便于下句「他是谁」
+    cur_mentions = list(getattr(context, "mentions", None) or [])
+    if cur_mentions:
+        session.last_mentions = [
+            {
+                "open_id": str(m.get("open_id") or "").strip(),
+                "name": str(m.get("name") or "").strip(),
+            }
+            for m in cur_mentions
+            if isinstance(m, dict)
+            and (str(m.get("open_id") or "").strip() or str(m.get("name") or "").strip())
+        ][:12]
+    decision, dmeta = _decide(q, identity, session, context)
     action = str(decision.get("action") or "speak").strip().lower()
     log.info(
         "colleague_v3 decide action=%s tool=%s pending=%s hard=%s q=%r",
@@ -983,7 +1060,7 @@ def handle(
             out.intent = "casual"
             return out
         query = str(decision.get("query") or q).strip() or q
-        tool_args = _build_ask_args(tool, query, decision, context)
+        tool_args = _build_ask_args(tool, query, decision, context, session)
         result = invoke_tool(tool, con, identity, permission, context, tool_args)
         out.tools_called = [tool]
         intent = _intent_for("ask", tool)

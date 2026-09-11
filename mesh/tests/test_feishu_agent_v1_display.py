@@ -106,6 +106,32 @@ def test_parse_im_message_dm():
     assert "具身智能" in p["text"]
 
 
+def test_parse_im_message_mentions():
+    event = {
+        "sender": {"sender_id": {"open_id": "ou_sender"}},
+        "message": {
+            "chat_id": "oc_g",
+            "chat_type": "group",
+            "message_type": "text",
+            "content": '{"text":"@_user_1 他是谁"}',
+            "mentions": [
+                {
+                    "key": "@_user_1",
+                    "id": {"open_id": "ou_target"},
+                    "name": "张山山",
+                }
+            ],
+        },
+    }
+    p = parse_im_message(event)
+    assert p is not None
+    assert p["channel"] == "feishu_group"
+    assert p["mentions"][0]["open_id"] == "ou_target"
+    assert p["mentions"][0]["name"] == "张山山"
+    assert "@张山山" in p["text"]
+    assert "@_user_1" not in p["text"]
+
+
 def test_url_verification_challenge():
     out = handle_feishu_event(None, {"type": "url_verification", "challenge": "abc", "token": ""})
     assert out.get("challenge") == "abc"

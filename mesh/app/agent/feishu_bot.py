@@ -123,6 +123,7 @@ def parse_im_message(event: dict[str, Any]) -> dict[str, Any] | None:
         text = str(content.get("text") or content.get("content") or "").strip()
     else:
         text = _extract_text(str(content or ""))
+    mentions = _parse_mentions(msg.get("mentions") or event.get("mentions") or [])
     # 群聊 @机器人 会留下 @_user_1；不剥掉则确认写整句匹配失败
     if text:
         try:
@@ -131,6 +132,17 @@ def parse_im_message(event: dict[str, Any]) -> dict[str, Any] | None:
             text = normalize_query(text)
         except Exception:
             pass
+    # normalize 会去掉 @；把有 open_id 的真人姓名写回正文，供同事层读懂（结构化仍在 mentions）
+    if mentions:
+        labels = []
+        for m in mentions:
+            oid = str(m.get("open_id") or "").strip()
+            name = str(m.get("name") or "").strip()
+            if not oid:
+                continue
+            labels.append(f"@{name}" if name else f"@{oid}")
+        if labels:
+            text = (" ".join(labels) + (" " + text if text else "")).strip()
     if not text and not open_id:
         return None
     channel = "feishu_group" if chat_type == "group" else "feishu_dm"
@@ -144,7 +156,30 @@ def parse_im_message(event: dict[str, Any]) -> dict[str, Any] | None:
         "thread_id": str(msg.get("thread_id") or "").strip(),
         "session_id": str(chat_id or "").strip(),
         "inbound_message_id": message_id,
+        "mentions": mentions,
     }
+
+
+def _parse_mentions(raw: Any) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if not isinstance(raw, list):
+        return out
+    for m in raw:
+        if not isinstance(m, dict):
+            continue
+        mid = m.get("id") if isinstance(m.get("id"), dict) else {}
+        oid = str(
+            (mid or {}).get("open_id")
+            or m.get("open_id")
+            or m.get("member_id")
+            or ""
+        ).strip()
+        key = str(m.get("key") or "").strip()
+        name = str(m.get("name") or "").strip()
+        if not oid and not name:
+            continue
+        out.append({"key": key, "open_id": oid, "name": name})
+    return out
 
 
 def _dedup_seen(message_id: str) -> bool:

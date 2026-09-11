@@ -166,6 +166,77 @@ def _cli_items_from_payload(payload: dict[str, Any]) -> list[Any]:
     return []
 
 
+def _cli_norm_members(raw: list[Any]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for u in raw:
+        if not isinstance(u, dict):
+            continue
+        name = str(u.get("name") or "").strip()
+        oid = str(u.get("member_id") or u.get("open_id") or u.get("user_id") or "").strip()
+        if not name and not oid:
+            continue
+        out.append(
+            {
+                "title": name or oid,
+                "snippet": oid,
+                "docs_type": "member",
+                "id": oid,
+                "url": "",
+            }
+        )
+    return out
+
+
+def _cli_norm_user_profile(payload: dict[str, Any], *, open_id: str = "") -> list[dict[str, Any]]:
+    if not isinstance(payload, dict):
+        return []
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
+    if not isinstance(data, dict):
+        return []
+    user = data.get("user") if isinstance(data.get("user"), dict) else data
+    if not isinstance(user, dict):
+        return []
+    name = str(user.get("name") or user.get("en_name") or "").strip()
+    oid = str(
+        open_id
+        or user.get("open_id")
+        or user.get("user_id")
+        or user.get("member_id")
+        or ""
+    ).strip()
+    job = str(user.get("job_title") or "").strip()
+    emp = str(user.get("employee_no") or "").strip()
+    email = str(user.get("enterprise_email") or "").strip()
+    # 不把手机号写进 snippet，避免群聊回显泄露
+    parts = [p for p in (job, emp, email, oid) if p]
+    if not name and not parts:
+        return []
+    return [
+        {
+            "title": name or oid or "同事",
+            "snippet": " · ".join(parts),
+            "docs_type": "user",
+            "id": oid,
+            "url": "",
+        }
+    ]
+
+
+def _cli_members_from_payload(payload: dict[str, Any]) -> list[Any]:
+    if not isinstance(payload, dict):
+        return []
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
+    if not isinstance(data, dict):
+        return []
+    users = data.get("users")
+    if isinstance(users, list):
+        return list(users)
+    items = data.get("items") or data.get("members")
+    if isinstance(items, list):
+        return list(items)
+    return []
+
+
 def _cli_iso_range(*, days: int = 7) -> tuple[str, str]:
     from datetime import datetime, timedelta, timezone
 
@@ -496,6 +567,7 @@ def _cli_call(
         rt = str(args.get("resource_type") or "doc").lower()
         q = str(args.get("query") or "").strip()
         mr = str(max(1, min(int(args.get("max_results") or 8), 20)))
+        chat_id = str(args.get("chat_id") or "").strip()
         if rt in ("doc", "folder", "wiki"):
             # drive +search 支持 bot；docs +search 仅 user。优先 bot（env TAT）。
             doc_types = {
@@ -535,7 +607,6 @@ def _cli_call(
             items = _cli_items_from_payload(payload if isinstance(payload, dict) else {})
             return envelope_ok(normalize_docs(items, kind=rt), tool=tool)
         if rt == "message":
-            chat_id = str(args.get("chat_id") or "").strip()
             items: list[Any] = []
             # 当前会话：优先拉最近消息（bot 可见），再按关键词过滤
             if chat_id:
@@ -633,6 +704,71 @@ def _cli_call(
                 raw = _cli_items_from_payload(payload if isinstance(payload, dict) else {})
                 items = _cli_norm_chats(raw, query="")
             return envelope_ok(normalize_docs(items[: int(mr)], kind="group"), tool=tool)
+        if rt == "member":
+            if not chat_id:
+                return envelope_fail("chat_id_required_for_members", tool=tool)
+            env = _cli_run(
+                [
+                    "im",
+                    "+chat-members-list",
+                    "--chat-id",
+                    chat_id,
+                    "--member-types",
+                    "user",
+                    "--page-size",
+                    str(min(100, max(int(mr), 20))),
+                ],
+                timeout_sec=timeout_sec,
+                tool=tool,
+                as_identity="bot",
+                user_access_token=uat,
+            )
+            if not env.ok:
+                return env
+            payload = (env.meta or {}).get("cli") or {}
+            raw_mem = _cli_members_from_payload(payload if isinstance(payload, dict) else {})
+            items = _cli_norm_members(raw_mem)
+            kw = str(args.get("keyword") or q or "").strip().lower()
+            if kw:
+                items = [
+                    it
+                    for it in items
+                    if kw in str(it.get("title") or "").lower()
+                    or kw in str(it.get("snippet") or "").lower()
+                ]
+            return envelope_ok(normalize_docs(items[: int(mr)], kind="member"), tool=tool)
+        if rt == "user":
+            oids: list[str] = []
+            for x in args.get("open_ids") or []:
+                s = str(x or "").strip()
+                if s and s not in oids:
+                    oids.append(s)
+            one = str(args.get("open_id") or args.get("user_id") or "").strip()
+            if one and one not in oids:
+                oids.insert(0, one)
+            if not oids:
+                return envelope_fail("open_id_required_for_user", tool=tool)
+            items = []
+            for uid in oids[: int(mr)]:
+                env = _cli_run(
+                    ["contact", "+get-user", "--user-id", uid],
+                    timeout_sec=timeout_sec,
+                    tool=tool,
+                    as_identity="bot",
+                    user_access_token=uat,
+                )
+                if not env.ok:
+                    continue
+                payload = (env.meta or {}).get("cli") or {}
+                items.extend(
+                    _cli_norm_user_profile(
+                        payload if isinstance(payload, dict) else {},
+                        open_id=uid,
+                    )
+                )
+            if not items:
+                return envelope_fail("user_lookup_empty", tool=tool)
+            return envelope_ok(normalize_docs(items[: int(mr)], kind="user"), tool=tool)
         if rt == "calendar":
             return _cli_call(
                 "feishu.calendar.list",

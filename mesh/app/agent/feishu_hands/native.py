@@ -202,6 +202,81 @@ def _list_chats(query: str, *, max_results: int) -> ToolResultEnvelope:
     return envelope_ok(normalize_docs(out, kind="group"), tool="feishu.search")
 
 
+def _list_members(chat_id: str, *, max_results: int, query: str = "") -> ToolResultEnvelope:
+    cid = (chat_id or "").strip()
+    if not cid:
+        return envelope_fail("chat_id_required_for_members", tool="feishu.search")
+    try:
+        data = _api(
+            "GET",
+            f"/open-apis/im/v1/chats/{cid}/members",
+            params={
+                "member_id_type": "open_id",
+                "page_size": min(100, max(int(max_results), 20)),
+            },
+        )
+    except Exception as e:
+        return _fail("feishu.search", e)
+    items = (data.get("data") or {}).get("items") or []
+    q = (query or "").strip().lower()
+    out = []
+    for m in items if isinstance(items, list) else []:
+        if not isinstance(m, dict):
+            continue
+        name = str(m.get("name") or "").strip()
+        oid = str(m.get("member_id") or m.get("open_id") or "").strip()
+        if q and q not in name.lower() and q not in oid.lower():
+            continue
+        out.append(
+            {
+                "title": name or oid or "成员",
+                "snippet": oid,
+                "docs_type": "member",
+                "id": oid,
+                "url": "",
+            }
+        )
+        if len(out) >= max_results:
+            break
+    return envelope_ok(normalize_docs(out, kind="member"), tool="feishu.search")
+
+
+def _get_users(open_ids: list[str], *, max_results: int) -> ToolResultEnvelope:
+    oids = [str(x or "").strip() for x in (open_ids or []) if str(x or "").strip()]
+    if not oids:
+        return envelope_fail("open_id_required_for_user", tool="feishu.search")
+    out = []
+    for oid in oids[: max(1, int(max_results))]:
+        try:
+            data = _api(
+                "GET",
+                f"/open-apis/contact/v3/users/{oid}",
+                params={"user_id_type": "open_id"},
+            )
+        except Exception:
+            continue
+        user = (data.get("data") or {}).get("user") or {}
+        if not isinstance(user, dict):
+            continue
+        name = str(user.get("name") or "").strip()
+        job = str(user.get("job_title") or "").strip()
+        emp = str(user.get("employee_no") or "").strip()
+        email = str(user.get("enterprise_email") or "").strip()
+        parts = [p for p in (job, emp, email, oid) if p]
+        out.append(
+            {
+                "title": name or oid,
+                "snippet": " · ".join(parts),
+                "docs_type": "user",
+                "id": oid,
+                "url": "",
+            }
+        )
+    if not out:
+        return envelope_fail("user_lookup_empty", tool="feishu.search")
+    return envelope_ok(normalize_docs(out, kind="user"), tool="feishu.search")
+
+
 def call_native(
     tool: str,
     arguments: dict[str, Any],
@@ -226,6 +301,18 @@ def call_native(
                 return _search_messages(q, chat_id=chat_id, max_results=mr)
             if rt == "group":
                 return _list_chats(q, max_results=mr)
+            if rt == "member":
+                return _list_members(
+                    chat_id,
+                    max_results=mr,
+                    query=str(args.get("keyword") or q or ""),
+                )
+            if rt == "user":
+                oids = [str(x).strip() for x in (args.get("open_ids") or []) if str(x).strip()]
+                one = str(args.get("open_id") or args.get("user_id") or "").strip()
+                if one:
+                    oids = [one] + [x for x in oids if x != one]
+                return _get_users(oids, max_results=mr)
             if rt == "calendar":
                 return _calendar_list(q, days=14, max_results=mr)
             return envelope_fail(f"resource_type_unsupported:{rt}", tool=tool)

@@ -130,4 +130,5 @@ def assemble_context(
         issue_ref=issue,
         chat_team=chat_team,
         text=(envelope.text or "").strip(),
+        mentions=list(envelope.mentions or []),
     )

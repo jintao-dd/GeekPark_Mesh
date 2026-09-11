@@ -20,14 +20,17 @@ def search(
     user_access_token: str = "",
     chat_id: str = "",
     phase: str = "full",
+    keyword: str = "",
+    open_ids: list[str] | None = None,
+    user_open_id: str = "",
 ) -> ToolResultEnvelope:
     if not flags.hands_enabled():
         return envelope_fail("hands_disabled")
 
     q = (query or "").strip()
     rt = (resource_type or "doc").strip().lower() or "doc"
-    # 群列表 / 日历允许空 query（列出可见范围）
-    if not q and rt not in ("group", "calendar"):
+    # 群列表 / 日历 / 群成员 / 按 id 查人：允许空 query
+    if not q and rt not in ("group", "calendar", "member", "user"):
         return envelope_ok([])
 
     if not feishu_search_type_allowed(rt, phase=phase):
@@ -44,6 +47,9 @@ def search(
             "resource_type": rt,
             "max_results": FEISHU_SEARCH.max_results,
             "chat_id": (chat_id or "").strip(),
+            "keyword": keyword,
+            "open_ids": list(open_ids or []),
+            "open_id": str(user_open_id or "").strip(),
         },
         timeout_sec=FEISHU_SEARCH.timeout_sec,
         user_access_token=(user_access_token or "").strip(),

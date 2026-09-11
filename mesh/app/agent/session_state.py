@@ -68,6 +68,8 @@ class SessionContextState:
     active_goal: dict[str, Any] | None = None
     # last_block: {code, tool, message, at}  code=scope_denied|hands_off|empty|feishu_api|other
     last_block: dict[str, Any] | None = None
+    # 最近一轮飞书 @：[{open_id, name}]，供「他是谁」解析
+    last_mentions: list[dict[str, Any]] = field(default_factory=list)
     updated_at: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:

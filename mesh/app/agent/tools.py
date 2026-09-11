@@ -293,6 +293,10 @@ def tool_feishu_search(
         return _deny("feishu.search", "hands_disabled")
     query = str(args.get("q") or args.get("query") or "").strip()
     resource_type = str(args.get("resource_type") or "doc").strip() or "doc"
+    open_ids = [str(x).strip() for x in (args.get("open_ids") or []) if str(x).strip()]
+    one = str(args.get("open_id") or args.get("user_id") or "").strip()
+    if one and one not in open_ids:
+        open_ids.insert(0, one)
     env = feishu_hands.feishu_search(
         query,
         resource_type=resource_type,
@@ -300,6 +304,9 @@ def tool_feishu_search(
         user_access_token=str(args.get("user_access_token") or ""),
         chat_id=str(args.get("chat_id") or ""),
         phase="full",
+        keyword=str(args.get("keyword") or "").strip(),
+        open_ids=open_ids,
+        user_open_id=one,
     )
     tr = _feishu_tool_result(
         "feishu.search",

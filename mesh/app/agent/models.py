@@ -80,6 +80,8 @@ class AgentEnvelope:
     pinned_issue_epoch: int = 0
     # 允许注入已解析 Identity（单测）
     identity_override: dict[str, Any] | None = None
+    # 本轮飞书 @mentions：[{key, open_id, name}]
+    mentions: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -166,6 +168,7 @@ class AgentContext:
     issue_ref: IssueRef = field(default_factory=lambda: IssueRef(mode="none"))
     chat_team: str = ""  # 群绑定；不改 Person.primary_team
     text: str = ""
+    mentions: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -178,6 +181,7 @@ class AgentContext:
             "issue_ref": self.issue_ref.to_dict(),
             "chat_team": self.chat_team,
             "text": self.text,
+            "mentions": list(self.mentions or []),
         }
 
 

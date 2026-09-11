@@ -26,6 +26,7 @@ def envelope_from_payload(payload: dict[str, Any]) -> AgentEnvelope:
         pinned_issue=str(p.get("pinned_issue") or "").strip(),
         pinned_issue_epoch=int(p.get("pinned_issue_epoch") or 0),
         identity_override=p.get("identity_override"),
+        mentions=list(p.get("mentions") or []) if isinstance(p.get("mentions"), list) else [],
     )
 
 

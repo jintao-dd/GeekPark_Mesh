@@ -139,7 +139,8 @@ _LIVE_OUT = {
 FEISHU_SEARCH = ToolContract(
     name="feishu.search",
     description=(
-        "统一飞书搜索。resource_type: doc|message|group|wiki|folder|calendar。"
+        "统一飞书搜索。resource_type: doc|message|group|wiki|folder|calendar|member|user。"
+        "member=当前/指定群成员；user=按 open_id 查人（非全公司通讯录枚举）。"
         "返回 live_context，不得当作 published。"
     ),
     input_schema={
@@ -148,7 +149,16 @@ FEISHU_SEARCH = ToolContract(
             "query": {"type": "string"},
             "resource_type": {
                 "type": "string",
-                "enum": ["doc", "message", "group", "wiki", "folder", "calendar"],
+                "enum": [
+                    "doc",
+                    "message",
+                    "group",
+                    "wiki",
+                    "folder",
+                    "calendar",
+                    "member",
+                    "user",
+                ],
             },
         },
         "required": ["query", "resource_type"],
@@ -315,7 +325,7 @@ ASK_PUBLISHED = ToolContract(
 SPEAK_GENERATE_NOTE = "colleague.speak — 整理成文/写稿，不写飞书；无需 Hands。"
 
 FEISHU_SEARCH_ALLOWED_TYPES = frozenset(
-    {"doc", "message", "group", "wiki", "folder", "calendar"}
+    {"doc", "message", "group", "wiki", "folder", "calendar", "member", "user"}
 )
 # 兼容旧名
 FEISHU_SEARCH_ALLOWED_TYPES_PHASE2 = frozenset({"doc"})
