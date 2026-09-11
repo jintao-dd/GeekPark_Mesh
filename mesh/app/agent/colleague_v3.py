@@ -593,6 +593,7 @@ def _decide(
     identity: Any,
     state: SessionContextState | None,
     context: Any = None,
+    company_block: str = "",
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     meta: dict[str, Any] = {"llm_used": False, "model": None, "error": ""}
     qn = _clean_user_text(user_text)
@@ -607,6 +608,8 @@ def _decide(
             return {"action": "cancel_write"}, meta
 
     system = _SYSTEM_DECIDE + "\n\n## 对方\n" + _identity_block(identity)
+    if company_block:
+        system += "\n\n" + company_block
     hist = _history_block(state)
     ment = _mentions_block(context, state)
     user = (hist + "\n\n" if hist else "")
@@ -662,9 +665,12 @@ def _speak_plain(
     user_text: str,
     identity: Any,
     state: SessionContextState | None,
+    company_block: str = "",
 ) -> tuple[str, dict[str, Any]]:
     meta: dict[str, Any] = {"llm_used": False, "model": None}
     system = _SYSTEM_SPEAK + "\n\n## 对方\n" + _identity_block(identity)
+    if company_block:
+        system += "\n\n" + company_block
     hist = _history_block(state)
     user = (hist + "\n\n" if hist else "") + f"用户：{(user_text or '').strip()}\nMesh："
     try:
@@ -693,6 +699,7 @@ def _synthesize(
     state: SessionContextState | None,
     *,
     source_tier: str = "published",
+    company_block: str = "",
 ) -> tuple[str, dict[str, Any]]:
     meta: dict[str, Any] = {"llm_used": False, "model": None}
     tier = (source_tier or "published").strip().lower()
@@ -713,9 +720,13 @@ def _synthesize(
     system = (
         "你是 GeekPark 内部同事 Mesh。"
         + material_note
-        + "不要输出 JSON。\n\n"
+        + "若合适可分栏写：事实 / 分析 / 我的判断 / 建议；"
+        "Wiki/Ontology 只助理解，禁止写成周报事实。"
+        "不要输出 JSON。\n\n"
         + _identity_block(identity)
     )
+    if company_block:
+        system += "\n\n" + company_block
     hist = _history_block(state)
     user = (
         (hist + "\n\n" if hist else "")
@@ -943,12 +954,27 @@ def handle(
             if isinstance(m, dict)
             and (str(m.get("open_id") or "").strip() or str(m.get("name") or "").strip())
         ][:12]
-    decision, dmeta = _decide(q, identity, session, context)
+
+    from . import company_context as cctx
+    from . import orchestrator as orch
+
+    company = cctx.assemble(
+        identity=identity,
+        permission=permission,
+        context=context,
+        session=session,
+        user_text=q,
+    )
+    company_block = company.prompt_block()
+    judgment = orch.judge_complexity(q, session=session)
+
+    decision, dmeta = _decide(q, identity, session, context, company_block=company_block)
     action = str(decision.get("action") or "speak").strip().lower()
     log.info(
-        "colleague_v3 decide action=%s tool=%s pending=%s hard=%s q=%r",
+        "colleague_v3 decide action=%s tool=%s band=%s pending=%s hard=%s q=%r",
         action,
         str(decision.get("tool") or "")[:40],
+        judgment.band,
         bool(isinstance(session.pending_write, dict) and (session.pending_write or {}).get("tool")),
         bool(dmeta.get("hard_confirm") or dmeta.get("hard_cancel")),
         (q or "")[:80],
@@ -968,6 +994,12 @@ def handle(
         model=dmeta.get("model"),
         trace={
             "colleague_v3": True,
+            "colleague_v4": True,
+            "complexity": judgment.to_dict(),
+            "company_understanding": {
+                "ontology_team": company.ontology.primary_team,
+                "wiki_matched": [p.slug for p in company.wiki.matched],
+            },
             "decide_error": dmeta.get("error") or "",
             "hard_confirm": bool(dmeta.get("hard_confirm")),
             "hard_cancel": bool(dmeta.get("hard_cancel")),
@@ -978,6 +1010,43 @@ def handle(
             },
         },
     )
+
+    # Complex / Medium：走 Orchestrator（写/拒仍走下方原路径）
+    if orch.should_orchestrate(judgment, action):
+        plan = orch.build_plan(q, judgment)
+        if plan.steps:
+            ores = orch.execute_plan(
+                plan,
+                con=con,
+                identity=identity,
+                permission=permission,
+                context=context,
+                invoke_tool=invoke_tool,
+                render_tool_result=render_tool_result,
+            )
+            out.action = "ask"
+            out.intent = "feishu_search" if judgment.band != "ordinary" or judgment.signals.get("chat_who") else "ask_published"
+            out.tools_called = list(ores.tools_called)
+            out.text = _sanitize_user_visible(ores.synthesis_text)
+            out.trace["orchestrator"] = ores.to_dict()
+            out.trace["source_tier"] = "feishu_live" if any(
+                str(t).startswith("feishu.") for t in ores.tools_called
+            ) else "published"
+            out.payload = {
+                "columns": ores.columns,
+                "partial": ores.partial,
+                "complexity": judgment.band,
+            }
+            if ores.partial:
+                _set_last_block(
+                    session,
+                    code="partial",
+                    tool="orchestrator",
+                    message=ores.budget_hit or "partial",
+                )
+            else:
+                _clear_last_block(session)
+            return out
 
     if action == "refuse":
         out.action = "refuse"
@@ -1045,6 +1114,7 @@ def handle(
                     f"用户原话：{q}",
                     identity,
                     session,
+                    company_block=company_block,
                 )
                 out.llm_used = bool(out.llm_used or smeta.get("llm_used"))
                 args["content"] = draft
@@ -1198,6 +1268,7 @@ def handle(
                 identity,
                 session,
                 source_tier="feishu_live",
+                company_block=company_block,
             )
             out.synthesize_llm_used = bool(smeta.get("llm_used"))
             out.llm_used = bool(out.llm_used or smeta.get("llm_used"))
@@ -1328,7 +1399,12 @@ def handle(
                 fact_text = "飞书这边这轮没查到 / 超时了。不要编造。"
         source_tier = "feishu_live" if is_feishu else "published"
         spoken, smeta = _synthesize(
-            q, fact_text, identity, session, source_tier=source_tier
+            q,
+            fact_text,
+            identity,
+            session,
+            source_tier=source_tier,
+            company_block=company_block,
         )
         out.synthesize_llm_used = bool(smeta.get("llm_used"))
         out.llm_used = bool(out.llm_used or smeta.get("llm_used"))
@@ -1339,7 +1415,7 @@ def handle(
         out.trace["source_tier"] = source_tier
         return out
 
-    spoken, smeta = _speak_plain(q, identity, session)
+    spoken, smeta = _speak_plain(q, identity, session, company_block=company_block)
     out.action = "speak"
     out.text = _strip_fake_hands_claims(_sanitize_user_visible(spoken))
     out.intent = "casual"

@@ -479,6 +479,19 @@ Company Understanding **在架构上前置**（先验）；**在工程上**与 O
 | `COLLEAGUE_MEMORY_ISOLATION.md` | 分桶隔离 |
 | `PROJECT_PROGRESS_*.md` | 进度快照（须指向本文） |
 | `AGENT_EVOLUTION.md` / 质量轨文档 | **仅** Grounded Brain / 周报；Ask 不得被 Wiki 替换 |
+| `COLLEAGUE_V4_ACCEPTANCE_8Q.md` | 八问产品验收（非单 case） |
+
+### 实现锚点（代码）
+
+| 模块 | 路径 |
+|------|------|
+| Ontology | `app/agent/company_ontology.py` |
+| Wiki | `app/agent/company_wiki.py` |
+| Context 组装 | `app/agent/company_context.py` |
+| Orchestrator | `app/agent/orchestrator.py` |
+| Brain 接线 | `colleague_v3.handle`（先验注入 + medium/complex 编排） |
+| 开关 | `MESH_COLLEAGUE_ORCHESTRATOR`（默认开） |
+| 测试 | `tests/test_colleague_v4.py` |
 
 ---
 

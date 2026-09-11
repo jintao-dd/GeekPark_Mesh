@@ -14,12 +14,16 @@ class SourceTier(str, Enum):
     PUBLISHED = "published"
     FEISHU_LIVE = "feishu_live"
     MODEL = "model"
+    WIKI_CONTEXT = "wiki_context"
+    ONTOLOGY = "ontology"
 
 
 class TruthLevel(str, Enum):
     ENTERPRISE_FACT = "enterprise_fact"
     LIVE_CONTEXT = "live_context"
     GENERAL_KNOWLEDGE = "general_knowledge"
+    COMPANY_CONTEXT = "company_context"
+    COMPANY_STRUCTURE = "company_structure"
 
 
 class SideEffect(str, Enum):
@@ -31,6 +35,8 @@ _TIER_TRUTH: dict[SourceTier, TruthLevel] = {
     SourceTier.PUBLISHED: TruthLevel.ENTERPRISE_FACT,
     SourceTier.FEISHU_LIVE: TruthLevel.LIVE_CONTEXT,
     SourceTier.MODEL: TruthLevel.GENERAL_KNOWLEDGE,
+    SourceTier.WIKI_CONTEXT: TruthLevel.COMPANY_CONTEXT,
+    SourceTier.ONTOLOGY: TruthLevel.COMPANY_STRUCTURE,
 }
 
 
@@ -123,6 +129,8 @@ def speech_hint(tier: SourceTier | str) -> str:
         SourceTier.PUBLISHED: "周报里记录的是",
         SourceTier.FEISHU_LIVE: "飞书最近的讨论/文档则",
         SourceTier.MODEL: "我觉得（看法，非企业事实）",
+        SourceTier.WIKI_CONTEXT: "按我们公司语境",
+        SourceTier.ONTOLOGY: "按组织/结构",
     }[t]
 
 

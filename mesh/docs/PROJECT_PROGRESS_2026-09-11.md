@@ -311,25 +311,25 @@ https://feishu.cn/docx/BCQodMvgyokof1x1SIsccJ7Tnmc
 
 ## 7. 未决项总表（按优先级）
 
-### P0 · 近端 + v4 梯子（Company Understanding 前置，见 `COLLEAGUE_AGENT_V4.md` §9）
+### P0 · 近端（Architecture 基建 ∪ Execution 场景；见 v4 §9–§10）
 
 | 项 | 状态 | 说明 |
 |----|------|------|
-| 架构契约文档 v4 | ✅ | 含公司理解三角；§9 实施序已按栈序改正 |
-| **Company Ontology v0** | ❌ | **先于** Orchestrator；结构先验注入 Brain/Judge |
-| **Company Wiki v0** | ❌ | **先于** Specialist 空转；`wiki_context`；禁冒充 FACT |
-| Session/Context 接线先验 | ❌ | Ontology+Wiki+Session 同一 Context |
-| Brain 消费先验 | ❌ | 无先验不装懂 |
-| TaskPlan + 只读 Orchestrator | ❌ | 在先验之后；写路径不动 |
-| Complexity Judge 显式档位 | ❌ | Judge 读先验再分档 |
-| Bounded ReAct 预算闸 | ❌ | 初值见 v4；Capacity 后校准 |
-| Specialist 接口 | ❌ | 只消费先验 + Capability |
-| Synthesis 分栏 FACT/ANALYSIS/OPINION/SUGGESTION | ❌ | 「有思想」落点 |
-| Complex 金丝雀 tmesh 真聊 | ❌ | 群+人+日历+周报 |
-| 开放平台 scopes **发版并生效** | ⚠ Ops | 勾选不够；须创建版本+发布 |
-| Hands 真人多轮（创建文档→确认→公司内可开） | 🔨 | 代码就绪；依赖 scopes + 现场验 |
-| Decide/调度稳健性（过渡期） | 🔨 | 至 Orchestrator 接管前持续真聊 |
-| Canary 2.0 真人指标 | 🔨 | 只量不修 |
+| 架构契约文档 v4 | ✅ | **Architecture ≠ Execution Complexity** 已分立 |
+| Company Ontology v0 | ✅ | `company_ontology.py` 注入 Context |
+| Company Wiki v0 | ✅ | 种子页 + `wiki_context`；禁冒充 FACT |
+| Session/Context 含先验 | ✅ | `company_context.assemble` |
+| Brain 消费先验 + Judge | ✅ | Decide/Speak/Synthesize + `orchestrator.judge` |
+| TaskPlan + 只读 Orchestrator | ✅ | `orchestrator.py`；写路径仍 confirm |
+| Bounded ReAct + Specialist | ✅ 预算闸 | replan 补边未齐 |
+| Synthesis 分栏 | ✅ | FACT/ANALYSIS/OPINION/SUGGESTION |
+| **Complex 金丝雀**（可直打） | ✅ 本地 mock | 真飞书 Canary 待做 |
+| Simple / Ordinary / Medium 回归 | ✅ 本地 | |
+| 八问验收文档 | ✅ | `COLLEAGUE_V4_ACCEPTANCE_8Q.md` |
+| Write / Budget / Identity 横切 | 🔨 | 日历 UAT 等 |
+| 开放平台 scopes **发版并生效** | ⚠ Ops | |
+| Hands 真人多轮 | 🔨 | |
+| Canary 2.0 / 八问·愿用 | ❌ | 须真人；不代码自证 |
 
 ### P1 · 下一波产品
 
@@ -413,11 +413,11 @@ f0c4762  native OpenAPI Hands；真测可开
 
 ## 11. 「现在该干什么」执行序
 
-1. **锁架构：** 以 `COLLEAGUE_AGENT_V4.md` 为准；**Company Understanding 前置**（§9），废止「先 Planner 后 Ontology」。  
-2. **先 C0–C2：** Ontology v0 → Wiki v0 → Brain 注入；pytest + tmesh。  
-3. **再 L0–L3：** TaskPlan / Judge / 金丝雀（群+人+日历+周报）。  
-4. **开放平台：** scopes 发版 + Agent OAuth 回调域。  
-5. **勿做：** 无先验空转 Specialist、解冻 Ranking/Claim、无限 ReAct、Wiki 冒充 FACT、跳过 tmesh 直推 prod。
+1. **锁两维：** Architecture 固定；Execution Complexity 只描述用户目标难度（v4 §9–§10）。  
+2. **补齐基建面：** Ontology / Wiki 注入 + Session/Context + Orchestrator + Synthesis（可同一迭代）。  
+3. **直打 Complex 金丝雀**（共用基建）；Simple/Medium **并行**回归，不当 Stage 门。  
+4. **开放平台：** scopes + OAuth 回调。  
+5. **勿做：** L0→L8 阶段叙事、无先验空壳「同事」、Wiki 冒充 FACT、解冻质量轨、跳过 tmesh。
 
 ---
 
@@ -429,6 +429,7 @@ f0c4762  native OpenAPI Hands；真测可开
 | 2026-09-11 | **路线修订：** 引入 Colleague v4 Agentic Enterprise；解禁有笼 Bounded ReAct/Planner/Specialists；废止 Stage 线性计划 |
 | 2026-09-11 | **公司理解三角：** Ontology + Wiki + Grounding 写入 v4；区分 Claim Ontology 与 Company Wiki 笼子 |
 | 2026-09-11 | **§9 改正：** Company Understanding 实施前置；废止先 Orchestrator 后 Ontology/Wiki |
+| 2026-09-11 | **§9–§10 再改正：** Architecture ≠ Execution Complexity；废除 L0–L8 Stage 读法；Complex 可直打 |
 
 ---
 
