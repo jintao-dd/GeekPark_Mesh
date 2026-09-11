@@ -179,7 +179,7 @@ def test_handle_orchestrates_complex_with_mock_tools():
     assert out.trace.get("complexity", {}).get("band") == "complex"
     assert "orchestrator" in out.trace
     assert calls  # tools ran
-    assert "**事实**" in (out.text or "") or "事实" in (out.text or "")
+    assert "**我查到的**" in (out.text or "") or "我查到的" in (out.text or "")
 
 
 def test_sanitize_keeps_colleague_text_with_incidental_action():
