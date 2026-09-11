@@ -769,6 +769,15 @@ def _cli_call(
             if not items:
                 return envelope_fail("user_lookup_empty", tool=tool)
             return envelope_ok(normalize_docs(items[: int(mr)], kind="user"), tool=tool)
+        if rt in ("directory", "org"):
+            # 通讯录走 OpenAPI（bot TAT）；与 CLI backend 无关，不依赖 +search-user
+            from . import org_directory
+
+            return org_directory.search_directory(
+                str(args.get("keyword") or q or ""),
+                max_results=max(int(mr), 40),
+                list_departments=bool(args.get("list_departments")),
+            )
         if rt == "calendar":
             return _cli_call(
                 "feishu.calendar.list",

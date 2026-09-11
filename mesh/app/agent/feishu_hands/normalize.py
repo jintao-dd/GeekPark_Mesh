@@ -71,7 +71,7 @@ def normalize_item(raw: dict[str, Any], *, kind: str = "doc") -> dict[str, Any] 
             url = ""
         elif docs_type in ("calendar", "event"):
             url = f"https://feishu.cn/calendar/{token}"
-        elif docs_type in ("member", "user", "person", "group", "message"):
+        elif docs_type in ("member", "user", "person", "group", "message", "department"):
             url = ""
         else:
             url = f"https://feishu.cn/drive/folder/{token}"

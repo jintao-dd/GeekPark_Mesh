@@ -115,7 +115,7 @@ _SYSTEM_DECIDE = """你是 GeekPark 内部 AI 同事 Mesh 的「调度」层。
 
 {"situation":"chat","action":"speak"}
 {"situation":"need_published","action":"ask","tool":"ask.published","query":"..."}
-{"situation":"need_feishu_read","action":"ask","tool":"feishu.search","query":"...","resource_type":"doc|message|group|wiki|folder|calendar|member|user","args":{}}
+{"situation":"need_feishu_read","action":"ask","tool":"feishu.search","query":"...","resource_type":"doc|message|group|wiki|folder|calendar|member|user|directory","args":{}}
 {"situation":"want_feishu_write","action":"prepare_write","tool":"feishu.doc.create|feishu.im.send|feishu.calendar.create","args":{"title":"短","content":""}}
 {"situation":"confirm_pending","action":"confirm_write"}
 {"situation":"cancel_pending","action":"cancel_write"}
@@ -132,12 +132,13 @@ _SYSTEM_DECIDE = """你是 GeekPark 内部 AI 同事 Mesh 的「调度」层。
 飞书读路由提示（结构化，不要把用户整句当检索词）：
 - 列群 → tool=feishu.search, resource_type=group, query=""（或 args.keyword=群名）
 - 列本群成员 → feishu.search + member, query=""（需当前 chat_id；私聊无 chat 时先问要哪个群）
+- 找同事/通讯录/公司里谁叫X/组织架构里的人 → feishu.search + directory，args.keyword=姓名或工号短词；空 keyword 可列可见范围人员/部门
 - @某人 / 他是谁（有 mentions.open_id）→ feishu.search + user，args.open_ids=[...]
 - 日程 → tool=feishu.calendar.list, query 可空；不要塞整句
 - 会话消息 → feishu.search + message；关键词放 args.keyword / 短 query
 - 文档/Wiki → feishu.search + doc|wiki，短检索词
 - feishu.search 必须带 resource_type
-- 不要假装已有全公司组织架构树；没有 open_id / 成员列表结果时如实说查不到
+- 通讯录可见范围 = 飞书应用通讯录权限；有结果就报姓名+open_id，没结果如实说查不到
 
 规则（看「系统工作记忆」+ 对话，不要枚举用户句式）：
 - 有待确认写操作 + 用户同意 → confirm_write
@@ -661,11 +662,12 @@ def _infer_search_resource_type(query: str) -> str:
     q = (query or "").strip()
     if not q:
         return "doc"
-    allowed = ("doc", "message", "group", "wiki", "folder", "calendar", "member", "user")
+    allowed = ("doc", "message", "group", "wiki", "folder", "calendar", "member", "user", "directory")
     system = (
         "你给飞书搜索选 resource_type。"
-        "只输出其中一个单词：doc / message / group / wiki / folder / calendar / member / user。"
-        "列群/群聊→group；列群成员/谁在群里→member；@某人/他是谁/查此人→user；"
+        "只输出其中一个单词：doc / message / group / wiki / folder / calendar / member / user / directory。"
+        "列群/群聊→group；列群成员/谁在群里→member；@某人/已知open_id查此人→user；"
+        "找同事/通讯录/公司里谁/按姓名搜人/组织架构→directory；"
         "日程/开会/周会→calendar；聊天消息→message；知识库→wiki；文件夹→folder；云文档→doc。"
         "不要解释。"
     )
@@ -713,7 +715,7 @@ def _build_ask_args(
             decide_q = str(decision.get("query") or "").strip()
             args["q"] = decide_q if decide_q and decide_q != (query or "").strip() else ""
             # 若 Decide 把整句放进 query，搜索词也清空，由 resource_type 决定 list/search
-            if args["q"] == (query or "").strip() and rt in ("group", "calendar", "member"):
+            if args["q"] == (query or "").strip() and rt in ("group", "calendar", "member", "directory"):
                 args["q"] = ""
         # @人 / 查人：从 args 或上下文 mentions 注入 open_ids
         if rt == "user":
@@ -741,6 +743,13 @@ def _build_ask_args(
             if oids:
                 args["open_ids"] = oids
                 args.setdefault("open_id", oids[0])
+        if rt in ("directory", "org"):
+            args["resource_type"] = "directory"
+            # 姓名/工号短词；整句清空
+            if args.get("q") == (query or "").strip():
+                args["q"] = keyword or ""
+                if keyword:
+                    args["keyword"] = keyword
     elif tool == "feishu.calendar.list":
         args["q"] = keyword
         if keyword:

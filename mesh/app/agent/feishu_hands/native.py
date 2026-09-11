@@ -313,6 +313,14 @@ def call_native(
                 if one:
                     oids = [one] + [x for x in oids if x != one]
                 return _get_users(oids, max_results=mr)
+            if rt in ("directory", "org"):
+                from . import org_directory
+
+                return org_directory.search_directory(
+                    str(args.get("keyword") or q or ""),
+                    max_results=max(int(mr), 40),
+                    list_departments=bool(args.get("list_departments")),
+                )
             if rt == "calendar":
                 return _calendar_list(q, days=14, max_results=mr)
             return envelope_fail(f"resource_type_unsupported:{rt}", tool=tool)

@@ -437,6 +437,37 @@ def test_cli_user_get(monkeypatch):
     assert "+86176" not in env.items[0]["snippet"]
 
 
+def test_directory_search_uses_org_module(monkeypatch):
+    from app.agent.feishu_hands import org_directory
+    from app.agent.feishu_hands.normalize import envelope_ok, normalize_docs
+
+    def fake_search(query="", *, max_results=20, list_departments=False):
+        return envelope_ok(
+            normalize_docs(
+                [
+                    {
+                        "title": "张山山",
+                        "snippet": "G-007 · ou_x",
+                        "docs_type": "user",
+                        "id": "ou_x",
+                        "url": "",
+                    }
+                ],
+                kind="user",
+            ),
+            tool="feishu.search",
+        )
+
+    monkeypatch.setattr(org_directory, "search_directory", fake_search)
+    env = backends._cli_call(
+        "feishu.search",
+        {"query": "张山山", "resource_type": "directory", "max_results": 8},
+        timeout_sec=5,
+    )
+    assert env.ok
+    assert env.items[0]["title"] == "张山山"
+
+
 def test_build_ask_args_user_injects_mentions():
     from app.agent.colleague_v3 import _build_ask_args
     from app.agent.models import AgentContext, IssueRef

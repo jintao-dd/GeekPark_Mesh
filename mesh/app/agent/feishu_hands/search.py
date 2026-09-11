@@ -29,8 +29,8 @@ def search(
 
     q = (query or "").strip()
     rt = (resource_type or "doc").strip().lower() or "doc"
-    # 群列表 / 日历 / 群成员 / 按 id 查人：允许空 query
-    if not q and rt not in ("group", "calendar", "member", "user"):
+    # 群列表 / 日历 / 群成员 / 按 id 查人 / 通讯录：允许空 query
+    if not q and rt not in ("group", "calendar", "member", "user", "directory"):
         return envelope_ok([])
 
     if not feishu_search_type_allowed(rt, phase=phase):
