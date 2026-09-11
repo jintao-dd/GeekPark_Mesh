@@ -10,7 +10,8 @@ __pycache__
 *.tar
 *.tar.gz
 app-deploy.tgz
-data/
+# Only exclude mesh root data/ (raw dumps). Keep app/agent/data/ roster etc.
+/data/
 eval/reports/
 **/reports/
 deploy/_*.py
