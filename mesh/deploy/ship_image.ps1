@@ -77,8 +77,10 @@ $tarLocal = Join-Path $env:TEMP "mesh_image_ctx.tgz"
 if (Test-Path $tarLocal) { Remove-Item $tarLocal -Force }
 Push-Location $MeshRoot
 try {
+  # Do not --exclude=data: that also drops app/agent/data (roster JSON).
+  # Root mesh/data is not in the pack list below, so it is already omitted.
   & tar -czf $tarLocal `
-    --exclude=__pycache__ --exclude=*.pyc --exclude=.env --exclude=data `
+    --exclude=__pycache__ --exclude=*.pyc --exclude=.env `
     --exclude=eval/reports --exclude=app-deploy.tgz `
     Dockerfile requirements.txt docker-compose.staging.yml docker-compose.yml `
     .dockerignore app deploy/docker-entry.sh eval/emit_repro_baseline.py
