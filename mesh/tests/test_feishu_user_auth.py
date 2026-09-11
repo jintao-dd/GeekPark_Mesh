@@ -45,3 +45,26 @@ def test_ensure_identity_allows_directory_without_uat(tmp_path, monkeypatch):
     )
     assert block is None
     assert uat == ""
+
+
+def test_parse_calendar_range_tomorrow_afternoon():
+    from app.agent.colleague_v3 import _parse_calendar_range
+
+    s, e = _parse_calendar_range("帮我创建一个明天下午两点的日历，需要我去吃饭")
+    assert s and e
+    assert "T14:00:00" in s or "T14:00:00+" in s
+    assert "T15:00:00" in e or "T15:00:00+" in e
+
+
+def test_format_display_skips_weekly_footer_for_feishu_write():
+    from app.agent.feishu_reply import format_display_text
+    from app.agent.models import AgentAnswer
+
+    ans = AgentAnswer(
+        text="准备创建日程：去吃饭\n时间：x ~ y",
+        intent="feishu_write",
+        context={"issue_ref": {"slug": "2026-09-08"}},
+        trace={},
+    )
+    text = format_display_text(ans)
+    assert "已上线周报" not in text

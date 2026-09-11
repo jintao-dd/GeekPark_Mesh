@@ -40,6 +40,111 @@ def _clean_user_text(text: str) -> str:
     return normalize_query(text or "")
 
 
+def _parse_calendar_range(text: str) -> tuple[str, str]:
+    """从中文相对时间抽出 start/end ISO（东八区）。失败返回 ('','')."""
+    from datetime import datetime, timedelta, timezone
+
+    q = text or ""
+    tz = timezone(timedelta(hours=8))
+    now = datetime.now(tz)
+    day = now
+    if "后天" in q:
+        day = now + timedelta(days=2)
+    elif "明天" in q:
+        day = now + timedelta(days=1)
+    elif "大后天" in q:
+        day = now + timedelta(days=3)
+
+    cn_num = {
+        "零": 0,
+        "〇": 0,
+        "一": 1,
+        "二": 2,
+        "两": 2,
+        "三": 3,
+        "四": 4,
+        "五": 5,
+        "六": 6,
+        "七": 7,
+        "八": 8,
+        "九": 9,
+        "十": 10,
+        "十一": 11,
+        "十二": 12,
+    }
+
+    def _to_hour(token: str) -> int | None:
+        t = (token or "").strip()
+        if not t:
+            return None
+        if t.isdigit():
+            return int(t)
+        if t in cn_num:
+            return int(cn_num[t])
+        if t.startswith("十") and len(t) == 2 and t[1] in cn_num:
+            return 10 + int(cn_num[t[1]])
+        return None
+
+    hour = None
+    minute = 0
+    # 14:00 / 14：30
+    m = re.search(r"(?<!\d)([01]?\d|2[0-3])\s*[:：]\s*([0-5]\d)", q)
+    if m:
+        hour = int(m.group(1))
+        minute = int(m.group(2))
+    if hour is None:
+        m = re.search(
+            r"(上午|下午|中午|晚上|傍晚)?\s*([0-9一二两三四五六七八九十]{1,3})\s*[点时]"
+            r"(?:半|(?:\s*([0-9一二三四五六七八九十]{1,2})\s*分?))?",
+            q,
+        )
+        if m:
+            tod = m.group(1) or ""
+            hour = _to_hour(m.group(2))
+            if m.group(0) and "半" in m.group(0) and not m.group(3):
+                minute = 30
+            elif m.group(3):
+                minute = _to_hour(m.group(3)) or 0
+            if hour is not None:
+                if tod in ("下午", "晚上", "傍晚") and hour < 12:
+                    hour += 12
+                elif tod == "中午" and hour < 11:
+                    hour = 12
+                elif tod == "上午" and hour == 12:
+                    hour = 0
+    if hour is None and re.search(r"中午", q):
+        hour, minute = 12, 0
+    if hour is None:
+        return "", ""
+
+    start = day.replace(hour=int(hour), minute=int(minute or 0), second=0, microsecond=0)
+    dur_h = 1.0
+    dm = re.search(r"(\d+(?:\.\d+)?)\s*小时", q)
+    if dm:
+        try:
+            dur_h = float(dm.group(1))
+        except Exception:
+            dur_h = 1.0
+    elif re.search(r"半小时|30\s*分", q):
+        dur_h = 0.5
+    end = start + timedelta(hours=dur_h)
+    return start.isoformat(), end.isoformat()
+
+
+def _guess_calendar_title(text: str, args: dict[str, Any]) -> str:
+    t = str(args.get("title") or "").strip()
+    if t and t not in ("未命名", "未命名日程"):
+        return t[:40]
+    q = text or ""
+    m = re.search(r"(?:标题|主题)\s*[：:]\s*([^\s，,。]{1,40})", q)
+    if m:
+        return m.group(1).strip()
+    m = re.search(r"(?:去|要去|约|开)\s*([^\s，,。]{2,20})", q)
+    if m:
+        return m.group(0).strip()[:40]
+    return "日程"
+
+
 def _looks_like_confirm(text: str) -> bool:
     """仅短句硬确认：有 pending 时防 JSON 炸掉。意图判断交给 LLM。"""
     q = _clean_user_text(text)
@@ -367,7 +472,9 @@ def _strip_fake_hands_claims(text: str) -> str:
 
 def _block_user_text(code: str, err: str) -> str:
     if code == "user_auth_required":
-        return err or "需要你的个人飞书授权后才能继续。"
+        if err and err not in ("user_auth_required", "need_uat") and "http" in err:
+            return err
+        return "需要你的个人飞书授权后才能继续。请点开授权链接，完成后回复「确认」或「继续」。"
     if code == "scope_denied":
         return (
             f"没写进去：应用缺权限（{err[:120]}）。"
@@ -794,9 +901,17 @@ def _prepare_write_text(tool: str, args: dict[str, Any]) -> str:
             f"确认发送吗？回复「确认」；「取消」则不发。"
         )
     if tool == "feishu.calendar.create":
+        start = str(args.get("start") or "").strip()
+        end = str(args.get("end") or "").strip()
+        title = str(args.get("title") or "未命名")
+        if not start or start == "None" or not end or end == "None":
+            return (
+                f"准备创建日程：{title}\n"
+                f"但时间还不清楚。请直接说具体时间，例如「明天下午两点到三点」，我再给你确认。"
+            )
         return (
-            f"准备创建日程：{args.get('title') or '未命名'}\n"
-            f"时间：{args.get('start')} ~ {args.get('end')}\n"
+            f"准备创建日程：{title}\n"
+            f"时间：{start} ~ {end}\n"
             f"{args.get('description') or ''}\n\n"
             f"确认创建吗？回复「确认」；「取消」则不作数。"
         )
@@ -937,6 +1052,54 @@ def handle(
                     args["title"] = (q[:32] or "Mesh 整理").strip()
         if tool == "feishu.im.send" and not str(args.get("text") or "").strip():
             args["text"] = q
+        if tool == "feishu.calendar.create":
+            args["title"] = _guess_calendar_title(q, args)
+            start = str(args.get("start") or "").strip()
+            end = str(args.get("end") or "").strip()
+            if (not start or start == "None") or (not end or end == "None"):
+                ps, pe = _parse_calendar_range(q)
+                if ps and pe:
+                    args["start"], args["end"] = ps, pe
+            start = str(args.get("start") or "").strip()
+            end = str(args.get("end") or "").strip()
+            if not start or not end or start == "None" or end == "None":
+                out.action = "speak"
+                out.intent = "feishu_write"
+                out.tool_id = tool
+                out.text = (
+                    f"想帮你建「{args.get('title') or '日程'}」，但还缺具体时间。"
+                    "请说清几点到几点，例如「明天下午两点到三点」。"
+                )
+                out.trace["source_tier"] = "feishu_live"
+                return out
+            # 创建日程必须个人授权：未授权时先给链接，pending 仍保留，授权后可直接「确认」
+            from . import feishu_user_auth as uauth
+
+            oid = str(getattr(identity, "feishu_open_id", None) or "").strip()
+            if not uauth.resolve_uat(open_id=oid):
+                session.pending_write = {"tool": tool, "args": args}
+                _persist_pending(session, context, identity)
+                _set_active_goal(
+                    session,
+                    summary=f"写入 {tool}：{args.get('title')}",
+                    family="feishu_write",
+                    tool=tool,
+                    utterance=q,
+                )
+                guide = uauth.auth_guide_text(open_id=oid, capability="以你的名义创建日程")
+                out.action = "speak"
+                out.intent = "feishu_write"
+                out.tool_id = tool
+                out.text = (
+                    _prepare_write_text(tool, args)
+                    + "\n\n"
+                    + guide
+                    + "\n\n授权完成后直接回复「确认」即可创建。"
+                )
+                out.trace["pending_write"] = tool
+                out.trace["source_tier"] = "feishu_live"
+                out.trace["user_auth_required"] = True
+                return out
         session.pending_write = {"tool": tool, "args": args}
         _persist_pending(session, context, identity)
         _set_active_goal(
@@ -958,6 +1121,7 @@ def handle(
             out.text = _prepare_write_text(tool, args)
         out.trace["pending_write"] = tool
         out.trace["active_goal"] = session.active_goal
+        out.trace["source_tier"] = "feishu_live"
         return out
 
     if action == "confirm_write":
@@ -1002,6 +1166,28 @@ def handle(
         out.claim_bindings = list(bindings or [])
         out.evidence_refs = list(evidence or [])
         out.payload = result.payload if isinstance(getattr(result, "payload", None), dict) else {}
+        # 缺个人授权：保留 pending，发引导链接（不要只回裸错误码）
+        if str(getattr(result, "error", "") or "") == "user_auth_required" or (
+            isinstance(out.payload, dict) and out.payload.get("user_auth_required")
+        ):
+            from . import feishu_user_auth as uauth
+
+            guide = str((out.payload or {}).get("auth_text") or "").strip()
+            if not guide:
+                guide = uauth.auth_guide_text(
+                    open_id=str(getattr(identity, "feishu_open_id", None) or ""),
+                    capability="以你的名义创建日程",
+                )
+            _set_last_block(session, code="user_auth_required", tool=tool, message="need_uat")
+            out.action = "speak"
+            out.text = _sanitize_user_visible(
+                guide + "\n\n授权完成后回复「确认」，我会按刚才的预览写入。"
+            )
+            out.trace["write_confirmed"] = tool
+            out.trace["source_tier"] = "feishu_live"
+            out.trace["user_auth_required"] = True
+            out.trace["last_block"] = session.last_block
+            return out
         _clear_pending(session, context, identity)
         if getattr(result, "ok", False):
             _clear_active_goal(session)

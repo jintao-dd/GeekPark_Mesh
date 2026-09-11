@@ -171,6 +171,15 @@ def format_display_text(
         tier = str(payload.get("source_tier") or "").strip().lower()
     if not tier:
         tier = str((answer.trace or {}).get("source_tier") or "").strip().lower()
+    if not tier and str(getattr(answer, "intent", "") or "") in (
+        "feishu_search",
+        "feishu_doc_get",
+        "feishu_calendar_list",
+        "feishu_calendar_propose",
+        "feishu_discuss",
+        "feishu_write",
+    ):
+        tier = "feishu_live"
     if tier == "feishu_live":
         if uniq_refs and kind not in ("no_hit", "system_error", "timeout", "permission"):
             meta_lines.append("可核对：")
