@@ -171,6 +171,126 @@ def test_cli_extract_created_doc_nested():
     assert url.endswith("/docx/abc")
 
 
+def test_cli_group_uses_chat_list(monkeypatch):
+    calls = []
+
+    def fake_run(argv, *, timeout_sec, tool, as_identity="bot", user_access_token="", confirm_yes=False):
+        calls.append(list(argv))
+        from app.agent.feishu_hands.normalize import envelope_ok
+
+        if argv[:2] == ["im", "+chat-search"]:
+            return envelope_ok(
+                [],
+                tool=tool,
+                meta={"cli": {"ok": True, "data": {"chats": None, "total": 0}}},
+            )
+        assert argv[:2] == ["im", "+chat-list"]
+        return envelope_ok(
+            [],
+            tool=tool,
+            meta={
+                "cli": {
+                    "ok": True,
+                    "data": {
+                        "chats": [
+                            {"name": "Mesh 测试群", "chat_id": "oc_aaa"},
+                            {"name": "其他", "chat_id": "oc_bbb"},
+                        ]
+                    },
+                }
+            },
+        )
+
+    monkeypatch.setattr(backends, "_cli_run", fake_run)
+    env = backends._cli_call(
+        "feishu.search",
+        {"query": "Mesh", "resource_type": "group", "max_results": 5},
+        timeout_sec=5,
+    )
+    assert env.ok
+    assert len(env.items) == 1
+    assert env.items[0]["title"] == "Mesh 测试群"
+    assert calls[0][:2] == ["im", "+chat-search"]
+    assert calls[1][:2] == ["im", "+chat-list"]
+
+
+def test_cli_calendar_uses_freebusy_for_open_id(monkeypatch):
+    def fake_run(argv, *, timeout_sec, tool, as_identity="bot", user_access_token="", confirm_yes=False):
+        from app.agent.feishu_hands.normalize import envelope_ok
+
+        assert argv[:2] == ["calendar", "+freebusy"]
+        assert "--user-id" in argv
+        return envelope_ok(
+            [],
+            tool=tool,
+            meta={
+                "cli": {
+                    "ok": True,
+                    "data": {
+                        "users": [
+                            {
+                                "user_id": "ou_x",
+                                "raw_busy": [
+                                    {
+                                        "start_time": "2026-09-13T12:30:00+08:00",
+                                        "end_time": "2026-09-13T13:00:00+08:00",
+                                        "rsvp_status": "accept",
+                                    }
+                                ],
+                            }
+                        ]
+                    },
+                }
+            },
+        )
+
+    monkeypatch.setattr(backends, "_cli_run", fake_run)
+    env = backends._cli_call(
+        "feishu.calendar.list",
+        {"days": 7},
+        timeout_sec=5,
+        open_id="ou_x",
+    )
+    assert env.ok
+    assert len(env.items) == 1
+    assert "12:30" in str(env.items[0].get("snippet") or "")
+
+
+def test_cli_message_prefers_chat_messages_list(monkeypatch):
+    def fake_run(argv, *, timeout_sec, tool, as_identity="bot", user_access_token="", confirm_yes=False):
+        from app.agent.feishu_hands.normalize import envelope_ok
+
+        assert argv[:2] == ["im", "+chat-messages-list"]
+        return envelope_ok(
+            [],
+            tool=tool,
+            meta={
+                "cli": {
+                    "ok": True,
+                    "data": {
+                        "messages": [
+                            {
+                                "content": "CLI火凤凰测试",
+                                "create_time": "2026-09-11 12:00",
+                                "message_id": "om_1",
+                                "sender": {"id": "ou_x"},
+                            }
+                        ]
+                    },
+                }
+            },
+        )
+
+    monkeypatch.setattr(backends, "_cli_run", fake_run)
+    env = backends._cli_call(
+        "feishu.search",
+        {"query": "火凤凰", "resource_type": "message", "chat_id": "oc_1", "max_results": 5},
+        timeout_sec=5,
+    )
+    assert env.ok
+    assert env.items and "火凤凰" in str(env.items[0].get("snippet") or env.items[0].get("title") or "")
+
+
 def test_format_display_skips_weekly_footer_for_feishu_live():
     from app.agent.feishu_reply import format_display_text
     from app.agent.models import AgentAnswer

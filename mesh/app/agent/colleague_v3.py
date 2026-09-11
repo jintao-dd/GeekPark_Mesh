@@ -115,7 +115,7 @@ _SYSTEM_DECIDE = """你是 GeekPark 内部 AI 同事 Mesh 的「调度」层。
 
 {"situation":"chat","action":"speak"}
 {"situation":"need_published","action":"ask","tool":"ask.published","query":"..."}
-{"situation":"need_feishu_read","action":"ask","tool":"feishu.search","query":"...","resource_type":"doc|message|wiki|folder|calendar","args":{}}
+{"situation":"need_feishu_read","action":"ask","tool":"feishu.search","query":"...","resource_type":"doc|message|group|wiki|folder|calendar","args":{}}
 {"situation":"want_feishu_write","action":"prepare_write","tool":"feishu.doc.create|feishu.im.send|feishu.calendar.create","args":{"title":"短","content":""}}
 {"situation":"confirm_pending","action":"confirm_write"}
 {"situation":"cancel_pending","action":"cancel_write"}
@@ -128,6 +128,12 @@ _SYSTEM_DECIDE = """你是 GeekPark 内部 AI 同事 Mesh 的「调度」层。
 可读 tool：ask.published | ask.relations_summary | context.list_issues |
   feishu.search | feishu.doc.get | feishu.calendar.list | feishu.discuss.summary
 可写 tool：feishu.doc.create | feishu.im.send | feishu.calendar.create
+
+飞书读路由提示：
+- 列群/群列表 → feishu.search + resource_type=group
+- 查我的日程/周会 → feishu.calendar.list（或 search + calendar）
+- 当前会话/群聊天记录 → feishu.search + message（系统会带 chat_id）
+- 搜文档/Wiki → feishu.search + doc|wiki
 
 规则（看「系统工作记忆」+ 对话，不要枚举用户句式）：
 - 有待确认写操作 + 用户同意 → confirm_write

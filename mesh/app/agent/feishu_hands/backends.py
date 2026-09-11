@@ -135,11 +135,123 @@ def _cli_items_from_payload(payload: dict[str, Any]) -> list[Any]:
     if isinstance(data, list):
         return list(data)
     if isinstance(data, dict):
-        for k in ("items", "events", "docs_entities", "messages", "calendar_list"):
+        for k in (
+            "items",
+            "events",
+            "docs_entities",
+            "messages",
+            "chats",
+            "calendar_list",
+            "agenda",
+        ):
             v = data.get(k)
             if isinstance(v, list):
                 return list(v)
+        # freebusy: data.users[].busy|raw_busy
+        users = data.get("users")
+        if isinstance(users, list):
+            busy: list[Any] = []
+            for u in users:
+                if not isinstance(u, dict):
+                    continue
+                slots = u.get("raw_busy") or u.get("busy") or []
+                if isinstance(slots, list):
+                    for s in slots:
+                        if isinstance(s, dict):
+                            row = dict(s)
+                            row.setdefault("user_id", u.get("user_id"))
+                            busy.append(row)
+            if busy:
+                return busy
     return []
+
+
+def _cli_iso_range(*, days: int = 7) -> tuple[str, str]:
+    from datetime import datetime, timedelta, timezone
+
+    tz = timezone(timedelta(hours=8))
+    start = datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+    end = (start + timedelta(days=max(1, int(days or 7)))).replace(
+        hour=23, minute=59, second=59, microsecond=0
+    )
+    return start.isoformat(), end.isoformat()
+
+
+def _cli_norm_chats(raw: list[Any], *, query: str = "") -> list[dict[str, Any]]:
+    q = (query or "").strip().lower()
+    out: list[dict[str, Any]] = []
+    for c in raw:
+        if not isinstance(c, dict):
+            continue
+        name = str(c.get("name") or c.get("chat_id") or "").strip()
+        cid = str(c.get("chat_id") or c.get("id") or "").strip()
+        if q and q not in name.lower() and q not in cid.lower():
+            continue
+        out.append(
+            {
+                "title": name or cid or "群聊",
+                "snippet": cid,
+                "docs_type": "group",
+                "id": cid,
+                "docs_token": cid,
+                "url": "",
+            }
+        )
+    return out
+
+
+def _cli_norm_busy(raw: list[Any]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for s in raw:
+        if not isinstance(s, dict):
+            continue
+        start = str(s.get("start_time") or s.get("start") or "").strip()
+        end = str(s.get("end_time") or s.get("end") or "").strip()
+        rsvp = str(s.get("rsvp_status") or "").strip()
+        title = str(s.get("summary") or s.get("title") or "忙碌时段").strip()
+        snip = f"{start} ~ {end}".strip(" ~")
+        if rsvp:
+            snip = f"{snip}（{rsvp}）" if snip else rsvp
+        out.append(
+            {
+                "title": title,
+                "snippet": snip,
+                "docs_type": "calendar",
+                "id": str(s.get("event_id") or s.get("id") or ""),
+                "url": "",
+            }
+        )
+    return out
+
+
+def _cli_norm_messages(raw: list[Any], *, query: str = "") -> list[dict[str, Any]]:
+    q = (query or "").strip().lower()
+    out: list[dict[str, Any]] = []
+    for m in raw:
+        if not isinstance(m, dict):
+            continue
+        text = str(m.get("content") or m.get("body") or m.get("text") or "").strip()
+        if len(text) > 400:
+            text = text[:400]
+        sender = m.get("sender") if isinstance(m.get("sender"), dict) else {}
+        sid = str((sender or {}).get("id") or (sender or {}).get("sender_id") or "").strip()
+        when = str(m.get("create_time") or m.get("created_at") or "").strip()
+        if q and q not in text.lower() and q not in sid.lower():
+            continue
+        title = (text[:40] or "消息").replace("\n", " ")
+        snip = text
+        if when:
+            snip = f"{when} · {snip}" if snip else when
+        out.append(
+            {
+                "title": title,
+                "snippet": snip[:300],
+                "docs_type": "message",
+                "id": str(m.get("message_id") or m.get("id") or ""),
+                "url": str(m.get("message_app_link") or ""),
+            }
+        )
+    return out
 
 
 def _cli_extract_created_doc(data: Any) -> tuple[str, str]:
@@ -424,27 +536,98 @@ def _cli_call(
             return envelope_ok(normalize_docs(items, kind=rt), tool=tool)
         if rt == "message":
             chat_id = str(args.get("chat_id") or "").strip()
-            argv = ["im", "+messages-search", "--query", q, "--page-size", str(min(int(mr), 50))]
+            items: list[Any] = []
+            # 当前会话：优先拉最近消息（bot 可见），再按关键词过滤
             if chat_id:
-                argv += ["--chat-id", chat_id]
-            env = _cli_run(
-                argv,
-                timeout_sec=timeout_sec,
+                env_list = _cli_run(
+                    [
+                        "im",
+                        "+chat-messages-list",
+                        "--chat-id",
+                        chat_id,
+                        "--page-size",
+                        str(min(int(mr) * 3, 50)),
+                    ],
+                    timeout_sec=timeout_sec,
+                    tool=tool,
+                    as_identity="bot",
+                    user_access_token=uat,
+                )
+                if env_list.ok:
+                    payload = (env_list.meta or {}).get("cli") or {}
+                    raw = _cli_items_from_payload(payload if isinstance(payload, dict) else {})
+                    items = _cli_norm_messages(raw, query=q)
+            # 跨会话关键词搜（无 chat 或会话内过滤后为空时）
+            if (not items) and q:
+                argv = [
+                    "im",
+                    "+messages-search",
+                    "--query",
+                    q,
+                    "--page-size",
+                    str(min(int(mr), 50)),
+                ]
+                if chat_id:
+                    argv += ["--chat-id", chat_id]
+                env = _cli_run(
+                    argv,
+                    timeout_sec=timeout_sec,
+                    tool=tool,
+                    as_identity="bot",
+                    user_access_token=uat,
+                )
+                if not env.ok and not chat_id:
+                    return env
+                if env.ok:
+                    payload = (env.meta or {}).get("cli") or {}
+                    raw = _cli_items_from_payload(payload if isinstance(payload, dict) else {})
+                    items = _cli_norm_messages(raw, query="")
+            return envelope_ok(
+                normalize_docs(items[: int(mr)], kind="message"),
                 tool=tool,
-                as_identity="bot",
-                user_access_token=uat,
             )
-            if not env.ok:
-                return env
+        if rt == "group":
+            env = None
+            if q:
+                env = _cli_run(
+                    [
+                        "im",
+                        "+chat-search",
+                        "--query",
+                        q,
+                        "--page-size",
+                        mr,
+                    ],
+                    timeout_sec=timeout_sec,
+                    tool=tool,
+                    as_identity="bot",
+                    user_access_token=uat,
+                )
+            need_list = env is None or (not env.ok) or (
+                env.ok
+                and not _cli_items_from_payload((env.meta or {}).get("cli") or {})
+            )
+            if need_list:
+                env = _cli_run(
+                    ["im", "+chat-list", "--page-size", "50"],
+                    timeout_sec=timeout_sec,
+                    tool=tool,
+                    as_identity="bot",
+                    user_access_token=uat,
+                )
+                if not env.ok:
+                    return env
             payload = (env.meta or {}).get("cli") or {}
-            items = _cli_items_from_payload(payload if isinstance(payload, dict) else {})
-            return envelope_ok(normalize_docs(items, kind="message"), tool=tool)
+            raw = _cli_items_from_payload(payload if isinstance(payload, dict) else {})
+            items = _cli_norm_chats(raw, query=q)
+            return envelope_ok(normalize_docs(items[: int(mr)], kind="group"), tool=tool)
         if rt == "calendar":
             return _cli_call(
                 "feishu.calendar.list",
-                {"query": q, "max_results": int(mr)},
+                {"query": q, "max_results": int(mr), "days": 7},
                 timeout_sec=timeout_sec,
                 user_access_token=uat,
+                open_id=oid,
             )
         return envelope_fail(f"cli_resource_unsupported:{rt}", tool=tool)
 
@@ -478,21 +661,60 @@ def _cli_call(
         )
 
     if tool == "feishu.calendar.list":
-        env = _cli_run(
-            ["calendar", "+agenda"],
-            timeout_sec=timeout_sec,
-            tool=tool,
-            as_identity="bot",
-            user_access_token=uat,
-        )
-        if not env.ok:
-            return env
-        payload = (env.meta or {}).get("cli") or {}
-        items = _cli_items_from_payload(payload if isinstance(payload, dict) else {})
-        return envelope_ok(
-            normalize_docs(items if isinstance(items, list) else [], kind="calendar"),
-            tool=tool,
-        )
+        days = int(args.get("days") or 7)
+        start, end = _cli_iso_range(days=days)
+        items: list[dict[str, Any]] = []
+        # bot 主日历通常为空；有 open_id 时用 freebusy 查用户忙碌时段
+        if oid:
+            env = _cli_run(
+                [
+                    "calendar",
+                    "+freebusy",
+                    "--user-id",
+                    oid,
+                    "--type",
+                    "raw_busy",
+                    "--start",
+                    start,
+                    "--end",
+                    end,
+                ],
+                timeout_sec=timeout_sec,
+                tool=tool,
+                as_identity="bot",
+                user_access_token=uat,
+            )
+            if env.ok:
+                payload = (env.meta or {}).get("cli") or {}
+                raw = _cli_items_from_payload(payload if isinstance(payload, dict) else {})
+                items = _cli_norm_busy(raw)
+        if not items:
+            env = _cli_run(
+                ["calendar", "+agenda", "--start", start, "--end", end],
+                timeout_sec=timeout_sec,
+                tool=tool,
+                as_identity="bot",
+                user_access_token=uat,
+            )
+            if not env.ok and not oid:
+                return env
+            if env.ok:
+                payload = (env.meta or {}).get("cli") or {}
+                raw = _cli_items_from_payload(payload if isinstance(payload, dict) else {})
+                items = normalize_docs(raw, kind="calendar")
+                # normalize_docs 已返回标准 item；若 raw 已是标准则再用 busy norm
+                if raw and not any(str(i.get("snippet") or "") for i in items):
+                    items = _cli_norm_busy(raw)
+        q = str(args.get("query") or "").strip().lower()
+        if q:
+            items = [
+                i
+                for i in items
+                if q in str(i.get("title") or "").lower()
+                or q in str(i.get("snippet") or "").lower()
+            ]
+        mr = int(args.get("max_results") or 12)
+        return envelope_ok(list(items)[:mr], tool=tool)
 
     if tool == "feishu.discuss.summary":
         chat_id = str(args.get("chat_id") or "").strip()
@@ -502,6 +724,7 @@ def _cli_call(
             {"resource_type": "message", "query": q, "chat_id": chat_id, "max_results": 10},
             timeout_sec=timeout_sec,
             user_access_token=uat,
+            open_id=oid,
         )
 
     if tool == "feishu.doc.create":

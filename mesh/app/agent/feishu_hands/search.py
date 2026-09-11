@@ -25,10 +25,11 @@ def search(
         return envelope_fail("hands_disabled")
 
     q = (query or "").strip()
-    if not q:
+    rt = (resource_type or "doc").strip().lower() or "doc"
+    # 群列表 / 日历允许空 query（列出可见范围）
+    if not q and rt not in ("group", "calendar"):
         return envelope_ok([])
 
-    rt = (resource_type or "doc").strip().lower() or "doc"
     if not feishu_search_type_allowed(rt, phase=phase):
         return envelope_fail(f"resource_type_not_allowed:{rt}")
 
