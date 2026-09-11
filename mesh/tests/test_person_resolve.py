@@ -39,7 +39,7 @@ def test_resolve_emp_no_49():
     r = pr.resolve_people_in_text("49最近跟谁聊过", people=PEOPLE, use_org=False)
     assert "彭康林" in r.canonical_names()
     hit = next(h for h in r.hits if h.canonical == "彭康林")
-    assert hit.source in ("seed", "org_emp")
+    assert hit.source in ("seed", "org_emp", "roster_alias")
 
 
 def test_resolve_honorific_wan_laoshi():
@@ -63,3 +63,15 @@ def test_expand_keeps_user_intent():
     assert "帮我看看" in r.expanded_query
     assert "杜锦涛" in r.expanded_query
     assert "赵思琪" in r.expanded_query
+
+
+def test_roster_file_loads_and_has_teams():
+    data = pr.load_roster(force=True)
+    people = data.get("people") or []
+    assert len(people) >= 60
+    # 至少有人有团队与职位字段
+    assert any((p.get("teams") or []) for p in people if isinstance(p, dict))
+    assert any(str(p.get("job_title") or "") for p in people if isinstance(p, dict))
+    amap = pr.alias_map()
+    assert amap.get("锦涛") == "杜锦涛"
+    assert amap.get("49") == "彭康林"

@@ -2,17 +2,22 @@
 
 这是 Company Understanding 的人名词典层，不是周报向量 Memory。
 用于检索前扩展：锦涛→杜锦涛，思琪→赵思琪，49→彭康林。
+
+别名手填表：app/agent/data/company_people_roster.json
+（按团队/职位列出全员；aliases 可多人多别名）
 """
 from __future__ import annotations
 
+import json
 import logging
 import re
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any
 
 log = logging.getLogger("uvicorn.error")
 
-# 人工种子别名（工号/花名）；通讯录命中后会自动覆盖增强
+# 内置兜底；正式别名以 roster JSON 为准（可覆盖）
 SEED_ALIASES: dict[str, str] = {
     "49": "彭康林",
     "peng49": "彭康林",
@@ -21,8 +26,11 @@ SEED_ALIASES: dict[str, str] = {
     "山山": "张山山",
     "康林": "彭康林",
     "晓龙": "闫晓龙",
-    "靖玉": "靖宇",  # 常见口误/同音
+    "靖玉": "靖宇",
 }
+
+_ROSTER_PATH = Path(__file__).resolve().parent / "data" / "company_people_roster.json"
+_ROSTER_CACHE: dict[str, Any] | None = None
 
 _STOP = frozenset(
     {
@@ -135,30 +143,108 @@ def _session_people(session: Any) -> list[dict[str, str]]:
     return out
 
 
+def load_roster(*, force: bool = False) -> dict[str, Any]:
+    """加载手填别名表；失败返回空结构。"""
+    global _ROSTER_CACHE
+    if _ROSTER_CACHE is not None and not force:
+        return _ROSTER_CACHE
+    data: dict[str, Any] = {"people": [], "alias_to_name": {}}
+    try:
+        if _ROSTER_PATH.is_file():
+            raw = json.loads(_ROSTER_PATH.read_text(encoding="utf-8"))
+            people = raw.get("people") if isinstance(raw, dict) else []
+            if not isinstance(people, list):
+                people = []
+            alias_map: dict[str, str] = {}
+            for row in people:
+                if not isinstance(row, dict):
+                    continue
+                name = str(row.get("name") or "").strip()
+                if not name:
+                    continue
+                for a in row.get("aliases") or []:
+                    alias = str(a or "").strip()
+                    if not alias or alias == name:
+                        continue
+                    # 后写不覆盖先写：避免重名简称互踩（手填时请保证唯一）
+                    alias_map.setdefault(alias, name)
+                    alias_map.setdefault(alias.lower(), name)
+            data = {
+                "people": people,
+                "alias_to_name": alias_map,
+                "path": str(_ROSTER_PATH),
+            }
+    except Exception as e:
+        log.warning("person_resolve roster load failed: %s", e)
+    _ROSTER_CACHE = data
+    return data
+
+
+def alias_map() -> dict[str, str]:
+    """内置种子 ∪ roster 手填别名（roster 优先）。"""
+    out = dict(SEED_ALIASES)
+    roster = load_roster()
+    for k, v in (roster.get("alias_to_name") or {}).items():
+        if k and v:
+            out[str(k)] = str(v)
+    return out
+
+
+def _roster_people() -> list[dict[str, str]]:
+    out: list[dict[str, str]] = []
+    for row in load_roster().get("people") or []:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("name") or "").strip()
+        if not name:
+            continue
+        out.append(
+            {
+                "name": name,
+                "open_id": str(row.get("open_id") or "").strip(),
+                "employee_no": str(row.get("employee_no") or "").strip(),
+                "job_title": str(row.get("job_title") or "").strip(),
+                "teams": ",".join(row.get("teams") or []),
+                "source": "roster",
+            }
+        )
+    return out
+
+
 def _org_people() -> list[dict[str, str]]:
+    out = _roster_people()  # 离线/无 Hands 时也有全员表
     try:
         from .feishu_hands import org_directory
 
         _depts, people = org_directory.load_directory()
-        out = []
+        by_name = {p["name"]: p for p in out}
         for u in people or []:
             if not isinstance(u, dict):
                 continue
             name = str(u.get("name") or "").strip()
             if not name:
                 continue
-            out.append(
-                {
-                    "name": name,
-                    "open_id": str(u.get("open_id") or "").strip(),
-                    "employee_no": str(u.get("employee_no") or "").strip(),
-                    "source": "org",
-                }
-            )
+            row = {
+                "name": name,
+                "open_id": str(u.get("open_id") or "").strip(),
+                "employee_no": str(u.get("employee_no") or "").strip(),
+                "source": "org",
+            }
+            # org 实时字段优先
+            if name in by_name:
+                prev = by_name[name]
+                if row["open_id"]:
+                    prev["open_id"] = row["open_id"]
+                if row["employee_no"]:
+                    prev["employee_no"] = row["employee_no"]
+                prev["source"] = "org+roster"
+            else:
+                out.append(row)
+                by_name[name] = row
         return out
     except Exception as e:
         log.info("person_resolve org unavailable: %s", e)
-        return []
+        return out
 
 
 def candidate_tokens(text: str) -> list[str]:
@@ -212,8 +298,9 @@ def _match_token(token: str, people: list[dict[str, str]]) -> PersonHit | None:
             )
     tl = t.lower()
 
-    # 1) seed alias
-    seed = SEED_ALIASES.get(t) or SEED_ALIASES.get(tl)
+    # 1) seed alias ∪ roster 手填
+    amap = alias_map()
+    seed = amap.get(t) or amap.get(tl)
     if seed:
         for p in people:
             if p["name"] == seed:
@@ -223,7 +310,7 @@ def _match_token(token: str, people: list[dict[str, str]]) -> PersonHit | None:
                     open_id=p.get("open_id") or "",
                     employee_no=p.get("employee_no") or "",
                     score=0.99,
-                    source="seed",
+                    source="roster_alias" if t in (load_roster().get("alias_to_name") or {}) else "seed",
                 )
         return PersonHit(alias=t, canonical=seed, score=0.95, source="seed")
 
@@ -331,7 +418,7 @@ def resolve_people_in_text(
             # 全名命中也记下来，方便下游
             hits.append(hit)
             seen_alias.add(tok)
-        elif tok in SEED_ALIASES or (tok.isdigit() and len(tok) <= 4):
+        elif tok in alias_map() or (tok.isdigit() and len(tok) <= 4):
             unresolved.append(tok)
 
     expanded = expand_for_retrieval(text, hits)
