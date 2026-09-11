@@ -14,6 +14,11 @@ PEOPLE = [
     {"name": "赵思琪", "open_id": "ou_b", "employee_no": "1002", "source": "org"},
     {"name": "彭康林", "open_id": "ou_c", "employee_no": "49", "source": "org"},
     {"name": "张山山", "open_id": "ou_d", "employee_no": "1004", "source": "org"},
+    {"name": "万东峰", "open_id": "ou_e", "employee_no": "G-345", "source": "org"},
+    {"name": "郭冀昂", "open_id": "ou_f", "employee_no": "", "source": "org"},
+    {"name": "郭宇祺", "open_id": "ou_g", "employee_no": "", "source": "org"},
+    {"name": "靖宇", "open_id": "ou_h", "employee_no": "", "source": "org"},
+    {"name": "郑明明", "open_id": "ou_i", "employee_no": "", "source": "org"},
 ]
 
 
@@ -35,6 +40,18 @@ def test_resolve_emp_no_49():
     assert "彭康林" in r.canonical_names()
     hit = next(h for h in r.hits if h.canonical == "彭康林")
     assert hit.source in ("seed", "org_emp")
+
+
+def test_resolve_honorific_wan_laoshi():
+    r = pr.resolve_people_in_text("万老师", people=PEOPLE, use_org=False)
+    assert "万东峰" in r.canonical_names()
+
+
+def test_resolve_guo_laoshi_ambiguous():
+    r = pr.resolve_people_in_text("郭老师", people=PEOPLE, use_org=False)
+    # 通讯录两郭，不得瞎猜
+    assert "郭冀昂" not in r.canonical_names() or len([h for h in r.hits if "郭" in h.canonical]) != 1
+    assert not any(h.canonical.startswith("郭") and h.source.startswith("org_surname") for h in r.hits)
 
 
 def test_expand_keeps_user_intent():

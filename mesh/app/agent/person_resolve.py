@@ -21,6 +21,7 @@ SEED_ALIASES: dict[str, str] = {
     "山山": "张山山",
     "康林": "彭康林",
     "晓龙": "闫晓龙",
+    "靖玉": "靖宇",  # 常见口误/同音
 }
 
 _STOP = frozenset(
@@ -65,11 +66,21 @@ _STOP = frozenset(
         "上午",
         "下午",
         "晚上",
+        "老师",
+        "老板",
+        "小姐",
+        "先生",
     }
+)
+
+# 称呼尾巴：万老师→万；靖宇姐→靖宇
+_HONORIFIC_TAIL = re.compile(
+    r"(?:老师|姐姐|哥哥|大姐|大哥|总|姐|哥|总工|总助)$"
 )
 
 _CJK_TOKEN = re.compile(r"[\u4e00-\u9fff]{2,4}")
 _CODE_TOKEN = re.compile(r"(?<![A-Za-z0-9_])([A-Za-z]*\d{1,6}|\d{1,6})(?![A-Za-z0-9_])")
+_LATIN_NICK = re.compile(r"(?<![A-Za-z])([A-Za-z]{2,12})(?![A-Za-z])")
 
 
 @dataclass
@@ -151,7 +162,7 @@ def _org_people() -> list[dict[str, str]]:
 
 
 def candidate_tokens(text: str) -> list[str]:
-    """抽出可能人名/工号；中文按 2～4 字滑窗，避免「锦涛最近」被吞成 4 字无效串。"""
+    """抽出可能人名/工号；中文按 2～4 字滑窗，并剥老师/姐等称呼。"""
     q = text or ""
     found: list[str] = []
 
@@ -162,16 +173,23 @@ def candidate_tokens(text: str) -> list[str]:
 
     for m in re.finditer(r"[\u4e00-\u9fff]+", q):
         run = m.group(0)
-        n = len(run)
-        if 2 <= n <= 4:
-            _add(run)
-        for L in (2, 3, 4):
-            if n < L:
+        stripped = _HONORIFIC_TAIL.sub("", run)
+        for piece in (run, stripped):
+            if not piece:
                 continue
-            for i in range(0, n - L + 1):
-                _add(run[i : i + L])
+            n = len(piece)
+            if 1 <= n <= 4:
+                _add(piece)
+            for L in (2, 3, 4):
+                if n < L:
+                    continue
+                for i in range(0, n - L + 1):
+                    _add(piece[i : i + L])
     for m in _CODE_TOKEN.finditer(q):
         _add(m.group(1))
+    for m in _LATIN_NICK.finditer(q):
+        _add(m.group(1))
+        _add(m.group(1).lower())
     return found
 
 
@@ -179,12 +197,24 @@ def _match_token(token: str, people: list[dict[str, str]]) -> PersonHit | None:
     t = (token or "").strip()
     if not t:
         return None
+    # 再剥一次称呼
+    t2 = _HONORIFIC_TAIL.sub("", t).strip()
+    if t2 and t2 != t:
+        hit = _match_token(t2, people)
+        if hit:
+            return PersonHit(
+                alias=token,
+                canonical=hit.canonical,
+                open_id=hit.open_id,
+                employee_no=hit.employee_no,
+                score=hit.score * 0.99,
+                source=hit.source + "+honorific",
+            )
     tl = t.lower()
 
     # 1) seed alias
     seed = SEED_ALIASES.get(t) or SEED_ALIASES.get(tl)
     if seed:
-        # 若通讯录有此人，补 open_id
         for p in people:
             if p["name"] == seed:
                 return PersonHit(
@@ -197,8 +227,12 @@ def _match_token(token: str, people: list[dict[str, str]]) -> PersonHit | None:
                 )
         return PersonHit(alias=t, canonical=seed, score=0.95, source="seed")
 
-    # 2) exact full name
-    exact = [p for p in people if p["name"] == t]
+    # 2) exact full name / latin name case-insensitive
+    exact = [
+        p
+        for p in people
+        if p["name"] == t or p["name"].lower() == tl
+    ]
     if len(exact) == 1:
         p = exact[0]
         return PersonHit(
@@ -223,15 +257,28 @@ def _match_token(token: str, people: list[dict[str, str]]) -> PersonHit | None:
             source="org_emp",
         )
 
-    # 4) 中文名后缀/内含子串（锦涛⊂杜锦涛）；仅唯一命中才自动展开
+    # 4) 单姓唯一：万老师→万→万东峰（通讯录仅一人姓万）
+    if re.fullmatch(r"[\u4e00-\u9fff]", t):
+        surname = [p for p in people if p["name"].startswith(t) and len(p["name"]) >= 2]
+        if len(surname) == 1:
+            p = surname[0]
+            return PersonHit(
+                alias=t,
+                canonical=p["name"],
+                open_id=p.get("open_id") or "",
+                employee_no=p.get("employee_no") or "",
+                score=0.88,
+                source="org_surname",
+            )
+
+    # 5) 中文名后缀/内含子串（锦涛⊂杜锦涛）；仅唯一命中才自动展开
     if re.fullmatch(r"[\u4e00-\u9fff]{2,3}", t):
+        end = [p for p in people if p["name"].endswith(t) and p["name"] != t]
         suf = [
             p
             for p in people
-            if p["name"].endswith(t) or (len(t) >= 2 and t in p["name"] and p["name"] != t)
+            if p["name"] != t and (p["name"].endswith(t) or (len(t) >= 2 and t in p["name"]))
         ]
-        # 优先 endswith
-        end = [p for p in people if p["name"].endswith(t) and p["name"] != t]
         pool = end if len(end) == 1 else (suf if len(suf) == 1 else [])
         if len(pool) == 1:
             p = pool[0]
