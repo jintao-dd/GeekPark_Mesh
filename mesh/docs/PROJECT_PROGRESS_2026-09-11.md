@@ -19,9 +19,9 @@ Mesh 今天是 **两条轨道**：
 | **A · 周报质量 / Grounded Brain** | ✅ **冻结**（v3.0 Production Baseline） | Retrieval / Ranking / Claim / Evidence 不再为 UX 解冻；Ask 只作 Capability |
 | **B · Colleague Agent** | 🔨 **主战场 → v4** | v3 Wave1 + Hands + Identity/UAT 为底座；目标态 = **Agentic Enterprise**：Brain → Complexity Judge →（Direct \| Planner+Bounded ReAct+Specialists）→ 一张嘴 |
 
-**当前主矛盾：** 把 **Task Orchestrator + Bounded Runtime + 分栏思想（FACT/ANALYSIS/OPINION/SUGGESTION）** 设计进底层并按 L0–L6 梯子验收；外加开放平台权限发版与真人 Canary。  
+**当前主矛盾：** 把 **固定 Architecture**（含 Company Understanding）+ **运行时 Execution Complexity**（Simple→Complex）设计进底层并验收；外加开放平台权限发版与真人 Canary。  
 **Colleague 轨允许（有笼子）：** Bounded ReAct · Planner（只出图）· Specialist Multi-Agent（不对用户说话）· **Company Ontology + Company Wiki（语境派生，非 Ask 替换）**。  
-**仍绝对不做：** 无限 ReAct · 用户可见多 Agent 话术 · Wiki/ES/Neo4j **替换** Published Ask · 长期向量 Memory · 解冻质量轨 · `docker cp` 当发布 · Planner 当第二大脑。
+**仍绝对不做：** 无限 ReAct · 用户可见多 Agent 话术 · Wiki/ES/Neo4j **替换** Published Ask · 长期向量 Memory · 解冻质量轨 · `docker cp` 当发布 · Planner 当第二大脑 · **把 Complexity 档重新当成 Stage 路线图**。
 
 ---
 
@@ -413,11 +413,11 @@ f0c4762  native OpenAPI Hands；真测可开
 
 ## 11. 「现在该干什么」执行序
 
-1. **锁架构：** 以 `COLLEAGUE_AGENT_V4.md` 为准；废止 Stage 1–4 /「绝对不做 Planner」旧口径。  
-2. **实现梯子 L0→L3：** TaskPlan 只读 Orchestrator → Judge → 金丝雀（群+人+日历+周报）；每档 pytest + tmesh 真聊。  
-3. **开放平台：** scopes 发版 + Agent OAuth 回调域；日历/个人搜依赖 UAT。  
-4. **再上 L4–L6：** 写闸共存、预算闸、身份矩阵；Capacity 校准数值。  
-5. **勿做：** 解冻 Ranking/Claim、无限 ReAct、用户可见多 Agent、跳过 tmesh 直推 prod、未过 L2 就上满 Specialist 对外话术。
+1. **锁架构：** 以 `COLLEAGUE_AGENT_V4.md` 为准；**Company Understanding 前置**（§9），废止「先 Planner 后 Ontology」。  
+2. **先 C0–C2：** Ontology v0 → Wiki v0 → Brain 注入；pytest + tmesh。  
+3. **再 L0–L3：** TaskPlan / Judge / 金丝雀（群+人+日历+周报）。  
+4. **开放平台：** scopes 发版 + Agent OAuth 回调域。  
+5. **勿做：** 无先验空转 Specialist、解冻 Ranking/Claim、无限 ReAct、Wiki 冒充 FACT、跳过 tmesh 直推 prod。
 
 ---
 
@@ -428,6 +428,7 @@ f0c4762  native OpenAPI Hands；真测可开
 | 2026-09-11 | 首版全量进度总览；对齐 HEAD `1337c66`；覆盖双轨、Hands、记忆隔离、验收与未决项 |
 | 2026-09-11 | **路线修订：** 引入 Colleague v4 Agentic Enterprise；解禁有笼 Bounded ReAct/Planner/Specialists；废止 Stage 线性计划 |
 | 2026-09-11 | **公司理解三角：** Ontology + Wiki + Grounding 写入 v4；区分 Claim Ontology 与 Company Wiki 笼子 |
+| 2026-09-11 | **§9 改正：** Company Understanding 实施前置；废止先 Orchestrator 后 Ontology/Wiki |
 
 ---
 
