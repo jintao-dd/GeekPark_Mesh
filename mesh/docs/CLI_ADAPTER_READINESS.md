@@ -36,16 +36,16 @@ Colleague / Tool Contract / 确认闸 / 分桶 / 短期记忆
 
 | # | 项 | 判定 |
 |---|----|------|
-| R1 | 镜像内 `lark-cli --version` 成功 | ☐ |
-| R2 | 仅 env 凭证（无 `auth login`）bot 身份可调用 | ☐ |
-| R3 | `BACKEND=cli` 不再出现 `cli_not_installed` | ☐ |
+| R1 | 镜像内 `lark-cli --version` 成功 | ✅ tmesh `cdd7511`+（1.0.94） |
+| R2 | 仅 env 凭证（无 `auth login`）bot 身份可调用 | ✅ dry-run `im +messages-send --as bot`（`FEISHU_APP_*`→CLI env 映射） |
+| R3 | `BACKEND=cli` 不再出现 `cli_not_installed` | ☐ 待显式金丝雀 `BACKEND=cli` |
 | R4 | 读：`feishu.search`（至少 doc）/ `doc.get` Envelope 对齐 | ☐ |
 | R5 | 写：prepare→confirm→`doc.create` 成功返回 url/token | ☐ |
-| R6 | 创建后公司内获链可读（`tenant_readable` 或等价） | ☐ |
-| R7 | 失败可映射到 `scope_denied` / `feishu_api_*` 等（供 `last_block`） | ☐ |
+| R6 | 创建后公司内获链可读（`tenant_readable` 或等价） | ☐ 代码已接 share helper；待真写验证 |
+| R7 | 失败可映射到 `scope_denied` / `feishu_api_*` 等（供 `last_block`） | ✅ 单测；待真错验证 |
 | R8 | `compose recreate` 后 R2–R6 仍过（无本地 login 态） | ☐ |
-| R9 | workers=1 稳定；若试 workers>1，仅验证 env 凭证仍可用 | ☐ |
-| R10 | native 可一键切回作 fallback | ☐（flag 已具备） |
+| R9 | workers=1 稳定；若试 workers>1，仅验证 env 凭证仍可用 | ☐ workers=1 现状 |
+| R10 | native 可一键切回作 fallback | ✅ flag（默认仍 native） |
 
 **未全绿：默认保持 `MESH_FEISHU_HANDS_BACKEND=native`。**
 

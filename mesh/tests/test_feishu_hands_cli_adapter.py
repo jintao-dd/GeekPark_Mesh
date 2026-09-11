@@ -6,7 +6,16 @@ from unittest import mock
 from app.agent.feishu_hands import backends
 
 
-def test_cli_error_code_scope_denied():
+def test_cli_subprocess_env_maps_feishu_app(monkeypatch):
+    monkeypatch.setenv("FEISHU_APP_ID", "cli_test_app")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "sec_test")
+    monkeypatch.delenv("LARKSUITE_CLI_APP_ID", raising=False)
+    monkeypatch.delenv("LARKSUITE_CLI_APP_SECRET", raising=False)
+    env = backends._cli_subprocess_env()
+    assert env["LARKSUITE_CLI_APP_ID"] == "cli_test_app"
+    assert env["LARKSUITE_CLI_APP_SECRET"] == "sec_test"
+    assert env["LARKSUITE_CLI_BRAND"] == "feishu"
+
     err = backends._cli_error_code(
         "feishu_api_99991672: Access denied",
         {"ok": False, "error": {"code": 99991672, "message": "Access denied"}},

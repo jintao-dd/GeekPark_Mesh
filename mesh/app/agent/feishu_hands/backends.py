@@ -126,9 +126,20 @@ def _cli_bin() -> str:
     return flags.cli_bin() or "lark-cli"
 
 
-def _cli_run(argv: list[str], *, timeout_sec: float, tool: str) -> ToolResultEnvelope:
+def _cli_subprocess_env() -> dict[str, str]:
+    """Headless CLI creds: prefer LARKSUITE_CLI_*; else map FEISHU_APP_* (same bot app)."""
     import os
 
+    env = {k: str(v) for k, v in os.environ.items() if v is not None}
+    if not env.get("LARKSUITE_CLI_APP_ID") and env.get("FEISHU_APP_ID"):
+        env["LARKSUITE_CLI_APP_ID"] = env["FEISHU_APP_ID"]
+    if not env.get("LARKSUITE_CLI_APP_SECRET") and env.get("FEISHU_APP_SECRET"):
+        env["LARKSUITE_CLI_APP_SECRET"] = env["FEISHU_APP_SECRET"]
+    env.setdefault("LARKSUITE_CLI_BRAND", "feishu")
+    return env
+
+
+def _cli_run(argv: list[str], *, timeout_sec: float, tool: str) -> ToolResultEnvelope:
     bin_path = _cli_bin()
     # Bot identity for headless env credentials (LARKSUITE_CLI_APP_ID/SECRET).
     cmd = [bin_path, *argv]
@@ -143,7 +154,7 @@ def _cli_run(argv: list[str], *, timeout_sec: float, tool: str) -> ToolResultEnv
             text=True,
             timeout=timeout_sec,
             check=False,
-            env=os.environ.copy(),
+            env=_cli_subprocess_env(),
         )
     except FileNotFoundError:
         return envelope_fail("cli_not_installed", tool=tool)
