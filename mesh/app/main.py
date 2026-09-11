@@ -705,6 +705,20 @@ def feishu_cb(request: Request, code: str = "", state: str = ""):
     try:
         target = auth.read_feishu_state(state)
         info = auth.feishu_exchange(code); u = auth.upsert_feishu_user(info); u["avatar_url"] = info.get("avatar_url", "")
+        # 网页登录也缓存 UAT，供后续 Hands 个人能力复用
+        try:
+            from .agent import feishu_user_auth as uauth
+
+            if info.get("access_token") and info.get("open_id"):
+                uauth.save_user_token(
+                    str(info["open_id"]),
+                    access_token=str(info.get("access_token") or ""),
+                    refresh_token=str(info.get("refresh_token") or ""),
+                    expires_in=int(info.get("expires_in") or 0),
+                    scopes=str(info.get("scope") or ""),
+                )
+        except Exception:
+            pass
         preset = (request.cookies.get(auth.DEBUG_PRESET_COOKIE) or "").strip()
         debug_role = preset if auth.is_debug_user(u.get("display") or info.get("name") or "", u.get("username") or "") else ""
     except auth.FeishuLoginError as e:
@@ -716,6 +730,58 @@ def feishu_cb(request: Request, code: str = "", state: str = ""):
                     secure=_cookie_secure(request), max_age=auth.SESSION_MAX_AGE)
     resp.delete_cookie(auth.DEBUG_PRESET_COOKIE, path="/", samesite="lax", secure=_cookie_secure(request))
     return resp
+
+
+@app.get("/auth/feishu/agent")
+def feishu_agent_auth_start(request: Request, open_id: str = ""):
+    """飞书同事 Agent：个人授权入口（日历/个人文档等）。"""
+    if not auth.feishu_enabled():
+        raise HTTPException(400, "未配置飞书应用")
+    from .agent import feishu_user_auth as uauth
+
+    return RedirectResponse(uauth.agent_authorize_url(open_id=open_id or ""), status_code=302)
+
+
+@app.get("/auth/feishu/agent/callback")
+def feishu_agent_auth_cb(request: Request, code: str = "", state: str = ""):
+    from .agent import feishu_user_auth as uauth
+
+    try:
+        st = uauth.read_agent_state(state)
+        info = auth.feishu_exchange(code)
+        oid = str(info.get("open_id") or "").strip()
+        expected = str(st.get("open_id") or "").strip()
+        if expected and oid and expected != oid:
+            return HTMLResponse(
+                "<h3>授权账号与当前飞书用户不一致</h3><p>请用对话里的同一飞书账号打开授权链接。</p>",
+                status_code=400,
+            )
+        uauth.save_user_token(
+            oid,
+            access_token=str(info.get("access_token") or ""),
+            refresh_token=str(info.get("refresh_token") or ""),
+            expires_in=int(info.get("expires_in") or 0),
+            scopes=str(info.get("scope") or ""),
+        )
+        # 顺带确保 Mesh users 有绑定
+        try:
+            auth.upsert_feishu_user(info)
+        except Exception:
+            pass
+        return HTMLResponse(
+            "<h3>个人飞书授权成功</h3>"
+            "<p>可以回到飞书对话，对我说「继续」。</p>"
+            "<p>已开通：个人日历/文档只读、消息只读、通讯录搜索等（以授权页勾选为准）。</p>"
+        )
+    except auth.FeishuLoginError as e:
+        return HTMLResponse(f"<h3>授权失败</h3><p>{e.user_message}</p>", status_code=400)
+    except Exception:
+        return HTMLResponse("<h3>授权失败</h3><p>请稍后在飞书里重新点授权链接。</p>", status_code=500)
+
+
+@app.get("/auth/feishu/agent/done")
+def feishu_agent_auth_done():
+    return HTMLResponse("<h3>可以关闭本页，回到飞书继续对话。</h3>")
 
 @app.post("/api/debug/role")
 async def api_debug_role(request: Request):

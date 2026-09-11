@@ -169,19 +169,48 @@ def resolve_identity(con, envelope: AgentEnvelope) -> IdentityResult:
     else:
         status = STATUS_BOUND
 
+    person: dict[str, Any] = {"display": user["display"], "username": user["username"]}
+    sync_status = contact_sync
+    oid = open_id or user["feishu_open_id"]
+    # 按需用应用身份补全通讯录人像（非长期 Sync 表；短时缓存见 org_directory）
+    if oid:
+        try:
+            from .feishu_hands import backends
+
+            env = backends.call_tool(
+                "feishu.search",
+                {"query": "", "resource_type": "user", "open_ids": [oid], "max_results": 1},
+                timeout_sec=8,
+                open_id=oid,
+            )
+            if env.ok and env.items:
+                it = env.items[0]
+                person = {
+                    **person,
+                    "display": str(it.get("title") or person.get("display") or ""),
+                    "feishu_open_id": oid,
+                    "snippet": str(it.get("snippet") or ""),
+                }
+                sync_status = "ok"
+            elif sync_status in ("", "skipped_no_scope"):
+                sync_status = "lookup_empty"
+        except Exception:
+            if sync_status in ("", "skipped_no_scope"):
+                sync_status = "lookup_error"
+
     return IdentityResult(
         status=status,
         mesh_user_id=user["id"],
-        feishu_open_id=open_id or user["feishu_open_id"],
+        feishu_open_id=oid,
         mesh_role=user["role"],
         primary_team=primary,
         mapped_teams=[normalize_team(t) or t for t in mapped_in if normalize_team(t)],
         mesh_users_team=mesh_team,
         team_source=src,
-        contact_sync=contact_sync,
+        contact_sync=sync_status,
         bind_state="linked",
         channel=channel,
         chat_id=envelope.chat_id,
-        display_hint=user["display"],
-        person={"display": user["display"], "username": user["username"]},
+        display_hint=str(person.get("display") or user["display"] or ""),
+        person=person,
     )

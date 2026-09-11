@@ -1127,6 +1127,34 @@ def call_tool(
     args = dict(arguments or {})
     to = float(timeout_sec if timeout_sec is not None else FEISHU_SEARCH.timeout_sec)
 
+    # Mesh 侧 Restrict：只允许已合同化的工具名（对齐 CLI Restrict 思想）
+    _ALLOWED_TOOLS = frozenset(
+        {
+            "feishu.search",
+            "feishu.doc.get",
+            "feishu.doc.create",
+            "feishu.calendar.list",
+            "feishu.calendar.create",
+            "feishu.calendar.propose",
+            "feishu.im.send",
+            "feishu.discuss.summary",
+        }
+    )
+    if tool not in _ALLOWED_TOOLS:
+        return envelope_fail(f"command_denied:{tool}", tool=tool)
+
+    if tool == "feishu.calendar.propose":
+        from . import meeting as meeting_mod
+
+        return meeting_mod.propose_meeting(
+            chat_id=str(args.get("chat_id") or ""),
+            days=int(args.get("days") or 5),
+            duration_min=int(args.get("duration_min") or 60),
+            identity=type("I", (), {"feishu_open_id": open_id})(),
+            user_access_token=user_access_token,
+            max_slots=int(args.get("max_results") or 5),
+        )
+
     if _injected_ops is not None:
         return _injected_ops(tool, args)
 

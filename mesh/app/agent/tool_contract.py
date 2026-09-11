@@ -305,6 +305,30 @@ FEISHU_CALENDAR_CREATE = ToolContract(
     confirmation_required=True,
 )
 
+FEISHU_CALENDAR_PROPOSE = ToolContract(
+    name="feishu.calendar.propose",
+    description=(
+        "受控多步：拉当前群成员 + 查 busy → 推荐共同空档。"
+        "不写日程；创建仍走 feishu.calendar.create + 确认。"
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "chat_id": {"type": "string"},
+            "days": {"type": "integer"},
+            "duration_min": {"type": "integer"},
+        },
+        "required": [],
+    },
+    permission_scope="calendar.read",
+    timeout_sec=45.0,
+    max_results=8,
+    source_tier=SourceTier.FEISHU_LIVE,
+    truth_level=TruthLevel.LIVE_CONTEXT,
+    output_schema=_LIVE_OUT,
+    side_effect=SideEffect.NONE,
+)
+
 ASK_PUBLISHED = ToolContract(
     name="ask.published",
     description="查询已上线周报企业事实（Evidence）。",
@@ -346,6 +370,7 @@ FEISHU_READ_TOOLS = frozenset(
         FEISHU_SEARCH.name,
         FEISHU_DOC_GET.name,
         FEISHU_CALENDAR_LIST.name,
+        FEISHU_CALENDAR_PROPOSE.name,
         FEISHU_DISCUSS_SUMMARY.name,
     }
 )
@@ -372,6 +397,7 @@ REGISTRY: dict[str, ToolContract] = {
         FEISHU_SEARCH,
         FEISHU_DOC_GET,
         FEISHU_CALENDAR_LIST,
+        FEISHU_CALENDAR_PROPOSE,
         FEISHU_DISCUSS_SUMMARY,
         FEISHU_DOC_CREATE,
         FEISHU_IM_SEND,

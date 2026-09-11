@@ -23,6 +23,62 @@ def _deny(tool_id: str, reason: str) -> ToolResult:
     return ToolResult(ok=False, tool_id=tool_id, denied=True, error=reason)
 
 
+def _auth_required(tool_id: str, *, open_id: str, resource_type: str = "") -> ToolResult:
+    from . import feishu_user_auth as uauth
+    from .feishu_hands.identity_policy import capability_label
+
+    cap = capability_label(tool_id, resource_type=resource_type)
+    text = uauth.auth_guide_text(open_id=open_id, capability=cap)
+    return ToolResult(
+        ok=False,
+        tool_id=tool_id,
+        denied=False,
+        error="user_auth_required",
+        payload={
+            "user_auth_required": True,
+            "auth_text": text,
+            "resource_type": resource_type,
+            "n_hits": 0,
+            "source_tier": "feishu_live",
+        },
+    )
+
+
+def _resolve_uat(identity: IdentityResult, args: dict[str, Any] | None) -> str:
+    from . import feishu_user_auth as uauth
+
+    args = args or {}
+    oid = str(getattr(identity, "feishu_open_id", None) or "").strip()
+    return uauth.resolve_uat(
+        open_id=oid,
+        explicit=str(args.get("user_access_token") or ""),
+    )
+
+
+def _ensure_identity(
+    tool_id: str,
+    identity: IdentityResult,
+    args: dict[str, Any],
+    *,
+    resource_type: str = "",
+) -> tuple[str, ToolResult | None]:
+    """返回 (uat, deny_or_auth_result)。"""
+    from .feishu_hands.identity_policy import IdentityNeed, need_for_tool
+
+    uat = _resolve_uat(identity, args)
+    need = need_for_tool(tool_id, resource_type=resource_type)
+    oid = str(getattr(identity, "feishu_open_id", None) or "").strip()
+    if need == IdentityNeed.USER and not uat:
+        return "", _auth_required(tool_id, open_id=oid, resource_type=resource_type)
+    if need == IdentityNeed.USER_PREFERRED and not uat:
+        # 日历：无 UAT 仍可 bot freebusy，但标注；若用户明确要「我的日程」则引导
+        q = str(args.get("q") or args.get("query") or args.get("keyword") or "").strip()
+        if any(x in q for x in ("我的日程", "我的日历", "agenda", "今天有什么会")):
+            return "", _auth_required(tool_id, open_id=oid, resource_type=resource_type or "calendar")
+    args["user_access_token"] = uat
+    return uat, None
+
+
 def _guard_common(
     tool_id: str,
     identity: IdentityResult,
@@ -293,6 +349,11 @@ def tool_feishu_search(
         return _deny("feishu.search", "hands_disabled")
     query = str(args.get("q") or args.get("query") or "").strip()
     resource_type = str(args.get("resource_type") or "doc").strip() or "doc"
+    _uat, auth_block = _ensure_identity(
+        "feishu.search", identity, args, resource_type=resource_type
+    )
+    if auth_block:
+        return auth_block
     open_ids = [str(x).strip() for x in (args.get("open_ids") or []) if str(x).strip()]
     one = str(args.get("open_id") or args.get("user_id") or "").strip()
     if one and one not in open_ids:
@@ -343,6 +404,9 @@ def tool_feishu_calendar_list(con, identity, permission, context, args=None):
         return blocked
     from . import feishu_hands
 
+    _uat, auth_block = _ensure_identity("feishu.calendar.list", identity, args)
+    if auth_block:
+        return auth_block
     env = feishu_hands.calendar_list(
         query=str(args.get("q") or args.get("query") or ""),
         days=int(args.get("days") or 7),
@@ -351,6 +415,32 @@ def tool_feishu_calendar_list(con, identity, permission, context, args=None):
     )
     return _feishu_tool_result(
         "feishu.calendar.list", env, empty_msg="近期日程这边没查到。"
+    )
+
+
+def tool_feishu_calendar_propose(con, identity, permission, context, args=None):
+    args = _with_chat(args or {}, context)
+    blocked = _guard_common(
+        "feishu.calendar.propose", identity, permission, context, args=args
+    )
+    if blocked:
+        return blocked
+    from . import feishu_hands
+
+    _uat, auth_block = _ensure_identity("feishu.calendar.propose", identity, args)
+    if auth_block:
+        return auth_block
+    env = feishu_hands.calendar_propose(
+        chat_id=str(args.get("chat_id") or ""),
+        days=int(args.get("days") or 5),
+        duration_min=int(args.get("duration_min") or 60),
+        identity=identity,
+        user_access_token=str(args.get("user_access_token") or ""),
+    )
+    return _feishu_tool_result(
+        "feishu.calendar.propose",
+        env,
+        empty_msg="这轮没算出共同空档。",
     )
 
 
@@ -424,6 +514,9 @@ def tool_feishu_calendar_create(con, identity, permission, context, args=None):
         return blocked
     from . import feishu_hands
 
+    _uat, auth_block = _ensure_identity("feishu.calendar.create", identity, args)
+    if auth_block:
+        return auth_block
     env = feishu_hands.calendar_create(
         title=str(args.get("title") or "").strip() or "未命名日程",
         start=str(args.get("start") or ""),
@@ -446,6 +539,7 @@ _REGISTRY: dict[str, Callable[..., ToolResult]] = {
     "feishu.search": tool_feishu_search,
     "feishu.doc.get": tool_feishu_doc_get,
     "feishu.calendar.list": tool_feishu_calendar_list,
+    "feishu.calendar.propose": tool_feishu_calendar_propose,
     "feishu.discuss.summary": tool_feishu_discuss_summary,
     "feishu.doc.create": tool_feishu_doc_create,
     "feishu.im.send": tool_feishu_im_send,

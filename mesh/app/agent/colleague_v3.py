@@ -126,19 +126,21 @@ _SYSTEM_DECIDE = """你是 GeekPark 内部 AI 同事 Mesh 的「调度」层。
 - 写飞书只能 prepare_write→confirm_write，禁止用 speak 假装「正在创建/已创建」
 
 可读 tool：ask.published | ask.relations_summary | context.list_issues |
-  feishu.search | feishu.doc.get | feishu.calendar.list | feishu.discuss.summary
+  feishu.search | feishu.doc.get | feishu.calendar.list | feishu.calendar.propose | feishu.discuss.summary
 可写 tool：feishu.doc.create | feishu.im.send | feishu.calendar.create
 
 飞书读路由提示（结构化，不要把用户整句当检索词）：
 - 列群 → tool=feishu.search, resource_type=group, query=""（或 args.keyword=群名）
 - 列本群成员 → feishu.search + member, query=""（需当前 chat_id；私聊无 chat 时先问要哪个群）
-- 找同事/通讯录/公司里谁叫X/组织架构里的人 → feishu.search + directory，args.keyword=姓名或工号短词；空 keyword 可列可见范围人员/部门
+- 找同事/通讯录/公司里谁叫X/组织架构里的人 → feishu.search + directory，args.keyword=姓名或工号短词
+- 帮这群人约时间/找共同空档 → tool=feishu.calendar.propose（受控多步，不直接建会）
 - @某人 / 他是谁（有 mentions.open_id）→ feishu.search + user，args.open_ids=[...]
-- 日程 → tool=feishu.calendar.list, query 可空；不要塞整句
+- 日程 → tool=feishu.calendar.list, query 可空；「我的日程」需个人授权
 - 会话消息 → feishu.search + message；关键词放 args.keyword / 短 query
 - 文档/Wiki → feishu.search + doc|wiki，短检索词
 - feishu.search 必须带 resource_type
 - 通讯录可见范围 = 飞书应用通讯录权限；有结果就报姓名+open_id，没结果如实说查不到
+- 若工具返回需要个人授权：如实转达授权链接，不要编造已查到
 
 规则（看「系统工作记忆」+ 对话，不要枚举用户句式）：
 - 有待确认写操作 + 用户同意 → confirm_write
@@ -331,9 +333,10 @@ def _classify_block(err: str, *, tool: str = "") -> dict[str, str]:
             "no access token",
             "user_token_required",
             "user_identity_required",
+            "user_auth_required",
         )
     ):
-        code = "feishu_api"
+        code = "user_auth_required"
     elif any(x in s for x in ("hands_disabled", "write_disabled", "mcp_not_configured", "cli_not_configured")):
         code = "hands_off"
     elif any(x in s for x in ("empty", "not_found", "no_result")):
@@ -363,6 +366,8 @@ def _strip_fake_hands_claims(text: str) -> str:
 
 
 def _block_user_text(code: str, err: str) -> str:
+    if code == "user_auth_required":
+        return err or "需要你的个人飞书授权后才能继续。"
     if code == "scope_denied":
         return (
             f"没写进去：应用缺权限（{err[:120]}）。"
@@ -641,6 +646,7 @@ def _intent_for(action: str, tool_id: str) -> str:
             "feishu.search": "feishu_search",
             "feishu.doc.get": "feishu_doc_get",
             "feishu.calendar.list": "feishu_calendar_list",
+            "feishu.calendar.propose": "feishu_calendar_propose",
             "feishu.discuss.summary": "feishu_discuss",
         }.get(tool_id, "ask_published")
     return "casual"
@@ -1074,6 +1080,25 @@ def handle(
         out.tools_called = [tool]
         intent = _intent_for("ask", tool)
         out.intent = intent
+        # 个人授权闸：直接把引导文案发用户，不经 synthesize 脑补
+        payload = result.payload if isinstance(getattr(result, "payload", None), dict) else {}
+        if str(getattr(result, "error", "") or "") == "user_auth_required" or payload.get(
+            "user_auth_required"
+        ):
+            guide = str(payload.get("auth_text") or "").strip()
+            if not guide:
+                from . import feishu_user_auth as uauth
+
+                guide = uauth.auth_guide_text(
+                    open_id=str(getattr(identity, "feishu_open_id", None) or ""),
+                    capability="个人飞书数据",
+                )
+            _set_last_block(session, code="user_auth_required", tool=tool, message="need_uat")
+            out.action = "speak"
+            out.text = _sanitize_user_visible(guide)
+            out.payload = payload
+            out.trace["user_auth_required"] = True
+            return out
         fact_text, bindings, evidence = render_tool_result(result, intent, identity.status)
         out.claim_bindings = list(bindings or [])
         out.evidence_refs = list(evidence or [])

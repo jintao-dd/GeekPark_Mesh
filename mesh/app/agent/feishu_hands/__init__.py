@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from .flags import hands_enabled, write_enabled
+from .meeting import propose_meeting as calendar_propose
 from .ops import (
     calendar_create,
     calendar_list,
@@ -16,6 +17,7 @@ __all__ = [
     "feishu_search",
     "doc_get",
     "calendar_list",
+    "calendar_propose",
     "discuss_summary",
     "doc_create",
     "im_send",

@@ -276,7 +276,7 @@ def _request_json(method: str, url: str, *, user_message: str, retries: int = 2,
     raise FeishuLoginError(user_message, last_detail or "unknown error")
 
 def feishu_exchange(code: str) -> dict:
-    """code → 用户信息（open_id, name）。失败抛异常。"""
+    """code → 用户信息 + token（open_id, name, access_token…）。失败抛异常。"""
     if not code:
         raise FeishuLoginError("登录信息已失效，请重新点击飞书登录。", "missing code")
     app_id, app_secret = os.environ["FEISHU_APP_ID"], os.environ["FEISHU_APP_SECRET"]
@@ -290,7 +290,8 @@ def feishu_exchange(code: str) -> dict:
                        headers={"Authorization": f"Bearer {app_token}", "Content-Type": "application/json"},
                        json={"grant_type": "authorization_code", "code": code},
                        user_message="飞书登录暂时不可用，请稍后重试。")
-    utoken = (r2.get("data") or {}).get("access_token")
+    data2 = r2.get("data") or {}
+    utoken = data2.get("access_token")
     if not utoken:
         msg = str(r2.get("msg") or "")
         if "code" in msg.lower() or "grant" in msg.lower():
@@ -306,7 +307,11 @@ def feishu_exchange(code: str) -> dict:
         "open_id": d["open_id"],
         "name": d.get("name") or d.get("en_name") or "飞书用户",
         "email": d.get("enterprise_email") or d.get("email") or "",
-        "avatar_url": d.get("avatar_url") or d.get("avatar_thumb") or d.get("avatar_middle") or d.get("avatar_big") or ""
+        "avatar_url": d.get("avatar_url") or d.get("avatar_thumb") or d.get("avatar_middle") or d.get("avatar_big") or "",
+        "access_token": str(utoken or ""),
+        "refresh_token": str(data2.get("refresh_token") or ""),
+        "expires_in": int(data2.get("expires_in") or 0),
+        "scope": str(data2.get("scope") or ""),
     }
 
 def feishu_auto_role(info: dict) -> str | None:
