@@ -62,10 +62,38 @@ _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划�
 3) 要写入飞书 → mode=prepare_write（系统会再请用户确认）；有待确认且用户同意 → confirm_write；取消 → cancel_write
 4) steps 只用只读工具；写入绝不进 steps
 5) feishu.search 必须带 resource_type（group|member|user|directory|doc|message|calendar|wiki|folder）
+   - 列群：group（query 可空）
+   - 群成员：member，且 depends_on 列群步骤；系统会注入 chat_id（不要空想 open_id）
+   - 按姓名找人：directory + keyword（不要用 user 除非已有 open_id）
+   - user 仅在已知 open_id 时使用
 6) 周报事实用 ask.*；飞书 live 用 feishu.*；禁止混成一个假事实源
-7) 步骤 ≤8；有依赖才写 depends_on；可并行的标同一 parallel_group
-8) 只输出 JSON
+7) 用户说「和我有关/我的周报」时：ask.published 的 query 必须写上对方姓名与团队（见下方身份），禁止让用户再报一遍部门
+8) 步骤 ≤8；有依赖才写 depends_on；可并行的标同一 parallel_group
+9) 只输出 JSON
 """
+
+
+def _identity_line(identity: Any) -> str:
+    if identity is None:
+        return "对方身份：未知"
+    person = getattr(identity, "person", None) or {}
+    if not isinstance(person, dict):
+        person = {}
+    name = (
+        str(getattr(identity, "display_hint", None) or "").strip()
+        or str(person.get("display") or person.get("name") or "").strip()
+    )
+    team = str(getattr(identity, "primary_team", None) or "").strip()
+    oid = str(getattr(identity, "feishu_open_id", None) or "").strip()
+    status = str(getattr(identity, "status", None) or "").strip()
+    bits = [f"绑定={status or 'unknown'}"]
+    if name:
+        bits.append(f"姓名={name}")
+    if team:
+        bits.append(f"团队={team}")
+    if oid:
+        bits.append(f"open_id={oid}")
+    return "对方身份：" + "；".join(bits)
 
 
 def _parse_json(raw: Any) -> dict[str, Any]:
@@ -169,7 +197,7 @@ def plan_turn(
     system = _PLANNER_SYSTEM
     if company_block:
         system += "\n\n" + company_block
-    user = f"用户目标：{q}\n"
+    user = f"{_identity_line(identity)}\n用户目标：{q}\n"
     if isinstance(pending, dict) and pending.get("tool"):
         user += (
             f"当前待确认写入：tool={pending.get('tool')} "

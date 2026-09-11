@@ -174,3 +174,80 @@ def test_plan_rejects_write_in_steps():
     )
     assert len(steps) == 1
     assert steps[0].tool == "ask.published"
+
+
+def test_enrich_about_me_query_uses_identity():
+    from app.agent.supervisor.types import PlanStep
+
+    ident = IdentityResult(
+        status="bound",
+        feishu_open_id="ou_x",
+        primary_team="编辑部",
+        display_hint="杜锦涛",
+    )
+    step = PlanStep(
+        id="s1",
+        worker="published",
+        tool="ask.published",
+        args={"query": "列出最近周报和我有关的内容"},
+    )
+    args = workers.enrich_args(
+        step,
+        identity=ident,
+        context=None,
+        user_text="列出最近周报和我有关的内容",
+    )
+    assert "杜锦涛" in args["query"]
+    assert "编辑部" in args["query"]
+
+
+def test_enrich_user_without_open_id_rewrites_directory():
+    from app.agent.supervisor.types import PlanStep
+
+    step = PlanStep(
+        id="s1",
+        worker="org",
+        tool="feishu.search",
+        args={"resource_type": "user", "query": "张三"},
+    )
+    args = workers.enrich_args(
+        step,
+        identity=IdentityResult(status="bound", display_hint="小王"),
+        context=None,
+        user_text="查张三",
+    )
+    assert args["resource_type"] == "directory"
+    assert "张三" in (args.get("keyword") or args.get("query") or "")
+
+
+def test_mouth_hides_protocol_noise():
+    from app.agent.supervisor import mouth
+    from app.agent.supervisor.types import TaskGraph, TieredEnvelope
+
+    cols = mouth.format_columns(
+        [
+            TieredEnvelope(
+                step_id="a",
+                worker="published",
+                tool="ask.published",
+                ok=True,
+                tier="published",
+                text="[published/published] 周报有一条推进",
+            ),
+            TieredEnvelope(
+                step_id="b",
+                worker="org",
+                tool="feishu.search",
+                ok=False,
+                tier="feishu_live",
+                error="open_id_required_for_user",
+            ),
+        ],
+        graph=TaskGraph(goal="t", band="complex", mode="work"),
+        partial=True,
+        budget_hit="",
+    )
+    assert "published/published" not in cols["FACT"]
+    assert "open_id_required" not in cols["FACT"]
+    assert "budget=" not in cols["ANALYSIS"]
+    assert "通讯录" in cols["FACT"] or "没查全" in cols["FACT"]

@@ -32,6 +32,7 @@ def _execute_graph(
     context: Any,
     invoke_tool: Callable[..., Any],
     render_tool_result: Callable[..., Any],
+    user_text: str = "",
 ) -> tuple[list[TieredEnvelope], list[str], str, list[str]]:
     t0 = time.monotonic()
     budget = dict(graph.budget or DEFAULT_BUDGET)
@@ -77,6 +78,9 @@ def _execute_graph(
 
             def _run_one(step: PlanStep) -> TieredEnvelope:
                 nonlocal calls
+                prior = [done[d] for d in (step.depends_on or []) if d in done]
+                # 同批之前已完成的步骤也可见（同图上下文）
+                prior = list(done.values()) + prior
                 env = workers.run_step(
                     step,
                     con=con,
@@ -85,6 +89,8 @@ def _execute_graph(
                     context=context,
                     invoke_tool=invoke_tool,
                     render_tool_result=render_tool_result,
+                    prior=prior,
+                    user_text=user_text,
                 )
                 calls += 1
                 tools_called.append(step.tool)
@@ -224,6 +230,7 @@ def handle_turn(
         context=context,
         invoke_tool=invoke_tool,
         render_tool_result=render_tool_result,
+        user_text=q,
     )
     out.progress = list(progress)
     out.tools_called = list(tools_called)
@@ -259,6 +266,7 @@ def handle_turn(
             context=context,
             invoke_tool=invoke_tool,
             render_tool_result=render_tool_result,
+            user_text=q,
         )
         out.tools_called.extend(tools_called2)
         for p in progress2:
@@ -270,7 +278,8 @@ def handle_turn(
             for k in ("ok_count", "total", "tiers", "cross_bucket", "want_replan", "replan_reason")
         }
 
-    partial = bool(budget_hit) or any(not e.ok for e in envelopes)
+    skipped = len(graph.steps or []) - len(envelopes)
+    partial = bool(budget_hit) or skipped > 0 or any(not e.ok for e in envelopes)
     columns = mouth.format_columns(
         envelopes, graph=graph, partial=partial, budget_hit=budget_hit
     )

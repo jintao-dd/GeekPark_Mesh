@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Callable
 
 from .types import PlanStep, TieredEnvelope
@@ -32,6 +33,8 @@ PROGRESS_LABEL = {
     "writer": "正在准备飞书写入",
 }
 
+_ABOUT_ME_RE = re.compile(r"(和我有关|与我有关|关于我|我的周报|跟我相关|我相关)")
+
 
 def resolve_worker(tool: str, args: dict[str, Any] | None = None) -> str:
     tool = (tool or "").strip()
@@ -47,6 +50,51 @@ def progress_for(worker: str) -> str:
     return PROGRESS_LABEL.get(worker, f"正在执行 {worker}")
 
 
+def _identity_bits(identity: Any) -> tuple[str, str, str]:
+    if identity is None:
+        return "", "", ""
+    person = getattr(identity, "person", None) or {}
+    if not isinstance(person, dict):
+        person = {}
+    name = (
+        str(getattr(identity, "display_hint", None) or "").strip()
+        or str(person.get("display") or person.get("name") or "").strip()
+    )
+    team = str(getattr(identity, "primary_team", None) or "").strip()
+    oid = str(getattr(identity, "feishu_open_id", None) or "").strip()
+    return name, team, oid
+
+
+def _chat_ids_from_prior(prior: list[TieredEnvelope]) -> list[str]:
+    out: list[str] = []
+    for e in prior or []:
+        for cid in e.payload.get("chat_ids") or []:
+            s = str(cid or "").strip()
+            if s and s not in out:
+                out.append(s)
+        text = e.text or ""
+        for m in re.finditer(r"\boc_[a-zA-Z0-9]+\b", text):
+            s = m.group(0)
+            if s not in out:
+                out.append(s)
+    return out
+
+
+def _open_ids_from_prior(prior: list[TieredEnvelope]) -> list[str]:
+    out: list[str] = []
+    for e in prior or []:
+        for oid in e.payload.get("open_ids") or []:
+            s = str(oid or "").strip()
+            if s.startswith("ou_") and s not in out:
+                out.append(s)
+        text = e.text or ""
+        for m in re.finditer(r"\bou_[a-zA-Z0-9]+\b", text):
+            s = m.group(0)
+            if s not in out:
+                out.append(s)
+    return out
+
+
 def _tool_args(step: PlanStep) -> dict[str, Any]:
     args = dict(step.args or {})
     nested = args.pop("args", None)
@@ -55,6 +103,78 @@ def _tool_args(step: PlanStep) -> dict[str, Any]:
     if step.tool.startswith("ask.") or step.tool.startswith("context."):
         if "query" in args:
             return {"query": args.get("query") or ""}
+    return args
+
+
+def enrich_args(
+    step: PlanStep,
+    *,
+    identity: Any,
+    context: Any,
+    prior: list[TieredEnvelope] | None = None,
+    user_text: str = "",
+) -> dict[str, Any]:
+    """补全 chat_id / open_id / 关于我的周报 query，避免把协议错误甩给用户。"""
+    args = _tool_args(step)
+    name, team, self_oid = _identity_bits(identity)
+    prior = list(prior or [])
+    q_user = (user_text or "").strip()
+
+    if step.tool.startswith("ask."):
+        q = str(args.get("query") or q_user or "").strip()
+        if _ABOUT_ME_RE.search(q) or _ABOUT_ME_RE.search(q_user):
+            bits = []
+            if name:
+                bits.append(name)
+            if team:
+                bits.append(f"团队={team}")
+            who = "、".join(bits) if bits else "当前登录同事"
+            args["query"] = (
+                f"{who} 在近期已上线周报中的相关进展、触点、项目与活动"
+                f"（用户原话：{(q_user or q)[:80]}）"
+            )
+        elif not q:
+            args["query"] = q_user[:160]
+        return args
+
+    if step.tool != "feishu.search":
+        return args
+
+    rt = str(args.get("resource_type") or "").strip().lower()
+    ctx_chat = str(getattr(context, "chat_id", None) or "").strip()
+    if ctx_chat and rt in ("member", "group", "message"):
+        args.setdefault("chat_id", ctx_chat)
+
+    if rt == "member" and not str(args.get("chat_id") or "").strip():
+        cids = _chat_ids_from_prior(prior)
+        if cids:
+            args["chat_id"] = cids[0]
+
+    if rt == "user":
+        oids = [str(x).strip() for x in (args.get("open_ids") or []) if str(x).strip()]
+        one = str(args.get("open_id") or args.get("user_id") or "").strip()
+        if one:
+            oids = [one] + [x for x in oids if x != one]
+        if not oids:
+            # 关于自己 → 用绑定 open_id；否则改通讯录按姓名查，禁止空 open_id 硬炸
+            about_self = bool(
+                re.search(r"(我自己|查我|我的档案|我是谁)", q_user)
+                or (name and name in str(args.get("query") or ""))
+            )
+            if about_self and self_oid:
+                args["open_id"] = self_oid
+            else:
+                prior_oids = _open_ids_from_prior(prior)
+                if prior_oids:
+                    args["open_ids"] = prior_oids[:8]
+                else:
+                    kw = str(args.get("keyword") or args.get("query") or name or "").strip()
+                    args["resource_type"] = "directory"
+                    args["keyword"] = kw or "同事"
+                    args.pop("open_id", None)
+                    args.pop("open_ids", None)
+                    log.info("worker rewrite user→directory keyword=%s", kw[:40])
+
     return args
 
 
@@ -74,6 +194,28 @@ def _render_intent(tool: str) -> str:
     }.get((tool or "").strip(), "ask_published")
 
 
+def _extract_ids(payload: dict[str, Any]) -> dict[str, list[str]]:
+    chat_ids: list[str] = []
+    open_ids: list[str] = []
+    items = payload.get("items") if isinstance(payload.get("items"), list) else []
+    for it in items[:40]:
+        if not isinstance(it, dict):
+            continue
+        iid = str(it.get("id") or "").strip()
+        dtype = str(it.get("docs_type") or it.get("type") or "").lower()
+        if iid.startswith("oc_") and iid not in chat_ids:
+            chat_ids.append(iid)
+        if iid.startswith("ou_") and iid not in open_ids:
+            open_ids.append(iid)
+        if "group" in dtype or "chat" in dtype:
+            if iid.startswith("oc_") and iid not in chat_ids:
+                chat_ids.append(iid)
+        if dtype in ("member", "user", "person"):
+            if iid.startswith("ou_") and iid not in open_ids:
+                open_ids.append(iid)
+    return {"chat_ids": chat_ids, "open_ids": open_ids}
+
+
 def run_step(
     step: PlanStep,
     *,
@@ -83,15 +225,19 @@ def run_step(
     context: Any,
     invoke_tool: Callable[..., Any],
     render_tool_result: Callable[..., Any],
+    prior: list[TieredEnvelope] | None = None,
+    user_text: str = "",
 ) -> TieredEnvelope:
     worker = step.worker or resolve_worker(step.tool, step.args)
     try:
-        args = _tool_args(step)
-        chat_id = str(getattr(context, "chat_id", None) or "").strip()
-        if chat_id and step.tool == "feishu.search":
-            rt = str(args.get("resource_type") or "")
-            if rt in ("member", "group", "message"):
-                args.setdefault("chat_id", chat_id)
+        args = enrich_args(
+            step,
+            identity=identity,
+            context=context,
+            prior=prior,
+            user_text=user_text,
+        )
+        worker = resolve_worker(step.tool, args)
         result = invoke_tool(step.tool, con, identity, permission, context, args)
         intent = _render_intent(step.tool)
         fact_text, _bindings, _ev = render_tool_result(
@@ -110,9 +256,16 @@ def run_step(
         text = (fact_text or "").strip()
         if text.startswith("{") and '"action"' in text[:40]:
             text = str(payload.get("answer") or payload.get("snippet") or text)[:2000]
+        ids = _extract_ids(payload)
         need_replan = False
         replan_reason = ""
-        if not ok and err in ("user_auth_required", "empty", "not_found"):
+        if not ok and err in (
+            "user_auth_required",
+            "empty",
+            "not_found",
+            "open_id_required_for_user",
+            "chat_id_required_for_members",
+        ):
             need_replan = True
             replan_reason = err
         elif ok and not text and payload.get("empty"):
@@ -129,9 +282,13 @@ def run_step(
             need_replan=need_replan,
             replan_reason=replan_reason,
             payload={
-                k: payload.get(k)
-                for k in ("empty", "user_auth_required", "meta", "source_tier")
-                if k in payload
+                **{
+                    k: payload.get(k)
+                    for k in ("empty", "user_auth_required", "meta", "source_tier")
+                    if k in payload
+                },
+                **ids,
+                "resource_type": str(args.get("resource_type") or ""),
             },
         )
     except Exception as e:
