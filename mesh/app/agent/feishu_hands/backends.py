@@ -126,6 +126,25 @@ def _cli_bin() -> str:
     return flags.cli_bin() or "lark-cli"
 
 
+def _usable_entity_filter(q: str) -> str:
+    """实体名/短关键词才拿来本地过滤；整句自然语言问法不过滤（否则必空）。"""
+    import re
+
+    s = (q or "").strip()
+    if not s:
+        return ""
+    # 飞书 id / token
+    if re.match(r"^(oc_|ou_|om_|omt_|docx?_|wiki_)[\w-]+$", s, re.I):
+        return s
+    # 拉丁短名
+    if re.fullmatch(r"[A-Za-z0-9_./-]{1,40}", s):
+        return s
+    # 短专名（≤8）：整句意图通常更长
+    if re.fullmatch(r"[\u4e00-\u9fffA-Za-z0-9]{1,8}", s):
+        return s
+    return ""
+
+
 def _cli_items_from_payload(payload: dict[str, Any]) -> list[Any]:
     if not isinstance(payload, dict):
         return []
@@ -556,7 +575,7 @@ def _cli_call(
                 if env_list.ok:
                     payload = (env_list.meta or {}).get("cli") or {}
                     raw = _cli_items_from_payload(payload if isinstance(payload, dict) else {})
-                    items = _cli_norm_messages(raw, query=q)
+                    items = _cli_norm_messages(raw, query=_usable_entity_filter(q))
             # 跨会话关键词搜（无 chat 或会话内过滤后为空时）
             if (not items) and q:
                 argv = [
@@ -588,13 +607,14 @@ def _cli_call(
             )
         if rt == "group":
             env = None
-            if q:
+            name_q = _usable_entity_filter(q)
+            if name_q:
                 env = _cli_run(
                     [
                         "im",
                         "+chat-search",
                         "--query",
-                        q,
+                        name_q,
                         "--page-size",
                         mr,
                     ],
@@ -619,7 +639,7 @@ def _cli_call(
                     return env
             payload = (env.meta or {}).get("cli") or {}
             raw = _cli_items_from_payload(payload if isinstance(payload, dict) else {})
-            items = _cli_norm_chats(raw, query=q)
+            items = _cli_norm_chats(raw, query=name_q)
             return envelope_ok(normalize_docs(items[: int(mr)], kind="group"), tool=tool)
         if rt == "calendar":
             return _cli_call(
@@ -705,7 +725,7 @@ def _cli_call(
                 # normalize_docs 已返回标准 item；若 raw 已是标准则再用 busy norm
                 if raw and not any(str(i.get("snippet") or "") for i in items):
                     items = _cli_norm_busy(raw)
-        q = str(args.get("query") or "").strip().lower()
+        q = _usable_entity_filter(str(args.get("query") or args.get("q") or ""))
         if q:
             items = [
                 i

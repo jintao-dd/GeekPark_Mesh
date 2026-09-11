@@ -130,10 +130,11 @@ _SYSTEM_DECIDE = """你是 GeekPark 内部 AI 同事 Mesh 的「调度」层。
 可写 tool：feishu.doc.create | feishu.im.send | feishu.calendar.create
 
 飞书读路由提示：
-- 列群/群列表 → feishu.search + resource_type=group
-- 查我的日程/周会 → feishu.calendar.list（或 search + calendar）
+- 列群/群聊 → feishu.search + resource_type=group；query 用空或群名短词，不要整句
+- 查我的日程/周会 → feishu.calendar.list（query 空或短关键词）
 - 当前会话/群聊天记录 → feishu.search + message（系统会带 chat_id）
 - 搜文档/Wiki → feishu.search + doc|wiki
+- feishu.search 必须带 resource_type；列表类意图 query 尽量短/空
 
 规则（看「系统工作记忆」+ 对话，不要枚举用户句式）：
 - 有待确认写操作 + 用户同意 → confirm_write
@@ -550,11 +551,14 @@ def _synthesize(
 ) -> tuple[str, dict[str, Any]]:
     meta: dict[str, Any] = {"llm_used": False, "model": None}
     tier = (source_tier or "published").strip().lower()
+    fact = (fact_text or "").strip()
     if tier == "feishu_live":
         material_note = (
             "下面是飞书 live_context 材料，不是已上线周报。"
             "用同事口吻转述；必须标明来自飞书侧；"
-            "禁止说成「周报里记录」；空/失败就说没查到，不要编造。"
+            "禁止说成「周报里记录」；"
+            "材料里已有条目时必须如实转述，禁止说成没查到/权限没打通；"
+            "仅当材料明确写空/失败时才说没查到；不要自己猜测权限问题。"
         )
     else:
         material_note = (
@@ -570,7 +574,7 @@ def _synthesize(
     hist = _history_block(state)
     user = (
         (hist + "\n\n" if hist else "")
-        + f"用户问：{(user_text or '').strip()}\n\n材料：\n{(fact_text or '').strip()}\n\nMesh："
+        + f"用户问：{(user_text or '').strip()}\n\n材料：\n{fact}\n\nMesh："
     )
     try:
         from .. import llm
@@ -579,10 +583,16 @@ def _synthesize(
         meta["llm_used"] = True
         meta["model"] = llm.model_for_task("answer")
         text = _sanitize_user_visible(str(out or "").strip())
-        return (text or fact_text), meta
+        # 有材料却被模型说成权限空结果：回落材料正文
+        if fact and re.search(r"^- ", fact, re.M) and re.search(
+            r"(没查到|权限没|没打通|可能是权限)", text or ""
+        ):
+            log.warning("colleague_v3 synthesize contradicted non-empty feishu materials")
+            return fact, meta
+        return (text or fact), meta
     except Exception as e:
         log.warning("colleague_v3 synthesize failed: %s", e)
-        return fact_text, meta
+        return fact, meta
 
 
 def _intent_for(action: str, tool_id: str) -> str:
@@ -609,7 +619,33 @@ def _default_resource_type(tool: str, decision: dict[str, Any]) -> str:
         return rt
     args = decision.get("args") if isinstance(decision.get("args"), dict) else {}
     rt2 = str(args.get("resource_type") or "").strip().lower()
-    return rt2 or "doc"
+    if rt2:
+        return rt2
+    return ""
+
+
+def _infer_search_resource_type(query: str) -> str:
+    """Decide 漏了 resource_type 时，按本轮用户话即时判断（非关键词表）。"""
+    q = (query or "").strip()
+    if not q:
+        return "doc"
+    allowed = ("doc", "message", "group", "wiki", "folder", "calendar")
+    system = (
+        "你给飞书搜索选 resource_type。"
+        "只输出其中一个单词：doc / message / group / wiki / folder / calendar。"
+        "列群/群聊→group；日程/开会/周会→calendar；聊天消息→message；知识库→wiki；文件夹→folder；云文档→doc。"
+        "不要解释。"
+    )
+    try:
+        from .. import llm
+
+        out = str(llm.call(system, f"用户：{q}\nresource_type：", max_tokens=8, json_mode=False, task="answer") or "").strip().lower()
+        word = re.split(r"[\s,，。；;]", out)[0].strip()
+        if word in allowed:
+            return word
+    except Exception as e:
+        log.warning("infer resource_type failed: %s", e)
+    return "doc"
 
 
 def _build_ask_args(tool: str, query: str, decision: dict[str, Any], context: Any = None) -> dict[str, Any]:
@@ -619,7 +655,21 @@ def _build_ask_args(tool: str, query: str, decision: dict[str, Any], context: An
         if k not in args and v is not None:
             args[k] = v
     if tool == "feishu.search":
-        args["resource_type"] = _default_resource_type(tool, decision)
+        rt = _default_resource_type(tool, decision)
+        if not rt:
+            rt = _infer_search_resource_type(query)
+            log.info("colleague_v3 inferred resource_type=%s q=%r", rt, (query or "")[:60])
+        args["resource_type"] = rt
+        # 列表类整句不要当实体过滤词
+        from .feishu_hands.backends import _usable_entity_filter
+
+        fq = _usable_entity_filter(str(args.get("q") or ""))
+        if args.get("resource_type") in ("group", "calendar") and not fq:
+            args["q"] = ""
+    if tool == "feishu.calendar.list":
+        from .feishu_hands.backends import _usable_entity_filter
+
+        args["q"] = _usable_entity_filter(str(args.get("q") or query or ""))
     if tool == "feishu.discuss.summary" and "person" not in args:
         args.setdefault("person", query[:40])
     chat_id = ""
@@ -627,7 +677,6 @@ def _build_ask_args(tool: str, query: str, decision: dict[str, Any], context: An
         chat_id = str(getattr(context, "chat_id", None) or "").strip()
     if chat_id:
         args.setdefault("chat_id", chat_id)
-        # 当前会话发消息默认目标
         if tool == "feishu.im.send":
             args.setdefault("receive_id", chat_id)
             args.setdefault("receive_id_type", "chat_id")
@@ -930,6 +979,14 @@ def handle(
         out.claim_bindings = list(bindings or [])
         out.evidence_refs = list(evidence or [])
         out.payload = result.payload if isinstance(getattr(result, "payload", None), dict) else {}
+        log.info(
+            "colleague_v3 ask tool=%s rt=%s ok=%s n=%s q=%r",
+            tool,
+            str(tool_args.get("resource_type") or ""),
+            bool(getattr(result, "ok", False)),
+            int((out.payload or {}).get("n_hits") or 0),
+            (query or "")[:60],
+        )
         if getattr(result, "denied", False):
             out.refused = True
             out.deny_reason = str(getattr(result, "error", "") or "ask_denied")
