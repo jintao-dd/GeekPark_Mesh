@@ -129,12 +129,12 @@ _SYSTEM_DECIDE = """你是 GeekPark 内部 AI 同事 Mesh 的「调度」层。
   feishu.search | feishu.doc.get | feishu.calendar.list | feishu.discuss.summary
 可写 tool：feishu.doc.create | feishu.im.send | feishu.calendar.create
 
-飞书读路由提示：
-- 列群/群聊 → feishu.search + resource_type=group；query 用空或群名短词，不要整句
-- 查我的日程/周会 → feishu.calendar.list（query 空或短关键词）
-- 当前会话/群聊天记录 → feishu.search + message（系统会带 chat_id）
-- 搜文档/Wiki → feishu.search + doc|wiki
-- feishu.search 必须带 resource_type；列表类意图 query 尽量短/空
+飞书读路由提示（结构化，不要把用户整句当检索词）：
+- 列群 → tool=feishu.search, resource_type=group, query=""（或 args.keyword=群名）
+- 日程 → tool=feishu.calendar.list, query 可空；不要塞整句
+- 会话消息 → feishu.search + message；关键词放 args.keyword / 短 query
+- 文档/Wiki → feishu.search + doc|wiki，短检索词
+- feishu.search 必须带 resource_type
 
 规则（看「系统工作记忆」+ 对话，不要枚举用户句式）：
 - 有待确认写操作 + 用户同意 → confirm_write
@@ -649,29 +649,42 @@ def _infer_search_resource_type(query: str) -> str:
 
 
 def _build_ask_args(tool: str, query: str, decision: dict[str, Any], context: Any = None) -> dict[str, Any]:
-    args: dict[str, Any] = {"q": query}
+    """组装工具参数：用户原话只作 Decide 输入；工具侧只用结构化字段。"""
+    args: dict[str, Any] = {}
     raw = decision.get("args") if isinstance(decision.get("args"), dict) else {}
     for k, v in raw.items():
-        if k not in args and v is not None:
+        if v is not None:
             args[k] = v
+    # Decide 可给 keyword；不要默认把整句用户话塞进 q 当过滤器
+    keyword = str(args.get("keyword") or args.get("name") or "").strip()
+    explicit_q = str(args.get("q") or args.get("query") or "").strip()
     if tool == "feishu.search":
         rt = _default_resource_type(tool, decision)
         if not rt:
             rt = _infer_search_resource_type(query)
             log.info("colleague_v3 inferred resource_type=%s q=%r", rt, (query or "")[:60])
         args["resource_type"] = rt
-        # 列表类整句不要当实体过滤词
-        from .feishu_hands.backends import _usable_entity_filter
-
-        fq = _usable_entity_filter(str(args.get("q") or ""))
-        if args.get("resource_type") in ("group", "calendar") and not fq:
-            args["q"] = ""
-    if tool == "feishu.calendar.list":
-        from .feishu_hands.backends import _usable_entity_filter
-
-        args["q"] = _usable_entity_filter(str(args.get("q") or query or ""))
+        if keyword:
+            args["q"] = keyword
+            args["keyword"] = keyword
+        elif explicit_q:
+            args["q"] = explicit_q
+        else:
+            # 列表类：空 q；搜索类：留给 Decide 的 query 字段（短检索词），不是用户整句
+            decide_q = str(decision.get("query") or "").strip()
+            args["q"] = decide_q if decide_q and decide_q != (query or "").strip() else ""
+            # 若 Decide 把整句放进 query，搜索词也清空，由 resource_type 决定 list/search
+            if args["q"] == (query or "").strip() and rt in ("group", "calendar"):
+                args["q"] = ""
+    elif tool == "feishu.calendar.list":
+        args["q"] = keyword
+        if keyword:
+            args["keyword"] = keyword
+        args.setdefault("days", int(args.get("days") or 7))
+    else:
+        args.setdefault("q", explicit_q or str(decision.get("query") or query or "").strip())
     if tool == "feishu.discuss.summary" and "person" not in args:
-        args.setdefault("person", query[:40])
+        args.setdefault("person", (keyword or query)[:40])
     chat_id = ""
     if context is not None:
         chat_id = str(getattr(context, "chat_id", None) or "").strip()

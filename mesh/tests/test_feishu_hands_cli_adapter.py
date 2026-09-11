@@ -193,8 +193,8 @@ def test_cli_group_uses_chat_list(monkeypatch):
                     "ok": True,
                     "data": {
                         "chats": [
-                            {"name": "Mesh 测试群", "chat_id": "oc_aaa"},
-                            {"name": "其他", "chat_id": "oc_bbb"},
+                            {"name": "Mesh Lab", "chat_id": "oc_aaa"},
+                            {"name": "Other", "chat_id": "oc_bbb"},
                         ]
                     },
                 }
@@ -208,8 +208,8 @@ def test_cli_group_uses_chat_list(monkeypatch):
         timeout_sec=5,
     )
     assert env.ok
-    assert len(env.items) == 1
-    assert env.items[0]["title"] == "Mesh 测试群"
+    # list fallback returns all visible chats; no local utterance filter
+    assert len(env.items) == 2
     assert calls[0][:2] == ["im", "+chat-search"]
     assert calls[1][:2] == ["im", "+chat-list"]
 
@@ -291,14 +291,7 @@ def test_cli_message_prefers_chat_messages_list(monkeypatch):
     assert env.items and "火凤凰" in str(env.items[0].get("snippet") or env.items[0].get("title") or "")
 
 
-def test_usable_entity_filter_drops_full_utterance():
-    assert backends._usable_entity_filter("\u5217\u4e00\u4e0b\u63a5\u4e0b\u6765\u51e0\u5929\u7684\u65e5\u7a0b") == ""
-    assert backends._usable_entity_filter("\u5217\u51fa\u4f60\u80fd\u8bbf\u95ee\u7684\u7fa4\u804a") == ""
-    assert backends._usable_entity_filter("CCC") == "CCC"
-    assert backends._usable_entity_filter("Mesh") == "Mesh"
-
-
-def test_cli_calendar_does_not_filter_away_full_question(monkeypatch):
+def test_cli_calendar_keeps_busy_even_if_nl_query_present(monkeypatch):
     def fake_run(argv, *, timeout_sec, tool, as_identity="bot", user_access_token="", confirm_yes=False):
         from app.agent.feishu_hands.normalize import envelope_ok
 
@@ -330,7 +323,7 @@ def test_cli_calendar_does_not_filter_away_full_question(monkeypatch):
     monkeypatch.setattr(backends, "_cli_run", fake_run)
     env = backends._cli_call(
         "feishu.calendar.list",
-        {"query": "\u5217\u4e00\u4e0b\u63a5\u4e0b\u6765\u51e0\u5929\u7684\u65e5\u7a0b", "days": 7},
+        {"query": "whatever full sentence", "days": 7},
         timeout_sec=5,
         open_id="ou_x",
     )
@@ -338,10 +331,16 @@ def test_cli_calendar_does_not_filter_away_full_question(monkeypatch):
     assert len(env.items) == 1
 
 
-def test_cli_group_list_utterance_not_used_as_name_filter(monkeypatch):
+def test_cli_group_list_no_local_utterance_filter(monkeypatch):
     def fake_run(argv, *, timeout_sec, tool, as_identity="bot", user_access_token="", confirm_yes=False):
         from app.agent.feishu_hands.normalize import envelope_ok
 
+        if argv[:2] == ["im", "+chat-search"]:
+            return envelope_ok(
+                [],
+                tool=tool,
+                meta={"cli": {"ok": True, "data": {"chats": None, "total": 0}}},
+            )
         assert argv[:2] == ["im", "+chat-list"]
         return envelope_ok(
             [],
@@ -349,7 +348,7 @@ def test_cli_group_list_utterance_not_used_as_name_filter(monkeypatch):
             meta={
                 "cli": {
                     "ok": True,
-                    "data": {"chats": [{"name": "CCC\u6280\u672f\u7ec4", "chat_id": "oc_1"}]},
+                    "data": {"chats": [{"name": "CCC Tech", "chat_id": "oc_1"}]},
                 }
             },
         )
@@ -357,16 +356,24 @@ def test_cli_group_list_utterance_not_used_as_name_filter(monkeypatch):
     monkeypatch.setattr(backends, "_cli_run", fake_run)
     env = backends._cli_call(
         "feishu.search",
-        {
-            "query": "\u5217\u51fa\u4f60\u80fd\u8bbf\u95ee\u7684\u7fa4\u804a",
-            "resource_type": "group",
-            "max_results": 5,
-        },
+        {"query": "list all groups please long utterance", "resource_type": "group", "max_results": 5},
         timeout_sec=5,
     )
     assert env.ok
     assert len(env.items) == 1
-    assert "CCC" in env.items[0]["title"]
+    assert env.items[0]["title"] == "CCC Tech"
+
+
+def test_build_ask_args_does_not_stuff_full_utterance_into_calendar_q():
+    from app.agent.colleague_v3 import _build_ask_args
+
+    a = _build_ask_args(
+        "feishu.calendar.list",
+        "\u5217\u4e00\u4e0b\u63a5\u4e0b\u6765\u51e0\u5929\u7684\u65e5\u7a0b",
+        {"tool": "feishu.calendar.list", "query": "\u5217\u4e00\u4e0b\u63a5\u4e0b\u6765\u51e0\u5929\u7684\u65e5\u7a0b"},
+        None,
+    )
+    assert a.get("q") in ("", None)
 
 
 def test_format_display_skips_weekly_footer_for_feishu_live():

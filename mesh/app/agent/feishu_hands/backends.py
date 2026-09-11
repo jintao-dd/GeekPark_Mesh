@@ -126,25 +126,6 @@ def _cli_bin() -> str:
     return flags.cli_bin() or "lark-cli"
 
 
-def _usable_entity_filter(q: str) -> str:
-    """实体名/短关键词才拿来本地过滤；整句自然语言问法不过滤（否则必空）。"""
-    import re
-
-    s = (q or "").strip()
-    if not s:
-        return ""
-    # 飞书 id / token
-    if re.match(r"^(oc_|ou_|om_|omt_|docx?_|wiki_)[\w-]+$", s, re.I):
-        return s
-    # 拉丁短名
-    if re.fullmatch(r"[A-Za-z0-9_./-]{1,40}", s):
-        return s
-    # 短专名（≤8）：整句意图通常更长
-    if re.fullmatch(r"[\u4e00-\u9fffA-Za-z0-9]{1,8}", s):
-        return s
-    return ""
-
-
 def _cli_items_from_payload(payload: dict[str, Any]) -> list[Any]:
     if not isinstance(payload, dict):
         return []
@@ -575,7 +556,9 @@ def _cli_call(
                 if env_list.ok:
                     payload = (env_list.meta or {}).get("cli") or {}
                     raw = _cli_items_from_payload(payload if isinstance(payload, dict) else {})
-                    items = _cli_norm_messages(raw, query=_usable_entity_filter(q))
+                    # 会话消息：有明确 keyword 才滤；否则原样给同事层
+                    kw = str(args.get("keyword") or "").strip()
+                    items = _cli_norm_messages(raw, query=kw)
             # 跨会话关键词搜（无 chat 或会话内过滤后为空时）
             if (not items) and q:
                 argv = [
@@ -606,15 +589,19 @@ def _cli_call(
                 tool=tool,
             )
         if rt == "group":
+            # Decide 给的 q 只作 CLI 搜索词；搜空则直接 list，本地不再二次过滤用户整句
+            keyword = str(args.get("keyword") or args.get("name") or "").strip()
+            if not keyword:
+                keyword = ""
+            q_cli = keyword or str(q or "").strip()
             env = None
-            name_q = _usable_entity_filter(q)
-            if name_q:
+            if q_cli:
                 env = _cli_run(
                     [
                         "im",
                         "+chat-search",
                         "--query",
-                        name_q,
+                        q_cli,
                         "--page-size",
                         mr,
                     ],
@@ -637,9 +624,14 @@ def _cli_call(
                 )
                 if not env.ok:
                     return env
-            payload = (env.meta or {}).get("cli") or {}
-            raw = _cli_items_from_payload(payload if isinstance(payload, dict) else {})
-            items = _cli_norm_chats(raw, query=name_q)
+                payload = (env.meta or {}).get("cli") or {}
+                raw = _cli_items_from_payload(payload if isinstance(payload, dict) else {})
+                # list 回退：原样返回，禁止用用户整句再滤一遍
+                items = _cli_norm_chats(raw, query="")
+            else:
+                payload = (env.meta or {}).get("cli") or {}
+                raw = _cli_items_from_payload(payload if isinstance(payload, dict) else {})
+                items = _cli_norm_chats(raw, query="")
             return envelope_ok(normalize_docs(items[: int(mr)], kind="group"), tool=tool)
         if rt == "calendar":
             return _cli_call(
@@ -725,13 +717,14 @@ def _cli_call(
                 # normalize_docs 已返回标准 item；若 raw 已是标准则再用 busy norm
                 if raw and not any(str(i.get("snippet") or "") for i in items):
                     items = _cli_norm_busy(raw)
-        q = _usable_entity_filter(str(args.get("query") or args.get("q") or ""))
-        if q:
+        # 禁止把用户整句当结果过滤器；关键词只认 Decide 显式 keyword
+        kw = str(args.get("keyword") or "").strip().lower()
+        if kw:
             items = [
                 i
                 for i in items
-                if q in str(i.get("title") or "").lower()
-                or q in str(i.get("snippet") or "").lower()
+                if kw in str(i.get("title") or "").lower()
+                or kw in str(i.get("snippet") or "").lower()
             ]
         mr = int(args.get("max_results") or 12)
         return envelope_ok(list(items)[:mr], tool=tool)
