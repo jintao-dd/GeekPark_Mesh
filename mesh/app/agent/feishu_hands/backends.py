@@ -142,6 +142,66 @@ def _cli_items_from_payload(payload: dict[str, Any]) -> list[Any]:
     return []
 
 
+def _cli_extract_created_doc(data: Any) -> tuple[str, str]:
+    """lark-cli docs +create 返回 data.document.{document_id,url}，兼容扁平字段。"""
+    if not isinstance(data, dict):
+        return "", ""
+    doc = data.get("document") if isinstance(data.get("document"), dict) else data
+    if not isinstance(doc, dict):
+        doc = data
+    token = str(
+        doc.get("document_id")
+        or doc.get("doc_token")
+        or doc.get("token")
+        or data.get("document_id")
+        or data.get("doc_token")
+        or data.get("token")
+        or ""
+    ).strip()
+    url = str(doc.get("url") or doc.get("doc_url") or data.get("url") or data.get("doc_url") or "").strip()
+    if not url and token:
+        url = f"https://feishu.cn/docx/{token}"
+    return token, url
+
+
+def _cli_grant_member(
+    token: str,
+    *,
+    open_id: str,
+    timeout_sec: float,
+    user_access_token: str = "",
+    perm: str = "full_access",
+) -> tuple[bool, str]:
+    oid = (open_id or "").strip()
+    tok = (token or "").strip()
+    if not oid or not tok:
+        return False, "missing_open_id_or_token"
+    env = _cli_run(
+        [
+            "drive",
+            "+member-add",
+            "--token",
+            tok,
+            "--type",
+            "docx",
+            "--member-type",
+            "openid",
+            "--member-id",
+            oid,
+            "--perm",
+            perm,
+        ],
+        timeout_sec=timeout_sec,
+        tool="feishu.doc.create",
+        as_identity="bot",
+        user_access_token=user_access_token,
+        confirm_yes=True,
+    )
+    if env.ok:
+        return True, ""
+    return False, str(env.error or "member_add_failed")[:160]
+
+
 def _cli_subprocess_env(*, user_access_token: str = "") -> dict[str, str]:
     """Headless CLI env provider.
 
@@ -313,10 +373,12 @@ def _cli_call(
     *,
     timeout_sec: float,
     user_access_token: str = "",
+    open_id: str = "",
 ) -> ToolResultEnvelope:
     """官方 lark-cli shortcuts（与 larksuite/cli Skills 同源命令面）。"""
     args = dict(arguments or {})
     uat = (user_access_token or str(args.get("user_access_token") or "")).strip()
+    oid = (open_id or str(args.get("open_id") or "")).strip()
 
     if tool == "feishu.search":
         rt = str(args.get("resource_type") or "doc").lower()
@@ -458,32 +520,47 @@ def _cli_call(
             return env
         payload = (env.meta or {}).get("cli") or {}
         data = payload.get("data") if isinstance(payload, dict) else {}
-        url = str((data or {}).get("url") or (data or {}).get("doc_url") or "")
-        token = str(
-            (data or {}).get("document_id")
-            or (data or {}).get("doc_token")
-            or (data or {}).get("token")
-            or ""
-        )
-        if not url and token:
-            url = f"https://feishu.cn/docx/{token}"
+        token, url = _cli_extract_created_doc(data)
         share_ok = False
         share_err = ""
+        member_ok = False
+        member_err = ""
         if token:
             share_ok, share_err = _cli_tenant_share(
                 token, timeout_sec=timeout_sec, user_access_token=uat
             )
             if not share_ok:
                 log.warning("cli doc tenant share failed token=%s: %s", token, share_err)
-        snippet = "已创建；公司内获链接可读" if share_ok else "已创建（公司内链接权限未设上）"
+            if oid:
+                member_ok, member_err = _cli_grant_member(
+                    token,
+                    open_id=oid,
+                    timeout_sec=timeout_sec,
+                    user_access_token=uat,
+                    perm="full_access",
+                )
+                if not member_ok:
+                    log.warning("cli doc member grant failed token=%s open_id=%s: %s", token, oid, member_err)
+        bits = ["已创建"]
+        if member_ok:
+            bits.append("已授予你编辑权限")
+        if share_ok:
+            bits.append("公司内获链接可读")
+        elif token:
+            bits.append("公司内链接权限未设上")
+        snippet = "；".join(bits)
+        # URL 必须进 items，否则 synthesize 说不清地址
+        item = {"title": title, "url": url, "snippet": snippet, "docs_token": token}
         return envelope_ok(
-            [{"title": title, "url": url, "snippet": snippet, "docs_token": token}],
+            [item],
             tool=tool,
             meta={
                 "url": url,
                 "doc_token": token,
                 "tenant_share": share_ok,
                 "tenant_share_error": share_err,
+                "member_grant": member_ok,
+                "member_grant_error": member_err,
                 "backend": "cli",
             },
         )
@@ -713,6 +790,7 @@ def call_tool(
             args,
             timeout_sec=to,
             user_access_token=user_access_token,
+            open_id=open_id,
         )
 
     return _mcp_post(

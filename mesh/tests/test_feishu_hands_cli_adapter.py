@@ -117,36 +117,58 @@ def test_cli_doc_search_fallback_docs_search_with_uat(monkeypatch):
     assert calls[1][1] == "user"
 
 
-def test_cli_doc_create_calls_cli_tenant_share(monkeypatch):
+def test_cli_doc_create_parses_nested_document_and_grants(monkeypatch):
+    calls = []
+
     def fake_cli_run(argv, *, timeout_sec, tool, as_identity="bot", user_access_token="", confirm_yes=False):
+        calls.append(list(argv))
         from app.agent.feishu_hands.normalize import envelope_ok
 
-        if argv[:3] == ["drive", "permission.public", "patch"]:
-            assert confirm_yes is True
-            return envelope_ok([], tool=tool, meta={"cli": {"ok": True}})
-        return envelope_ok(
-            [],
-            tool=tool,
-            meta={
-                "cli": {
-                    "ok": True,
-                    "data": {
-                        "document_id": "docx_tok_1",
-                        "url": "https://feishu.cn/docx/docx_tok_1",
-                    },
-                }
-            },
-        )
+        if argv[:2] == ["docs", "+create"]:
+            return envelope_ok(
+                [],
+                tool=tool,
+                meta={
+                    "cli": {
+                        "ok": True,
+                        "data": {
+                            "document": {
+                                "document_id": "docx_tok_nested",
+                                "url": "https://geek.feishu.cn/docx/docx_tok_nested",
+                            }
+                        },
+                    }
+                },
+            )
+        # share / member-add
+        return envelope_ok([], tool=tool, meta={"cli": {"ok": True}})
 
     monkeypatch.setattr(backends, "_cli_run", fake_cli_run)
     env = backends._cli_call(
         "feishu.doc.create",
         {"title": "T", "content": "body", "confirmed": True},
         timeout_sec=10,
+        open_id="ou_test_user",
     )
     assert env.ok
+    assert env.items and env.items[0]["url"].endswith("docx_tok_nested")
     assert (env.meta or {}).get("tenant_share") is True
-    assert (env.meta or {}).get("backend") == "cli"
+    assert (env.meta or {}).get("member_grant") is True
+    assert any(a[:2] == ["drive", "+member-add"] for a in calls)
+    assert any(a[:3] == ["drive", "permission.public", "patch"] for a in calls)
+
+
+def test_cli_extract_created_doc_nested():
+    token, url = backends._cli_extract_created_doc(
+        {
+            "document": {
+                "document_id": "abc",
+                "url": "https://geek.feishu.cn/docx/abc",
+            }
+        }
+    )
+    assert token == "abc"
+    assert url.endswith("/docx/abc")
 
 
 def test_format_display_skips_weekly_footer_for_feishu_live():

@@ -856,13 +856,21 @@ def handle(
             out.synthesize_llm_used = bool(smeta.get("llm_used"))
             out.llm_used = bool(out.llm_used or smeta.get("llm_used"))
             out.text = _sanitize_user_visible(spoken)
-            # 公司内可读：native 已尽力设置；回传 meta
             meta = out.payload.get("meta") if isinstance(out.payload, dict) else None
-            if isinstance(meta, dict) and meta.get("tenant_share") is False:
-                out.text = (
-                    out.text.rstrip()
-                    + "\n\n（提醒：公司内链接权限这次没设上，同事可能打不开；可手动开「组织内获得链接可阅读」。）"
-                )
+            if isinstance(meta, dict):
+                url = str(meta.get("url") or "").strip()
+                if url and url not in out.text:
+                    out.text = out.text.rstrip() + f"\n\n文档地址：{url}"
+                if meta.get("tenant_share") is False:
+                    out.text = (
+                        out.text.rstrip()
+                        + "\n\n（提醒：公司内链接权限这次没设上，同事可能打不开；可手动开「组织内获得链接可阅读」。）"
+                    )
+                if meta.get("member_grant") is False and str(meta.get("doc_token") or ""):
+                    out.text = (
+                        out.text.rstrip()
+                        + "\n\n（提醒：这次没能把编辑权限授给你本人，文档仍在机器人名下；用上面链接打开，必要时让我再改权限。）"
+                    )
         else:
             err = str(getattr(result, "error", "") or "")
             classified = _classify_block(err, tool=tool)
