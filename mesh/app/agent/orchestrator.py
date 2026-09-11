@@ -280,6 +280,20 @@ def _tool_args(step: PlanStep) -> dict[str, Any]:
     return args
 
 
+def _render_intent_for(tool: str) -> str:
+    t = (tool or "").strip()
+    return {
+        "feishu.search": "feishu_search",
+        "feishu.doc.get": "feishu_doc_get",
+        "feishu.calendar.list": "feishu_calendar_list",
+        "feishu.calendar.propose": "feishu_calendar_list",
+        "feishu.discuss.summary": "feishu_discuss",
+        "ask.published": "ask_published",
+        "ask.relations_summary": "ask_relations",
+        "context.list_issues": "list_issues",
+    }.get(t, "ask_published")
+
+
 def execute_plan(
     plan: TaskPlan,
     *,
@@ -302,6 +316,13 @@ def execute_plan(
     tools_called: list[str] = []
     budget_hit = ""
     calls = 0
+    chat_id = str(getattr(context, "chat_id", None) or "").strip()
+    log.info(
+        "orchestrator start band=%s steps=%s wall=%s",
+        plan.band,
+        [s.id for s in steps],
+        wall,
+    )
 
     def _ready(s: PlanStep) -> bool:
         return all(d in done for d in (s.depends_on or []))
@@ -317,7 +338,6 @@ def execute_plan(
         if not batch:
             budget_hit = budget_hit or "dependency_stuck"
             break
-        # 同 parallel_group 并行，其余串行保序
         groups: dict[str, list[PlanStep]] = {}
         for s in batch:
             g = s.parallel_group or f"_serial_{s.id}"
@@ -325,47 +345,64 @@ def execute_plan(
 
         for _g, group_steps in groups.items():
             if time.monotonic() - t0 > wall or calls >= max_calls:
-                budget_hit = budget_hit or ("wall_time" if time.monotonic() - t0 > wall else "tool_calls")
+                budget_hit = budget_hit or (
+                    "wall_time" if time.monotonic() - t0 > wall else "tool_calls"
+                )
                 break
 
             def _run_one(step: PlanStep) -> StepResult:
                 nonlocal calls
                 try:
+                    args = _tool_args(step)
+                    if chat_id and step.tool == "feishu.search":
+                        rt = str(args.get("resource_type") or "")
+                        if rt in ("member", "group", "message"):
+                            args.setdefault("chat_id", chat_id)
                     result = invoke_tool(
                         step.tool,
                         con,
                         identity,
                         permission,
                         context,
-                        _tool_args(step),
+                        args,
                     )
                     calls += 1
                     tools_called.append(step.tool)
+                    intent = _render_intent_for(step.tool)
                     fact_text, _bindings, _ev = render_tool_result(
                         result,
-                        "feishu_search"
-                        if str(step.tool).startswith("feishu.")
-                        else "ask",
+                        intent,
                         getattr(identity, "status", "") or "",
                     )
                     ok = bool(getattr(result, "ok", False))
-                    tier = "feishu_live" if str(step.tool).startswith("feishu.") else "published"
+                    tier = (
+                        "feishu_live"
+                        if str(step.tool).startswith("feishu.")
+                        else "published"
+                    )
                     payload = getattr(result, "payload", None)
                     if not isinstance(payload, dict):
                         payload = {}
-                    # 从 envelope / payload 抽 tier
                     if payload.get("source_tier"):
                         tier = str(payload.get("source_tier"))
                     err = str(getattr(result, "error", "") or "")
+                    # 勿把原始 JSON 协议塞进成文
+                    text = (fact_text or "").strip()
+                    if text.startswith("{") and '"action"' in text[:40]:
+                        text = str(payload.get("answer") or payload.get("snippet") or text)[:2000]
                     return StepResult(
                         step_id=step.id,
                         specialist=step.specialist,
                         tool=step.tool,
                         ok=ok,
                         source_tier=tier,
-                        text=(fact_text or "")[:4000],
+                        text=text[:4000],
                         error=err,
-                        payload=payload,
+                        payload={
+                            k: payload.get(k)
+                            for k in ("empty", "user_auth_required", "meta", "source_tier")
+                            if k in payload
+                        },
                     )
                 except Exception as e:
                     log.warning("orchestrator step %s failed: %s", step.id, e)
@@ -394,8 +431,18 @@ def execute_plan(
     ordered = [done[s.id] for s in steps if s.id in done]
     skipped = [s.id for s in steps if s.id not in done]
     partial = bool(budget_hit or skipped)
-    columns = synthesize_columns(ordered, plan=plan, partial=partial, budget_hit=budget_hit)
+    columns = synthesize_columns(
+        ordered, plan=plan, partial=partial, budget_hit=budget_hit
+    )
     text = format_columns(columns)
+    log.info(
+        "orchestrator done band=%s ok_steps=%s/%s chars=%s partial=%s",
+        plan.band,
+        sum(1 for s in ordered if s.ok),
+        len(steps),
+        len(text or ""),
+        partial,
+    )
     return OrchestratorResult(
         band=plan.band,
         plan=plan,
@@ -495,12 +542,12 @@ def synthesize_columns(
 def format_columns(columns: dict[str, str]) -> str:
     order = ("FACT", "ANALYSIS", "OPINION", "SUGGESTION")
     labels = {
-        "FACT": "事实",
-        "ANALYSIS": "分析",
+        "FACT": "我查到的",
+        "ANALYSIS": "怎么串起来看",
         "OPINION": "我的判断",
-        "SUGGESTION": "建议",
+        "SUGGESTION": "建议下一步",
     }
-    blocks: list[str] = []
+    blocks: list[str] = ["按你的目标，我分几块说："]
     for k in order:
         v = (columns.get(k) or "").strip()
         if not v:

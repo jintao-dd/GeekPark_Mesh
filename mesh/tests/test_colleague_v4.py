@@ -109,8 +109,10 @@ def test_columns_keep_tiers_separate():
     assert "已上线周报" in cols["FACT"]
     assert "飞书 live" in cols["FACT"]
     text = orch.format_columns(cols)
-    assert "**事实**" in text
+    assert "**我查到的**" in text
     assert "**我的判断**" in text
+    assert "已上线周报" in cols["FACT"]
+    assert "飞书 live" in cols["FACT"]
 
 
 def test_handle_orchestrates_complex_with_mock_tools():
@@ -178,6 +180,23 @@ def test_handle_orchestrates_complex_with_mock_tools():
     assert "orchestrator" in out.trace
     assert calls  # tools ran
     assert "**事实**" in (out.text or "") or "事实" in (out.text or "")
+
+
+def test_sanitize_keeps_colleague_text_with_incidental_action():
+    # 正文里偶然出现 "action" 不得整段毁掉
+    raw = (
+        "**事实**\n飞书侧查到 3 个群。\n\n"
+        '**分析**\n其中有个 payload 提到 "action" 字段但那是材料。\n\n'
+        "**我的判断**\n先看第一个群。"
+    )
+    out = colleague_v3._sanitize_user_visible(raw)
+    assert "3 个群" in out
+    assert "我的判断" in out
+
+
+def test_sanitize_still_strips_pure_protocol():
+    out = colleague_v3._sanitize_user_visible('{"action":"speak","text":"你好啊"}')
+    assert out == "你好啊" or "action" not in out
 
 
 def test_company_context_assemble():

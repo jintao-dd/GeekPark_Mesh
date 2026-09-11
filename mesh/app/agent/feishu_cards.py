@@ -110,29 +110,16 @@ def card_json_v2(
     ]
     tips = list(followups or [])
     if tips:
-        actions = []
-        for i, tip in enumerate(tips[:3]):
-            actions.append(
+        # CardKit schema 2.0 不再支持 tag=action；改用 markdown 列表避免整卡更新失败
+        tip_lines = "\n".join(f"- {t[:80]}" for t in tips[:3] if str(t).strip())
+        if tip_lines:
+            elements.append(
                 {
-                    "tag": "button",
-                    "text": {"tag": "plain_text", "content": tip[:40]},
-                    "type": "default" if i else "primary",
-                    "width": "default",
-                    "behaviors": [
-                        {
-                            "type": "callback",
-                            "value": {"mesh_action": "ask", "q": tip},
-                        }
-                    ],
+                    "tag": "markdown",
+                    "content": f"\n你可以接着问：\n{tip_lines}",
+                    "element_id": ACTIONS_ELEMENT_ID,
                 }
             )
-        elements.append(
-            {
-                "tag": "action",
-                "actions": actions,
-                "element_id": ACTIONS_ELEMENT_ID,
-            }
-        )
 
     cfg: dict[str, Any] = {
         "wide_screen_mode": True,

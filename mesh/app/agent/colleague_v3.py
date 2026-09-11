@@ -532,10 +532,12 @@ def _parse_decision(raw: str) -> dict[str, Any]:
 
 
 def _sanitize_user_visible(text: str) -> str:
+    """只拦「整段协议泄漏」；禁止因正文偶然出现 action 字样就毁掉同事回复。"""
     t = (text or "").strip()
     if not t:
         return t
-    if not _LEAK_RE.search(t) and "'action'" not in t and '"action"' not in t:
+    # 整段就是 decide JSON / 泄漏协议时才抽 text
+    if not _LEAK_RE.search(t):
         return t
     for parser in (json.loads, ast.literal_eval):
         try:
@@ -543,7 +545,7 @@ def _sanitize_user_visible(text: str) -> str:
             data = parser(m.group(0) if m else t)
             if isinstance(data, dict):
                 inner = str(data.get("text") or "").strip()
-                if inner and "'action'" not in inner and '"action"' not in inner[:20]:
+                if inner and not _LEAK_RE.search(inner):
                     return inner
         except Exception:
             pass
@@ -1066,6 +1068,25 @@ def handle(
         out.intent = "casual"
         out.trace["write_cancelled"] = True
         return out
+
+    # confirm 但无 pending：像「继续创建日程」应改走 prepare（须在 prepare 分支之前）
+    if action == "confirm_write":
+        pending0 = session.pending_write if isinstance(session.pending_write, dict) else None
+        if (not pending0 or not pending0.get("tool")) and re.search(
+            r"日程|日历|开会|约", q or ""
+        ):
+            decision = {
+                "action": "prepare_write",
+                "tool": "feishu.calendar.create",
+                "args": {},
+            }
+            action = "prepare_write"
+            out.trace["confirm_without_pending_reroute"] = True
+            out.trace["decision"] = {
+                "action": action,
+                "tool": "feishu.calendar.create",
+                "query": (q or "")[:200],
+            }
 
     if action == "prepare_write":
         tool = str(decision.get("tool") or "").strip()
