@@ -3,7 +3,8 @@
 > **状态（2026-09-09 · Ranking v1.4 候选）**  
 > Temporal **24/24** · Recall **83/90/94** 冻结 · Vector **OFF**  
 > Ranking v1.4：****4125→Top5** · worse=[] · R06/R16/R18/R@20 守住 → **CANDIDATE 合并（待确认）**  
-> 轻量 Ontology = 反推 schema only · Wiki / Agentic RAG **冻结**  
+> 轻量 Ontology = 反推 schema only · 质量轨 Wiki / Agentic RAG **仍冻结**  
+> **2026-09-11：** Colleague **Company Wiki / Company Ontology**（懂语境/懂结构）见 `COLLEAGUE_AGENT_V4.md` §1.5；**不得**替换本页 Published Grounding / Recall  
 > 报告：`AGENT_QUALITY_V2_3b_RANKING_4125.md`
 
 相关：`MESH_AGENT_FULL_ACCEPTANCE.md` · `TEMPORAL_PHASE1.md` · `RECALL_FAILURE_REVIEW.md`  

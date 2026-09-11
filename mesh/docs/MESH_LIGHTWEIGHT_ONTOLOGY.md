@@ -1,5 +1,6 @@
 # Mesh 轻量 Ontology（反推稿 · 非系统）
 
+> **2026-09-11：** Colleague 轨另建 **Company Ontology**（懂组织结构），见 `COLLEAGUE_AGENT_V4.md` §1.5。本文仍只服务质量轨 claim↔evidence **语法**；两层勿混。  
 > **原则（锁定）**  
 > Ontology schema **必须从现有对象反推**，不是先设计理想模型再改库 / Retrieval / Contract。  
 > 价值一句话：**给 claim ↔ evidence 加语法**，不是把 Mesh 升级成知识图谱。

@@ -20,8 +20,8 @@ Mesh 今天是 **两条轨道**：
 | **B · Colleague Agent** | 🔨 **主战场 → v4** | v3 Wave1 + Hands + Identity/UAT 为底座；目标态 = **Agentic Enterprise**：Brain → Complexity Judge →（Direct \| Planner+Bounded ReAct+Specialists）→ 一张嘴 |
 
 **当前主矛盾：** 把 **Task Orchestrator + Bounded Runtime + 分栏思想（FACT/ANALYSIS/OPINION/SUGGESTION）** 设计进底层并按 L0–L6 梯子验收；外加开放平台权限发版与真人 Canary。  
-**Colleague 轨允许（有笼子）：** Bounded ReAct · Planner（只出图）· Specialist Multi-Agent（不对用户说话）。  
-**仍绝对不做：** 无限 ReAct · 用户可见多 Agent 话术 · Graph/ES/Wiki 主路径 · 长期向量 Memory · 解冻质量轨 · `docker cp` 当发布 · Planner 当第二大脑。
+**Colleague 轨允许（有笼子）：** Bounded ReAct · Planner（只出图）· Specialist Multi-Agent（不对用户说话）· **Company Ontology + Company Wiki（语境派生，非 Ask 替换）**。  
+**仍绝对不做：** 无限 ReAct · 用户可见多 Agent 话术 · Wiki/ES/Neo4j **替换** Published Ask · 长期向量 Memory · 解冻质量轨 · `docker cp` 当发布 · Planner 当第二大脑。
 
 ---
 
@@ -294,16 +294,18 @@ https://feishu.cn/docx/BCQodMvgyokof1x1SIsccJ7Tnmc
 - 无限 `while true` ReAct / 无预算 tool loop  
 - 用户可见「XX Agent 认为」多角色话术；Router/Answer/Critic 式拆人对外  
 - Planner 做公司事实、最终人格回答或权限放行  
-- 新 Retrieval 主路径 / Wiki / ES / Neo4j·图谱主路径（质量轨）  
+- 新 Retrieval 主路径 / 用 Wiki·ES·Neo4j **替换** Published Ask（质量轨）  
 - **长期向量 Memory** / Dynamic Router  
 - 为 Colleague UX **解冻** Ranking / Claim / 质量微补丁  
-- 把 `feishu_live` 混进 `published` / enterprise_fact  
+- 把 `feishu_live` / Wiki 语境 混进 `published` / enterprise_fact  
 - 无用户确认（及 WRITE 开关）的飞书写入  
 - 回写 Mesh 业务库 / 自动扩能力  
 - Ask 事实绕过 Published-only  
 - `docker cp` 当发布；无 digest / REPRO 的上线  
 - 把产品中轴拉回 v2 Controller  
 - 用关键词枚举用户句式替代上下文 LLM 调度（硬确认短句除外）
+
+> **说明：** Colleague **Company Ontology / Company Wiki** 已写入 v4（懂结构/懂语境）；这与「Wiki 当 Ask 主路径」不是同一件事。
 
 ---
 
@@ -319,6 +321,7 @@ https://feishu.cn/docx/BCQodMvgyokof1x1SIsccJ7Tnmc
 | Bounded ReAct 预算闸 | ❌ | 初值见 v4；Capacity 后校准 |
 | Specialist 接口 | ❌ | Org / Research / Calendar / Published |
 | Synthesis 分栏 FACT/ANALYSIS/OPINION/SUGGESTION | ❌ | 「有思想」落点 |
+| Company Ontology v0 / Company Wiki v0 | ❌ | 懂结构+懂语境；见 v4 §1.5；禁冒充 FACT |
 | Complex 金丝雀 tmesh 真聊 | ❌ | 群+人+日历+周报 |
 | 开放平台 scopes **发版并生效** | ⚠ Ops | 勾选不够；须创建版本+发布 |
 | Hands 真人多轮（创建文档→确认→公司内可开） | 🔨 | 代码就绪；依赖 scopes + 现场验 |
@@ -407,11 +410,11 @@ f0c4762  native OpenAPI Hands；真测可开
 
 ## 11. 「现在该干什么」执行序
 
-1. **开放平台：** 按 `FEISHU_HANDS_SCOPES.md` 勾选 → **发版发布** →（如需）管理员审批。  
-2. **真人回归：** `创建个文档…` → `确认` → 检查链接公司内可开；催促/权限失败是否记 `last_block` 且不虚晃。  
-3. **Canary 2.0：** 只记四指标，不顺手改质量轨。  
-4. **收口 Hands 真测** 后再议：User OAuth、MCP 默认、Wave 2。  
-5. **勿做：** 解冻 Ranking/Claim、加 Planner/Multi-Agent、上长期向量 Memory、跳过 tmesh 直推 prod。
+1. **锁架构：** 以 `COLLEAGUE_AGENT_V4.md` 为准；废止 Stage 1–4 /「绝对不做 Planner」旧口径。  
+2. **实现梯子 L0→L3：** TaskPlan 只读 Orchestrator → Judge → 金丝雀（群+人+日历+周报）；每档 pytest + tmesh 真聊。  
+3. **开放平台：** scopes 发版 + Agent OAuth 回调域；日历/个人搜依赖 UAT。  
+4. **再上 L4–L6：** 写闸共存、预算闸、身份矩阵；Capacity 校准数值。  
+5. **勿做：** 解冻 Ranking/Claim、无限 ReAct、用户可见多 Agent、跳过 tmesh 直推 prod、未过 L2 就上满 Specialist 对外话术。
 
 ---
 
@@ -420,6 +423,8 @@ f0c4762  native OpenAPI Hands；真测可开
 | 日期 | 说明 |
 |------|------|
 | 2026-09-11 | 首版全量进度总览；对齐 HEAD `1337c66`；覆盖双轨、Hands、记忆隔离、验收与未决项 |
+| 2026-09-11 | **路线修订：** 引入 Colleague v4 Agentic Enterprise；解禁有笼 Bounded ReAct/Planner/Specialists；废止 Stage 线性计划 |
+| 2026-09-11 | **公司理解三角：** Ontology + Wiki + Grounding 写入 v4；区分 Claim Ontology 与 Company Wiki 笼子 |
 
 ---
 
