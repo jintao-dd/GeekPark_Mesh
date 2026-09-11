@@ -13,8 +13,9 @@ class CompanyUnderstanding:
     ontology: CompanyOntology
     wiki: CompanyWiki
     grounding_hint: str = (
-        "企业事实唯一入口：Published Ask（已上线周报）。"
-        "飞书 Hands 结果是 feishu_live。Wiki/Ontology 不得写入 FACT。"
+        "分桶纪律：published=已上线周报事实；feishu_live=飞书现场材料；"
+        "wiki_prior=公司先验别名（非事实）；analysis=综合判断。"
+        "合成时 FACT 不得跨桶冒充。Wiki/Ontology 不得写入 FACT。"
     )
     session_summary: str = ""
 

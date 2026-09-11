@@ -44,6 +44,11 @@ def colleague_v3_enabled() -> bool:
     return v not in ("0", "false", "off", "no")
 
 
+def supervisor_enabled() -> bool:
+    """默认开启：MeshSupervisor 主路径。MESH_SUPERVISOR=0 回退 colleague_v3。"""
+    v = (os.environ.get("MESH_SUPERVISOR") or "1").strip().lower()
+    return v not in ("0", "false", "off", "no")
+
 def _colleague_turn(
     *,
     user_text: str,
@@ -546,16 +551,33 @@ def _handle_colleague_v3(
             route=route,
         )
 
-    result = colleague_v3.handle(
-        con=con,
-        user_text=text_in,
-        identity=identity,
-        permission=permission,
-        context=context,
-        session=session,
-        invoke_tool=toolsmod.invoke_tool,
-        render_tool_result=_render,
-    )
+    use_supervisor = supervisor_enabled()
+    if use_supervisor:
+        from . import supervisor as supermod
+
+        result = supermod.handle_turn(
+            con=con,
+            user_text=text_in,
+            identity=identity,
+            permission=permission,
+            context=context,
+            session=session,
+            invoke_tool=toolsmod.invoke_tool,
+            render_tool_result=_render,
+        )
+        brain_note = "supervisor"
+    else:
+        result = colleague_v3.handle(
+            con=con,
+            user_text=text_in,
+            identity=identity,
+            permission=permission,
+            context=context,
+            session=session,
+            invoke_tool=toolsmod.invoke_tool,
+            render_tool_result=_render,
+        )
+        brain_note = "colleague_v3"
 
     # 映射 route 供 Session 更新
     if result.action == "ask" or result.intent in (
@@ -586,15 +608,15 @@ def _handle_colleague_v3(
             route=route_name,
             intent=result.intent,
             rewritten_query=str((result.trace or {}).get("ask_query") or text_in),
-            notes="colleague_v3_ask",
+            notes=f"{brain_note}_ask",
         )
     elif result.action == "refuse" or result.refused:
-        route = conv.RouteDecision(route="refuse", intent="refuse", notes="colleague_v3")
+        route = conv.RouteDecision(route="refuse", intent="refuse", notes=brain_note)
     else:
         route = conv.RouteDecision(
             route="general_conversation",
             intent="casual",
-            notes="colleague_v3_speak",
+            notes=f"{brain_note}_speak",
         )
 
     tr = fp.build_trace(
@@ -604,8 +626,9 @@ def _handle_colleague_v3(
         identity_status=identity.status,
     )
     tr["colleague_v3"] = True
-    tr["router_llm_used"] = False  # 无独立 Controller
-    tr["llm_used"] = bool(result.llm_used or result.synthesize_llm_used)
+    tr["supervisor"] = bool(use_supervisor)
+    tr["router_llm_used"] = False  # 无独立 Controller；Supervisor 内嵌规划
+    tr["llm_used"] = bool(result.llm_used or getattr(result, "synthesize_llm_used", False))
     tr["colleague_action"] = result.action
     if result.model:
         tr["model_used"] = result.model
@@ -616,6 +639,8 @@ def _handle_colleague_v3(
         tr["n_hits"] = result.payload.get("n_hits")
     if result.payload.get("claim_support"):
         tr["claim_support"] = result.payload.get("claim_support")
+    if result.payload.get("progress"):
+        tr["progress"] = result.payload.get("progress")
 
     answer = AgentAnswer(
         text=result.text,

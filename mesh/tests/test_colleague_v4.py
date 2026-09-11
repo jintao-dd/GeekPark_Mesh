@@ -127,6 +127,7 @@ def test_columns_keep_tiers_separate():
 
 
 def test_handle_orchestrates_complex_with_mock_tools():
+    """Legacy colleague_v3 path still works when called directly."""
     st = sstore.SessionContextState()
     ident = IdentityResult(
         status="bound",
@@ -182,12 +183,6 @@ def test_handle_orchestrates_complex_with_mock_tools():
                         },
                         {
                             "id": "s2",
-                            "tool": "feishu.search",
-                            "args": {"resource_type": "member"},
-                            "depends_on": ["s1"],
-                        },
-                        {
-                            "id": "s3",
                             "tool": "ask.published",
                             "args": {"query": "近期协作"},
                             "parallel_group": "fanout",
@@ -213,7 +208,7 @@ def test_handle_orchestrates_complex_with_mock_tools():
     assert out.trace.get("colleague_v4") is True
     assert "planner" in out.trace
     assert "orchestrator" in out.trace
-    assert calls  # tools ran
+    assert calls
     assert "**我查到的**" in (out.text or "") or "我查到的" in (out.text or "")
 
 

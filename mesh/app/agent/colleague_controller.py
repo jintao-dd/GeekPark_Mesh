@@ -1,9 +1,7 @@
-"""Colleague Controller · Semantic Decision Layer (Stage 1).
+"""Colleague Controller · Semantic Decision Layer (legacy rollback only).
 
-原则：规则定义边界，模型理解语言。
-- 不枚举口语/观点/闲聊关键词
-- Controller 只决策，不回答，不 Retrieval，不当 Truth
-- 明显硬边界 → 0 Controller LLM；其余最多 1× Controller LLM
+主产品路径已切换到 MeshSupervisor（MESH_SUPERVISOR=1）。
+本模块仅在 MESH_COLLEAGUE_V3=0 的旧 runtime 分支保留，禁止继续加业务。
 """
 from __future__ import annotations
 

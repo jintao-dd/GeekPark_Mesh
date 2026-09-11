@@ -1,9 +1,9 @@
 # Colleague Agent v4 · Agentic Enterprise Architecture
 
 > **日期：** 2026-09-11  
-> **状态：** **现行产品架构契约**（取代 v2 Stage 1–4 线性计划；v3 Wave 1 为已落地底座，并入本架构第①②⑤层）  
-> **一句话：** 用户只认识 **Mesh** 这一个同事；**懂公司**靠 Ontology+Wiki+Grounding；做事靠 Orchestrator；事实与思想分栏，永不混级。  
-> **双轨纪律：** 本架构只动 **Colleague / Hands / Orchestrator / 公司理解层**。周报质量轨（Retrieval / Ranking / Claim / Published-only）**继续冻结**；Ask 是 Grounding Capability，不是第二张嘴。
+> **状态：** 能力与分桶合同仍有效；**控制面实现**已切到 [`MESH_SUPERVISOR.md`](./MESH_SUPERVISOR.md)（默认 `MESH_SUPERVISOR=1`）。  
+> **一句话：** 用户只认识 **Mesh**；**MeshSupervisor** 分配监督，Workers 执行；事实分桶，永不混级。  
+> **双轨纪律：** Ask 内核作为 WorkerPublished 保留；不再把旧 Decide+Planner 双脑当产品中轴。
 
 ---
 

@@ -1,0 +1,309 @@
+"""MeshSupervisor loop — assign, observe, verify, replan, one mouth."""
+from __future__ import annotations
+
+import logging
+import os
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Callable
+
+from ..session_state import SessionContextState
+from . import mouth
+from . import plan as planmod
+from . import verify as verifymod
+from . import workers
+from . import write_gate
+from .types import DEFAULT_BUDGET, PlanStep, SupervisorResult, TaskGraph, TieredEnvelope
+
+log = logging.getLogger("uvicorn.error")
+
+
+def supervisor_enabled() -> bool:
+    v = (os.environ.get("MESH_SUPERVISOR") or "1").strip().lower()
+    return v not in ("0", "false", "off", "no")
+
+
+def _execute_graph(
+    graph: TaskGraph,
+    *,
+    con: Any,
+    identity: Any,
+    permission: Any,
+    context: Any,
+    invoke_tool: Callable[..., Any],
+    render_tool_result: Callable[..., Any],
+) -> tuple[list[TieredEnvelope], list[str], str, list[str]]:
+    t0 = time.monotonic()
+    budget = dict(graph.budget or DEFAULT_BUDGET)
+    max_steps = int(budget.get("plan_steps") or 8)
+    max_calls = int(budget.get("tool_calls") or 12)
+    wall = float(budget.get("wall_time_sec") or 60.0)
+    steps = list(graph.steps or [])[:max_steps]
+    done: dict[str, TieredEnvelope] = {}
+    tools_called: list[str] = []
+    progress: list[str] = []
+    budget_hit = ""
+    calls = 0
+
+    def _ready(s: PlanStep) -> bool:
+        return all(d in done for d in (s.depends_on or []))
+
+    while len(done) < len(steps):
+        if time.monotonic() - t0 > wall:
+            budget_hit = "wall_time"
+            break
+        if calls >= max_calls:
+            budget_hit = "tool_calls"
+            break
+        batch = [s for s in steps if s.id not in done and _ready(s)]
+        if not batch:
+            budget_hit = budget_hit or "dependency_stuck"
+            break
+        groups: dict[str, list[PlanStep]] = {}
+        for s in batch:
+            g = s.parallel_group or f"_serial_{s.id}"
+            groups.setdefault(g, []).append(s)
+
+        for _g, group_steps in groups.items():
+            if time.monotonic() - t0 > wall or calls >= max_calls:
+                budget_hit = budget_hit or (
+                    "wall_time" if time.monotonic() - t0 > wall else "tool_calls"
+                )
+                break
+            for s in group_steps:
+                label = workers.progress_for(s.worker or workers.resolve_worker(s.tool, s.args))
+                if label not in progress:
+                    progress.append(label)
+
+            def _run_one(step: PlanStep) -> TieredEnvelope:
+                nonlocal calls
+                env = workers.run_step(
+                    step,
+                    con=con,
+                    identity=identity,
+                    permission=permission,
+                    context=context,
+                    invoke_tool=invoke_tool,
+                    render_tool_result=render_tool_result,
+                )
+                calls += 1
+                tools_called.append(step.tool)
+                return env
+
+            if len(group_steps) == 1:
+                env = _run_one(group_steps[0])
+                done[env.step_id] = env
+            else:
+                with ThreadPoolExecutor(max_workers=min(4, len(group_steps))) as pool:
+                    futs = {pool.submit(_run_one, s): s for s in group_steps}
+                    for fut in as_completed(futs):
+                        env = fut.result()
+                        done[env.step_id] = env
+        if budget_hit:
+            break
+
+    ordered = [done[s.id] for s in steps if s.id in done]
+    return ordered, tools_called, budget_hit, progress
+
+
+def handle_turn(
+    *,
+    con: Any,
+    user_text: str,
+    identity: Any,
+    permission: Any,
+    context: Any,
+    session: SessionContextState,
+    invoke_tool: Callable[..., Any],
+    render_tool_result: Callable[..., Any],
+) -> SupervisorResult:
+    from .. import company_context
+
+    q = (user_text or "").strip()
+    company = company_context.assemble(
+        identity=identity,
+        permission=permission,
+        context=context,
+        session=session,
+        user_text=q,
+    )
+    company_block = company.prompt_block()
+
+    out = SupervisorResult(
+        llm_used=False,
+        trace={
+            "supervisor": True,
+            "colleague_v4": True,
+            "company_understanding": {
+                "ontology_team": company.ontology.primary_team,
+                "wiki_matched": [p.slug for p in company.wiki.matched],
+            },
+        },
+    )
+
+    hard = write_gate.hard_confirm_or_cancel(q, session)
+    if hard:
+        graph = TaskGraph(goal=q[:200], mode=hard)
+        wr = write_gate.run_write(
+            mode=hard,
+            graph=graph,
+            con=con,
+            user_text=q,
+            identity=identity,
+            permission=permission,
+            context=context,
+            session=session,
+            invoke_tool=invoke_tool,
+            render_tool_result=render_tool_result,
+            company_block=company_block,
+        )
+        wr.trace = {**out.trace, **(wr.trace or {}), "hard_write": hard}
+        return wr
+
+    graph, pmeta = planmod.plan_turn(
+        q,
+        company_block=company_block,
+        identity=identity,
+        session=session,
+    )
+    out.llm_used = bool(pmeta.get("llm_used"))
+    out.model = pmeta.get("model")
+    out.trace["planner"] = pmeta
+    out.trace["task_graph"] = graph.to_dict()
+    replans_left = int((graph.budget or DEFAULT_BUDGET).get("replans") or 2)
+
+    mode = graph.mode
+    if mode in ("prepare_write", "confirm_write", "cancel_write"):
+        wr = write_gate.run_write(
+            mode=mode,
+            graph=graph,
+            con=con,
+            user_text=q,
+            identity=identity,
+            permission=permission,
+            context=context,
+            session=session,
+            invoke_tool=invoke_tool,
+            render_tool_result=render_tool_result,
+            company_block=company_block,
+        )
+        wr.llm_used = bool(wr.llm_used or out.llm_used)
+        wr.trace = {**out.trace, **(wr.trace or {})}
+        return wr
+
+    if mode == "refuse":
+        out.action = "refuse"
+        out.refused = True
+        out.deny_reason = "supervisor_refuse"
+        out.intent = "refuse"
+        out.text = mouth.sanitize(graph.refuse_text or "这个我做不了。")
+        return out
+
+    if mode == "speak" or not graph.steps:
+        text, smeta = mouth.speak(
+            q,
+            identity,
+            session,
+            company_block=company_block,
+            hint=graph.speak_hint,
+        )
+        out.action = "speak"
+        out.intent = "casual"
+        out.text = text
+        out.llm_used = bool(out.llm_used or smeta.get("llm_used"))
+        if smeta.get("model"):
+            out.model = smeta.get("model")
+        out.trace["mouth"] = "speak"
+        return out
+
+    envelopes, tools_called, budget_hit, progress = _execute_graph(
+        graph,
+        con=con,
+        identity=identity,
+        permission=permission,
+        context=context,
+        invoke_tool=invoke_tool,
+        render_tool_result=render_tool_result,
+    )
+    out.progress = list(progress)
+    out.tools_called = list(tools_called)
+    verdict = verifymod.verify(envelopes, graph=graph)
+    out.trace["verify"] = {
+        k: verdict[k]
+        for k in ("ok_count", "total", "tiers", "cross_bucket", "want_replan", "replan_reason")
+    }
+
+    while verdict.get("want_replan") and replans_left > 0:
+        replans_left -= 1
+        out.trace.setdefault("replans", []).append(verdict.get("replan_reason") or "replan")
+        graph2, pmeta2 = planmod.plan_turn(
+            q,
+            company_block=company_block,
+            identity=identity,
+            session=session,
+            observations=verdict.get("observations") or [],
+        )
+        out.llm_used = bool(out.llm_used or pmeta2.get("llm_used"))
+        out.trace.setdefault("replan_meta", []).append(pmeta2)
+        if graph2.mode != "work" or not graph2.steps:
+            break
+        same = [s.tool for s in graph2.steps] == [s.tool for s in graph.steps]
+        if same:
+            break
+        graph = graph2
+        envelopes, tools_called2, budget_hit, progress2 = _execute_graph(
+            graph,
+            con=con,
+            identity=identity,
+            permission=permission,
+            context=context,
+            invoke_tool=invoke_tool,
+            render_tool_result=render_tool_result,
+        )
+        out.tools_called.extend(tools_called2)
+        for p in progress2:
+            if p not in out.progress:
+                out.progress.append(p)
+        verdict = verifymod.verify(envelopes, graph=graph)
+        out.trace["verify"] = {
+            k: verdict[k]
+            for k in ("ok_count", "total", "tiers", "cross_bucket", "want_replan", "replan_reason")
+        }
+
+    partial = bool(budget_hit) or any(not e.ok for e in envelopes)
+    columns = mouth.format_columns(
+        envelopes, graph=graph, partial=partial, budget_hit=budget_hit
+    )
+    text = mouth.render_work_answer(columns)
+    out.action = "ask"
+    out.intent = (
+        "feishu_search"
+        if any(str(t).startswith("feishu.") for t in out.tools_called)
+        else "ask_published"
+    )
+    out.text = mouth.sanitize(text)
+    out.payload = {
+        "columns": columns,
+        "partial": partial,
+        "complexity": graph.band,
+        "source_tier": (
+            "feishu_live"
+            if any(str(t).startswith("feishu.") for t in out.tools_called)
+            else "published"
+        ),
+        "orchestrated": True,
+        "supervised": True,
+        "progress": list(out.progress),
+    }
+    out.trace["source_tier"] = out.payload["source_tier"]
+    out.trace["progress"] = list(out.progress)
+    out.trace["envelopes"] = [e.to_dict() for e in envelopes]
+    out.trace["budget_hit"] = budget_hit
+    log.info(
+        "supervisor done mode=work band=%s tools=%s chars=%s progress=%s",
+        graph.band,
+        out.tools_called,
+        len(out.text or ""),
+        out.progress,
+    )
+    return out

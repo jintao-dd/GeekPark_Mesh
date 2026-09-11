@@ -21,11 +21,14 @@ def _clip(text: str, n: int = 6000) -> str:
     return t[: n - 20] + "\n…（已截断）"
 
 
-def stage_copy(stage: int, *, query: str = "") -> str:
-    """等待阶段文案（口语）。不默认假装「正在查周报」。"""
+def stage_copy(stage: int, *, query: str = "", progress: list[str] | None = None) -> str:
+    """等待阶段文案。优先展示 Supervisor 派工进度。"""
     q = _clip(query, 80)
     quote = f"\n\n> {q}" if q else ""
-    # 明显写稿/闲聊：别说翻周报
+    if progress:
+        line = "；".join([p for p in progress if p][:3])
+        if line:
+            return f"{line}…{quote}"
     soft = bool(
         re.search(
             r"(写|文章|润色|改写|翻译|帮忙看看|忙死了|哈哈|傻|机械|同事)",
@@ -39,7 +42,7 @@ def stage_copy(stage: int, *, query: str = "") -> str:
     if stage <= 0:
         return f"收到，我看一下…{quote}"
     if stage == 1:
-        return f"若要查周报，我在已上线内容里找证据…{quote}"
+        return f"在分派查询（组织 / 日历 / 周报）…{quote}"
     return f"在整理，马上好…{quote}"
 
 
