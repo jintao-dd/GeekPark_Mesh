@@ -2,7 +2,8 @@
 
 > **日期：** 2026-09-10（2026-09-11 更新：CLI Adapter 生产就绪中）  
 > **状态：** **10 项能力已接入代码**；默认 backend=`native`；CLI 按 `docs/CLI_ADAPTER_READINESS.md` 金丝雀验收  
-> **目标态：** 飞书 → Colleague Brain →（Mesh Ask | **Hands Runtime → Adapter(native|cli|mcp)** | Org）→ 一张嘴  
+> **目标态：** 见 [`COLLEAGUE_AGENT_V4.md`](./COLLEAGUE_AGENT_V4.md) — Brain → Orchestrator →（Ask | Hands | Org | Calendar Specialists）→ 一张嘴  
+> **本页范围：** Hands = Capability / Adapter 层；不定义 Planner / Specialist。  
 > **原则：** 官方 CLI/MCP **并入** Adapter，不替换 Runtime；**绝不混级**；**绝不越权**。  
 >
 > CLI 热路径凭证：**env provider**（`LARKSUITE_CLI_APP_ID/SECRET`，可由 `FEISHU_APP_*` 映射），禁止依赖交互 `auth login`。  

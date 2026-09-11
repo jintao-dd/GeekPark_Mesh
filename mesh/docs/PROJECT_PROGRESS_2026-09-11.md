@@ -1,11 +1,12 @@
 # GeekPark Mesh · 全量进度总览
 
-> **日期：** 2026-09-11  
-> **HEAD：** `1337c66`（`feat(agent): short-term working memory, isolation schedule, tenant doc share.`）  
+> **日期：** 2026-09-11（架构修订同日）  
+> **HEAD：** 以 git 为准（日历 UAT 等已续上 `a21c7fc` 一带）  
 > **分支：** `feat/relation-pipeline-v2-embedding`  
 > **环境：** [tmesh](https://tmesh.geekpark.net) · [prod](https://mesh.geekpark.ai)  
-> **用途：** 当前唯一「全量进度」快照；覆盖周报质量轨、Agent 架构、Colleague v3、Feishu Hands、记忆/隔离、验收与未决项。  
-> **原则：** 只写可核对事实；状态用 ✅ Done / 🔨 In Progress / ⏸ Deferred / ⛔ Banned / ❌ Not Started / ⚠ Ops-blocked。
+> **用途：** 当前唯一「全量进度」快照；覆盖周报质量轨、Colleague v4 架构、Hands、记忆/隔离、验收与未决项。  
+> **原则：** 只写可核对事实；状态用 ✅ Done / 🔨 In Progress / ⏸ Deferred / ⛔ Banned / ❌ Not Started / ⚠ Ops-blocked。  
+> **Colleague 现行架构：** [`COLLEAGUE_AGENT_V4.md`](./COLLEAGUE_AGENT_V4.md)（废止 v2 Stage 1–4 线性计划）。
 
 ---
 
@@ -15,11 +16,12 @@ Mesh 今天是 **两条轨道**：
 
 | 轨道 | 状态 | 一句话 |
 |------|------|--------|
-| **A · 周报质量 / Grounded Brain** | ✅ **冻结**（v3.0 Production Baseline） | Retrieval / Ranking / Claim / Evidence 不再为 UX 解冻；Mesh v1 = **候选 Go** Agent 底座 |
-| **B · Colleague Agent / Feishu Hands** | 🔨 **主战场** | Colleague v3 Wave1 已是主路径；Hands 10 项代码已接入并可 native 实测；短期工作记忆 + 公司内文档可读已落地（`1337c66`）；**CLI Adapter 生产就绪验收进行中**（`docs/CLI_ADAPTER_READINESS.md`，默认仍 native） |
+| **A · 周报质量 / Grounded Brain** | ✅ **冻结**（v3.0 Production Baseline） | Retrieval / Ranking / Claim / Evidence 不再为 UX 解冻；Ask 只作 Capability |
+| **B · Colleague Agent** | 🔨 **主战场 → v4** | v3 Wave1 + Hands + Identity/UAT 为底座；目标态 = **Agentic Enterprise**：Brain → Complexity Judge →（Direct \| Planner+Bounded ReAct+Specialists）→ 一张嘴 |
 
-**当前主矛盾：** 不是「会不会调飞书 API」，而是 **调度（什么时候做什么）+ 开放平台权限发布 + 真人 Canary**。  
-**绝对不做：** ReAct / Planner / Multi-Agent / Graph·ES·Wiki 主路径 / 长期向量 Memory / 解冻质量轨 / `docker cp` 当发布。
+**当前主矛盾：** 把 **Task Orchestrator + Bounded Runtime + 分栏思想（FACT/ANALYSIS/OPINION/SUGGESTION）** 设计进底层并按 L0–L6 梯子验收；外加开放平台权限发版与真人 Canary。  
+**Colleague 轨允许（有笼子）：** Bounded ReAct · Planner（只出图）· Specialist Multi-Agent（不对用户说话）。  
+**仍绝对不做：** 无限 ReAct · 用户可见多 Agent 话术 · Graph/ES/Wiki 主路径 · 长期向量 Memory · 解冻质量轨 · `docker cp` 当发布 · Planner 当第二大脑。
 
 ---
 
@@ -35,11 +37,12 @@ Mesh 今天是 **两条轨道**：
                               ▲
                               │ Tool 调用（只读 Published）
 ┌─────────────────────────────────────────────────────────────┐
-│ B. Colleague Agent（主战场）                                  │
-│    飞书 → SafetyGate → Colleague v3（一张嘴）                 │
-│         ├ speak / ask(published|feishu_live)                 │
-│         └ prepare_write → confirm_write（Hands）             │
-│    短期工作记忆：pending / active_goal / last_block            │
+│ B. Colleague Agent v4（主战场）                               │
+│    Identity → Company → Session → Colleague Brain            │
+│         → Complexity Judge → Direct Tool | Planner/DAG       │
+│         → Bounded Executor + Specialists → Verify → 一张嘴   │
+│    Hands / Ask / Org = Capability；写仍 prepare→confirm      │
+│    成文分栏：FACT / ANALYSIS / OPINION / SUGGESTION           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -49,11 +52,13 @@ Mesh 今天是 **两条轨道**：
 
 | 文档 | 用途 |
 |------|------|
+| `docs/COLLEAGUE_AGENT_V4.md` | **Colleague 现行架构**（Orchestrator / Bounded ReAct / Specialists） |
 | `docs/AGENT_ARCHITECTURE_V1.md` | Org→…→Tool→Agent 冻结分层 |
 | `docs/AGENT_QUALITY_V2.md` | 质量线冻结说明 |
 | `docs/FEISHU_AGENT_V1.md` | 飞书产品硬边界 |
-| `docs/COLLEAGUE_AGENT_V3.md` | Colleague 产品中轴 + Wave 路线 |
+| `docs/COLLEAGUE_AGENT_V3.md` | Wave1 底座（已并入 v4） |
 | `docs/COLLEAGUE_FEISHU_HANDS.md` | Hands 10 项 / 分桶 / 确认闸 |
+| `docs/FEISHU_PERSONAL_AUTH.md` | 双身份 / UAT |
 | `docs/COLLEAGUE_MEMORY_ISOLATION.md` | 短期记忆 + 数据隔离契约 |
 | `docs/ENVIRONMENT_REPRODUCIBILITY.md` | 镜像发布 / REPRO 硬门 |
 | `docs/MESH_V1_AGENT_GO_NOGO.md` | Mesh 作 Agent 底座 = 候选 Go |
@@ -280,10 +285,16 @@ https://feishu.cn/docx/BCQodMvgyokof1x1SIsccJ7Tnmc
 
 ---
 
-## 6. 绝对禁令（仍有效）
+## 6. 绝对禁令（修订后仍有效）
 
-- ReAct / LLM Planner / Multi-Agent / 自由 tool loop  
-- 新 Retrieval 主路径 / Wiki / ES / Neo4j·图谱主路径 / Agentic RAG  
+**Colleague 轨已解禁（须带笼子，见 v4）：** Bounded ReAct · Planner（只规划）· Specialist Agents（不对用户说话）。
+
+**仍禁止：**
+
+- 无限 `while true` ReAct / 无预算 tool loop  
+- 用户可见「XX Agent 认为」多角色话术；Router/Answer/Critic 式拆人对外  
+- Planner 做公司事实、最终人格回答或权限放行  
+- 新 Retrieval 主路径 / Wiki / ES / Neo4j·图谱主路径（质量轨）  
 - **长期向量 Memory** / Dynamic Router  
 - 为 Colleague UX **解冻** Ranking / Claim / 质量微补丁  
 - 把 `feishu_live` 混进 `published` / enterprise_fact  
@@ -291,29 +302,36 @@ https://feishu.cn/docx/BCQodMvgyokof1x1SIsccJ7Tnmc
 - 回写 Mesh 业务库 / 自动扩能力  
 - Ask 事实绕过 Published-only  
 - `docker cp` 当发布；无 digest / REPRO 的上线  
-- 把产品中轴拉回 v2 Controller / 独立 Decide Agent  
+- 把产品中轴拉回 v2 Controller  
 - 用关键词枚举用户句式替代上下文 LLM 调度（硬确认短句除外）
 
 ---
 
 ## 7. 未决项总表（按优先级）
 
-### P0 · 近端
+### P0 · 近端 + v4 梯子（见 `COLLEAGUE_AGENT_V4.md` L0–L6）
 
 | 项 | 状态 | 说明 |
 |----|------|------|
-| 开放平台 scopes **发版并生效** | ⚠ Ops | 勾选不够；须创建版本+发布（+管理员审批） |
+| 架构契约文档 v4 | ✅ | `COLLEAGUE_AGENT_V4.md`；废止 Stage 1–4 线性中轴 |
+| TaskPlan + 只读 Orchestrator | ❌ | 先只读多步，写路径不动 |
+| Complexity Judge 显式档位 | ❌ | 现 Decide 隐式 |
+| Bounded ReAct 预算闸 | ❌ | 初值见 v4；Capacity 后校准 |
+| Specialist 接口 | ❌ | Org / Research / Calendar / Published |
+| Synthesis 分栏 FACT/ANALYSIS/OPINION/SUGGESTION | ❌ | 「有思想」落点 |
+| Complex 金丝雀 tmesh 真聊 | ❌ | 群+人+日历+周报 |
+| 开放平台 scopes **发版并生效** | ⚠ Ops | 勾选不够；须创建版本+发布 |
 | Hands 真人多轮（创建文档→确认→公司内可开） | 🔨 | 代码就绪；依赖 scopes + 现场验 |
-| Decide/调度稳健性（JSON、催促轮、失败回跳） | 🔨 | `1337c66` 已加固；需持续真聊验证 |
+| Decide/调度稳健性（过渡期） | 🔨 | 至 Orchestrator 接管前持续真聊 |
 | Canary 2.0 真人指标 | 🔨 | 只量不修 |
 
 ### P1 · 下一波产品
 
 | 项 | 状态 |
 |----|------|
-| User OAuth（全库云文档搜） | ❌ |
+| User OAuth 覆盖面（全库搜等；日历 UAT 已起步） | 🔨 |
 | MCP 作 Hands 默认 runtime | ❌ |
-| Colleague Wave 2（会话内懂你） | ❌ |
+| 会话内「懂你」（原 Wave 2，并入 Brain/Memory 层） | ❌ |
 | 多实例共享 Session Store（扩容门） | ❌（现磁盘 pending + workers=1） |
 | Observability（request_id / route / repair） | ⏸ Partial |
 | 群边界现场 enforce | 🔨 / 计划中 |
@@ -323,7 +341,7 @@ https://feishu.cn/docx/BCQodMvgyokof1x1SIsccJ7Tnmc
 
 | 项 | 状态 |
 |----|------|
-| Wave 3 长期 Memory | ⏸ / ⛔ 向量方案 |
+| 长期 Memory（原 Wave 3） | ⏸ / ⛔ 向量方案 |
 | Evidence 卡片 UX 打磨 | ⏸ Canary 后 |
 | 流式首 token / 队列 UX | ❌ |
 | 飞书事件层压测 | ❌ |

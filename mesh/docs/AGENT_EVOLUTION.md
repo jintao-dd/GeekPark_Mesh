@@ -1,3 +1,8 @@
+> **2026-09-08 起**：周报 / Grounded Ask 主设计迁至 `AGENT_ARCHITECTURE_V1.md`（Organization 先行）。本文档保留 North Star 与 Phase 3 历史。  
+> **2026-09-11 起**：**Colleague 轨**主架构见 [`COLLEAGUE_AGENT_V4.md`](./COLLEAGUE_AGENT_V4.md)（Bounded ReAct / Planner / Specialists）。本文 **不**承载 Colleague Orchestrator；质量轨仍禁止开放 ReAct。
+
+---
+
 # Agent 演进设计（基于现有架构，不重构）
 
 > 2026-08-31 · Phase 3 Verify v2 收口 · **North Star 定稿**

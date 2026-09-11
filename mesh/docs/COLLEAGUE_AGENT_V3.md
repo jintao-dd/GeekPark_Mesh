@@ -1,8 +1,9 @@
 # Colleague Agent v3 · 一个能懂我们的同事
 
 > **日期：** 2026-09-10  
+> **状态：** Wave 1 **已落地底座**；产品中轴自 2026-09-11 起迁至 [`COLLEAGUE_AGENT_V4.md`](./COLLEAGUE_AGENT_V4.md)（Agentic Enterprise：Orchestrator / Bounded ReAct / Specialists）。  
 > **唯一目标：** 飞书里是一个懂 GeekPark、认识你、能查已上线周报的同事——不是装配机器人。  
-> **总计划：** Wave 1（本页）→ Wave 2 会话关系 → Wave 3 Memory  
+> **原 Wave 2/3 线性计划：** 废止；能力并入 v4 五层。  
 
 ## 失败声明
 
@@ -28,8 +29,9 @@ Identity / Permission / Published 底座沿用 Architecture v1，**不重做组�
 ```
 
 - **旁路** Controller（不再先 Decide Agent）  
-- **禁止** Multi-Agent / ReAct / 解冻质量轨  
-- 闲聊 ≤1 LLM；带事实 ≤1 Colleague + 1 Ask + ≤1 合成  
+- **当时禁止**开放 Multi-Agent / ReAct（**v4 起改为有笼子的 Specialist + Bounded ReAct**）  
+- 闲聊 ≤1 LLM；带事实 ≤1 Colleague + 1 Ask + ≤1 合成（v4 Complex 档放宽为有预算多工具）  
+- **质量轨**仍禁止解冻 Ranking / Claim  
 
 验收：真人觉得「像普通同事」；企业事实仍 Evidence + Published-only。
 
