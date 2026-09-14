@@ -13,6 +13,7 @@ WORKER_FOR_TOOL = {
     "ask.published": "published",
     "ask.relations_summary": "published",
     "context.list_issues": "published",
+    "crm.search": "crm",
     "feishu.search": "research",
     "feishu.doc.get": "research",
     "feishu.discuss.summary": "research",
@@ -27,6 +28,7 @@ ORG_RESOURCE_TYPES = frozenset({"group", "member", "user", "directory"})
 
 PROGRESS_LABEL = {
     "org": "正在查组织/群成员",
+    "crm": "正在查硅谷 CRM（思琪侧）",
     "research": "正在查飞书资料",
     "calendar": "正在查日历",
     "published": "正在查已上线周报",
@@ -188,6 +190,7 @@ def _render_intent(tool: str) -> str:
         "feishu.discuss.summary": "feishu_discuss",
         "ask.published": "ask_published",
         "ask.relations_summary": "ask_relations",
+        "crm.search": "crm_search",
         "context.list_issues": "list_issues",
         "feishu.doc.create": "feishu_write",
         "feishu.calendar.create": "feishu_write",

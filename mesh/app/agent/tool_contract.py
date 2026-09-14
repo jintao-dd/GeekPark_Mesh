@@ -13,6 +13,7 @@ from typing import Any
 class SourceTier(str, Enum):
     PUBLISHED = "published"
     FEISHU_LIVE = "feishu_live"
+    CRM_PRIOR = "crm_prior"
     MODEL = "model"
     WIKI_CONTEXT = "wiki_context"
     ONTOLOGY = "ontology"
@@ -21,6 +22,7 @@ class SourceTier(str, Enum):
 class TruthLevel(str, Enum):
     ENTERPRISE_FACT = "enterprise_fact"
     LIVE_CONTEXT = "live_context"
+    CRM_CONTEXT = "crm_context"
     GENERAL_KNOWLEDGE = "general_knowledge"
     COMPANY_CONTEXT = "company_context"
     COMPANY_STRUCTURE = "company_structure"
@@ -34,6 +36,7 @@ class SideEffect(str, Enum):
 _TIER_TRUTH: dict[SourceTier, TruthLevel] = {
     SourceTier.PUBLISHED: TruthLevel.ENTERPRISE_FACT,
     SourceTier.FEISHU_LIVE: TruthLevel.LIVE_CONTEXT,
+    SourceTier.CRM_PRIOR: TruthLevel.CRM_CONTEXT,
     SourceTier.MODEL: TruthLevel.GENERAL_KNOWLEDGE,
     SourceTier.WIKI_CONTEXT: TruthLevel.COMPANY_CONTEXT,
     SourceTier.ONTOLOGY: TruthLevel.COMPANY_STRUCTURE,
@@ -128,6 +131,7 @@ def speech_hint(tier: SourceTier | str) -> str:
     return {
         SourceTier.PUBLISHED: "周报里记录的是",
         SourceTier.FEISHU_LIVE: "飞书最近的讨论/文档则",
+        SourceTier.CRM_PRIOR: "硅谷 CRM（思琪侧跟进）里",
         SourceTier.MODEL: "我觉得（看法，非企业事实）",
         SourceTier.WIKI_CONTEXT: "按我们公司语境",
         SourceTier.ONTOLOGY: "按组织/结构",
@@ -354,6 +358,29 @@ ASK_PUBLISHED = ToolContract(
     side_effect=SideEffect.NONE,
 )
 
+CRM_SEARCH = ToolContract(
+    name="crm.search",
+    description="查询硅谷 CRM（思琪/Lilyann Notion 底库：人/公司/沟通/Takes）。",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "query": {"type": "string"},
+            "mode": {
+                "type": "string",
+                "enum": ["auto", "person", "company", "recent", "take"],
+            },
+        },
+        "required": ["query"],
+    },
+    permission_scope="crm.search",
+    timeout_sec=20.0,
+    max_results=12,
+    source_tier=SourceTier.CRM_PRIOR,
+    truth_level=TruthLevel.CRM_CONTEXT,
+    output_schema={"type": "object"},
+    side_effect=SideEffect.NONE,
+)
+
 # 生成成文 = Brain speak，无独立 Tool（#7）
 SPEAK_GENERATE_NOTE = "colleague.speak — 整理成文/写稿，不写飞书；无需 Hands。"
 
@@ -411,5 +438,6 @@ REGISTRY: dict[str, ToolContract] = {
         FEISHU_IM_SEND,
         FEISHU_CALENDAR_CREATE,
         ASK_PUBLISHED,
+        CRM_SEARCH,
     )
 }

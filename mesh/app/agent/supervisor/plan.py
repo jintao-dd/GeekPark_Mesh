@@ -16,6 +16,7 @@ ALLOWED_READ_TOOLS = frozenset(
         "ask.published",
         "ask.relations_summary",
         "context.list_issues",
+        "crm.search",
         "feishu.search",
         "feishu.doc.get",
         "feishu.calendar.list",
@@ -67,7 +68,12 @@ _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划�
    - 按姓名找人：directory + keyword=姓名
    - 列某队/部门有谁：directory + keyword=队名或部门名（如「品牌创意」「创意视频」）；系统会按飞书树 rollup，不要改去空转 ask.published
    - user 仅在已知 open_id 时使用
-6) 周报事实用 ask.*；飞书 live 用 feishu.*；禁止混成一个假事实源
+5b) 硅谷对外人脉/BD 跟进（思琪·Lilyann 的 Notion CRM）→ crm.search
+   - 问「最近聊了谁/沟通/跟进」：mode=recent 或 query 含最近
+   - 问某人「怎么样/下一步/判断」：mode=take 或默认 auto + 人名
+   - 问公司档案：mode=company
+   - 禁止把 CRM 结果说成已上线周报；CRM ≠ 飞书通讯录同事
+6) 周报事实用 ask.*；飞书 live 用 feishu.*；CRM 用 crm.search；禁止混成一个假事实源
 7) 用户说「和我有关/我的周报」时：ask.published 的 query 必须写上对方姓名与团队（见下方身份），禁止让用户再报一遍部门
 8) 若目标要「关联周报/这些人有关」：ask.published 必须 depends_on 列成员步骤，等拿到人名后再查周报（系统也会注入人名）
 9) 用户可能用简称/工号（锦涛、思琪、49）；系统会解析成全名。规划时用全名检索，不要要求用户必须打全名

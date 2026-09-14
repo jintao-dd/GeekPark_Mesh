@@ -736,6 +736,11 @@ def _render(
             else:
                 answer = "飞书文档这边这轮没查到相关结果。"
         return answer, visible_bindings, list(result.evidence_refs or [])
+    if intent == "crm_search":
+        answer = str(payload.get("text") or payload.get("answer") or "").strip()
+        if not answer:
+            answer = "硅谷 CRM 这边这轮没查到相关结果。"
+        return answer, visible_bindings, list(result.evidence_refs or [])
     if intent in (
         "feishu_doc_get",
         "feishu_calendar_list",

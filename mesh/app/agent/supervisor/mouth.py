@@ -14,7 +14,9 @@ _FAKE_HANDS = re.compile(
     r"(已创建|正在创建|创建成功|写入成功|已经写进飞书|已发到飞书|日程已建好)",
     re.I,
 )
-_TAG_RE = re.compile(r"\[(?:published|feishu_live|wiki_prior|analysis|system)/[^\]]+\]\s*")
+_TAG_RE = re.compile(
+    r"\[(?:published|feishu_live|crm_prior|wiki_prior|analysis|system)/[^\]]+\]\s*"
+)
 
 # 成文材料上限：宁多勿砍；飞书卡片另有展示上限
 _MATERIAL_CAP = 14000
@@ -37,7 +39,7 @@ _SYNTH_SYSTEM = """你是 GeekPark 内部同事 Mesh（唯一对外的一张嘴�
 
 硬规则：
 1) 不得弱化、改写用户目标；用户问了什么就答什么，材料不够就明说缺哪一块，不要假装答完。
-2) published = 已上线周报事实；feishu_live = 飞书现场；禁止把飞书讨论说成「周报里记录」。
+2) published = 已上线周报事实；feishu_live = 飞书现场；crm_prior = 硅谷 CRM（思琪/Lilyann Notion 跟进），禁止把 CRM/飞书说成「周报里记录」。
 3) 不要输出 JSON、不要输出 action/tool、不要甩 open_id/chat_id/budget 等协议词。
 4) 材料里已有的人名、群、日程、周报条目必须尽量完整转述，禁止无故截短成口号。
 5) 可用结构：我查到的 / 怎么串起来看 / 我的判断 / 建议下一步——但内容要充实，不要套话。
@@ -97,6 +99,7 @@ def materials_block(envelopes: list[TieredEnvelope]) -> str:
         bucket = {
             "published": "已上线周报",
             "feishu_live": "飞书侧",
+            "crm_prior": "硅谷 CRM（思琪侧）",
         }.get(r.tier, r.tier or "其他")
         worker = r.worker or ""
         parts.append(f"### {bucket}" + (f" · {worker}" if worker else "") + f"\n{snippet}")
@@ -143,6 +146,8 @@ def format_columns(
                 "research": "飞书资料",
             }.get(r.worker, "飞书")
             facts_live.append(f"（{label}）{snippet}")
+        elif r.tier == "crm_prior":
+            facts_other.append(f"（硅谷CRM）{snippet}")
         else:
             facts_other.append(snippet)
 

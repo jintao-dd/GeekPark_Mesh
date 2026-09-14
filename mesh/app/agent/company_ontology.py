@@ -112,6 +112,10 @@ def build_ontology(
         notes.append(brand_creative_tree_note())
     except Exception:
         pass
+    notes.append(
+        "硅谷对外人脉在 Notion CRM（Owner/Our side=Lilyann=思琪）；"
+        "问「思琪最近沟通 / Gavin 怎么样」走 crm.search，不是飞书通讯录。"
+    )
     if not oid:
         notes.append("未绑定飞书 open_id：个人日历/全库搜等需授权后才完整")
     if not primary and not mapped:

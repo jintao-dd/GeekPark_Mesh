@@ -19,6 +19,7 @@ _BOUND_TOOLS = [
     "context.list_issues",
     "ask.published",
     "ask.relations_summary",
+    "crm.search",
 ]
 # my_team 语义 Tool：v1 不进注册表，但 Permission 显式禁止
 _FORBIDDEN_MY_TEAM = "ask.published.my_team"

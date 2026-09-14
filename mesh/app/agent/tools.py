@@ -275,6 +275,22 @@ def tool_ask_relations(
     return adapter(con, identity, permission, context, args)
 
 
+def tool_crm_search(
+    con,
+    identity: IdentityResult,
+    permission: PermissionDecision,
+    context: AgentContext,
+    args: dict[str, Any] | None = None,
+) -> ToolResult:
+    args = args or {}
+    blocked = _guard_common("crm.search", identity, permission, context, args=args)
+    if blocked:
+        return blocked
+    from .crm_search import tool_crm_search as _impl
+
+    return _impl(con, identity, permission, context, args)
+
+
 def _feishu_tool_result(tool_id: str, env, *, empty_msg: str) -> ToolResult:
     from .tool_contract import SourceTier, TruthLevel, speech_hint
 
@@ -544,6 +560,7 @@ _REGISTRY: dict[str, Callable[..., ToolResult]] = {
     "context.list_issues": tool_list_issues,
     "ask.published": tool_ask_published,
     "ask.relations_summary": tool_ask_relations,
+    "crm.search": tool_crm_search,
     "feishu.search": tool_feishu_search,
     "feishu.doc.get": tool_feishu_doc_get,
     "feishu.calendar.list": tool_feishu_calendar_list,
