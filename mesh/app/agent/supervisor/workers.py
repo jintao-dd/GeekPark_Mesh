@@ -142,6 +142,7 @@ def enrich_args(
             clues.append("提问者身份：" + "、".join(bits))
         if name and name not in names:
             names = [name] + names
+        teammates: list[str] = []
         if team:
             try:
                 from ..feishu_hands import org_directory as od
@@ -155,10 +156,21 @@ def enrich_args(
                     "提问者飞书部门子树同事（周报可能写在别的桶名下，这些人算「我们团队」）："
                     + "、".join(extra[:20])
                 )
+                clues.append(
+                    "成文时：凡材料提到上述同事的周报条目一律算「我们团队相关」，"
+                    "即使条目团队标签是「硅谷 BD」等，也禁止因桶名不同而排除。"
+                )
+                names = names + [t for t in extra if t not in names]
         if names:
             clues.append("已解析/已查到的人：" + "、".join(names[:12]))
         if clues:
             args["query"] = q_full + "\n\n【检索线索，勿当作用户原话弱化】\n" + "\n".join(clues)
+            log.info(
+                "ask enrich team=%s teammates=%s query_len=%s",
+                team or "-",
+                len(teammates),
+                len(args["query"]),
+            )
         else:
             args["query"] = q_full
         return args

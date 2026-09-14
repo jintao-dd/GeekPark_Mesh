@@ -163,6 +163,22 @@ def handle_turn(
         if ident_team and not str(getattr(session, "active_team", "") or "").strip():
             session.active_team = ident_team
 
+    # Mouth 也要看见飞书子树同事，避免成文只认周报桶名
+    try:
+        team = str(getattr(identity, "primary_team", None) or "").strip()
+        if team:
+            from ..feishu_hands import org_directory as od
+
+            teammates = od.member_names_for_scope(team, limit=16)
+            if teammates:
+                company_block += (
+                    "\n\n## 提问者飞书子树同事（「我们团队」认人用）\n"
+                    + "、".join(teammates)
+                    + "\n规则：材料里出现这些人即算团队相关；周报桶名「硅谷 BD」等不得用来排除。"
+                )
+    except Exception:
+        pass
+
     out = SupervisorResult(
         llm_used=False,
         trace={

@@ -272,6 +272,49 @@ def test_mouth_strips_open_ids():
     assert "杜锦涛" in cleaned
 
 
+def test_mouth_system_keeps_subtree_people_despite_weekly_bucket():
+    from app.agent.supervisor import mouth
+
+    assert "飞书子树" in mouth._SYNTH_SYSTEM or "飞书组织子树" in mouth._SYNTH_SYSTEM
+    assert "硅谷 BD" in mouth._SYNTH_SYSTEM
+    assert "禁止说成「不属于品牌创意」" in mouth._SYNTH_SYSTEM
+
+
+def test_enrich_ask_includes_subtree_teammates(monkeypatch):
+    from app.agent.supervisor import workers
+    from app.agent.supervisor.types import PlanStep
+    from app.agent.models import IdentityResult
+
+    def fake_names(query, *, limit=24):
+        return ["赵思琪", "Sean Shen", "胡清远", "杜锦涛"]
+
+    monkeypatch.setattr(
+        "app.agent.feishu_hands.org_directory.member_names_for_scope",
+        fake_names,
+    )
+    step = PlanStep(
+        id="s1",
+        worker="published",
+        tool="ask.published",
+        args={"query": "最近周报有和我们团队相关的？"},
+    )
+    args = workers.enrich_args(
+        step,
+        identity=IdentityResult(
+            status="bound",
+            feishu_open_id="ou_x",
+            primary_team="品牌创意团队",
+            display_hint="杜锦涛",
+        ),
+        context=None,
+        user_text="最近周报有和我们团队相关的？",
+    )
+    q = args["query"]
+    assert "赵思琪" in q
+    assert "硅谷 BD" in q
+    assert "一律算「我们团队相关」" in q
+
+
 def test_mouth_hides_protocol_noise():
     from app.agent.supervisor import mouth
     from app.agent.supervisor.types import TaskGraph, TieredEnvelope
