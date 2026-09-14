@@ -47,11 +47,23 @@ def test_resolve_honorific_wan_laoshi():
     assert "万东峰" in r.canonical_names()
 
 
-def test_resolve_guo_laoshi_ambiguous():
+def test_resolve_guo_laoshi_via_roster():
+    # 通讯录两郭：无别名时不瞎猜；roster 手填「郭老师」→郭冀昂 后应命中
     r = pr.resolve_people_in_text("郭老师", people=PEOPLE, use_org=False)
-    # 通讯录两郭，不得瞎猜
-    assert "郭冀昂" not in r.canonical_names() or len([h for h in r.hits if "郭" in h.canonical]) != 1
-    assert not any(h.canonical.startswith("郭") and h.source.startswith("org_surname") for h in r.hits)
+    assert "郭冀昂" in r.canonical_names()
+    assert not any(h.source.startswith("org_surname") for h in r.hits)
+
+
+def test_resolve_boss_alias_not_stopped():
+    pr.load_roster(force=True)
+    people = PEOPLE + [
+        {"name": "张鹏", "open_id": "ou_ceo", "employee_no": "G-001", "source": "org"},
+        {"name": "杜书惠", "open_id": "ou_hr", "employee_no": "", "source": "org"},
+    ]
+    r = pr.resolve_people_in_text("帮我看看老板最近在忙什么", people=people, use_org=False)
+    assert "张鹏" in r.canonical_names()
+    r2 = pr.resolve_people_in_text("程程的周报", people=people, use_org=False)
+    assert "杜书惠" in r2.canonical_names()
 
 
 def test_expand_keeps_user_intent():

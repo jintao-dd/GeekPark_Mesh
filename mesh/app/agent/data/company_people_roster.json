@@ -10,7 +10,7 @@
         "CEO",
         "变量资本"
       ],
-      "aliases": [],
+      "aliases": ["老板","鹏总"],
       "notes": ""
     },
     {
@@ -21,7 +21,7 @@
       "teams": [
         "CEO"
       ],
-      "aliases": [],
+      "aliases": ["蒙苏"],
       "notes": ""
     },
     {
@@ -32,7 +32,7 @@
       "teams": [
         "GeekPark 媒体业务"
       ],
-      "aliases": [],
+      "aliases": ["永亮"],
       "notes": ""
     },
     {
@@ -54,7 +54,7 @@
       "teams": [
         "GeekPark 媒体业务"
       ],
-      "aliases": [],
+      "aliases": ["玄编"],
       "notes": ""
     },
     {
@@ -66,7 +66,7 @@
         "GeekPark 媒体业务"
       ],
       "aliases": [
-        "靖玉"
+        "靖宇"
       ],
       "notes": ""
     },
@@ -78,7 +78,7 @@
       "teams": [
         "GeekPark 媒体业务"
       ],
-      "aliases": [],
+      "aliases": ["xuxu"],
       "notes": ""
     },
     {
@@ -89,7 +89,7 @@
       "teams": [
         "GeekPark 媒体业务"
       ],
-      "aliases": [],
+      "aliases": ["蒜蒜"],
       "notes": ""
     },
     {
@@ -100,7 +100,7 @@
       "teams": [
         "GeekPark 媒体业务"
       ],
-      "aliases": [],
+      "aliases": ["若岚"],
       "notes": ""
     },
     {
@@ -111,7 +111,7 @@
       "teams": [
         "GeekPark 媒体业务"
       ],
-      "aliases": [],
+      "aliases": ["雨倩"],
       "notes": ""
     },
     {
@@ -122,7 +122,7 @@
       "teams": [
         "GeekPark 媒体业务"
       ],
-      "aliases": [],
+      "aliases": ["Alan"],
       "notes": ""
     },
     {
@@ -133,7 +133,7 @@
       "teams": [
         "GeekPark 媒体业务"
       ],
-      "aliases": [],
+      "aliases": ["徐珊"],
       "notes": ""
     },
     {
@@ -144,7 +144,7 @@
       "teams": [
         "GeekPark 媒体业务"
       ],
-      "aliases": [],
+      "aliases": ["维鹏"],
       "notes": ""
     },
     {
@@ -155,7 +155,7 @@
       "teams": [
         "GeekPark 媒体业务"
       ],
-      "aliases": [],
+      "aliases": ["连冉"],
       "notes": ""
     },
     {
@@ -166,7 +166,7 @@
       "teams": [
         "GeekPark 媒体业务"
       ],
-      "aliases": [],
+      "aliases": ["思颀"],
       "notes": ""
     },
     {
@@ -177,7 +177,7 @@
       "teams": [
         "GeekPark 媒体业务"
       ],
-      "aliases": [],
+      "aliases": [ "李源" ],
       "notes": ""
     },
     {
@@ -188,7 +188,7 @@
       "teams": [
         "Global Partnership"
       ],
-      "aliases": [],
+      "aliases": ["Mandy"],
       "notes": ""
     },
     {
@@ -212,7 +212,7 @@
       "teams": [
         "人力行政组"
       ],
-      "aliases": [],
+      "aliases": ["程程"],
       "notes": ""
     },
     {
@@ -234,7 +234,7 @@
       "teams": [
         "人力行政组"
       ],
-      "aliases": [],
+      "aliases": ["名扬"],
       "notes": ""
     },
     {
@@ -245,7 +245,7 @@
       "teams": [
         "创意视频"
       ],
-      "aliases": [],
+      "aliases": ["娜娜"],
       "notes": ""
     },
     {
@@ -256,7 +256,7 @@
       "teams": [
         "创意视频"
       ],
-      "aliases": [],
+      "aliases": ["文哲"],
       "notes": ""
     },
     {
@@ -280,7 +280,7 @@
       "teams": [
         "创意视频"
       ],
-      "aliases": [],
+      "aliases": ["宇祺","燕子"],
       "notes": ""
     },
     {
@@ -348,7 +348,7 @@
       "teams": [
         "变量资本-投资"
       ],
-      "aliases": [],
+      "aliases": ["江叔"],
       "notes": ""
     },
     {
@@ -359,7 +359,7 @@
       "teams": [
         "变量资本-投资"
       ],
-      "aliases": [],
+      "aliases": ["君辉"],
       "notes": ""
     },
     {
@@ -371,7 +371,7 @@
         "品牌创意部"
       ],
       "aliases": [
-        "山山"
+        "山山","山总"
       ],
       "notes": ""
     },
@@ -397,7 +397,7 @@
       "teams": [
         "品牌设计"
       ],
-      "aliases": [],
+      "aliases": ["耳塞"],
       "notes": ""
     },
     {
@@ -408,7 +408,7 @@
       "teams": [
         "品牌设计"
       ],
-      "aliases": [],
+      "aliases": ["Raven"],
       "notes": ""
     },
     {
@@ -452,7 +452,7 @@
       "teams": [
         "商业化"
       ],
-      "aliases": [],
+      "aliases": ["小郭","郭老师"],
       "notes": ""
     },
     {
@@ -485,7 +485,7 @@
       "teams": [
         "商业化"
       ],
-      "aliases": [],
+      "aliases": ["琦琦"],
       "notes": ""
     },
     {
@@ -496,7 +496,7 @@
       "teams": [
         "商业化"
       ],
-      "aliases": [],
+      "aliases": ["可欣"],
       "notes": ""
     },
     {
@@ -507,7 +507,7 @@
       "teams": [
         "商业化"
       ],
-      "aliases": [],
+      "aliases": ["丽雅"],
       "notes": ""
     },
     {
@@ -518,7 +518,7 @@
       "teams": [
         "商业化"
       ],
-      "aliases": [],
+      "aliases": ["小乔"],
       "notes": ""
     },
     {
@@ -595,7 +595,7 @@
       "teams": [
         "总裁办"
       ],
-      "aliases": [],
+      "aliases": ["敬玉","敬玉姐"],
       "notes": ""
     },
     {
@@ -606,7 +606,7 @@
       "teams": [
         "海外拓展"
       ],
-      "aliases": [],
+      "aliases": ["Sean"],
       "notes": ""
     },
     {
@@ -674,7 +674,7 @@
       "teams": [
         "社区内容"
       ],
-      "aliases": [],
+      "aliases": ["万老师"],
       "notes": ""
     },
     {
@@ -685,7 +685,7 @@
       "teams": [
         "社区运营"
       ],
-      "aliases": [],
+      "aliases": ["马老师"],
       "notes": ""
     },
     {
@@ -696,7 +696,7 @@
       "teams": [
         "社区运营"
       ],
-      "aliases": [],
+      "aliases": ["馨梓"],
       "notes": ""
     },
     {
@@ -707,7 +707,7 @@
       "teams": [
         "社区运营"
       ],
-      "aliases": [],
+      "aliases": ["夏天"],
       "notes": ""
     },
     {
@@ -718,7 +718,7 @@
       "teams": [
         "社区运营"
       ],
-      "aliases": [],
+      "aliases": ["晓普"],
       "notes": ""
     },
     {
@@ -729,7 +729,7 @@
       "teams": [
         "社区运营"
       ],
-      "aliases": [],
+      "aliases": ["王子艺"],
       "notes": ""
     },
     {
@@ -740,7 +740,7 @@
       "teams": [
         "社区运营"
       ],
-      "aliases": [],
+      "aliases": ["晨薇","Vivi"],
       "notes": ""
     },
     {
@@ -784,7 +784,7 @@
       "teams": [
         "顾问"
       ],
-      "aliases": [],
+      "aliases": ["秋里"],
       "notes": ""
     }
   ],
