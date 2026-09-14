@@ -102,6 +102,16 @@ def resolve_identity(con, envelope: AgentEnvelope) -> IdentityResult:
     channel = (envelope.channel or "web").strip()
     mapped_in = [t for t in (envelope.mapped_teams or []) if t]
     contact_sync = envelope.contact_sync or "skipped_no_scope"
+    # 信封未带映射时，按飞书 Department → Mesh 业务队表解析
+    if not mapped_in and open_id:
+        try:
+            from .dept_team_map import mapped_teams_for_open_id
+
+            mapped_in = list(mapped_teams_for_open_id(open_id) or [])
+            if mapped_in and contact_sync in ("", "skipped_no_scope"):
+                contact_sync = "ok"
+        except Exception:
+            pass
 
     user = None
     if envelope.mesh_user_id:

@@ -106,6 +106,12 @@ def build_ontology(
         n_dept = int(org_snapshot.get("department_count") or 0)
         if n_people or n_dept:
             notes.append(f"通讯录缓存约 {n_dept} 部门 / {n_people} 人（应用可见范围）")
+    try:
+        from .dept_team_map import brand_creative_tree_note
+
+        notes.append(brand_creative_tree_note())
+    except Exception:
+        pass
     if not oid:
         notes.append("未绑定飞书 open_id：个人日历/全库搜等需授权后才完整")
     if not primary and not mapped:

@@ -761,6 +761,13 @@ _TEAM_ALIAS_DEFAULT = {
 
 def _team_alias_map() -> dict:
     m = dict(_TEAM_ALIAS_DEFAULT)
+    # 飞书部门名 → Mesh 业务队（与 dept_team_map 同源）
+    try:
+        from .agent.dept_team_map import feishu_name_aliases
+
+        m.update(feishu_name_aliases())
+    except Exception:
+        pass
     raw = (os.environ.get("MESH_TEAM_ALIASES") or "").strip()
     if raw:
         try:

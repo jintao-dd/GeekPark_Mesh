@@ -1,0 +1,158 @@
+{
+  "_doc": "飞书 Department → Mesh canonical_team 映射（唯一要手维的组织配置）。\n权威：飞书通讯录树；本表只做业务语义映射。\ncanonical_team 空字符串 = 不同步为业务队。\n子部门未单独配置时，运行时会沿 parent 向上查找。\n同步自 tmesh 通讯录 2026-09-14（70人/20部门）。",
+  "mesh_teams_ref": [
+    "编辑部",
+    "商业化团队",
+    "硅谷 BD 团队",
+    "Global Partnership 团队",
+    "英文站",
+    "品牌创意团队",
+    "社群",
+    "投资团队",
+    "音频播客团队",
+    "视频号团队",
+    "CEO / 总裁办"
+  ],
+  "departments": [
+    {
+      "feishu_department_id": "od-aa20d8c6258aac06f2f6afb93bf166ec",
+      "name": "CEO",
+      "parent_department_id": "0",
+      "canonical_team": "CEO / 总裁办",
+      "note": "飞书根部门 CEO"
+    },
+    {
+      "feishu_department_id": "od-75e60334d099395c276b332457f1bce6",
+      "name": "总裁办",
+      "parent_department_id": "0",
+      "canonical_team": "CEO / 总裁办",
+      "note": ""
+    },
+    {
+      "feishu_department_id": "od-17c9eb5e880daa476c77b70ba8abe741",
+      "name": "人力行政组",
+      "parent_department_id": "od-75e60334d099395c276b332457f1bce6",
+      "canonical_team": "CEO / 总裁办",
+      "note": "挂在总裁办下"
+    },
+    {
+      "feishu_department_id": "od-fe6dd572bdcb90ff028a2908188575c7",
+      "name": "财务",
+      "parent_department_id": "od-75e60334d099395c276b332457f1bce6",
+      "canonical_team": "CEO / 总裁办",
+      "note": "挂在总裁办下"
+    },
+    {
+      "feishu_department_id": "od-a61a33ff0086cba2326ff3c66879af73",
+      "name": "顾问",
+      "parent_department_id": "0",
+      "canonical_team": "CEO / 总裁办",
+      "note": "法务顾问等；归总裁办业务桶"
+    },
+    {
+      "feishu_department_id": "od-45bae71c3f4e586f346fc76900622df0",
+      "name": "GeekPark 媒体业务",
+      "parent_department_id": "0",
+      "canonical_team": "编辑部",
+      "note": "媒体/内容编辑主队"
+    },
+    {
+      "feishu_department_id": "od-e3a7af81f8537ef3d578829620334159",
+      "name": "实习&兼职",
+      "parent_department_id": "od-45bae71c3f4e586f346fc76900622df0",
+      "canonical_team": "编辑部",
+      "note": "挂在媒体业务下"
+    },
+    {
+      "feishu_department_id": "od-d756181697da32606b14a8852f38387e",
+      "name": "商业化",
+      "parent_department_id": "0",
+      "canonical_team": "商业化团队",
+      "note": ""
+    },
+    {
+      "feishu_department_id": "od-37242b2b258f00b726c0e919f436f82a",
+      "name": "Global Partnership",
+      "parent_department_id": "0",
+      "canonical_team": "Global Partnership 团队",
+      "note": ""
+    },
+    {
+      "feishu_department_id": "od-d41f7628a5d2dd90ad5d538dd3adb0b6",
+      "name": "变量资本",
+      "parent_department_id": "0",
+      "canonical_team": "投资团队",
+      "note": ""
+    },
+    {
+      "feishu_department_id": "od-7ab0e03fe380621cb888b03853cad7a5",
+      "name": "变量资本-投后",
+      "parent_department_id": "od-d41f7628a5d2dd90ad5d538dd3adb0b6",
+      "canonical_team": "投资团队",
+      "note": ""
+    },
+    {
+      "feishu_department_id": "od-3d4772c193dc135e3b5c6e536361f7f7",
+      "name": "变量资本-投资",
+      "parent_department_id": "od-d41f7628a5d2dd90ad5d538dd3adb0b6",
+      "canonical_team": "投资团队",
+      "note": ""
+    },
+    {
+      "feishu_department_id": "od-4df2fe2a41baba12696ce4ea1ad302fa",
+      "name": "Founder Park 创新业务",
+      "parent_department_id": "0",
+      "canonical_team": "社群",
+      "note": "FP / 社群业务根"
+    },
+    {
+      "feishu_department_id": "od-086ac54bbeaa0070ecf5076b5a7fee29",
+      "name": "社区内容",
+      "parent_department_id": "od-4df2fe2a41baba12696ce4ea1ad302fa",
+      "canonical_team": "社群",
+      "note": ""
+    },
+    {
+      "feishu_department_id": "od-776f09ac21a7c54ec88721cb114a243c",
+      "name": "社区运营",
+      "parent_department_id": "od-4df2fe2a41baba12696ce4ea1ad302fa",
+      "canonical_team": "社群",
+      "note": ""
+    },
+    {
+      "feishu_department_id": "od-3f2b9310260ff7673d0694fb43060515",
+      "name": "品牌创意部",
+      "parent_department_id": "0",
+      "canonical_team": "品牌创意团队",
+      "note": "飞书父部门；子组全部归此业务队"
+    },
+    {
+      "feishu_department_id": "od-a6227428b9e705a41cf142128fb1bfda",
+      "name": "创意视频",
+      "parent_department_id": "od-3f2b9310260ff7673d0694fb43060515",
+      "canonical_team": "品牌创意团队",
+      "note": "品牌创意部 / 创意视频"
+    },
+    {
+      "feishu_department_id": "od-47a97215f774c63e3aad5dbc98b2a521",
+      "name": "创新技术",
+      "parent_department_id": "od-3f2b9310260ff7673d0694fb43060515",
+      "canonical_team": "品牌创意团队",
+      "note": "品牌创意部 / 创新技术（含杜锦涛）"
+    },
+    {
+      "feishu_department_id": "od-0dbbfe8b62d3bed18f8b5001f59e5481",
+      "name": "品牌设计",
+      "parent_department_id": "od-3f2b9310260ff7673d0694fb43060515",
+      "canonical_team": "品牌创意团队",
+      "note": "品牌创意部 / 品牌设计"
+    },
+    {
+      "feishu_department_id": "od-644d40c70347c24aec465ea85bb88d93",
+      "name": "海外拓展",
+      "parent_department_id": "od-3f2b9310260ff7673d0694fb43060515",
+      "canonical_team": "品牌创意团队",
+      "note": "飞书挂在品牌创意部下（非独立 Mesh 队）"
+    }
+  ]
+}
