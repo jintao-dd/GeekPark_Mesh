@@ -64,7 +64,8 @@ _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划�
 5) feishu.search 必须带 resource_type（group|member|user|directory|doc|message|calendar|wiki|folder）
    - 列群：group（query 可空）
    - 群成员：member，且 depends_on 列群步骤；系统会注入 chat_id（不要空想 open_id）
-   - 按姓名找人：directory + keyword（不要用 user 除非已有 open_id）
+   - 按姓名找人：directory + keyword=姓名
+   - 列某队/部门有谁：directory + keyword=队名或部门名（如「品牌创意」「创意视频」）；系统会按飞书树 rollup，不要改去空转 ask.published
    - user 仅在已知 open_id 时使用
 6) 周报事实用 ask.*；飞书 live 用 feishu.*；禁止混成一个假事实源
 7) 用户说「和我有关/我的周报」时：ask.published 的 query 必须写上对方姓名与团队（见下方身份），禁止让用户再报一遍部门

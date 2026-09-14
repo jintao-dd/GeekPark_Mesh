@@ -5,6 +5,11 @@
 
 可见范围 = 应用在飞书后台的「通讯录权限范围」；本租户实测可覆盖部门树下全员。
 短时进程内缓存，避免每次聊天都全量 walk。
+
+查询支持：
+- 人名 / 工号 / 邮箱
+- 飞书部门名（含父部门 → 子组成员 rollup）
+- Mesh 业务队名（如「品牌创意」→ 品牌创意团队下全部飞书子部门）
 """
 from __future__ import annotations
 
@@ -150,24 +155,222 @@ def load_directory(*, force: bool = False) -> tuple[list[dict[str, Any]], list[d
     return departments, people
 
 
+def _descendants(
+    root_ids: set[str],
+    departments: list[dict[str, Any]],
+) -> set[str]:
+    """root ∪ 全部子孙 open_department_id。"""
+    kids: dict[str, list[str]] = {}
+    for d in departments:
+        pid = str(d.get("parent_department_id") or "").strip()
+        oid = str(d.get("open_department_id") or "").strip()
+        if pid and oid:
+            kids.setdefault(pid, []).append(oid)
+    out = set(root_ids)
+    stack = list(root_ids)
+    while stack:
+        cur = stack.pop()
+        for c in kids.get(cur) or []:
+            if c not in out:
+                out.add(c)
+                stack.append(c)
+    return out
+
+
+def _mesh_team_for_query(q: str) -> str | None:
+    raw = (q or "").strip()
+    if not raw:
+        return None
+    try:
+        from ... import db
+
+        n = db.normalize_team(raw)
+        if n:
+            return n
+    except Exception:
+        pass
+    try:
+        from ..dept_team_map import map_department_name
+
+        return map_department_name(raw)
+    except Exception:
+        return None
+
+
+def _dept_ids_for_mesh_team(team: str) -> set[str]:
+    out: set[str] = set()
+    try:
+        from ..dept_team_map import load_dept_team_map
+
+        for row in load_dept_team_map().get("departments") or []:
+            if str(row.get("canonical_team") or "").strip() != team:
+                continue
+            oid = str(row.get("feishu_department_id") or "").strip()
+            if oid:
+                out.add(oid)
+    except Exception:
+        pass
+    return out
+
+
+def resolve_org_scope(
+    query: str,
+    departments: list[dict[str, Any]],
+) -> tuple[set[str] | None, str]:
+    """把队名/部门名解析成要列出的飞书部门 id 集合。
+
+    返回 (dept_ids|None, label)。None 表示不是组织范围查询，应走人名检索。
+    """
+    q = (query or "").strip()
+    # 去掉口语尾巴，便于「品牌创意有谁 / 品牌创意部都有哪些人」
+    for tail in (
+        "有谁",
+        "有哪些人",
+        "有哪些",
+        "都有谁",
+        "成员",
+        "名单",
+        "人员",
+        "团队",
+        "的人",
+        "里有谁",
+    ):
+        if q.endswith(tail) and len(q) > len(tail) + 1:
+            q = q[: -len(tail)].strip("的 ：:，,")
+            break
+    if not q:
+        return None, ""
+    ql = q.lower()
+
+    # 1) 命中飞书部门名（精确或互相包含）→ 该部门 + 子孙
+    hit_roots: set[str] = set()
+    hit_names: list[str] = []
+    for d in departments:
+        name = str(d.get("name") or "").strip()
+        oid = str(d.get("open_department_id") or "").strip()
+        if not name or not oid:
+            continue
+        nl = name.lower()
+        if ql == nl or ql in nl or nl in ql:
+            hit_roots.add(oid)
+            hit_names.append(name)
+    if hit_roots:
+        ids = _descendants(hit_roots, departments)
+        label = "、".join(hit_names[:4])
+        if len(hit_names) > 4:
+            label += "…"
+        return ids, label
+
+    # 2) Mesh 业务队（品牌创意 / 品牌创意团队 / 社群…）→ 映射表内全部飞书部门
+    team = _mesh_team_for_query(q)
+    if team:
+        ids = _dept_ids_for_mesh_team(team)
+        try:
+            from ..dept_team_map import map_department_id, map_department_name
+
+            parent_lookup = {
+                str(d.get("open_department_id") or ""): str(d.get("parent_department_id") or "")
+                for d in departments
+            }
+            for d in departments:
+                oid = str(d.get("open_department_id") or "").strip()
+                name = str(d.get("name") or "").strip()
+                mapped = (
+                    map_department_id(oid, parent_lookup=parent_lookup)
+                    or map_department_name(name)
+                )
+                if mapped == team and oid:
+                    ids.add(oid)
+        except Exception:
+            pass
+        if ids:
+            return ids, team
+    return None, ""
+
+
+def _people_in_depts(
+    people: list[dict[str, Any]],
+    dept_ids: set[str],
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for u in people:
+        u_depts = {str(x).strip() for x in (u.get("department_ids") or []) if str(x).strip()}
+        if not (u_depts & dept_ids):
+            continue
+        oid = str(u.get("open_id") or "").strip()
+        key = oid or str(u.get("name") or "")
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(u)
+    out.sort(key=lambda x: str(x.get("name") or ""))
+    return out
+
+
+def _roster_people_for_team(team: str) -> list[dict[str, Any]]:
+    """飞书 walk 空结果时，用手填花名册按 Mesh 队兜底。"""
+    try:
+        from ..person_resolve import load_roster
+        from ..dept_team_map import map_department_name
+        from ... import db
+
+        people = []
+        for row in load_roster(force=False).get("people") or []:
+            if not isinstance(row, dict):
+                continue
+            name = str(row.get("name") or "").strip()
+            if not name:
+                continue
+            hit = False
+            for t in row.get("teams") or []:
+                ts = str(t or "").strip()
+                mapped = map_department_name(ts) or db.normalize_team(ts)
+                if mapped == team or ts == team:
+                    hit = True
+                    break
+            if not hit:
+                continue
+            people.append(
+                {
+                    "name": name,
+                    "open_id": str(row.get("open_id") or "").strip(),
+                    "employee_no": str(row.get("employee_no") or "").strip(),
+                    "enterprise_email": "",
+                    "job_title": str(row.get("job_title") or "").strip(),
+                    "department_ids": [],
+                    "teams": list(row.get("teams") or []),
+                    "source": "roster",
+                }
+            )
+        people.sort(key=lambda x: x["name"])
+        return people
+    except Exception as e:
+        log.info("roster team fallback fail: %s", e)
+        return []
+
+
 def search_directory(
     query: str = "",
     *,
     max_results: int = 20,
     list_departments: bool = False,
 ) -> ToolResultEnvelope:
-    """按姓名/工号/邮箱子串查人；空 query 且 list_departments 则列部门。"""
+    """按姓名/工号/邮箱查人；或按部门名/Mesh 业务队列成员。"""
     try:
         departments, people = load_directory()
     except Exception as e:
         return envelope_fail(f"org_directory_error:{e}"[:180], tool="feishu.search")
 
-    q = (query or "").strip().lower()
+    q = (query or "").strip()
+    ql = q.lower()
+    limit = max(1, int(max_results))
+
     if list_departments or (not q and not people):
         items = []
         for d in departments:
             name = str(d.get("name") or "").strip()
-            if q and q not in name.lower() and q not in str(d.get("open_department_id") or "").lower():
+            if ql and ql not in name.lower() and ql not in str(d.get("open_department_id") or "").lower():
                 continue
             items.append(
                 {
@@ -178,12 +381,47 @@ def search_directory(
                     "url": "",
                 }
             )
-            if len(items) >= int(max_results):
+            if len(items) >= limit:
                 break
         return envelope_ok(
             normalize_docs(items, kind="department"),
             tool="feishu.search",
-            max_results=int(max_results),
+            max_results=limit,
+        )
+
+    # 部门 / 业务队范围 → 列成员（「品牌创意有谁」）
+    scope_ids, scope_label = resolve_org_scope(q, departments)
+    if scope_ids is not None:
+        matched = _people_in_depts(people, scope_ids)
+        source = "feishu_org"
+        if not matched:
+            team = _mesh_team_for_query(q) or scope_label
+            matched = _roster_people_for_team(team) if team else []
+            source = "roster" if matched else source
+        team_limit = max(limit, 50)
+        items = []
+        for u in matched[:team_limit]:
+            name = str(u.get("name") or "")
+            job = str(u.get("job_title") or "")
+            emp = str(u.get("employee_no") or "")
+            oid = str(u.get("open_id") or "")
+            teams = u.get("teams") or []
+            bits = [p for p in (scope_label, job, emp) if p]
+            if teams:
+                bits.append("/".join(str(t) for t in teams[:3]))
+            items.append(
+                {
+                    "title": name or oid or "同事",
+                    "snippet": " · ".join(bits) or source,
+                    "docs_type": "user",
+                    "id": oid,
+                    "url": "",
+                }
+            )
+        return envelope_ok(
+            normalize_docs(items, kind="user"),
+            tool="feishu.search",
+            max_results=team_limit,
         )
 
     items = []
@@ -193,15 +431,15 @@ def search_directory(
         email = str(u.get("enterprise_email") or "")
         oid = str(u.get("open_id") or "")
         job = str(u.get("job_title") or "")
-        if q and not (
-            q in name.lower()
-            or q in emp.lower()
-            or q in email.lower()
-            or q in oid.lower()
-            or q in job.lower()
+        if ql and not (
+            ql in name.lower()
+            or ql in emp.lower()
+            or ql in email.lower()
+            or ql in oid.lower()
+            or ql in job.lower()
         ):
             continue
-        parts = [p for p in (job, emp, email, oid) if p]
+        parts = [p for p in (job, emp, email) if p]
         items.append(
             {
                 "title": name or oid or "同事",
@@ -211,10 +449,10 @@ def search_directory(
                 "url": "",
             }
         )
-        if len(items) >= int(max_results):
+        if len(items) >= limit:
             break
     return envelope_ok(
         normalize_docs(items, kind="user"),
         tool="feishu.search",
-        max_results=int(max_results),
+        max_results=limit,
     )
