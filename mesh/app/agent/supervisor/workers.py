@@ -35,8 +35,6 @@ PROGRESS_LABEL = {
     "writer": "正在准备飞书写入",
 }
 
-_ABOUT_ME_RE = re.compile(r"(和我有关|与我有关|关于我|我的周报|跟我相关|我相关)")
-
 
 def resolve_worker(tool: str, args: dict[str, Any] | None = None) -> str:
     tool = (tool or "").strip()
@@ -115,36 +113,35 @@ def enrich_args(
     context: Any,
     prior: list[TieredEnvelope] | None = None,
     user_text: str = "",
+    resolved_names: list[str] | None = None,
 ) -> dict[str, Any]:
-    """补全 chat_id / open_id / 关于我的周报 query，避免把协议错误甩给用户。"""
+    """补全 chat_id / open_id / 检索线索；不做句式路由。"""
     args = _tool_args(step)
     name, team, self_oid = _identity_bits(identity)
     prior = list(prior or [])
     q_user = (user_text or "").strip()
+    resolved = [str(n).strip() for n in (resolved_names or []) if str(n).strip()]
 
     if step.tool == "crm.search":
         q_plan = str(args.get("query") or "").strip()
-        # 丢掉人名解析附录，只留检索词
-        q_clean = (q_plan or q_user).split("【人名解析")[0].strip()
-        m = re.search(r"和([\u4e00-\u9fffA-Za-z]{2,12})（", q_clean)
-        if m:
-            q_clean = m.group(1)
-        args["query"] = (q_clean or q_plan or q_user)[:80]
+        if not q_plan and resolved:
+            q_plan = resolved[0]
+        elif not q_plan:
+            q_plan = q_user[:80]
+        args["query"] = q_plan[:80]
         args.setdefault("mode", str(args.get("mode") or "auto"))
         return args
 
     if step.tool.startswith("ask."):
-        # 保留用户完整原话作主 query，只追加检索线索——禁止用短句替换原目标
         q_plan = str(args.get("query") or "").strip()
         q_full = q_user or q_plan
-        names = _names_from_prior(prior)
+        names = list(resolved) + [n for n in _names_from_prior(prior) if n not in resolved]
         clues: list[str] = []
-        if _ABOUT_ME_RE.search(q_full) or _ABOUT_ME_RE.search(q_plan):
-            bits = [b for b in (name, f"团队={team}" if team else "") if b]
-            if bits:
-                clues.append("提问者身份：" + "、".join(bits))
+        bits = [b for b in (name, f"团队={team}" if team else "") if b]
+        if bits:
+            clues.append("提问者身份：" + "、".join(bits))
         if names:
-            clues.append("已查到的相关同事：" + "、".join(names[:12]))
+            clues.append("已解析/已查到的人：" + "、".join(names[:12]))
         if clues:
             args["query"] = q_full + "\n\n【检索线索，勿当作用户原话弱化】\n" + "\n".join(clues)
         else:
@@ -157,13 +154,11 @@ def enrich_args(
     rt = str(args.get("resource_type") or "").strip().lower()
     if rt == "directory":
         kw = str(args.get("keyword") or args.get("query") or "").strip()
-        if re.search(r"我所在的?部门|我的部门|我们组|我们队", kw or q_user) and team:
-            args["keyword"] = team
-            args["query"] = team
-        elif not kw and team and re.search(r"部门|团队|子部门", q_user):
-            args["keyword"] = team
-        if re.search(r"子部门|再细|详细到", q_user):
-            args["include_subdepartments"] = True
+        if not kw:
+            kw = team or (resolved[0] if resolved else "")
+        if kw:
+            args["keyword"] = kw
+        args.setdefault("include_subdepartments", True)
         args.setdefault("max_results", 50)
     ctx_chat = str(getattr(context, "chat_id", None) or "").strip()
     if ctx_chat and rt in ("member", "group", "message"):
@@ -180,24 +175,18 @@ def enrich_args(
         if one:
             oids = [one] + [x for x in oids if x != one]
         if not oids:
-            # 关于自己 → 用绑定 open_id；否则改通讯录按姓名查，禁止空 open_id 硬炸
-            about_self = bool(
-                re.search(r"(我自己|查我|我的档案|我是谁)", q_user)
-                or (name and name in str(args.get("query") or ""))
-            )
-            if about_self and self_oid:
+            prior_oids = _open_ids_from_prior(prior)
+            if self_oid and not str(args.get("query") or args.get("keyword") or "").strip():
                 args["open_id"] = self_oid
+            elif prior_oids:
+                args["open_ids"] = prior_oids[:8]
             else:
-                prior_oids = _open_ids_from_prior(prior)
-                if prior_oids:
-                    args["open_ids"] = prior_oids[:8]
-                else:
-                    kw = str(args.get("keyword") or args.get("query") or name or "").strip()
-                    args["resource_type"] = "directory"
-                    args["keyword"] = kw or "同事"
-                    args.pop("open_id", None)
-                    args.pop("open_ids", None)
-                    log.info("worker rewrite user→directory keyword=%s", kw[:40])
+                kw = str(args.get("keyword") or args.get("query") or name or "").strip()
+                args["resource_type"] = "directory"
+                args["keyword"] = kw or "同事"
+                args.pop("open_id", None)
+                args.pop("open_ids", None)
+                log.info("worker rewrite user→directory keyword=%s", kw[:40])
 
     return args
 
@@ -295,6 +284,7 @@ def run_step(
     render_tool_result: Callable[..., Any],
     prior: list[TieredEnvelope] | None = None,
     user_text: str = "",
+    resolved_names: list[str] | None = None,
 ) -> TieredEnvelope:
     worker = step.worker or resolve_worker(step.tool, step.args)
     try:
@@ -304,6 +294,7 @@ def run_step(
             context=context,
             prior=prior,
             user_text=user_text,
+            resolved_names=resolved_names,
         )
         worker = resolve_worker(step.tool, args)
         result = invoke_tool(step.tool, con, identity, permission, context, args)
@@ -336,7 +327,7 @@ def run_step(
         ):
             need_replan = True
             replan_reason = err
-        elif ok and not text and payload.get("empty"):
+        elif payload.get("empty") or (ok and not text):
             need_replan = True
             replan_reason = "empty_result"
         return TieredEnvelope(
@@ -357,6 +348,7 @@ def run_step(
                 },
                 **ids,
                 "resource_type": str(args.get("resource_type") or ""),
+                "keyword": str(args.get("keyword") or args.get("query") or "")[:80],
             },
         )
     except Exception as e:

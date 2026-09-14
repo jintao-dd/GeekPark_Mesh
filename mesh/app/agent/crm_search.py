@@ -112,9 +112,7 @@ def _search_interactions(
     recent: bool = False,
     limit: int = 12,
 ) -> list[dict[str, Any]]:
-    if recent or not (q or "").strip() or (q or "").strip().lower() in _SIQI_ALIASES or any(
-        x in (q or "") for x in ("最近", "近期", "沟通", "跟进", "见了谁", "聊了谁")
-    ):
+    if recent or not (q or "").strip():
         rows = con.execute(
             """
             SELECT title, date_start, interact_type, people_names, our_side, output_link
@@ -188,17 +186,9 @@ def _search_takes(con, q: str = "", *, limit: int = 10) -> list[dict[str, Any]]:
 
 def _infer_mode(q: str, mode: str) -> str:
     m = (mode or "").strip().lower()
-    if m in ("person", "company", "recent", "take", "auto"):
-        if m != "auto":
-            return m
-    t = q or ""
-    if any(x in t for x in ("最近", "近期", "聊了谁", "见了谁", "沟通记录", "跟进了谁")):
-        return "recent"
-    if any(x in t for x in ("怎么样", "判断", "下一步", "结论", "take", "观点", "prospect")):
-        return "take"
-    if any(x in t for x in ("公司", "赛道", "融资", "company")):
-        return "company"
-    return "person"
+    if m in ("person", "company", "recent", "take"):
+        return m
+    return "auto"
 
 
 def _format_text(
@@ -267,7 +257,7 @@ def _format_text(
 
     if not (takes or interactions or people or companies):
         lines.append("")
-        lines.append("这轮 CRM 里没有匹配到人/沟通/判断；可以换人名，或问「思琪最近沟通」。")
+        lines.append("这轮 CRM 里没有匹配到人/沟通/判断。")
     return "\n".join(lines)
 
 
@@ -296,9 +286,8 @@ def search_crm(
     interactions: list[dict] = []
     takes: list[dict] = []
 
-    if m == "recent":
+    if m == "recent" or (m == "auto" and not q):
         interactions = _search_interactions(con, q, recent=True, limit=limit)
-        # 最近沟通涉及的人，带上 Take
         names = []
         for ix in interactions:
             for p in (ix.get("people") or "").split(","):
@@ -307,7 +296,6 @@ def search_crm(
                     names.append(p)
         for name in names[:8]:
             takes.extend(_search_takes(con, name, limit=2))
-        # dedupe takes by person+verdict
         seen = set()
         uniq = []
         for t in takes:
@@ -319,12 +307,12 @@ def search_crm(
         takes = uniq[:limit]
     elif m == "take":
         takes = _search_takes(con, q, limit=limit)
-        if q and q.lower() not in _SIQI_ALIASES:
+        if q:
             interactions = _search_interactions(con, q, limit=min(6, limit))
             people = _search_people(con, q, limit=3)
     elif m == "company":
         companies = _search_companies(con, q, limit=limit)
-    else:  # person
+    elif m == "person":
         people = _search_people(con, q, limit=limit) if q else []
         takes = _search_takes(con, q, limit=limit) if q else _search_takes(con, "", limit=5)
         interactions = (
@@ -334,6 +322,13 @@ def search_crm(
         )
         if not people and not takes and not interactions and q:
             companies = _search_companies(con, q, limit=5)
+    else:  # auto + query：四面都搜，空则退回最近沟通
+        people = _search_people(con, q, limit=limit)
+        takes = _search_takes(con, q, limit=limit)
+        interactions = _search_interactions(con, q, limit=min(8, limit))
+        companies = _search_companies(con, q, limit=5)
+        if not (people or takes or interactions or companies):
+            interactions = _search_interactions(con, "", recent=True, limit=limit)
 
     text = _format_text(
         mode=m,

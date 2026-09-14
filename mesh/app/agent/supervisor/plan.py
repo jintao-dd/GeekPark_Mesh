@@ -35,7 +35,7 @@ ALLOWED_WRITE_TOOLS = frozenset(
 
 _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划与派工，不对用户说话，不做公司事实断言。
 
-根据用户目标、公司先验、会话状态，输出一个 JSON：
+根据用户目标、工作记忆、公司先验，输出一个 JSON：
 
 {
   "mode": "speak|work|prepare_write|confirm_write|cancel_write|refuse",
@@ -57,42 +57,23 @@ _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划�
   ]
 }
 
-规则：
-1) 需要查数/多源/关联 → mode=work，用 steps；任意用户措辞都按意图规划，禁止假设固定模板句
-2) 闲聊/观点/写稿不落飞书 → mode=speak
-3) 要写入飞书 → mode=prepare_write（系统会再请用户确认）；有待确认且用户同意 → confirm_write；取消 → cancel_write
-4) steps 只用只读工具；写入绝不进 steps
-5) feishu.search 必须带 resource_type（group|member|user|directory|doc|message|calendar|wiki|folder）
-   - 列群：group（query 可空）
-   - 群成员：member，且 depends_on 列群步骤；系统会注入 chat_id（不要空想 open_id）
-   - 按姓名找人：directory + keyword=姓名
-   - 列某队/部门有谁：directory + keyword=队名或部门名（如「品牌创意」「创意视频」）；系统会按飞书树 rollup，不要改去空转 ask.published
-   - user 仅在已知 open_id 时使用
-5b) 硅谷对外人脉/BD 跟进（思琪·Lilyann 的 Notion CRM）→ crm.search
-   - 问「最近聊了谁/沟通/跟进」：mode=recent 或 query 含最近
-   - 问某人「怎么样/下一步/判断」：mode=take 或默认 auto + 人名
-   - 问公司档案：mode=company
-   - 禁止把 CRM 结果说成已上线周报；CRM ≠ 飞书通讯录同事
-5c) 「和某人/老板相关的事情」「最近跟某人有关」：必须并行 crm.search（query=解析后的全名）+ ask.published（同全名）；禁止只查飞书通讯录就说「没有」
-5d) 用户反驳上文（「这个不是吗」「为什么说没有」「那你刚刚」）→ mode=work，按会话里的人名/主题重查 crm.search（必要时加 ask.published），禁止 mode=speak 空辩解
-5e) 纯组织名单（「X团队/部门有谁」「我所在的部门」「详细到子部门」）→ 只用 feishu.search directory；禁止顺手加 ask.published
-6) 周报事实用 ask.*；飞书 live 用 feishu.*；CRM 用 crm.search；禁止混成一个假事实源
-7) 用户说「和我有关/我的周报」时：ask.published 的 query 必须写上对方姓名与团队（见下方身份），禁止让用户再报一遍部门
-8) 若目标要「关联周报/这些人有关」：ask.published 必须 depends_on 列成员步骤，等拿到人名后再查周报（系统也会注入人名）
-9) 用户可能用简称/工号（锦涛、思琪、49、老板）；系统会解析成全名。规划时用全名检索，不要要求用户必须打全名
-10) 步骤 ≤8；有依赖才写 depends_on；可并行的标同一 parallel_group
-11) 只输出 JSON
-"""
+可用源（按意图选用，不要混成一个假事实源）：
+- crm.search：硅谷对外人脉/BD 底库（People 枢纽、Interactions 事件、Takes 判断）。内部同事通讯录不是这个源。query 用解析后的全名；mode=auto|person|company|recent|take。
+- ask.published：已上线周报事实。
+- feishu.search：飞书现场。必须带 resource_type（group|member|user|directory|doc|message|calendar|wiki|folder）。
+  directory 的 keyword 用队名/部门名/姓名，或提问者团队（工作记忆里有）；系统按飞书树展开子部门。列组织不要改去空转周报。
+  member 必须 depends_on 列群步骤；user 仅在已知 open_id 时使用。
+- feishu.calendar.* / feishu.doc.* / feishu.discuss.summary：日历、文档、讨论。
 
-_ORG_ROSTER_RE = re.compile(
-    r"(有谁|都有谁|有哪些人|成员名单|子部门|我所在的部门|我的部门|哪个队|哪支队)"
-)
-_RELATED_AFFAIRS_RE = re.compile(r"(相关的事情|有关的事情|相关进展|近况|跟进|打交道|引荐)")
-_CHALLENGE_RE = re.compile(
-    r"(为什么说没有|这个不是吗|那你刚刚|你刚才|你不是说|明明有|漏了|刚才那)"
-)
-_PERSON_ARROW_RE = re.compile(r"([\u4e00-\u9fffA-Za-z·\.\s]{1,24})→([\u4e00-\u9fffA-Za-z·\.\s]{1,24})")
-_CANON_IN_EXPAND_RE = re.compile(r"和([\u4e00-\u9fffA-Za-z]{2,12})（")
+规划原则：
+1) 需要查数、多源、关联、组织、对外人脉 → mode=work。按意图选源，禁止假设固定问法。
+2) 纯闲聊/观点/写稿不落飞书 → mode=speak。若用户在追问或质疑上一轮事实结论，必须 mode=work 换源或改 query，禁止空辩解。
+3) 要写入飞书 → prepare_write（系统会再请用户确认）。
+4) steps 只用只读工具；写入绝不进 steps。
+5) 检索用工作记忆里的全名/团队，不要要求用户再报一遍。
+6) 步骤 ≤8；有依赖才写 depends_on；可并行的标同一 parallel_group。
+7) 只输出 JSON。
+"""
 
 
 def _identity_line(identity: Any) -> str:
@@ -116,6 +97,58 @@ def _identity_line(identity: Any) -> str:
     if oid:
         bits.append(f"open_id={oid}")
     return "对方身份：" + "；".join(bits)
+
+
+def work_memory_block(
+    *,
+    identity: Any = None,
+    session: Any = None,
+    resolved_people: list[Any] | None = None,
+) -> str:
+    """Planner 的一等输入：人、身份、上一轮，不是句式表。"""
+    lines = ["## 工作记忆（规划用，不是事实）"]
+    lines.append(_identity_line(identity))
+
+    hits: list[str] = []
+    for h in resolved_people or []:
+        alias = str(getattr(h, "alias", "") or "").strip()
+        canon = str(getattr(h, "canonical", "") or "").strip()
+        if isinstance(h, dict):
+            alias = str(h.get("alias") or "").strip()
+            canon = str(h.get("canonical") or "").strip()
+        if canon:
+            bit = f"{alias}→{canon}" if alias and alias != canon else canon
+            if bit not in hits:
+                hits.append(bit)
+    if session is not None:
+        for n in getattr(session, "active_entities", None) or []:
+            s = str(n or "").strip()
+            if s and s not in hits and not any(s in x for x in hits):
+                hits.append(s)
+    if hits:
+        lines.append("已解析人名：" + "；".join(hits[:12]))
+        lines.append("检索时用全名，不要只用称呼。")
+
+    if session is None:
+        return "\n".join(lines)
+
+    last_q = str(getattr(session, "last_query", "") or "").strip()
+    team = str(getattr(session, "active_team", "") or "").strip()
+    if last_q:
+        lines.append(f"上一问：{last_q[:200]}")
+    if team:
+        lines.append(f"当前组织范围：{team}")
+    turns = list(getattr(session, "recent_turns", None) or [])[-4:]
+    if turns:
+        lines.append("最近对话：")
+        for t in turns:
+            if not isinstance(t, dict):
+                continue
+            role = str(t.get("role") or "")
+            text = str(t.get("text") or "").strip()
+            if text:
+                lines.append(f"- {role}: {text[:220]}")
+    return "\n".join(lines)
 
 
 def _parse_json(raw: Any) -> dict[str, Any]:
@@ -200,252 +233,6 @@ def _steps_from_decide_shape(data: dict[str, Any], *, goal: str) -> list[PlanSte
     return _normalize_steps([{"id": "s1", "tool": tool, "args": args}], goal=goal or q)
 
 
-def _identity_bits(identity: Any) -> tuple[str, str]:
-    if identity is None:
-        return "", ""
-    person = getattr(identity, "person", None) or {}
-    if not isinstance(person, dict):
-        person = {}
-    name = (
-        str(getattr(identity, "display_hint", None) or "").strip()
-        or str(person.get("display") or person.get("name") or "").strip()
-    )
-    team = str(getattr(identity, "primary_team", None) or "").strip()
-    return name, team
-
-
-def _resolved_people_from_text(text: str, session: Any = None) -> list[str]:
-    """从 expanded_query / 人名解析块 / session 抽全名。"""
-    names: list[str] = []
-    seen: set[str] = set()
-
-    def _add(n: str) -> None:
-        n = (n or "").strip(" ：:，,（）()")
-        if not n or n in seen or len(n) < 2:
-            return
-        seen.add(n)
-        names.append(n)
-
-    for m in _PERSON_ARROW_RE.finditer(text or ""):
-        _add(m.group(2))
-    for m in _CANON_IN_EXPAND_RE.finditer(text or ""):
-        _add(m.group(1))
-    if session is not None:
-        for n in getattr(session, "active_entities", None) or []:
-            _add(str(n))
-        for turn in reversed(list(getattr(session, "recent_turns", None) or [])[-6:]):
-            if not isinstance(turn, dict):
-                continue
-            t = str(turn.get("text") or "")
-            for m in _PERSON_ARROW_RE.finditer(t):
-                _add(m.group(2))
-            # 常见 CRM 人名残留
-            for token in ("张鹏", "赵思琪", "思琪", "Sheng Z.", "Sheng Zha", "Gavin Ni"):
-                if token in t:
-                    _add(token.replace("思琪", "赵思琪") if token == "思琪" else token)
-    return names[:8]
-
-
-def _has_tool(steps: list[PlanStep], tool: str) -> bool:
-    return any(s.tool == tool for s in steps)
-
-
-def _ensure_step(
-    steps: list[PlanStep],
-    *,
-    tool: str,
-    args: dict[str, Any],
-    sid: str,
-    parallel_group: str = "p1",
-) -> list[PlanStep]:
-    for s in steps:
-        if s.tool != tool:
-            continue
-        # 已有同工具：补强 query/mode/keyword
-        merged = dict(s.args or {})
-        for k, v in args.items():
-            if v and not str(merged.get(k) or "").strip():
-                merged[k] = v
-            elif k in ("query", "keyword", "mode") and v:
-                merged[k] = v
-        s.args = merged
-        return steps
-    worker = resolve_worker(tool, args)
-    steps.append(
-        PlanStep(
-            id=sid,
-            worker=worker,
-            tool=tool,
-            args=dict(args),
-            depends_on=[],
-            parallel_group=parallel_group,
-            optional=False,
-        )
-    )
-    return steps
-
-
-def _strip_ask_from_org_only(steps: list[PlanStep]) -> list[PlanStep]:
-    kept = [s for s in steps if not s.tool.startswith("ask.")]
-    return kept or steps
-
-
-def apply_colleague_repairs(
-    graph: TaskGraph,
-    *,
-    user_text: str,
-    identity: Any = None,
-    session: Any = None,
-) -> tuple[TaskGraph, list[str]]:
-    """确定性修补 Planner 常见漏召：老板相关、追问、纯组织名单。"""
-    notes: list[str] = []
-    q = (user_text or "").strip()
-    steps = list(graph.steps or [])
-    mode = graph.mode
-    band = graph.band
-    _, my_team = _identity_bits(identity)
-    people = _resolved_people_from_text(q, session)
-
-    # B) 反驳/追问上文
-    if _CHALLENGE_RE.search(q):
-        mode = "work"
-        band = "medium" if band == "simple" else band
-        focus = people[:]
-        if not focus:
-            focus = ["张鹏", "赵思琪"]
-        crm_q = " ".join(focus[:3])
-        steps = _ensure_step(
-            steps,
-            tool="crm.search",
-            args={"query": crm_q, "mode": "auto"},
-            sid="crm_challenge",
-            parallel_group="p_fix",
-        )
-        steps = _ensure_step(
-            steps,
-            tool="ask.published",
-            args={"query": crm_q},
-            sid="ask_challenge",
-            parallel_group="p_fix",
-        )
-        notes.append("challenge_reopen_crm")
-
-    # A) 和某人/老板相关 → CRM + 周报
-    if people and (
-        _RELATED_AFFAIRS_RE.search(q)
-        or ("相关" in q and ("事情" in q or "进展" in q or "最近" in q))
-        or any(x in q for x in ("老板", "鹏总"))
-    ):
-        mode = "work"
-        if band == "simple":
-            band = "medium"
-        canon = people[0]
-        steps = _ensure_step(
-            steps,
-            tool="crm.search",
-            args={"query": canon, "mode": "auto"},
-            sid="crm_person",
-            parallel_group="p_person",
-        )
-        steps = _ensure_step(
-            steps,
-            tool="ask.published",
-            args={"query": f"{canon} 最近 相关"},
-            sid="ask_person",
-            parallel_group="p_person",
-        )
-        # 去掉「只查飞书通讯录」这种空转
-        feishu_only_dir = [
-            s
-            for s in steps
-            if s.tool == "feishu.search"
-            and str((s.args or {}).get("resource_type") or "") == "directory"
-            and not any(p in str((s.args or {}).get("keyword") or (s.args or {}).get("query") or "") for p in people)
-        ]
-        if feishu_only_dir and _has_tool(steps, "crm.search"):
-            drop_ids = {s.id for s in feishu_only_dir}
-            steps = [s for s in steps if s.id not in drop_ids]
-        notes.append(f"person_related_crm:{canon}")
-
-    # C) 纯组织名单：禁周报；我所在部门 → 注入团队；子部门追问
-    org_followup = bool(re.search(r"子部门|再细|详细到", q))
-    org_ask = bool(_ORG_ROSTER_RE.search(q) or re.search(r"(团队|部门).{0,6}(有谁|成员)", q))
-    if org_ask or org_followup:
-        mode = "work"
-        band = "simple"
-        kw = ""
-        if re.search(r"我所在的?部门|我的部门|我们组|我们队", q):
-            kw = my_team or "我所在部门"
-        elif org_followup and session is not None:
-            kw = str(getattr(session, "active_team", "") or "").strip()
-            if not kw:
-                last_q = str(getattr(session, "last_query", "") or "")
-                for token in ("硅谷", "品牌创意", "商业化", "编辑部", "投资", "社群", "视频号", "播客"):
-                    if token in last_q:
-                        kw = token
-                        break
-        if not kw:
-            # 从本句抽队名线索
-            for token in (
-                "硅谷",
-                "品牌创意",
-                "商业化",
-                "编辑部",
-                "投资",
-                "社群",
-                "视频号",
-                "播客",
-                "总裁办",
-                "英文站",
-            ):
-                if token in q:
-                    kw = token
-                    break
-        if not kw:
-            kw = my_team or "组织"
-        args = {
-            "resource_type": "directory",
-            "keyword": kw,
-            "max_results": 50,
-        }
-        if org_followup or "子部门" in q:
-            args["include_subdepartments"] = True
-        steps = _ensure_step(
-            steps,
-            tool="feishu.search",
-            args=args,
-            sid="org_dir",
-            parallel_group="p_org",
-        )
-        before = len(steps)
-        steps = _strip_ask_from_org_only(steps)
-        if len(steps) < before:
-            notes.append("strip_ask_from_org")
-        notes.append(f"org_directory:{kw}")
-
-    # 思琪最近跟进类：确保 crm recent（若已有则保留）
-    if re.search(r"(思琪|赵思琪|Lilyann).{0,8}(最近|跟进|沟通|聊了)", q) or re.search(
-        r"(最近|近期).{0,6}(跟进|沟通|聊了谁)", q
-    ):
-        mode = "work"
-        steps = _ensure_step(
-            steps,
-            tool="crm.search",
-            args={"query": q[:80], "mode": "recent"},
-            sid="crm_recent",
-            parallel_group="p_crm",
-        )
-        notes.append("crm_recent_ensure")
-
-    if notes:
-        graph.mode = mode
-        graph.band = band
-        graph.steps = steps
-        if mode == "work" and not steps:
-            graph.mode = "speak"
-    return graph, notes
-
-
 def plan_turn(
     user_text: str,
     *,
@@ -453,48 +240,30 @@ def plan_turn(
     identity: Any = None,
     session: Any = None,
     observations: list[dict[str, Any]] | None = None,
+    resolved_people: list[Any] | None = None,
 ) -> tuple[TaskGraph, dict[str, Any]]:
     """Single Supervisor plan (and optional replan with observations)."""
     meta: dict[str, Any] = {"llm_used": False, "model": None, "error": "", "source": "supervisor"}
     q = (user_text or "").strip()
     pending = getattr(session, "pending_write", None) if session is not None else None
-    if isinstance(pending, dict) and pending.get("tool") and not observations:
-        # 短确认由 loop 硬处理；这里仍允许模型在复合句里选 confirm/cancel/work
-        pass
 
     system = _PLANNER_SYSTEM
     if company_block:
         system += "\n\n" + company_block
-    user = f"{_identity_line(identity)}\n用户目标：{q}\n"
-    if session is not None:
-        last_q = str(getattr(session, "last_query", "") or "").strip()
-        ents = [str(x) for x in (getattr(session, "active_entities", None) or []) if str(x).strip()]
-        team = str(getattr(session, "active_team", "") or "").strip()
-        if last_q or ents or team:
-            user += "会话线索（追问时必须接着查，禁止假装没发生过）：\n"
-            if last_q:
-                user += f"- 上一问：{last_q[:160]}\n"
-            if ents:
-                user += "- 已解析人名：" + "、".join(ents[:8]) + "\n"
-            if team:
-                user += f"- 当前组织范围：{team}\n"
-        turns = list(getattr(session, "recent_turns", None) or [])[-4:]
-        if turns:
-            bits = []
-            for t in turns:
-                if not isinstance(t, dict):
-                    continue
-                bits.append(f"{t.get('role')}: {str(t.get('text') or '')[:180]}")
-            if bits:
-                user += "最近对话摘录：\n" + "\n".join(bits) + "\n"
+    user = work_memory_block(
+        identity=identity,
+        session=session,
+        resolved_people=resolved_people,
+    )
+    user += f"\n用户目标：{q}\n"
     if isinstance(pending, dict) and pending.get("tool"):
         user += (
             f"当前待确认写入：tool={pending.get('tool')} "
             f"args_keys={list((pending.get('args') or {}).keys())}\n"
         )
     if observations:
-        user += "上一轮执行观察（请 replan 或改 mode）：\n"
-        user += json.dumps(observations[:8], ensure_ascii=False)[:2500] + "\n"
+        user += "上一轮执行观察（请换源或改 query 再 plan，不要重复同一空转）：\n"
+        user += json.dumps(observations[:10], ensure_ascii=False)[:2800] + "\n"
         meta["replan"] = True
     user += "只输出任务 JSON："
 
@@ -518,10 +287,6 @@ def plan_turn(
                 goal=q,
             ),
         )
-        graph, notes = apply_colleague_repairs(
-            graph, user_text=q, identity=identity, session=session
-        )
-        meta["repairs"] = notes
         meta["step_ids"] = [s.id for s in graph.steps]
         meta["mode"] = graph.mode
         return graph, meta
@@ -549,7 +314,6 @@ def plan_turn(
     write_args = data.get("write_args") if isinstance(data.get("write_args"), dict) else {}
     write_args = dict(write_args or {})
     if mode == "prepare_write" and write_tool not in ALLOWED_WRITE_TOOLS:
-        # 误把读工具标成写 → 改 work
         if write_tool in ALLOWED_READ_TOOLS:
             mode = "work"
             if not steps:
@@ -571,10 +335,6 @@ def plan_turn(
         speak_hint=str(data.get("speak_hint") or "")[:200],
         budget=dict(DEFAULT_BUDGET),
     )
-    graph, notes = apply_colleague_repairs(
-        graph, user_text=q, identity=identity, session=session
-    )
-    meta["repairs"] = notes
     meta["step_ids"] = [s.id for s in graph.steps]
     meta["mode"] = graph.mode
     return graph, meta

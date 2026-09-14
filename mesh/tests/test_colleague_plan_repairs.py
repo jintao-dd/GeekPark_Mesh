@@ -1,4 +1,4 @@
-"""Colleague plan repairs for boss/CRM/org follow-ups."""
+"""Work memory for planner — no utterance routing."""
 from __future__ import annotations
 
 import sys
@@ -7,96 +7,54 @@ from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.agent.supervisor.plan import apply_colleague_repairs
-from app.agent.supervisor.types import PlanStep, TaskGraph
+from app.agent.supervisor.plan import work_memory_block
+from app.agent.supervisor.verify import verify
+from app.agent.supervisor.types import TaskGraph, TieredEnvelope
 
 
-def _graph(steps=None, mode="speak"):
-    return TaskGraph(goal="g", mode=mode, band="simple", steps=list(steps or []))
-
-
-def test_boss_related_forces_crm_and_ask():
-    g = _graph(
-        [
-            PlanStep(
-                id="s1",
-                worker="research",
-                tool="feishu.search",
-                args={"resource_type": "directory", "keyword": "老板"},
-            )
-        ],
-        mode="work",
+def test_work_memory_includes_identity_people_and_history():
+    ident = SimpleNamespace(
+        display_hint="测试",
+        primary_team="品牌创意团队",
+        feishu_open_id="ou_x",
+        status="bound",
+        person={"name": "测试"},
     )
-    q = "最近和张鹏（老板）相关的事情有哪些？\n\n【人名解析 · 检索用全名】\n- 老板→张鹏（工号G-001）"
-    out, notes = apply_colleague_repairs(g, user_text=q)
-    tools = [s.tool for s in out.steps]
-    assert "crm.search" in tools
-    assert "ask.published" in tools
-    assert any("person_related_crm" in n for n in notes)
-    crm = next(s for s in out.steps if s.tool == "crm.search")
-    assert "张鹏" in str(crm.args.get("query") or "")
-
-
-def test_challenge_reopens_crm():
     session = SimpleNamespace(
         active_entities=["张鹏"],
-        recent_turns=[{"role": "assistant", "text": "没有和老板相关的事情"}],
+        active_team="硅谷 BD 团队",
         last_query="最近和老板相关的事情有哪些？",
-        active_team="",
-    )
-    out, notes = apply_colleague_repairs(
-        _graph(mode="speak"),
-        user_text="那你刚刚为什么说没有和老板相关的事情？",
-        session=session,
-    )
-    assert out.mode == "work"
-    assert any(s.tool == "crm.search" for s in out.steps)
-    assert "challenge_reopen_crm" in notes
-
-
-def test_org_roster_strips_ask_and_uses_directory():
-    g = _graph(
-        [
-            PlanStep(
-                id="s1",
-                worker="research",
-                tool="feishu.search",
-                args={"resource_type": "directory", "keyword": "硅谷"},
-            ),
-            PlanStep(
-                id="s2",
-                worker="published",
-                tool="ask.published",
-                args={"query": "我所在的部门都有谁"},
-            ),
+        recent_turns=[
+            {"role": "user", "text": "最近和老板相关的事情有哪些？"},
+            {"role": "assistant", "text": "周报这边没查到。"},
         ],
-        mode="work",
+        pending_write=None,
     )
-    identity = SimpleNamespace(primary_team="品牌创意团队", display_hint="测试", person={})
-    out, notes = apply_colleague_repairs(
-        g, user_text="我所在的部门都有谁？", identity=identity
-    )
-    tools = [s.tool for s in out.steps]
-    assert "ask.published" not in tools
-    assert "feishu.search" in tools
-    assert any("org_directory" in n for n in notes)
-    feishu = next(s for s in out.steps if s.tool == "feishu.search")
-    assert feishu.args.get("keyword") == "品牌创意团队"
+    people = [SimpleNamespace(alias="老板", canonical="张鹏")]
+    block = work_memory_block(identity=ident, session=session, resolved_people=people)
+    assert "张鹏" in block
+    assert "老板" in block
+    assert "品牌创意团队" in block
+    assert "上一问" in block
+    assert "周报这边没查到" in block
 
 
-def test_subdept_followup_uses_active_team():
-    session = SimpleNamespace(
-        active_entities=[],
-        recent_turns=[],
-        last_query="硅谷团队主要都有谁？",
-        active_team="硅谷",
-    )
-    out, notes = apply_colleague_repairs(
-        _graph(mode="speak"),
-        user_text="我需要详细到子部门",
-        session=session,
-    )
-    assert out.mode == "work"
-    feishu = next(s for s in out.steps if s.tool == "feishu.search")
-    assert feishu.args.get("include_subdepartments") is True
-    assert feishu.args.get("keyword") == "硅谷"
+def test_verify_empty_with_unused_crm_wants_replan():
+    graph = TaskGraph(goal="g", mode="work", band="simple")
+    envs = [
+        TieredEnvelope(
+            step_id="s1",
+            worker="org",
+            tool="feishu.search",
+            ok=True,
+            tier="feishu_live",
+            text="",
+            need_replan=True,
+            replan_reason="empty_result",
+            payload={"empty": True, "resource_type": "directory"},
+        )
+    ]
+    v = verify(envs, graph=graph)
+    assert v["want_replan"] is True
+    assert "crm.search" in v["unused_sources"]
+    assert v["replan_reason"] == "empty_with_unused_sources"

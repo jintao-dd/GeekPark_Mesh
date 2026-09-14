@@ -20,6 +20,17 @@ def test_crm_search_gavin_take():
     assert "硅谷 CRM" in out["text"] or "思琪" in out["text"]
 
 
+def test_crm_search_auto_hits_without_phrase_routing():
+    con = db.connect()
+    out = cs.search_crm(con, query="Gavin Ni", mode="auto")
+    assert out["ok"]
+    assert out["takes"] or out["people"] or out["interactions"]
+    assert any("Gavin" in str(x) for x in (
+        [t.get("person") for t in out.get("takes") or []]
+        + [p.get("name") for p in out.get("people") or []]
+    ))
+
+
 def test_crm_search_recent_interactions():
     con = db.connect()
     out = cs.search_crm(con, query="最近沟通", mode="recent")

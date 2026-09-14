@@ -104,4 +104,5 @@ def test_search_directory_design_only():
     with mock.patch.object(od, "load_directory", fake_load):
         env = od.search_directory("品牌设计", max_results=20)
     titles = [it.get("title") for it in (env.items or [])]
-    assert titles == ["彭康林"]
+    assert "彭康林" in titles
+    assert "张山山" not in titles

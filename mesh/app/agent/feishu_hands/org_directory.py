@@ -14,7 +14,6 @@
 from __future__ import annotations
 
 import logging
-import re
 import threading
 import time
 from typing import Any
@@ -178,6 +177,46 @@ def _descendants(
     return out
 
 
+def _known_org_labels() -> list[tuple[str, str]]:
+    """已知部门名/业务队名/别名 → canonical。最长命中优先。"""
+    pairs: list[tuple[str, str]] = []
+    try:
+        from ... import db, ingest
+
+        for k, v in (db.team_alias_map() or {}).items():
+            ks, vs = str(k or "").strip(), str(v or "").strip()
+            if len(ks) >= 2 and vs:
+                pairs.append((ks, vs))
+        for t in ingest.TEAMS:
+            ts = str(t or "").strip()
+            if len(ts) >= 2:
+                pairs.append((ts, ts))
+    except Exception:
+        pass
+    try:
+        from ..dept_team_map import load_dept_team_map
+
+        for row in load_dept_team_map().get("departments") or []:
+            if not isinstance(row, dict):
+                continue
+            name = str(row.get("name") or "").strip()
+            team = str(row.get("canonical_team") or "").strip()
+            if len(name) >= 2:
+                pairs.append((name, team or name))
+            if len(team) >= 2:
+                pairs.append((team, team))
+    except Exception:
+        pass
+    seen: set[str] = set()
+    out: list[tuple[str, str]] = []
+    for lab, canon in sorted(pairs, key=lambda x: len(x[0]), reverse=True):
+        if lab in seen:
+            continue
+        seen.add(lab)
+        out.append((lab, canon))
+    return out
+
+
 def _mesh_team_for_query(q: str) -> str | None:
     raw = (q or "").strip()
     if not raw:
@@ -190,6 +229,14 @@ def _mesh_team_for_query(q: str) -> str | None:
             return n
     except Exception:
         pass
+    for lab, canon in _known_org_labels():
+        if lab in raw:
+            try:
+                from ... import db
+
+                return db.normalize_team(canon) or db.normalize_team(lab) or canon
+            except Exception:
+                return canon
     try:
         from ..dept_team_map import map_department_name
 
@@ -223,17 +270,6 @@ def resolve_org_scope(
     返回 (dept_ids|None, label)。None 表示不是组织范围查询，应走人名检索。
     """
     q = (query or "").strip()
-    # 去掉口语尾巴，便于「品牌创意有谁 / 硅谷团队主要都有谁 / 详细到子部门」
-    q = re.sub(
-        r"(主要|大概|都)?(有谁|有哪些人|有哪些|都有谁|成员|名单|人员|的人|里有谁|子部门)+$",
-        "",
-        q,
-    ).strip("的 ：:，,")
-    for tail in ("团队",):
-        # 保留「硅谷团队」整体给 normalize；仅当后面还有别的尾巴时才剥
-        if q.endswith(tail) and len(q) > len(tail) + 1:
-            # 不剥「硅谷团队」本身
-            break
     if not q:
         return None, ""
     ql = q.lower()
@@ -351,7 +387,7 @@ def search_directory(
     *,
     max_results: int = 20,
     list_departments: bool = False,
-    include_subdepartments: bool = False,
+    include_subdepartments: bool = True,
 ) -> ToolResultEnvelope:
     """按姓名/工号/邮箱查人；或按部门名/Mesh 业务队列成员。"""
     try:
@@ -397,7 +433,7 @@ def search_directory(
             source = "roster" if matched else source
         team_limit = max(limit, 50)
         items = []
-        if include_subdepartments or list_departments or "子部门" in (query or ""):
+        if include_subdepartments or list_departments:
             child_depts = [
                 d
                 for d in departments

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable
@@ -16,68 +15,26 @@ from . import workers
 from . import write_gate
 from .types import DEFAULT_BUDGET, PlanStep, SupervisorResult, TaskGraph, TieredEnvelope
 
-
-def _published_looks_empty(text: str) -> bool:
-    t = (text or "").strip()
-    if not t:
-        return True
-    return bool(
-        re.search(
-            r"(没找到|没查到|没有.*记录|无可引用|没有可直接|未拿到|找不到)",
-            t,
-        )
-    )
-
-
-def _correlate_published_with_names(
-    envelopes: list[TieredEnvelope],
-    *,
-    con: Any,
-    identity: Any,
-    permission: Any,
-    context: Any,
-    invoke_tool: Callable[..., Any],
-    render_tool_result: Callable[..., Any],
-    user_text: str,
-) -> tuple[list[TieredEnvelope], list[str]]:
-    """飞书已拿到人名但周报空 → 用这些人名补一枪 ask.published。"""
-    names = workers._names_from_prior(envelopes)
-    if len(names) < 2:
-        return envelopes, []
-    pubs = [e for e in envelopes if str(e.tool).startswith("ask.")]
-    live_ok = any(e.ok and e.tier == "feishu_live" for e in envelopes)
-    if not live_ok:
-        return envelopes, []
-    if pubs and not any(_published_looks_empty(e.text) or not e.ok for e in pubs):
-        return envelopes, []
-    step = PlanStep(
-        id="s_corr_pub",
-        worker="published",
-        tool="ask.published",
-        args={"query": f"近期周报与 { '、'.join(names[:8]) } 相关的进展与触点"},
-    )
-    env = workers.run_step(
-        step,
-        con=con,
-        identity=identity,
-        permission=permission,
-        context=context,
-        invoke_tool=invoke_tool,
-        render_tool_result=render_tool_result,
-        prior=envelopes,
-        user_text=user_text,
-    )
-    # 替换旧 published 或追加
-    kept = [e for e in envelopes if not str(e.tool).startswith("ask.")]
-    kept.append(env)
-    return kept, [step.tool]
-
 log = logging.getLogger("uvicorn.error")
 
 
 def supervisor_enabled() -> bool:
     v = (os.environ.get("MESH_SUPERVISOR") or "1").strip().lower()
     return v not in ("0", "false", "off", "no")
+
+
+def _remember_org_scope(session: Any, envelopes: list[TieredEnvelope]) -> None:
+    if session is None:
+        return
+    for e in envelopes or []:
+        if str(e.tool) != "feishu.search":
+            continue
+        if str((e.payload or {}).get("resource_type") or "") != "directory":
+            continue
+        kw = str((e.payload or {}).get("keyword") or "").strip()
+        if kw:
+            session.active_team = kw[:80]
+            return
 
 
 def _execute_graph(
@@ -90,6 +47,7 @@ def _execute_graph(
     invoke_tool: Callable[..., Any],
     render_tool_result: Callable[..., Any],
     user_text: str = "",
+    resolved_names: list[str] | None = None,
 ) -> tuple[list[TieredEnvelope], list[str], str, list[str]]:
     t0 = time.monotonic()
     budget = dict(graph.budget or DEFAULT_BUDGET)
@@ -148,6 +106,7 @@ def _execute_graph(
                     render_tool_result=render_tool_result,
                     prior=prior,
                     user_text=user_text,
+                    resolved_names=resolved_names,
                 )
                 calls += 1
                 tools_called.append(step.tool)
@@ -196,34 +155,12 @@ def handle_turn(
 
     people_res = pr.resolve_people_in_text(q, session=session)
     pr.remember_hits(session, people_res.hits)
+    resolved_names = [h.canonical for h in people_res.hits if getattr(h, "canonical", "")]
     if session is not None:
         session.last_query = q[:200]
-        # 组织范围线索，供「详细到子部门」追问
-        for token in (
-            "硅谷",
-            "品牌创意",
-            "商业化",
-            "编辑部",
-            "投资",
-            "社群",
-            "视频号",
-            "播客",
-            "总裁办",
-            "英文站",
-        ):
-            if token in q:
-                session.active_team = token
-                break
-    q_tools = people_res.expanded_query or q
-    if people_res.hits:
-        company_block += (
-            "\n\n## 人名解析（检索线索 · 非事实）\n"
-            + "\n".join(
-                f"- {h.alias} → {h.canonical}"
-                + (f" · {h.source}" if h.source else "")
-                for h in people_res.hits[:12]
-            )
-        )
+        ident_team = str(getattr(identity, "primary_team", None) or "").strip()
+        if ident_team and not str(getattr(session, "active_team", "") or "").strip():
+            session.active_team = ident_team
 
     out = SupervisorResult(
         llm_used=False,
@@ -258,10 +195,11 @@ def handle_turn(
         return wr
 
     graph, pmeta = planmod.plan_turn(
-        q_tools,
+        q,
         company_block=company_block,
         identity=identity,
         session=session,
+        resolved_people=people_res.hits,
     )
     out.llm_used = bool(pmeta.get("llm_used"))
     out.model = pmeta.get("model")
@@ -321,25 +259,29 @@ def handle_turn(
         context=context,
         invoke_tool=invoke_tool,
         render_tool_result=render_tool_result,
-        user_text=q_tools,
+        user_text=q,
+        resolved_names=resolved_names,
     )
     out.progress = list(progress)
     out.tools_called = list(tools_called)
+    _remember_org_scope(session, envelopes)
     verdict = verifymod.verify(envelopes, graph=graph)
     out.trace["verify"] = {
         k: verdict[k]
-        for k in ("ok_count", "total", "tiers", "cross_bucket", "want_replan", "replan_reason")
+        for k in ("ok_count", "total", "tiers", "cross_bucket", "want_replan", "replan_reason", "unused_sources")
+        if k in verdict
     }
 
     while verdict.get("want_replan") and replans_left > 0:
         replans_left -= 1
         out.trace.setdefault("replans", []).append(verdict.get("replan_reason") or "replan")
         graph2, pmeta2 = planmod.plan_turn(
-            q_tools,
+            q,
             company_block=company_block,
             identity=identity,
             session=session,
             observations=verdict.get("observations") or [],
+            resolved_people=people_res.hits,
         )
         out.llm_used = bool(out.llm_used or pmeta2.get("llm_used"))
         out.trace.setdefault("replan_meta", []).append(pmeta2)
@@ -357,35 +299,20 @@ def handle_turn(
             context=context,
             invoke_tool=invoke_tool,
             render_tool_result=render_tool_result,
-            user_text=q_tools,
+            user_text=q,
+            resolved_names=resolved_names,
         )
         out.tools_called.extend(tools_called2)
         for p in progress2:
             if p not in out.progress:
                 out.progress.append(p)
+        _remember_org_scope(session, envelopes)
         verdict = verifymod.verify(envelopes, graph=graph)
         out.trace["verify"] = {
             k: verdict[k]
-            for k in ("ok_count", "total", "tiers", "cross_bucket", "want_replan", "replan_reason")
+            for k in ("ok_count", "total", "tiers", "cross_bucket", "want_replan", "replan_reason", "unused_sources")
+            if k in verdict
         }
-
-    # 人名已在、周报空：补一轮关联 Ask（不依赖模型是否写对 depends_on）
-    envelopes2, extra_tools = _correlate_published_with_names(
-        envelopes,
-        con=con,
-        identity=identity,
-        permission=permission,
-        context=context,
-        invoke_tool=invoke_tool,
-        render_tool_result=render_tool_result,
-        user_text=q_tools,
-    )
-    if extra_tools:
-        envelopes = envelopes2
-        out.tools_called.extend(extra_tools)
-        out.trace["correlate_published"] = True
-        if "正在查已上线周报" not in out.progress:
-            out.progress.append("正在查已上线周报")
 
     skipped = len(graph.steps or []) - len(envelopes)
     partial = bool(budget_hit) or skipped > 0 or any(not e.ok for e in envelopes)

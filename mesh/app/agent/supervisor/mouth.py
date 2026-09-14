@@ -258,10 +258,12 @@ def synthesize_work(
         if not text:
             text = render_work_answer(columns)
             meta["source"] = "rule_columns_empty_llm"
-        # 有实质材料却被说成全空：回落材料正文
-        if material and len(material) > 80 and re.search(
-            r"(完全没|什么都没|全都没查到|没有任何材料)", text or ""
-        ):
+        grounded = [
+            e
+            for e in envelopes
+            if e.ok and (e.text or "").strip() and not (e.payload or {}).get("empty")
+        ]
+        if grounded and text and len((text or "").strip()) < 48 and max(len(e.text or "") for e in grounded) > 80:
             log.warning("supervisor mouth contradicted non-empty materials")
             text = render_work_answer(columns)
             meta["source"] = "rule_columns_contradiction"
