@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import time
 from typing import Any
@@ -222,21 +223,16 @@ def resolve_org_scope(
     返回 (dept_ids|None, label)。None 表示不是组织范围查询，应走人名检索。
     """
     q = (query or "").strip()
-    # 去掉口语尾巴，便于「品牌创意有谁 / 品牌创意部都有哪些人」
-    for tail in (
-        "有谁",
-        "有哪些人",
-        "有哪些",
-        "都有谁",
-        "成员",
-        "名单",
-        "人员",
-        "团队",
-        "的人",
-        "里有谁",
-    ):
+    # 去掉口语尾巴，便于「品牌创意有谁 / 硅谷团队主要都有谁 / 详细到子部门」
+    q = re.sub(
+        r"(主要|大概|都)?(有谁|有哪些人|有哪些|都有谁|成员|名单|人员|的人|里有谁|子部门)+$",
+        "",
+        q,
+    ).strip("的 ：:，,")
+    for tail in ("团队",):
+        # 保留「硅谷团队」整体给 normalize；仅当后面还有别的尾巴时才剥
         if q.endswith(tail) and len(q) > len(tail) + 1:
-            q = q[: -len(tail)].strip("的 ：:，,")
+            # 不剥「硅谷团队」本身
             break
     if not q:
         return None, ""
@@ -355,6 +351,7 @@ def search_directory(
     *,
     max_results: int = 20,
     list_departments: bool = False,
+    include_subdepartments: bool = False,
 ) -> ToolResultEnvelope:
     """按姓名/工号/邮箱查人；或按部门名/Mesh 业务队列成员。"""
     try:
@@ -400,13 +397,42 @@ def search_directory(
             source = "roster" if matched else source
         team_limit = max(limit, 50)
         items = []
+        if include_subdepartments or list_departments or "子部门" in (query or ""):
+            child_depts = [
+                d
+                for d in departments
+                if str(d.get("open_department_id") or "") in scope_ids
+            ]
+            child_depts.sort(key=lambda d: str(d.get("name") or ""))
+            for d in child_depts[:40]:
+                did = str(d.get("open_department_id") or "")
+                n_here = sum(
+                    1
+                    for u in people
+                    if did in {str(x) for x in (u.get("department_ids") or [])}
+                )
+                items.append(
+                    {
+                        "title": str(d.get("name") or did),
+                        "snippet": f"子部门 · {n_here}人 · {did}",
+                        "docs_type": "department",
+                        "id": did,
+                        "url": "",
+                    }
+                )
         for u in matched[:team_limit]:
             name = str(u.get("name") or "")
             job = str(u.get("job_title") or "")
             emp = str(u.get("employee_no") or "")
             oid = str(u.get("open_id") or "")
             teams = u.get("teams") or []
-            bits = [p for p in (scope_label, job, emp) if p]
+            u_depts = {str(x).strip() for x in (u.get("department_ids") or []) if str(x).strip()}
+            dept_names = [
+                str(d.get("name") or "")
+                for d in departments
+                if str(d.get("open_department_id") or "") in u_depts
+            ]
+            bits = [p for p in (scope_label, (dept_names[0] if dept_names else ""), job, emp) if p]
             if teams:
                 bits.append("/".join(str(t) for t in teams[:3]))
             items.append(

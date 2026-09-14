@@ -196,6 +196,24 @@ def handle_turn(
 
     people_res = pr.resolve_people_in_text(q, session=session)
     pr.remember_hits(session, people_res.hits)
+    if session is not None:
+        session.last_query = q[:200]
+        # 组织范围线索，供「详细到子部门」追问
+        for token in (
+            "硅谷",
+            "品牌创意",
+            "商业化",
+            "编辑部",
+            "投资",
+            "社群",
+            "视频号",
+            "播客",
+            "总裁办",
+            "英文站",
+        ):
+            if token in q:
+                session.active_team = token
+                break
     q_tools = people_res.expanded_query or q
     if people_res.hits:
         company_block += (

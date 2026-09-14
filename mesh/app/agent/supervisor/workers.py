@@ -122,6 +122,17 @@ def enrich_args(
     prior = list(prior or [])
     q_user = (user_text or "").strip()
 
+    if step.tool == "crm.search":
+        q_plan = str(args.get("query") or "").strip()
+        # 丢掉人名解析附录，只留检索词
+        q_clean = (q_plan or q_user).split("【人名解析")[0].strip()
+        m = re.search(r"和([\u4e00-\u9fffA-Za-z]{2,12})（", q_clean)
+        if m:
+            q_clean = m.group(1)
+        args["query"] = (q_clean or q_plan or q_user)[:80]
+        args.setdefault("mode", str(args.get("mode") or "auto"))
+        return args
+
     if step.tool.startswith("ask."):
         # 保留用户完整原话作主 query，只追加检索线索——禁止用短句替换原目标
         q_plan = str(args.get("query") or "").strip()
@@ -144,6 +155,16 @@ def enrich_args(
         return args
 
     rt = str(args.get("resource_type") or "").strip().lower()
+    if rt == "directory":
+        kw = str(args.get("keyword") or args.get("query") or "").strip()
+        if re.search(r"我所在的?部门|我的部门|我们组|我们队", kw or q_user) and team:
+            args["keyword"] = team
+            args["query"] = team
+        elif not kw and team and re.search(r"部门|团队|子部门", q_user):
+            args["keyword"] = team
+        if re.search(r"子部门|再细|详细到", q_user):
+            args["include_subdepartments"] = True
+        args.setdefault("max_results", 50)
     ctx_chat = str(getattr(context, "chat_id", None) or "").strip()
     if ctx_chat and rt in ("member", "group", "message"):
         args.setdefault("chat_id", ctx_chat)

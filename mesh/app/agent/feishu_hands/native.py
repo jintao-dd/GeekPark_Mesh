@@ -320,6 +320,7 @@ def call_native(
                     str(args.get("keyword") or q or ""),
                     max_results=max(int(mr), 40),
                     list_departments=bool(args.get("list_departments")),
+                    include_subdepartments=bool(args.get("include_subdepartments")),
                 )
             if rt == "calendar":
                 return _calendar_list(q, days=14, max_results=mr)

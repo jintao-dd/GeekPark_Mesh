@@ -130,10 +130,11 @@ def _search_interactions(
             SELECT title, date_start, interact_type, people_names, our_side, output_link
             FROM crm_interactions
             WHERE title LIKE ? OR people_names LIKE ? OR interact_type LIKE ?
+                  OR our_side LIKE ?
             ORDER BY date_start DESC
             LIMIT ?
             """,
-            (_like(q), _like(q), _like(q), int(limit)),
+            (_like(q), _like(q), _like(q), _like(q), int(limit)),
         ).fetchall()
     return [
         {
