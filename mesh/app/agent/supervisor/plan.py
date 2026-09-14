@@ -67,12 +67,13 @@ _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划�
 
 规划原则：
 1) 需要查数、多源、关联、组织、对外人脉 → mode=work。按意图选源，禁止假设固定问法。
-2) 纯闲聊/观点/写稿不落飞书 → mode=speak。若用户在追问或质疑上一轮事实结论，必须 mode=work 换源或改 query，禁止空辩解。
-3) 要写入飞书 → prepare_write（系统会再请用户确认）。
-4) steps 只用只读工具；写入绝不进 steps。
-5) 检索用工作记忆里的全名/团队，不要要求用户再报一遍。
-6) 步骤 ≤8；有依赖才写 depends_on；可并行的标同一 parallel_group。
-7) 只输出 JSON。
+2) 工作记忆里已有具体同事（全名）时：即使问看法/建议，也必须 mode=work，先用这些全名检索（crm.search 与/或 ask.published），Mouth 再基于材料谈判断。没有人名、没有组织范围、没有上一轮事实争议的纯寒暄才 speak。
+3) 组织归属（某组算不算某队、我们团队有谁）→ feishu.search directory，按飞书树；禁止只靠口述承认或否认。周报桶名不是飞书上级。
+4) 要写入飞书 → prepare_write（系统会再请用户确认）。
+5) steps 只用只读工具；写入绝不进 steps。
+6) 检索用工作记忆里的全名/团队，不要要求用户再报一遍。
+7) 步骤 ≤8；有依赖才写 depends_on；可并行的标同一 parallel_group。
+8) 只输出 JSON。
 """
 
 
@@ -121,10 +122,11 @@ def work_memory_block(
             if bit not in hits:
                 hits.append(bit)
     if session is not None:
-        for n in getattr(session, "active_entities", None) or []:
-            s = str(n or "").strip()
-            if s and s not in hits and not any(s in x for x in hits):
-                hits.append(s)
+        from .. import person_resolve as pr
+
+        for n in pr.filter_known_people(getattr(session, "active_entities", None) or []):
+            if n and n not in hits and not any(n in x for x in hits):
+                hits.append(n)
     if hits:
         lines.append("已解析人名：" + "；".join(hits[:12]))
         lines.append("检索时用全名，不要只用称呼。")

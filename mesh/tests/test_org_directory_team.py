@@ -106,3 +106,15 @@ def test_search_directory_design_only():
     titles = [it.get("title") for it in (env.items or [])]
     assert "彭康林" in titles
     assert "张山山" not in titles
+
+
+def test_member_names_for_scope_brand_tree():
+    def fake_load(*, force=False):
+        return DEPTS, PEOPLE
+
+    with mock.patch.object(od, "load_directory", fake_load):
+        names = od.member_names_for_scope("品牌创意", limit=20)
+    assert "张山山" in names
+    assert "闫晓龙" in names
+    assert "彭康林" in names
+    assert "李源" not in names

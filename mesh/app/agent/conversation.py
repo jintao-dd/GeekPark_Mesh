@@ -118,6 +118,8 @@ _STOP = frozenset(
         "最近", "怎么样", "如何", "什么", "哪些", "这个", "那个", "还有", "后来",
         "本期", "这一期", "编辑部", "商务", "海外", "公司", "项目", "事情",
         "谢谢", "你好", "帮助", "关系", "接触", "沟通", "对接",
+        "周报", "团队", "内容", "部门", "日历", "材料", "条目", "飞书",
+        "相关", "记录",
     }
 )
 
@@ -549,19 +551,36 @@ def update_state_after_turn(
         state.push_topic()
     state.conversation_mode = new_mode
 
+    from . import person_resolve as pr
+
     q_ents = extract_entities_from_text(user_text)
     if route.resolved_entity:
         q_ents = merge_entities([route.resolved_entity], q_ents)
-    a_ents = extract_entities_from_text(answer_text) if answer_text else []
+    lead = re.match(r"^([\u4e00-\u9fff]{2,4})", normalize_query(user_text) or "")
+    if lead:
+        n = lead.group(1)
+        for tail in ("最近", "相关", "那边", "这边"):
+            if n.endswith(tail) and len(n) > len(tail):
+                n = n[: -len(tail)]
+                break
+        if n and n not in _STOP:
+            q_ents = merge_entities([n], q_ents)
+    q_ents = merge_entities(
+        q_ents,
+        [h.canonical for h in pr.resolve_people_in_text(user_text).hits if h.canonical],
+    )
+    a_people = pr.filter_known_people(extract_entities_from_text(answer_text)) if answer_text else []
+    prior_people = pr.filter_known_people(state.active_entities)
     if new_mode == "enterprise":
-        state.active_entities = merge_entities(
-            state.active_entities, merge_entities(q_ents, a_ents[:8])
-        )
+        # 用户问句可留公司/项目指代；助手成文只并入通讯录里的人
+        state.active_entities = merge_entities(q_ents, merge_entities(a_people, prior_people))
         state.last_query_refs = q_ents[:8]
         if q_ents:
             state.active_topic = "、".join(q_ents[:3])
         elif route.rewritten_query:
             state.active_topic = route.rewritten_query[:40]
+    else:
+        state.active_entities = merge_entities(a_people, prior_people)
     if evidence_refs is not None and new_mode == "enterprise":
         state.last_evidence_refs = list(evidence_refs)[:16]
     if issue and new_mode == "enterprise":

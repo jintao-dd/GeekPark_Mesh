@@ -110,6 +110,11 @@ def build_ontology(
         from .dept_team_map import brand_creative_tree_note
 
         notes.append(brand_creative_tree_note())
+        notes.append(
+            "飞书树 ≠ 周报桶。周报「硅谷 BD 团队」是内容标签；"
+            "飞书「海外拓展」挂在品牌创意部下。问「我们团队」按提问者飞书子树的人检索，"
+            "不要只用周报桶名过滤。"
+        )
     except Exception:
         pass
     notes.append(

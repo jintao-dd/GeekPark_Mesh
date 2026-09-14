@@ -166,13 +166,13 @@ def test_session_update_extracts_entities_not_fact_cache():
         st,
         route=route,
         user_text="小鹏最近有接触吗",
-        answer_text="**小鹏**：已接触。**高德**：群访。",
+        answer_text="**已上线周报**里写了。**小鹏**：已接触。**高德**：群访。",
         intent="ask_published",
         issue="2026-09-08",
         evidence_refs=["ev:item:1"],
     )
     assert "小鹏" in st.active_entities
-    assert "高德" in st.active_entities
+    assert "已上线周报" not in st.active_entities
     assert st.last_topic_frame == "contact"
     assert st.active_issue == "2026-09-08"
     # state must not store answer as truth blob

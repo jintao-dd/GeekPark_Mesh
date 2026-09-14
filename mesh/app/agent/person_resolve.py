@@ -138,8 +138,7 @@ def _session_people(session: Any) -> list[dict[str, str]]:
         oid = str(m.get("open_id") or "").strip()
         if name:
             out.append({"name": name, "open_id": oid, "employee_no": "", "source": "mention"})
-    for ent in getattr(session, "active_entities", None) or []:
-        name = str(ent or "").strip()
+    for name in filter_known_people(getattr(session, "active_entities", None) or []):
         if name and not any(x["name"] == name for x in out):
             out.append({"name": name, "open_id": "", "employee_no": "", "source": "session"})
     return out
@@ -457,8 +456,36 @@ def expand_for_retrieval(text: str, hits: list[PersonHit]) -> str:
     )
 
 
+def filter_known_people(names: list[str] | None, *, people: list[dict[str, str]] | None = None) -> list[str]:
+    """只保留通讯录/花名册里的人；助手成文里的「已上线周报」等不算人。"""
+    raw = [str(n or "").strip() for n in (names or []) if str(n or "").strip()]
+    if not raw:
+        return []
+    pool = people if people is not None else _org_people()
+    known = {str(p.get("name") or "").strip() for p in pool if str(p.get("name") or "").strip()}
+    amap = alias_map()
+    out: list[str] = []
+    seen: set[str] = set()
+    for s in raw:
+        canon = s if s in known else (amap.get(s) or amap.get(s.lower()) or "")
+        if canon in known and canon not in seen:
+            seen.add(canon)
+            out.append(canon)
+    return out
+
+
+def sanitize_session_people(session: Any) -> None:
+    if session is None:
+        return
+    ents = filter_known_people(getattr(session, "active_entities", None) or [])
+    session.active_entities = ents[:16]
+
+
 def remember_hits(session: Any, hits: list[PersonHit]) -> None:
-    if session is None or not hits:
+    if session is None:
+        return
+    sanitize_session_people(session)
+    if not hits:
         return
     ents = list(getattr(session, "active_entities", None) or [])
     for h in hits:

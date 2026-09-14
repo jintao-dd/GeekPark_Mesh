@@ -137,9 +137,24 @@ def enrich_args(
         q_full = q_user or q_plan
         names = list(resolved) + [n for n in _names_from_prior(prior) if n not in resolved]
         clues: list[str] = []
-        bits = [b for b in (name, f"团队={team}" if team else "") if b]
+        bits = [b for b in (name, f"Mesh队={team}" if team else "") if b]
         if bits:
             clues.append("提问者身份：" + "、".join(bits))
+        if name and name not in names:
+            names = [name] + names
+        if team:
+            try:
+                from ..feishu_hands import org_directory as od
+
+                teammates = od.member_names_for_scope(team, limit=20)
+            except Exception:
+                teammates = []
+            extra = [t for t in teammates if t not in names]
+            if extra:
+                clues.append(
+                    "提问者飞书部门子树同事（周报可能写在别的桶名下，这些人算「我们团队」）："
+                    + "、".join(extra[:20])
+                )
         if names:
             clues.append("已解析/已查到的人：" + "、".join(names[:12]))
         if clues:

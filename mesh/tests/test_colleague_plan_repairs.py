@@ -39,6 +39,27 @@ def test_work_memory_includes_identity_people_and_history():
     assert "周报这边没查到" in block
 
 
+def test_work_memory_ignores_answer_chrome_entities():
+    ident = SimpleNamespace(
+        display_hint="杜锦涛",
+        primary_team="品牌创意团队",
+        feishu_open_id="ou_x",
+        status="bound",
+        person={"name": "杜锦涛"},
+    )
+    session = SimpleNamespace(
+        active_entities=["已上线周报", "缺的那一块", "10:30–12:00", "张鹏"],
+        active_team="品牌创意团队",
+        last_query="和我相关的呢？",
+        recent_turns=[],
+        pending_write=None,
+    )
+    block = work_memory_block(identity=ident, session=session, resolved_people=[])
+    assert "已上线周报" not in block
+    assert "缺的那一块" not in block
+    assert "张鹏" in block
+
+
 def test_verify_empty_with_unused_crm_wants_replan():
     graph = TaskGraph(goal="g", mode="work", band="simple")
     envs = [

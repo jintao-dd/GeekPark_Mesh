@@ -154,6 +154,7 @@ def handle_turn(
     from .. import person_resolve as pr
 
     people_res = pr.resolve_people_in_text(q, session=session)
+    pr.sanitize_session_people(session)
     pr.remember_hits(session, people_res.hits)
     resolved_names = [h.canonical for h in people_res.hits if getattr(h, "canonical", "")]
     if session is not None:

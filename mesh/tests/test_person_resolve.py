@@ -87,3 +87,15 @@ def test_roster_file_loads_and_has_teams():
     amap = pr.alias_map()
     assert amap.get("锦涛") == "杜锦涛"
     assert amap.get("49") == "彭康林"
+
+
+def test_filter_known_people_drops_answer_chrome():
+    pr.load_roster(force=True)
+    kept = pr.filter_known_people(
+        ["已上线周报", "10:30–12:00", "杜锦涛", "老板", "缺的那一块"],
+        people=PEOPLE + [{"name": "张鹏", "open_id": "ou_ceo", "employee_no": "G-001", "source": "org"}],
+    )
+    assert "杜锦涛" in kept
+    assert "张鹏" in kept
+    assert "已上线周报" not in kept
+    assert "缺的那一块" not in kept

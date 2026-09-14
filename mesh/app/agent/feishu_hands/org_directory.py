@@ -382,6 +382,34 @@ def _roster_people_for_team(team: str) -> list[dict[str, Any]]:
         return []
 
 
+def member_names_for_scope(query: str, *, limit: int = 24) -> list[str]:
+    """飞书部门/Mesh 队子树里的人名（问「我们团队」时给周报当线索）。"""
+    q = (query or "").strip()
+    if not q:
+        return []
+    try:
+        departments, people = load_directory()
+    except Exception as e:
+        log.info("member_names_for_scope load fail: %s", e)
+        departments, people = [], []
+    scope_ids, label = resolve_org_scope(q, departments)
+    matched: list[dict[str, Any]] = []
+    if scope_ids:
+        matched = _people_in_depts(people, scope_ids)
+    if not matched:
+        team = _mesh_team_for_query(q) or label
+        if team:
+            matched = _roster_people_for_team(team)
+    names: list[str] = []
+    for u in matched:
+        n = str(u.get("name") or "").strip()
+        if n and n not in names:
+            names.append(n)
+        if len(names) >= int(limit):
+            break
+    return names
+
+
 def search_directory(
     query: str = "",
     *,
