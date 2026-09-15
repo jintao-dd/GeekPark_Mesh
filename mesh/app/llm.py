@@ -570,7 +570,9 @@ def build_issue_draft(
 
 
 RELATION_DECISIONS_MAX_TOKENS = 8000
-RELATION_DECISIONS_RETRIES = 2
+RELATION_DECISIONS_RETRIES = 3
+# mco-6 / 较弱模型在单次 JSON 里约 80+ 条会截断；分批 + 漏答只补 missing。
+RELATION_DECISIONS_BATCH_SIZE = 40
 
 
 class RelationDecisionCoverageError(LLMError):
@@ -659,6 +661,46 @@ def missing_decision_ids(candidates: list[dict], decisions: list[dict]) -> list[
     return [cid for cid in expected if cid not in got]
 
 
+def _merge_relation_decisions(
+    existing: list[dict],
+    batch: list[dict],
+    preferred_ids: list[str] | None = None,
+) -> list[dict]:
+    by_id: dict[str, dict] = {}
+    for d in existing:
+        cid = (d.get("candidate_id") or "").strip()
+        if cid:
+            by_id[cid] = d
+    for d in batch:
+        cid = (d.get("candidate_id") or "").strip()
+        if cid:
+            by_id[cid] = d
+    if preferred_ids is None:
+        preferred_ids = list(by_id.keys())
+    out = [by_id[cid] for cid in preferred_ids if cid in by_id]
+    seen = {d.get("candidate_id") for d in out}
+    for d in batch:
+        cid = (d.get("candidate_id") or "").strip()
+        if cid and cid not in seen:
+            out.append(d)
+            seen.add(cid)
+    return out
+
+
+def _call_relation_decisions_batch(
+    candidates: list[dict],
+    team_cards: list[dict],
+    *,
+    extra_user_suffix: str = "",
+) -> tuple[list[dict], dict]:
+    system, user, prep_meta = prepare_relation_decisions_messages(
+        candidates, team_cards, extra_user_suffix=extra_user_suffix,
+    )
+    out = call_json_compliant(system, user, max_tokens=RELATION_DECISIONS_MAX_TOKENS)
+    batch = [d for d in (out.get("relation_decisions") or []) if isinstance(d, dict)]
+    return batch, prep_meta
+
+
 def build_relation_decisions(
     candidates: list[dict],
     team_cards: list[dict],
@@ -672,58 +714,84 @@ def build_relation_decisions_with_coverage(
     team_cards: list[dict],
     *,
     max_retries: int = RELATION_DECISIONS_RETRIES,
+    batch_size: int = RELATION_DECISIONS_BATCH_SIZE,
 ) -> tuple[list[dict], dict]:
-    """带 coverage 校验与 retry；仍缺则抛 RelationDecisionCoverageError。"""
-    attempts: list[dict] = []
-    decisions: list[dict] = []
-    missing: list[str] = list(missing_decision_ids(candidates, []))
-    suffix = ""
+    """带 coverage 校验与 retry；仍缺则抛 RelationDecisionCoverageError。
 
-    for attempt in range(max_retries + 1):
-        system, user, prep_meta = prepare_relation_decisions_messages(
-            candidates, team_cards, extra_user_suffix=suffix,
-        )
-        out = call_json_compliant(system, user, max_tokens=RELATION_DECISIONS_MAX_TOKENS)
-        batch = [d for d in (out.get("relation_decisions") or []) if isinstance(d, dict)]
-        by_id: dict[str, dict] = {}
-        for d in decisions:
-            cid = (d.get("candidate_id") or "").strip()
-            if cid:
-                by_id[cid] = d
-        for d in batch:
-            cid = (d.get("candidate_id") or "").strip()
-            if cid:
-                by_id[cid] = d
-        decisions = [by_id[cid] for cid in prep_meta["candidate_ids"] if cid in by_id]
-        # preserve any extra order from batch for unknown ids
-        seen = {d.get("candidate_id") for d in decisions}
-        for d in batch:
-            cid = (d.get("candidate_id") or "").strip()
-            if cid and cid not in seen:
-                decisions.append(d)
-                seen.add(cid)
+    - 候选数超过 batch_size 时分批调用，避免单次 JSON 截断。
+    - 漏答重试只送 missing 子集（不再塞全量），补全成功率更高。
+    """
+    attempts: list[dict] = []
+    all_ids = [
+        (c.get("candidate_id") or "").strip()
+        for c in candidates
+        if (c.get("candidate_id") or "").strip()
+    ]
+    by_cand = {
+        (c.get("candidate_id") or "").strip(): c
+        for c in candidates
+        if (c.get("candidate_id") or "").strip()
+    }
+    decisions: list[dict] = []
+    bs = max(1, int(batch_size or RELATION_DECISIONS_BATCH_SIZE))
+
+    # Pass 0: batched first coverage
+    chunks = [candidates[i : i + bs] for i in range(0, len(candidates), bs)] or [[]]
+    for bi, chunk in enumerate(chunks):
+        if not chunk:
+            continue
+        batch, prep_meta = _call_relation_decisions_batch(chunk, team_cards)
+        decisions = _merge_relation_decisions(decisions, batch, preferred_ids=all_ids)
         missing = missing_decision_ids(candidates, decisions)
         attempts.append({
-            "attempt": attempt + 1,
+            "attempt": 0,
+            "batch_index": bi,
+            "n_batch_candidates": len(chunk),
             "n_returned": len(batch),
             "n_merged": len(decisions),
             "missing_ids": list(missing),
             **prep_meta,
         })
+
+    missing = missing_decision_ids(candidates, decisions)
+
+    # Pass 1..N: missing-only retries
+    for attempt in range(1, max_retries + 1):
         if not missing:
             break
-        suffix = (
-            f"\n\n【硬性补全】以下 candidate_id 必须各输出一条 relation_decisions，"
-            f"不得遗漏：{', '.join(missing)}。"
-            f"共 {len(prep_meta['candidate_ids'])} 条候选，你已漏 {len(missing)} 条。"
-        )
+        miss_cands = [by_cand[cid] for cid in missing if cid in by_cand]
+        # 漏答也分批，防止补全时再次截断
+        miss_chunks = [miss_cands[i : i + bs] for i in range(0, len(miss_cands), bs)]
+        for mi, chunk in enumerate(miss_chunks):
+            suffix = (
+                f"\n\n【硬性补全】以下 candidate_id 必须各输出一条 relation_decisions，"
+                f"不得遗漏：{', '.join((c.get('candidate_id') or '').strip() for c in chunk)}。"
+                f"本批仅 {len(chunk)} 条，请完整输出。"
+            )
+            batch, prep_meta = _call_relation_decisions_batch(
+                chunk, team_cards, extra_user_suffix=suffix,
+            )
+            decisions = _merge_relation_decisions(decisions, batch, preferred_ids=all_ids)
+            missing = missing_decision_ids(candidates, decisions)
+            attempts.append({
+                "attempt": attempt,
+                "batch_index": mi,
+                "n_batch_candidates": len(chunk),
+                "n_returned": len(batch),
+                "n_merged": len(decisions),
+                "missing_ids": list(missing),
+                "missing_only": True,
+                **prep_meta,
+            })
+        missing = missing_decision_ids(candidates, decisions)
 
     meta = {
         "n_candidates": len(candidates),
         "n_decisions_received": len(decisions),
         "missing_ids": missing,
         "attempts": attempts,
-        "retries_used": max(0, len(attempts) - 1),
+        "retries_used": max(0, len([a for a in attempts if a.get("attempt", 0) > 0])),
+        "batch_size": bs,
         "coverage_ok": not missing,
     }
     if missing:

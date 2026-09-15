@@ -56,3 +56,48 @@ def test_apply_evidence_gate_records_decision_missing_not_skip():
     assert by_id["c2"]["gate_reason_code"] == GATE_CODE_DECISION_MISSING
     assert by_id["c2"]["final_outcome"] != "skipped_llm"
     assert by_id["c1"]["final_outcome"] == "skipped_llm"
+
+
+def test_build_relation_decisions_batches_and_missing_only_retry(monkeypatch):
+    """大批量 + 末尾截断时：分批合并，漏答只补 missing。"""
+    from app import llm
+
+    cands = assign_candidate_ids([_cand("", f"t{i}") for i in range(5)])
+    calls: list[list[str]] = []
+
+    def fake_call(system, user, max_tokens=0):
+        # 从 user 里抽出本批 candidate_id
+        ids = [c["candidate_id"] for c in cands if f'"candidate_id": "{c["candidate_id"]}"' in user
+               or f'"candidate_id":"{c["candidate_id"]}"' in user]
+        # 简化：按本批出现顺序取 id（prepare 会 json dump）
+        import re
+        ids = re.findall(r'"candidate_id":\s*"(c\d+)"', user)
+        # 去重保序
+        seen = set()
+        ordered = []
+        for cid in ids:
+            if cid not in seen:
+                seen.add(cid)
+                ordered.append(cid)
+        calls.append(ordered)
+        # 前两批（batch_size=3 → 2 chunks）故意丢掉末尾，模拟截断
+        drop_tail = len(calls) <= 2
+        keep = ordered[:-1] if drop_tail and len(ordered) > 1 else ordered
+        return {
+            "relation_decisions": [
+                {"candidate_id": cid, "decision": "skip", "reason": "x", "evidence_refs": []}
+                for cid in keep
+            ]
+        }
+
+    monkeypatch.setattr(llm, "call_json_compliant", fake_call)
+    decisions, meta = llm.build_relation_decisions_with_coverage(
+        cands, [], batch_size=3, max_retries=2,
+    )
+    assert meta["coverage_ok"] is True
+    assert len(decisions) == 5
+    assert missing_decision_ids(cands, decisions) == []
+    # 至少有一次 missing-only 补全（调用次数 > 初始分批数）
+    assert len(calls) > 2
+    # 补全调用不应再塞全量 5 条
+    assert all(len(c) < 5 for c in calls[2:])
