@@ -406,8 +406,10 @@ def extract_items(
                     "entities": it.get("entities", []), "roles": it.get("roles", []), "signals": it.get("signals", []),
                     "llm_owner_team_hint": llm_hint,
                     "source_label": it.get("source_label", ""), "pointer": it.get("pointer", ""), "blocked": blocked, "team": it.get("team") or team})
+    # 名单打包 → 一主体一条；⑤区父条不拆；子条仍走硬拦
+    from .item_list_split import expand_stage_list_items
     from .zone_hard import apply_hard_blocks
-    return apply_hard_blocks(out)
+    return apply_hard_blocks(expand_stage_list_items(out))
 
 
 def extract_source(
