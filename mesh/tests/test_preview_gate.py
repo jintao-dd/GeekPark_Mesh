@@ -55,15 +55,17 @@ def test_filter_ungrounded_drops_card_without_evidence():
                 "title": "甲 · 乙跨团队",
                 "decision_tier": "strong",
                 "teams": ["编辑部", "商业化团队"],
-                "body": "两边都在做",
+                "body": "两边都在做甲相关事项。",
+                "details": ["编辑部：甲相关"],
                 "evidence": [],
             },
             {
                 "title": "单侧观察",
                 "decision_tier": "watch",
                 "teams": ["编辑部"],
-                "body": "编辑部在跟",
-                "evidence": [{"item_id": 1, "team": "编辑部"}],
+                "body": "编辑部在跟甲。",
+                "details": ["编辑部：甲相关"],
+                "evidence": [{"item_id": 1, "team": "编辑部", "snippet": "甲相关"}],
                 "weak": True,
             },
         ]
@@ -73,3 +75,4 @@ def test_filter_ungrounded_drops_card_without_evidence():
     titles = [r.get("title") for r in out["relations"]]
     assert "甲 · 乙跨团队" not in titles
     assert "单侧观察" in titles
+    assert "_relations_dropped_ungrounded" not in out

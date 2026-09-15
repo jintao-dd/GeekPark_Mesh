@@ -417,9 +417,11 @@ def collect_unsupported_flags(draft: dict, *, hard_only: bool = False) -> list[s
             flags.append(f"关系「{title}」无 evidence 且未标 weak")
         if r.get("status") == "weak" or r.get("weak"):
             continue
-        # needs_review 不再豁免 body 论证；过不了就进硬 flag，由 filter 藏卡
+        # needs_review 不再豁免 body 论证；body 用 paraphrase 标准（与 Verify 一致）
+        from .relation_verify import body_summary_grounded
+
         body = (r.get("body") or "").strip()
-        if body and not _is_verified_skeleton_body(body, r) and not line_grounded(body, r):
+        if body and not _is_verified_skeleton_body(body, r) and not body_summary_grounded(body, r):
             flags.append(f"关系「{title}」body 无法由 evidence 证明")
         for d in r.get("details") or []:
             if d and not line_grounded(str(d), r):

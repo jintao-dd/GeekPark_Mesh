@@ -43,8 +43,8 @@
     {% if preview and preview_gate_stale %}
     <p class="note" id="gateStaleNote" style="color:#B45309;margin-top:8px">稿面已改动，进预览检查已失效。请回素材页重新点「生成预览」后再上线。</p>
     {% endif %}
-    {% if preview and dropped_ungrounded %}
-    <p class="note" id="droppedRelNote" style="color:#B45309;margin-top:8px">本轮已隐藏 {{ dropped_ungrounded|length }} 张论证不足的关系卡：{{ dropped_ungrounded|join('、') }}</p>
+    {% if preview and dup_rel_warnings %}
+    <p class="note" id="dupRelNote" style="color:#B45309;margin-top:8px">有 {{ dup_rel_warnings }} 张疑似重复的关系卡（已标 Warning），请发布前确认保留哪些。</p>
     {% endif %}
   </div>
 </main></div>
@@ -60,6 +60,9 @@
       <div class="card" data-path="relations.{{ ri }}">
         <span class="flag" {{ flagstyle(r.label) }} data-path="relations.{{ ri }}.label" title="单击换标签，双击改文字">{{ r.label }}</span>
         {% if preview and r.decision_tier %}<span class="tier" style="font-size:11px;opacity:.65;margin-left:6px">{{ r.decision_tier }}</span>{% endif %}
+        {% if preview and r._draft_warning == 'suspected_duplicate' %}
+        <span class="tier" style="font-size:11px;color:#B45309;margin-left:6px" title="与「{{ (r._dup_peer_titles or [])|join('、') }}」可能讲同一件事">Warning · 疑似重复</span>
+        {% endif %}
         <p class="t" data-path="relations.{{ ri }}.title">{{ r.title }}</p>
         {% if r.body %}<p class="b" data-path="relations.{{ ri }}.body">{{ r.body }}</p>{% endif %}
         {% if r.details %}<div class="detail"><ul>{% for li in r.details %}<li data-path="relations.{{ ri }}.details.{{ loop.index0 }}">{{ li }}</li>{% endfor %}</ul></div>{% endif %}

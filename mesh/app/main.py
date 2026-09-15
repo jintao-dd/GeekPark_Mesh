@@ -3505,9 +3505,13 @@ def issue_page(request: Request, slug: str, preview: int = 0, edit: int = 0, syn
             status_code=302,
         )
     preview_gate_stale = preview and gate_stale and not gate_ok and not preview_building
-    dropped_ungrounded = []
+    dup_rel_warnings = 0
     if isinstance(data, dict):
-        dropped_ungrounded = list(data.get("_relations_dropped_ungrounded") or [])[:20]
+        dup_rel_warnings = sum(
+            1
+            for r in (data.get("relations") or [])
+            if isinstance(r, dict) and r.get("_draft_warning") == "suspected_duplicate"
+        )
     # 模板依赖 keywords/plans 等对象；缺省时给空结构，避免半成品草稿炸页
     data.setdefault("kpis", [])
     data.setdefault("relations", [])
@@ -3556,7 +3560,7 @@ def issue_page(request: Request, slug: str, preview: int = 0, edit: int = 0, syn
             relations_view=relations_view,
             preview_gate_stale=bool(preview_gate_stale),
             preview_building=bool(preview_building),
-            dropped_ungrounded=dropped_ungrounded,
+            dup_rel_warnings=int(dup_rel_warnings),
         ),
     )
 

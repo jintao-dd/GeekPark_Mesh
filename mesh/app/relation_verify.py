@@ -151,6 +151,17 @@ def body_summary_grounded(body: str, rel: dict) -> bool:
                     break
             if anchor_ok:
                 break
+            # 短实体：evidence 与 body 共享连续 2 字（如「甲相关」↔「跟甲」里的不足，用 snippet 内 2-gram）
+            cn = "".join(ch for ch in snip if "\u4e00" <= ch <= "\u9fff")
+            for i in range(len(cn) - 1):
+                bi = cn[i : i + 2]
+                if bi in _BODY_META_STOP or bi in _STOP:
+                    continue
+                if bi in s:
+                    anchor_ok = True
+                    break
+            if anchor_ok:
+                break
     if not anchor_ok:
         return False
 

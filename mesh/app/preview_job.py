@@ -740,12 +740,10 @@ def _run(slug: str, username: str, token: int = 0) -> None:
 
         data = prog.finalize_preview_flags(data, stamp=stamp)
         data = prog.attach_relation_input_fingerprint(data, rel_fp)
-        if resilience.skipped or dropped_rels:
+        # 不够格不成卡：静默过滤，不标 degraded、不写「已隐藏」
+        if resilience.skipped:
             data["_preview_degraded"] = True
-        if dropped_rels:
-            data["_relations_dropped_ungrounded"] = dropped_rels
-        else:
-            data.pop("_relations_dropped_ungrounded", None)
+        data.pop("_relations_dropped_ungrounded", None)
         if not _is_current(slug, token):
             return
         with db.write_lock():
@@ -759,8 +757,6 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                 )
                 db.register_entities(con, data, slug)
                 note = "渐进预览完成：要点卡与草稿已通过进预览检查"
-                if dropped_rels:
-                    note += f"；已隐藏 {len(dropped_rels)} 张论证不足的关系卡"
                 if resilience.skipped:
                     note += f"；跳过要点卡 {len(resilience.skipped)}"
                 if resilience.retry_total:
@@ -773,15 +769,20 @@ def _run(slug: str, username: str, token: int = 0) -> None:
             finally:
                 con.close()
 
-        final = "degraded" if (resilience.skipped or dropped_rels) else "ok"
+        final = "degraded" if resilience.skipped else "ok"
         msg = "完成，已通过检查"
         bits = []
-        if dropped_rels:
-            bits.append(f"已隐藏 {len(dropped_rels)} 张论证不足的关系卡")
         if resilience.skipped:
             bits.append(f"跳过 {len(resilience.skipped)} 张要点卡")
         if resilience.retry_total:
             bits.append(f"自动重试 {resilience.retry_total} 次")
+        n_dup = sum(
+            1
+            for r in (data.get("relations") or [])
+            if isinstance(r, dict) and r.get("_draft_warning") == "suspected_duplicate"
+        )
+        if n_dup:
+            bits.append(f"{n_dup} 张疑似重复待确认")
         if bits:
             msg = "完成（" + "；".join(bits) + "）"
         _set(

@@ -25,6 +25,21 @@ _INTERNAL_DRAFT_KEYS = frozenset({
     "_relations_reader",
     "_relations_backlog",
     "_relation_decision_audit",
+    "_relations_not_formed_count",
+    "_relations_not_formed_titles",
+    "_relations_dropped_ungrounded",
+})
+
+# 单卡内部草稿标记：上线投影时剥离
+_INTERNAL_REL_KEYS = frozenset({
+    "_draft_warning",
+    "_dup_peer_titles",
+    "_writer_raw",
+    "_claim_check",
+    "_body_omitted_ungrounded",
+    "_body_omitted_dup",
+    "_body_omitted_empty",
+    "_body_from_evidence",
 })
 
 # 展示顺序：数值越小越靠前
@@ -254,6 +269,10 @@ def build_published_projection(draft: dict | None) -> dict:
     reader, _backlog = split_relations_for_publish(flagged)
     # 双保险：可见性以 reader_visible 为准（完整卡），不因 tier 再砍
     reader = [r for r in reader if reader_visible(r)]
-    data["relations"] = sort_relations_by_strength(reader)
+    cleaned: list[dict] = []
+    for r in reader:
+        row = {k: v for k, v in r.items() if k not in _INTERNAL_REL_KEYS and not str(k).startswith("_")}
+        cleaned.append(row)
+    data["relations"] = sort_relations_by_strength(cleaned)
     _sync_relation_kpi(data, len(data["relations"]))
     return data
