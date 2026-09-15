@@ -56,7 +56,7 @@ LABEL_WRITE_HINTS: dict[str, str] = {
     "已公开报道，内部也在用": "一侧写公开报道事实，一侧按 evidence 原表述写内部使用、跟进等事实；不把报道写成内部合作。",
     "中英文站同周各自成稿": "分写中/英（或两站）同周各自成稿动作；保持并行，不写成联合稿或已联动。",
     "一方报道了，另一方在接触": "分写已报道与正在接触的事实；可点明共同对象或同事链，但不写成已联动、合作或商务关系已成立。",
-    "两处记录待核对": "并列冲突点、不选边；body 只点「待核对」，细节各写各的记录原文要点。",
+    "两处记录待核对": "并列冲突点、不选边；body 可点「两边记录不一致需核对」，勿把标签整句当标题；细节各写各的记录原文要点。",
     "一方有需求，另一方尚未接触": "写清有需求侧已发生事实；另一侧仅写 evidence 明确记录的相关事实或「尚未接触」状态，不补充接触推断，不写「该谁去接」的路由建议。",
     "一方接触，另一方用得上": "只写接触/发现侧已发生事实；禁止「记录标注××用得上」等元话（承接方看虚线团队）。",
     "海外接触，国内可能承接": "海外动作须有 evidence；国内侧仅写已有事实，无国内证据就不要写「将承接/可承接」。",
@@ -65,7 +65,44 @@ LABEL_WRITE_HINTS: dict[str, str] = {
     "已排期，内容侧待安排": "写清已排期事实与内容侧待安排的现状；不写成内容已产出或已联动完成。",
 }
 
+# title/body 不得复读的标签腔（旗已展示类型）
+_LABEL_LEAK_FRAGMENTS: tuple[str, ...] = (
+    "各知一半",
+    "不同触点",
+    "已联动",
+    "各自在做",
+    "用得上",
+    "尚未接触",
+    "待核对",
+    "两处记录待核对",
+    "一方接触，另一方",
+    "一方接触了，另一方",
+    "一方有需求",
+    "一方报道了",
+    "海外接触，国内",
+    "海外新发现",
+    "外部在热聊",
+    "采访对象也是客户",
+    "已公开报道，内部也在用",
+    "中英文站同周",
+    "已排期，内容侧",
+    "同一件事，两个部门",
+    "同一公司，不同触点",
+    "同一赛道，各自",
+)
+
+_BODY_TEMPLATE = re.compile(
+    r"(这一合作|这一事项|这一关系).{0,12}(各掌握一部分|两边各|两侧各)"
+    r"|各掌握一部分"
+    r"|两边各掌握"
+    r"|两侧各知一半"
+    r"|两个部门各知一半"
+)
+
 _DETAIL_TEAM = re.compile(r"^(.+?)(?:记录|：|:)")
+_HINT_NO_LABEL_IN_COPY = (
+    "类型只看 flag；title/body 禁止写标签原词（各知一半/不同触点/已联动等）。"
+)
 
 
 def label_write_hint(label: str) -> str:
@@ -73,7 +110,115 @@ def label_write_hint(label: str) -> str:
     from .relation_decision_consistency import normalize_relation_label
 
     lab = normalize_relation_label((label or "").strip())
-    return LABEL_WRITE_HINTS.get(lab, "")
+    base = LABEL_WRITE_HINTS.get(lab, "")
+    if not base:
+        return _HINT_NO_LABEL_IN_COPY
+    return f"{base} {_HINT_NO_LABEL_IN_COPY}"
+
+
+def title_has_label_leak(title: str) -> bool:
+    t = (title or "").strip()
+    if not t:
+        return False
+    return any(frag in t for frag in _LABEL_LEAK_FRAGMENTS)
+
+
+def body_is_template(body: str) -> bool:
+    b = (body or "").strip()
+    if not b:
+        return False
+    if _BODY_TEMPLATE.search(b):
+        return True
+    # 短句整句复读标签
+    if len(b) < 40 and any(
+        frag in b for frag in ("各知一半", "不同触点", "已联动", "各自在做")
+    ):
+        return True
+    return False
+
+
+def _detail_fact_core(detail: str, max_len: int = 28) -> str:
+    ds = strip_route_meta_copy(str(detail or "").strip())
+    m = _DETAIL_TEAM.match(ds)
+    core = ds[m.end():].strip() if m else ds
+    core = re.split(r"[，,；;。．]", core)[0].strip()
+    return core[:max_len]
+
+
+def _subject_from_candidate(candidate_title: str) -> str:
+    t = (candidate_title or "").strip()
+    if not t:
+        return ""
+    t = re.split(r"[·•｜|]", t)[0].strip()
+    t = re.split(r"[：:]", t)[0].strip()
+    # 去掉尾部标签腔
+    for frag in _LABEL_LEAK_FRAGMENTS:
+        if frag in t:
+            t = t.split(frag)[0].strip(" ·-—")
+    return t[:20]
+
+
+def title_from_details(
+    details: list[str],
+    *,
+    candidate_title: str = "",
+    evidence: list[dict] | None = None,
+) -> str:
+    """用 details/evidence 核拼标题（无标签词）。"""
+    cores = [_detail_fact_core(d) for d in (details or []) if str(d).strip()]
+    cores = [c for c in cores if c]
+    if len(cores) < 2 and evidence:
+        for e in evidence:
+            if not isinstance(e, dict):
+                continue
+            snip = (e.get("snippet") or e.get("quote") or "").strip()
+            if snip:
+                cores.append(re.split(r"[，,；;。．]", snip)[0].strip()[:28])
+        cores = [c for c in cores if c]
+    subj = _subject_from_candidate(candidate_title)
+    if len(cores) >= 2:
+        if subj:
+            return f"{subj}：{cores[0]} × {cores[1]}"[:80]
+        return f"{cores[0]} × {cores[1]}"[:80]
+    if len(cores) == 1:
+        return f"{subj}：{cores[0]}"[:80] if subj else cores[0][:80]
+    return (subj or candidate_title or "").strip()[:80]
+
+
+def enforce_narrative_hygiene(
+    *,
+    title: str,
+    body: str,
+    details: list[str],
+    candidate_title: str = "",
+    evidence: list[dict] | None = None,
+) -> tuple[str, str, dict[str, bool]]:
+    """确定性收口：剥标签腔标题、清空壳 body。返回 (title, body, flags)。"""
+    flags = {"title_rebuilt": False, "body_cleared_template": False}
+    t = strip_route_meta_copy((title or "").strip())
+    b = strip_route_meta_copy((body or "").strip())
+    dets = [strip_route_meta_copy(str(d).strip()) for d in (details or []) if str(d).strip()]
+
+    if (not t) or title_has_label_leak(t):
+        rebuilt = title_from_details(dets, candidate_title=candidate_title, evidence=evidence)
+        if rebuilt:
+            t = rebuilt
+            flags["title_rebuilt"] = True
+        elif title_has_label_leak(t):
+            # 仍泄标签且无法重建 → 剥掉已知碎片
+            for frag in _LABEL_LEAK_FRAGMENTS:
+                t = t.replace(frag, "")
+            t = re.sub(r"[：:\s·×xX]{2,}", "：", t).strip(" ：:·-—")
+
+    if body_is_template(b):
+        b = ""
+        flags["body_cleared_template"] = True
+    elif any(frag in b for frag in ("各知一半", "各掌握一部分", "两侧各知一半")) and len(b) < 56:
+        b = ""
+        flags["body_cleared_template"] = True
+
+    return t, b, flags
+
 
 # 禁止写入读者文案的路由元叙述 / 标题尾巴
 _META_ROUTE_COPY = re.compile(
@@ -242,6 +387,24 @@ def _normalize_details_for_teams(rel: dict, snap: dict) -> list[str]:
     return ordered[:8]
 
 
+def _apply_hygiene_to_rel(rel: dict, obj: dict) -> dict:
+    """merge 后强制 title/body 卫生。"""
+    title, body, flags = enforce_narrative_hygiene(
+        title=rel.get("title") or "",
+        body=rel.get("body") or "",
+        details=list(rel.get("details") or []),
+        candidate_title=obj.get("candidate_title") or "",
+        evidence=list(rel.get("evidence") or obj.get("evidence") or []),
+    )
+    rel["title"] = title
+    rel["body"] = body
+    if flags.get("title_rebuilt"):
+        rel["_title_rebuilt_from_details"] = True
+    if flags.get("body_cleared_template"):
+        rel["_body_omitted_template"] = True
+    return rel
+
+
 def merge_writing(obj: dict, writing: dict) -> dict[str, Any]:
     """RelationObject + Writer 输出 → 带叙事的 relation（锁字段强制还原）。"""
     snap = _locked_snapshot(obj)
@@ -268,6 +431,7 @@ def merge_writing(obj: dict, writing: dict) -> dict[str, Any]:
         rel["details"] = _align_relation_from_evidence(
             dict(rel), suggested=_suggested_teams(snap),
         ).get("details") or []
+    rel = _apply_hygiene_to_rel(rel, obj)
     return rel
 
 
@@ -289,7 +453,8 @@ def call_writer_llm(objects: list[dict]) -> list[dict]:
     user = (
         f"【relation_objects】\n{json.dumps(payload, ensure_ascii=False)[:llm.budget(20000)]}\n\n"
         "对每个 candidate_id 写一条；遵守该卡 label_hint；不得修改 label/teams/evidence。"
-        " body 必须写一句话跨队关系总结（非复述某一队 detail）；写不出则 body 留空（该卡不上读者页）。"
+        " title 只写主体与两侧事实核，禁止各知一半/不同触点/已联动等标签词；"
+        " body 写一句跨队具体事实总结（禁止「这一合作…各掌握一部分」）；写不出则 body 留空。"
     )
     out = llm.call_json_compliant(system, user, max_tokens=8000)
     rows = list(out.get("relation_writings") or out.get("relation_narratives") or [])

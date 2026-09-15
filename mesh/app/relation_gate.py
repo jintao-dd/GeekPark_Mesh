@@ -109,7 +109,7 @@ def _sanitize_relation_narrative(rel: dict) -> dict:
         body_summary_grounded,
         line_grounded,
     )
-    from .relation_writer import strip_route_meta_copy
+    from .relation_writer import enforce_narrative_hygiene, strip_route_meta_copy
 
     out = dict(rel)
     if out.get("body"):
@@ -130,6 +130,20 @@ def _sanitize_relation_narrative(rel: dict) -> dict:
         kept = _backfill_details_by_team(kept, out)
         kept = [strip_route_meta_copy(x) for x in kept if x]
     out["details"] = kept[:8]
+
+    title, body, flags = enforce_narrative_hygiene(
+        title=out.get("title") or "",
+        body=out.get("body") or "",
+        details=out["details"],
+        candidate_title=out.get("candidate_title") or out.get("title") or "",
+        evidence=list(out.get("evidence") or []),
+    )
+    out["title"] = title
+    out["body"] = body
+    if flags.get("title_rebuilt"):
+        out["_title_rebuilt_from_details"] = True
+    if flags.get("body_cleared_template"):
+        out["_body_omitted_template"] = True
 
     body = (out.get("body") or "").strip()
     if body and not body_summary_grounded(body, out):

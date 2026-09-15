@@ -11,10 +11,14 @@ from app.relation_decision_consistency import normalize_relation_label
 from app.relation_writer import (
     LABEL_WRITE_HINTS,
     LOCKED_FIELDS,
+    body_is_template,
+    enforce_narrative_hygiene,
     label_write_hint,
     merge_writing,
     relation_object_from_gate,
     strip_route_meta_copy,
+    title_from_details,
+    title_has_label_leak,
     to_writer_input,
     write_relations,
 )
@@ -46,6 +50,7 @@ def test_writer_input_excludes_locked_mutation_surface():
     assert inp["candidate_id"] == "c9"
     assert inp["label"] == "同一赛道，各自在做"
     assert "分别写两队各自已发生动作" in inp["label_hint"]
+    assert "title/body 禁止写标签原词" in inp["label_hint"]
     assert len(inp["evidence"]) == 2
     assert inp["relation_reason"] == "两团队分别围绕豆包开展动作"
     assert "sources" not in inp
@@ -56,7 +61,9 @@ def test_label_write_hints_cover_canonical_labels():
     canonical = {normalize_relation_label(lb) for lb in FLAG_COLORS}
     missing = [lb for lb in canonical if lb not in LABEL_WRITE_HINTS]
     assert not missing, f"missing LABEL_WRITE_HINTS: {missing}"
-    assert label_write_hint("同一条赛道，各自在做") == LABEL_WRITE_HINTS["同一赛道，各自在做"]
+    hint_parallel = label_write_hint("同一条赛道，各自在做")
+    assert hint_parallel.startswith(LABEL_WRITE_HINTS["同一赛道，各自在做"])
+    assert "title/body 禁止写标签原词" in hint_parallel
     assert "不根据缺失证据推断" in label_write_hint("海外新发现，国内尚未接触")
     assert "不补充接触推断" in label_write_hint("一方有需求，另一方尚未接触")
 
@@ -199,3 +206,64 @@ def test_strip_route_meta_copy_investment_tails():
     )
     # 不要误伤正常「可用」事实句（无用得上类路由词）
     assert "数据可用" in strip_route_meta_copy("本期报表数据可用")
+
+
+def test_title_label_leak_and_rebuild():
+    assert title_has_label_leak("京东合作：两侧各知一半")
+    assert not title_has_label_leak("京东：合同催初稿 × 商务选题已提报")
+    title, body, flags = enforce_narrative_hygiene(
+        title="京东合作：稿件催初稿与商务选题两侧各知一半",
+        body="商业化在催初稿；编辑部已提报商务选题。",
+        details=[
+            "商业化团队：京东合同流程中，催初稿",
+            "编辑部：京东商务选题进行中，提报 9/10",
+        ],
+        candidate_title="京东",
+    )
+    assert flags["title_rebuilt"]
+    assert not title_has_label_leak(title)
+    assert "催初稿" in title or "合同" in title
+    assert "各知一半" not in title
+    assert body.startswith("商业化")
+
+
+def test_body_template_cleared():
+    assert body_is_template(
+        "京东这一合作，商业化团队与编辑部各掌握一部分：一边在推进合同，一边在报选题。"
+    )
+    title, body, flags = enforce_narrative_hygiene(
+        title="京东：催初稿 × 选题提报",
+        body="京东这一合作，商业化团队与编辑部各掌握一部分：一边在推进合同，一边在报选题。",
+        details=["商业化团队：催初稿", "编辑部：选题提报"],
+        candidate_title="京东",
+    )
+    assert flags["body_cleared_template"]
+    assert body == ""
+    assert "催初稿" in title
+
+
+def test_merge_writing_strips_label_from_title():
+    obj = _sample_object()
+    writing = {
+        "candidate_id": "c9",
+        "title": "豆包 · 两队各知一半",
+        "body": "商业化关注豆包终端；视频号有豆包相关视频。",
+        "details": [
+            "商业化团队：豆包 AI 手机判断",
+            "视频号团队：豆包收费视频",
+        ],
+    }
+    rel = merge_writing(obj, writing)
+    assert "各知一半" not in (rel.get("title") or "")
+    assert rel.get("_title_rebuilt_from_details")
+    assert "豆包" in (rel.get("title") or "") or "AI" in (rel.get("title") or "")
+
+
+def test_title_from_details_shape():
+    t = title_from_details(
+        ["商业化团队：合同催初稿", "编辑部：商务选题已提报"],
+        candidate_title="京东 · 合作",
+    )
+    assert t.startswith("京东")
+    assert "×" in t
+    assert "各知一半" not in t
