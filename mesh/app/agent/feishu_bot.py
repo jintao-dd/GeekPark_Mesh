@@ -219,15 +219,17 @@ def _schedule_stage_ticker(
     message_id: str = "",
     card_id: str = "",
     seq: feishu_api.CardSeq | None = None,
+    progress_holder: list[str] | None = None,
 ) -> None:
-    """等待中只推一次阶段文案（~3.5s），避免频繁刷新显得卡。"""
+    """等待中推阶段文案；若有 Supervisor progress 则展示 Worker 进度。"""
 
     def _run() -> None:
         if done.wait(3.5):
             return
         if done.is_set():
             return
-        body = feishu_cards.stage_copy(1, query=query)
+        prog = list(progress_holder or [])
+        body = feishu_cards.stage_copy(1, query=query, progress=prog or None)
         try:
             with card_lock:
                 if done.is_set():
@@ -242,9 +244,11 @@ def _schedule_stage_ticker(
                 elif message_id:
                     feishu_api.patch_message(
                         message_id=message_id,
-                        content=feishu_cards.thinking_card(query=query, stage=1),
+                        content=feishu_cards.thinking_card(
+                            query=query, stage=1, progress=prog or None
+                        ),
                     )
-            _elog("stage tick stage=1 mode=%s", mode)
+            _elog("stage tick stage=1 mode=%s progress=%s", mode, prog)
         except Exception as e:
             log.debug("feishu stage tick skip: %s", e)
 
@@ -327,6 +331,7 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
     seq = feishu_api.CardSeq(1)
     done = threading.Event()
     card_lock = threading.Lock()
+    progress_holder: list[str] = []
     d: dict[str, Any] = {}
     reply = ""
     try:
@@ -377,11 +382,44 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                 message_id=card_message_id,
                 card_id=card_id,
                 seq=seq if mode == "cardkit" else None,
+                progress_holder=progress_holder,
             )
         else:
             log.warning("feishu bot reply disabled; skip outbound")
             _elog("bot reply disabled; skip outbound")
 
+        def _on_progress(label: str) -> None:
+            s = str(label or "").strip()
+            if not s or s in progress_holder:
+                return
+            progress_holder.append(s)
+            if done.is_set() or not feishu_api.bot_reply_enabled():
+                return
+            body = feishu_cards.stage_copy(1, query=query, progress=progress_holder)
+            try:
+                with card_lock:
+                    if done.is_set():
+                        return
+                    if mode == "cardkit" and card_id:
+                        feishu_api.stream_card_text(
+                            card_id=card_id,
+                            element_id=feishu_cards.BODY_ELEMENT_ID,
+                            content=body,
+                            sequence=seq.next(),
+                        )
+                    elif card_message_id:
+                        feishu_api.patch_message(
+                            message_id=card_message_id,
+                            content=feishu_cards.thinking_card(
+                                query=query, stage=1, progress=progress_holder
+                            ),
+                        )
+            except Exception as e:
+                log.debug("feishu progress patch skip: %s", e)
+
+        from .supervisor import progress as progressmod
+
+        prog_token = progressmod.set_progress_callback(_on_progress)
         con = db.connect()
         try:
             env = envelope_from_payload(payload)
@@ -390,6 +428,7 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
             reply = str(d.get("display_text") or d.get("text") or "").strip()
         finally:
             con.close()
+            progressmod.reset_progress_callback(prog_token)
 
         tr = d.get("trace") if isinstance(d.get("trace"), dict) else {}
         dec = tr.get("decision") if isinstance(tr.get("decision"), dict) else {}

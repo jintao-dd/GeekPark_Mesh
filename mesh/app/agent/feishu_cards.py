@@ -144,10 +144,10 @@ def card_json_v2(
     }
 
 
-def thinking_card_v2(*, query: str = "", stage: int = 0) -> dict[str, Any]:
+def thinking_card_v2(*, query: str = "", stage: int = 0, progress: list[str] | None = None) -> dict[str, Any]:
     return card_json_v2(
         title="Mesh",
-        body_md=stage_copy(stage, query=query),
+        body_md=stage_copy(stage, query=query, progress=progress),
         template="wathet",
         streaming=True,
         summary="Mesh 检索中…",
@@ -185,7 +185,7 @@ def error_card_v2(*, message: str, query: str = "") -> dict[str, Any]:
 # —— 旧版 interactive（无 CardKit 权限时回退）——
 
 
-def thinking_card(*, query: str = "", stage: int = 0) -> dict[str, Any]:
+def thinking_card(*, query: str = "", stage: int = 0, progress: list[str] | None = None) -> dict[str, Any]:
     return {
         "config": {"wide_screen_mode": True, "update_multi": True},
         "header": {
@@ -195,7 +195,10 @@ def thinking_card(*, query: str = "", stage: int = 0) -> dict[str, Any]:
         "elements": [
             {
                 "tag": "div",
-                "text": {"tag": "lark_md", "content": stage_copy(stage, query=query)},
+                "text": {
+                    "tag": "lark_md",
+                    "content": stage_copy(stage, query=query, progress=progress),
+                },
             }
         ],
     }

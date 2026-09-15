@@ -106,6 +106,14 @@ def build_ontology(
         n_dept = int(org_snapshot.get("department_count") or 0)
         if n_people or n_dept:
             notes.append(f"通讯录缓存约 {n_dept} 部门 / {n_people} 人（应用可见范围）")
+        teammates = org_snapshot.get("teammates") or []
+        team = str(org_snapshot.get("team") or "").strip()
+        if isinstance(teammates, list) and teammates:
+            shown = "、".join(str(x).strip() for x in teammates[:16] if str(x).strip())
+            if shown:
+                notes.append(
+                    f"飞书子树同事（{team or '本队'}，wiki_prior）：{shown}"
+                )
     try:
         from .dept_team_map import brand_creative_tree_note
 

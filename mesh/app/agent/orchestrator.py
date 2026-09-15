@@ -1,6 +1,7 @@
-"""Task Orchestrator — Complexity Judge + TaskPlan + Bounded ReAct + Specialists + Synthesis.
+"""Task Orchestrator — legacy Decide/Planner 执行器（仅 MESH_SUPERVISOR=0 回滚）。
 
-Architecture 固定；Execution Complexity 按用户目标分档（非 Stage）。
+主产品路径：MeshSupervisor（`app.agent.supervisor`）。
+`judge_complexity` 正则分档 **不得** 再当产品主路径加需求；Supervisor 自有 plan_turn。
 """
 from __future__ import annotations
 

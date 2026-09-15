@@ -430,3 +430,178 @@ def test_mouth_hides_protocol_noise():
     assert "open_id_required" not in cols["FACT"]
     assert "budget=" not in cols["ANALYSIS"]
     assert "通讯录" in cols["FACT"] or "没查全" in cols["FACT"]
+
+
+def test_supervisor_enabled_default_on(monkeypatch):
+    monkeypatch.delenv("MESH_SUPERVISOR", raising=False)
+    assert supervisor.supervisor_enabled() is True
+    monkeypatch.setenv("MESH_SUPERVISOR", "0")
+    assert supervisor.supervisor_enabled() is False
+
+
+def test_progress_callback_emits_during_work(monkeypatch):
+    from app.agent.supervisor import progress as progressmod
+
+    seen: list[str] = []
+    token = progressmod.set_progress_callback(lambda lab: seen.append(lab))
+    try:
+        st = sstore.SessionContextState()
+        ident = IdentityResult(status="bound", feishu_open_id="ou_x", primary_team="编辑部")
+        perm = PermissionDecision(
+            agent_access=True,
+            tool_acl=["ask.published"],
+            data_visibility={"published_only": True},
+            query_scope={"mode": "all_published"},
+        )
+        ctx = AgentContext(
+            scope_key="t",
+            channel="feishu_dm",
+            issue_ref=IssueRef(mode="latest_published", slug="2026-09-08"),
+            text="",
+        )
+
+        def fake_invoke(tool, con, identity, permission, context, args):
+            return ToolResult(
+                ok=True,
+                tool_id=tool,
+                payload={"source_tier": "published", "text": "hit", "items": []},
+            )
+
+        def fake_render(result, intent, status):
+            return ("- hit", [], [])
+
+        def fake_call(system, user, max_tokens=4000, json_mode=False, task="default"):
+            if json_mode:
+                return {
+                    "mode": "work",
+                    "band": "ordinary",
+                    "goal": "周报",
+                    "steps": [
+                        {
+                            "id": "s1",
+                            "worker": "published",
+                            "tool": "ask.published",
+                            "args": {"q": "进展"},
+                        }
+                    ],
+                }
+            return "整理好了。"
+
+        monkeypatch.setattr("app.llm.call", fake_call)
+        monkeypatch.setattr("app.llm.model_for_task", lambda *a, **k: "mock")
+        monkeypatch.setattr(
+            "app.agent.supervisor.mouth.synthesize_work",
+            lambda *a, **k: ("答", {"llm_used": False}, {"FACT": "x"}),
+        )
+        out = supervisor.handle_turn(
+            con=None,
+            user_text="最近周报有什么",
+            identity=ident,
+            permission=perm,
+            context=ctx,
+            session=st,
+            invoke_tool=fake_invoke,
+            render_tool_result=fake_render,
+        )
+        assert out.action == "ask"
+        assert any("周报" in p for p in (out.progress or seen))
+        assert seen  # callback fired
+    finally:
+        progressmod.reset_progress_callback(token)
+
+
+def test_write_gate_prepare_and_confirm_via_writer(monkeypatch):
+    from app.agent.supervisor import write_gate
+    from app.agent.supervisor.types import TaskGraph
+
+    st = sstore.SessionContextState()
+    ident = IdentityResult(status="bound", feishu_open_id="ou_x", primary_team="编辑部")
+    perm = PermissionDecision(
+        agent_access=True,
+        tool_acl=["feishu.doc.create"],
+        data_visibility={"published_only": True},
+        query_scope={"mode": "all_published"},
+    )
+    ctx = AgentContext(
+        scope_key="t",
+        channel="feishu_dm",
+        chat_id="oc_chat",
+        issue_ref=IssueRef(mode="latest_published", slug="2026-09-08"),
+        text="",
+    )
+
+    monkeypatch.setattr("app.agent.feishu_hands.hands_enabled", lambda: True)
+    monkeypatch.setattr("app.agent.feishu_hands.write_enabled", lambda: True)
+    monkeypatch.setattr(
+        "app.agent.supervisor.mouth.speak",
+        lambda *a, **k: ("文档正文草稿", {"llm_used": False}),
+    )
+
+    prep = write_gate.run_write(
+        mode="prepare_write",
+        graph=TaskGraph(
+            goal="写文档",
+            mode="prepare_write",
+            write_tool="feishu.doc.create",
+            write_args={"title": "测试"},
+        ),
+        con=None,
+        user_text="帮我创建飞书文档介绍 Mesh",
+        identity=ident,
+        permission=perm,
+        context=ctx,
+        session=st,
+        invoke_tool=lambda *a, **k: None,
+        render_tool_result=lambda *a, **k: ("", [], []),
+    )
+    assert prep.trace.get("supervisor_owned_write") is True
+    assert st.pending_write and st.pending_write.get("tool") == "feishu.doc.create"
+    assert "确认" in (prep.text or "")
+
+    calls: list[str] = []
+
+    def fake_invoke(tool, con, identity, permission, context, args):
+        calls.append(tool)
+        assert args.get("confirmed") is True
+        return ToolResult(
+            ok=True,
+            tool_id=tool,
+            payload={"meta": {"url": "https://example.com/doc"}, "text": "created"},
+        )
+
+    def fake_render(result, intent, status):
+        return ("文档已创建", [], [])
+
+    monkeypatch.setattr(
+        "app.agent.supervisor.mouth.speak",
+        lambda *a, **k: ("写好了，文档已创建。", {"llm_used": False}),
+    )
+    conf = write_gate.run_write(
+        mode="confirm_write",
+        graph=TaskGraph(goal="确认", mode="confirm_write"),
+        con=None,
+        user_text="确认",
+        identity=ident,
+        permission=perm,
+        context=ctx,
+        session=st,
+        invoke_tool=fake_invoke,
+        render_tool_result=fake_render,
+    )
+    assert calls == ["feishu.doc.create"]
+    assert conf.trace.get("writer_envelope")
+    assert st.pending_write is None
+    assert "example.com" in (conf.text or "") or "写好了" in (conf.text or "")
+
+
+def test_thinking_card_shows_progress():
+    from app.agent import feishu_cards
+
+    body = feishu_cards.stage_copy(
+        1, query="查一下", progress=["正在查组织/群成员", "正在查日历"]
+    )
+    assert "组织" in body
+    card = feishu_cards.thinking_card(
+        query="查一下", stage=1, progress=["正在查已上线周报"]
+    )
+    assert "周报" in str(card)

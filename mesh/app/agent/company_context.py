@@ -69,11 +69,27 @@ def assemble(
     user_text: str = "",
     org_snapshot: dict[str, Any] | None = None,
 ) -> CompanyUnderstanding:
+    snap = dict(org_snapshot or {})
+    # 深化 prior：提问者飞书子树同事名（仍标 wiki_prior，非 FACT）
+    if not snap.get("teammates"):
+        try:
+            team = str(getattr(identity, "primary_team", None) or "").strip()
+            if not team and session is not None:
+                team = str(getattr(session, "active_team", "") or "").strip()
+            if team:
+                from .feishu_hands import org_directory as od
+
+                names = od.member_names_for_scope(team, limit=20)
+                if names:
+                    snap["teammates"] = names
+                    snap["team"] = team
+        except Exception:
+            pass
     ont = build_ontology(
         identity=identity,
         permission=permission,
         context=context,
-        org_snapshot=org_snapshot,
+        org_snapshot=snap or None,
     )
     wiki = load_wiki(query=user_text or "")
     return CompanyUnderstanding(

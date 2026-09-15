@@ -1,7 +1,7 @@
-"""Conversation Route — 入口决策：不是每句话都是 Search Query。
+"""Conversation Route — 入口决策（legacy helpers）。
 
-Meta / Casual / Clarify / Follow-up / Business
-不改 Ranking / Claim / Retrieval；Follow-up 只 rewrite query 后走既有 Ask。
+主产品路径：MeshSupervisor。本模块仍提供 whoami / normalize_query / update_state_after_turn
+等系统层工具；**禁止**把正则 RouteDecision 当业务主脑继续加意图。
 """
 from __future__ import annotations
 

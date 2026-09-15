@@ -1,4 +1,12 @@
-"""Workers: execute tools only; never speak to the user."""
+"""Workers: execute tools only; never speak to the user.
+
+映射：
+- org / research ← feishu.search（resource_type 分流）
+- calendar ← feishu.calendar.*
+- published ← ask.* / context.list_issues
+- crm ← crm.search
+- writer ← feishu.doc.create / calendar.create / im.send（仅 WriteGate confirm 走 run_step）
+"""
 from __future__ import annotations
 
 import logging

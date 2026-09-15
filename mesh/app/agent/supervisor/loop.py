@@ -10,6 +10,7 @@ from typing import Any, Callable
 from ..session_state import SessionContextState
 from . import mouth
 from . import plan as planmod
+from . import progress as progressmod
 from . import verify as verifymod
 from . import workers
 from . import write_gate
@@ -90,6 +91,7 @@ def _execute_graph(
                 label = workers.progress_for(s.worker or workers.resolve_worker(s.tool, s.args))
                 if label not in progress:
                     progress.append(label)
+                    progressmod.emit_progress(label)
 
             def _run_one(step: PlanStep) -> TieredEnvelope:
                 nonlocal calls
@@ -304,8 +306,11 @@ def handle_turn(
         out.trace.setdefault("replan_meta", []).append(pmeta2)
         if graph2.mode != "work" or not graph2.steps:
             break
-        same = [s.tool for s in graph2.steps] == [s.tool for s in graph.steps]
-        if same:
+        same_tools = [s.tool for s in graph2.steps] == [s.tool for s in graph.steps]
+        same_args = [dict(s.args or {}) for s in graph2.steps] == [
+            dict(s.args or {}) for s in graph.steps
+        ]
+        if same_tools and same_args:
             break
         graph = graph2
         envelopes, tools_called2, budget_hit, progress2 = _execute_graph(
