@@ -40,8 +40,13 @@ def test_normal_narrative_kept():
         details=["商业化团队记录：飞书合作待PR部门走正规流程对接（接触中）"],
     )
     out = verify_relation_narrative(rel)
-    assert "飞书" in out["body"] or "WorkBuddy" in out["body"]
+    # details 必须保留证据；body 不得再被 details 整段顶替
     assert any("飞书合作" in str(d) for d in out["details"])
+    detail = (out.get("details") or [""])[0]
+    assert (out.get("body") or "") != detail
+    from app.relation_verify import body_redundant_with_details
+
+    assert not body_redundant_with_details(out.get("body") or "", out.get("details") or [])
 
 
 def test_partial_overflow_trimmed():
@@ -74,3 +79,39 @@ def test_no_evidence_downgraded():
     assert out.get("needs_review") is True
     assert out["details"] == ["编辑部记录：独家战略合作已签署"]
     assert "独家战略合作" in out["body"]
+
+
+def test_ungrounded_body_not_copied_from_details():
+    """body 论证失败时，不得把 details 整段拼回 body。"""
+    detail = "商业化团队记录：飞书合作待PR部门走正规流程对接（接触中）"
+    rel = _rel_with_evidence(
+        body="完全编造的跨部门并购已完成并上市。",
+        details=[detail],
+    )
+    out = verify_relation_narrative(rel)
+    assert out.get("needs_review") is False
+    assert detail not in (out.get("body") or "")
+    assert "；".join([detail]) != (out.get("body") or "")
+    # 短 snippet 或空；不得与 detail 同文
+    from app.relation_verify import body_redundant_with_details
+
+    assert not body_redundant_with_details(out.get("body") or "", out.get("details") or [])
+    assert any("飞书合作" in str(d) for d in out["details"])
+
+
+def test_display_dedupe_hides_identical_body():
+    from app.relation_display import dedupe_body_vs_details, indexed_relations_for_display
+
+    same = "Global Partnership 团队记录：新发现嘉宾查晟"
+    rel = {
+        "title": "亚马逊",
+        "body": same,
+        "details": [same],
+        "evidence": [{"item_id": 1, "snippet": "x"}],
+        "decision_tier": "watch",
+    }
+    shown = dedupe_body_vs_details(rel)
+    assert shown["body"] == ""
+    assert shown["details"] == [same]
+    entries = indexed_relations_for_display([rel])
+    assert entries[0]["rel"]["body"] == ""

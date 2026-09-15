@@ -83,7 +83,24 @@ def normalize_decision_tier(decision: str, label: str, tier: str | None, *, rela
 def _card_complete(rel: dict) -> bool:
     if not (rel.get("evidence") or []):
         return False
-    return bool((rel.get("title") or "").strip() and (rel.get("body") or "").strip())
+    if not (rel.get("title") or "").strip():
+        return False
+    # body 可空（与 details 去重后）；有 details 或 body 其一即可
+    if (rel.get("body") or "").strip():
+        return True
+    return any(str(d).strip() for d in (rel.get("details") or []))
+
+
+def dedupe_body_vs_details(rel: dict) -> dict:
+    """展示用：body 与 details 重复时清空 body（不改原 dict）。"""
+    from .relation_verify import body_redundant_with_details
+
+    out = dict(rel)
+    body = (out.get("body") or "").strip()
+    details = list(out.get("details") or [])
+    if body_redundant_with_details(body, details):
+        out["body"] = ""
+    return out
 
 
 def tier_sort_key(rel: dict) -> tuple:
@@ -109,7 +126,7 @@ def indexed_relations_for_display(relations: list | None) -> list[dict]:
     for i, r in enumerate(relations or []):
         if not isinstance(r, dict):
             continue
-        entries.append({"index": i, "rel": r})
+        entries.append({"index": i, "rel": dedupe_body_vs_details(r)})
     return sort_relation_entries_by_strength(entries)
 
 

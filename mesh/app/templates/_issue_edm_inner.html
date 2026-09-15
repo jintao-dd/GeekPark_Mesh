@@ -39,7 +39,7 @@
       <div class="card">
         <span class="flag" {{ flagstyle(r.label) }}>{{ r.label }}</span>
         <p class="t">{{ r.title }}</p>
-        <p class="b">{{ r.body }}</p>
+        {% if r.body %}<p class="b">{{ r.body }}</p>{% endif %}
         {% if r.details %}<div class="detail"><ul>{% for li in r.details %}<li>{{ li }}</li>{% endfor %}</ul></div>{% endif %}
         <div class="srcs">{% for s in r.sources %}<p><span class="lab">来源</span><span>{{ s }}</span></p>{% endfor %}</div>
         <div class="deps">{% for t in r.teams %}<span class="dep{% if t.startswith('→') or t.startswith('->') %} dep-sug{% endif %}">{{ t }}</span>{% endfor %}</div>

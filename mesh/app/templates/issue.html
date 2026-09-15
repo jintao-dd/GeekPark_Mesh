@@ -61,7 +61,7 @@
         <span class="flag" {{ flagstyle(r.label) }} data-path="relations.{{ ri }}.label" title="单击换标签，双击改文字">{{ r.label }}</span>
         {% if preview and r.decision_tier %}<span class="tier" style="font-size:11px;opacity:.65;margin-left:6px">{{ r.decision_tier }}</span>{% endif %}
         <p class="t" data-path="relations.{{ ri }}.title">{{ r.title }}</p>
-        <p class="b" data-path="relations.{{ ri }}.body">{{ r.body }}</p>
+        {% if r.body %}<p class="b" data-path="relations.{{ ri }}.body">{{ r.body }}</p>{% endif %}
         {% if r.details %}<div class="detail"><ul>{% for li in r.details %}<li data-path="relations.{{ ri }}.details.{{ loop.index0 }}">{{ li }}</li>{% endfor %}</ul></div>{% endif %}
         <div class="srcs">{% for s in r.sources %}<p><span class="lab">来源</span><span data-path="relations.{{ ri }}.sources.{{ loop.index0 }}">{{ s }}</span></p>{% endfor %}</div>
         <div class="deps">{% for t in r.teams %}<span class="dep{% if t.startswith('→') or t.startswith('->') %} dep-sug{% endif %}" data-path="relations.{{ ri }}.teams.{{ loop.index0 }}">{{ t }}</span>{% endfor %}</div>
