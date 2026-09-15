@@ -6,8 +6,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.edm import FLAG_COLORS
+from app.relation_decision_consistency import normalize_relation_label
 from app.relation_writer import (
+    LABEL_WRITE_HINTS,
     LOCKED_FIELDS,
+    label_write_hint,
     merge_writing,
     relation_object_from_gate,
     strip_route_meta_copy,
@@ -41,9 +45,32 @@ def test_writer_input_excludes_locked_mutation_surface():
     inp = to_writer_input(obj)
     assert inp["candidate_id"] == "c9"
     assert inp["label"] == "同一赛道，各自在做"
+    assert "分别写两队各自已发生动作" in inp["label_hint"]
     assert len(inp["evidence"]) == 2
     assert inp["relation_reason"] == "两团队分别围绕豆包开展动作"
     assert "sources" not in inp
+
+
+def test_label_write_hints_cover_canonical_labels():
+    """规范 17 标签均有 hint；别名归一后也能取到。"""
+    canonical = {normalize_relation_label(lb) for lb in FLAG_COLORS}
+    missing = [lb for lb in canonical if lb not in LABEL_WRITE_HINTS]
+    assert not missing, f"missing LABEL_WRITE_HINTS: {missing}"
+    assert label_write_hint("同一条赛道，各自在做") == LABEL_WRITE_HINTS["同一赛道，各自在做"]
+    assert "不根据缺失证据推断" in label_write_hint("海外新发现，国内尚未接触")
+    assert "不补充接触推断" in label_write_hint("一方有需求，另一方尚未接触")
+
+
+def test_flag_colors_unique_per_canonical_label():
+    """规范标签色互异（别名可与主标签同色）。"""
+    by_color: dict[str, list[str]] = {}
+    for lab, color in FLAG_COLORS.items():
+        canon = normalize_relation_label(lab)
+        by_color.setdefault(color, [])
+        if canon not in by_color[color]:
+            by_color[color].append(canon)
+    collisions = {c: labs for c, labs in by_color.items() if len(labs) > 1}
+    assert not collisions, f"shared flag colors: {collisions}"
 
 
 def test_merge_writing_only_adds_narrative_fields():
@@ -100,9 +127,39 @@ def test_merge_writing_preserves_decision_tier_when_writer_omits():
     assert rel["relation_type"] == "parallel_tracks"
 
 
-def test_write_relations_skips_empty_body():
+def test_write_relations_allows_empty_body_with_details():
     obj = _sample_object()
-    rels, skipped = write_relations([obj], writings=[{"candidate_id": "c9", "title": "x", "body": "", "details": []}])
+    rels, skipped = write_relations(
+        [obj],
+        writings=[{
+            "candidate_id": "c9",
+            "title": "豆包两条线",
+            "body": "",
+            "details": ["商业化团队：豆包 AI 手机判断", "视频号团队：豆包收费视频"],
+        }],
+    )
+    assert skipped == []
+    assert len(rels) == 1
+    assert rels[0]["body"] == ""
+    assert len(rels[0]["details"]) == 2
+
+
+def test_write_relations_skips_missing_title_and_narrative():
+    # evidence 为空且无 title/body/details → skip（normalize 也补不出 details）
+    bare = relation_object_from_gate({
+        "candidate_id": "c0",
+        "candidate_title": "",
+        "label": "已联动",
+        "relation_type": "event_chain",
+        "decision_tier": "strong",
+        "teams": ["编辑部"],
+        "evidence": [],
+        "item_ids": [],
+    })
+    rels, skipped = write_relations(
+        [bare],
+        writings=[{"candidate_id": "c0", "title": "", "body": "", "details": []}],
+    )
     assert rels == []
     assert skipped[0]["reason"] == "missing_narrative_title_or_body"
 

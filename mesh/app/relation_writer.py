@@ -43,7 +43,37 @@ LOCKED_FIELDS = frozenset({
 
 WRITER_OUTPUT_KEYS = frozenset({"title", "body", "details"})
 
+# 按卡注入的一行写作 hint（提炼自 Decision 定义；勿整表塞进 system prompt）
+# 别名「同一条赛道…」经 normalize 后落到「同一赛道…」
+LABEL_WRITE_HINTS: dict[str, str] = {
+    "已联动": "只写 evidence 支撑的同一事项或连续动作；接触/提及不得写成合作或共同推进。",
+    "同一件事，两个部门各知一半": "写清同一件事上两队各自掌握的事实；强调信息互补，不写成双方已协同执行。",
+    "一方接触了，另一方正在接触": "分别写已接触与正在接触的事实进度；可点同事链，但不升级为已联动/已合作。",
+    "同一赛道，各自在做": "分别写两队各自已发生动作；明确并行，禁止写成合作、共同推进或同一事链。",
+    "同一公司，不同触点": "写同一公司上的不同触点/动作；并列事实，不并成一条合作叙事。",
+    "两个部门各有判断": "并列两队各自判断/口径；不裁决对错，不写成已统一结论。",
+    "采访对象也是客户": "写清采访侧与客户/商务侧各自已发生的事实；有明确事链才写衔接，否则保持并行。",
+    "已公开报道，内部也在用": "一侧写公开报道事实，一侧按 evidence 原表述写内部使用、跟进等事实；不把报道写成内部合作。",
+    "中英文站同周各自成稿": "分写中/英（或两站）同周各自成稿动作；保持并行，不写成联合稿或已联动。",
+    "一方报道了，另一方在接触": "分写已报道与正在接触的事实；可点明共同对象或同事链，但不写成已联动、合作或商务关系已成立。",
+    "两处记录待核对": "并列冲突点、不选边；body 只点「待核对」，细节各写各的记录原文要点。",
+    "一方有需求，另一方尚未接触": "写清有需求侧已发生事实；另一侧仅写 evidence 明确记录的相关事实或「尚未接触」状态，不补充接触推断，不写「该谁去接」的路由建议。",
+    "一方接触，另一方用得上": "只写接触/发现侧已发生事实；禁止「记录标注××用得上」等元话（承接方看虚线团队）。",
+    "海外接触，国内可能承接": "海外动作须有 evidence；国内侧仅写已有事实，无国内证据就不要写「将承接/可承接」。",
+    "海外新发现，国内尚未接触": "写海外新发现事实；国内侧仅写 evidence 明确记录的相关事实或「尚未接触」状态，不根据缺失证据推断国内未接触。",
+    "外部在热聊，我们还没碰": "外部热度与内部未接触须都有可引用依据；不写成我们已在跟进或已联动。",
+    "已排期，内容侧待安排": "写清已排期事实与内容侧待安排的现状；不写成内容已产出或已联动完成。",
+}
+
 _DETAIL_TEAM = re.compile(r"^(.+?)(?:记录|：|:)")
+
+
+def label_write_hint(label: str) -> str:
+    """本卡 label → 一行 Writer hint；未知标签返回空串。"""
+    from .relation_decision_consistency import normalize_relation_label
+
+    lab = normalize_relation_label((label or "").strip())
+    return LABEL_WRITE_HINTS.get(lab, "")
 
 # 禁止写入读者文案的路由元叙述 / 标题尾巴
 _META_ROUTE_COPY = re.compile(
@@ -128,9 +158,11 @@ def to_writer_input(obj: dict) -> dict[str, Any]:
             "team": tf.get("team"),
             "snippets": [(s or "")[:200] for s in (tf.get("snippets") or [])[:3]],
         })
+    label = obj.get("label") or ""
     return {
         "candidate_id": obj.get("candidate_id"),
-        "label": obj.get("label"),
+        "label": label,
+        "label_hint": label_write_hint(label),
         "teams": solid_teams,
         "evidence": evidence,
         "team_facts": team_facts,
@@ -246,7 +278,8 @@ def call_writer_llm(objects: list[dict]) -> list[dict]:
     payload = [to_writer_input(obj) for obj in objects]
     user = (
         f"【relation_objects】\n{json.dumps(payload, ensure_ascii=False)[:llm.budget(20000)]}\n\n"
-        "对每个 candidate_id 写一条；不得修改 label/teams/evidence。"
+        "对每个 candidate_id 写一条；遵守该卡 label_hint；不得修改 label/teams/evidence；"
+        "写不出跨队交叉句则 body 留空，只写 details。"
     )
     out = llm.call_json_compliant(system, user, max_tokens=8000)
     rows = list(out.get("relation_writings") or out.get("relation_narratives") or [])
@@ -284,7 +317,11 @@ def write_relations(
         cid = (obj.get("candidate_id") or "").strip()
         w = by_id.get(cid) or {}
         rel = merge_writing(obj, w)
-        if not rel.get("title") or not rel.get("body"):
+        title_ok = bool((rel.get("title") or "").strip())
+        body_ok = bool((rel.get("body") or "").strip())
+        details_ok = any(str(d).strip() for d in (rel.get("details") or []))
+        # body 可空（与 label_hint / Verify 去重契约一致）；须有 title，且 body 或 details 其一
+        if not title_ok or not (body_ok or details_ok):
             skipped.append({
                 "candidate_id": cid,
                 "reason": "missing_narrative_title_or_body",
