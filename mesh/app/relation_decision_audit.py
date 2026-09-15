@@ -5,6 +5,7 @@ from typing import Any
 
 # 代码 Gate 机器可读原因码
 GATE_CODE_PURE_CO = "pure_entity_cooccurrence"
+GATE_CODE_NO_SHARED_ANCHOR = "no_shared_anchor"
 GATE_CODE_LLM_SKIP = "llm_skip"
 GATE_CODE_INVALID_CAND = "invalid_candidate_id"
 GATE_CODE_INVALID_LABEL = "invalid_label"
@@ -18,6 +19,7 @@ GATE_CODE_DECISION_MISSING = "decision_missing"
 
 _KNOWN_GATE_CODES = frozenset({
     GATE_CODE_PURE_CO,
+    GATE_CODE_NO_SHARED_ANCHOR,
     GATE_CODE_LLM_SKIP,
     GATE_CODE_INVALID_CAND,
     GATE_CODE_MISSING_REFS,
@@ -30,7 +32,8 @@ _KNOWN_GATE_CODES = frozenset({
 })
 
 _GATE_CODE_LABELS: dict[str, str] = {
-    GATE_CODE_PURE_CO: "纯实体共现（次实体未形成跨团队事链）",
+    GATE_CODE_PURE_CO: "纯实体共现（次实体未形成跨团队事链）→ 硬 skip",
+    GATE_CODE_NO_SHARED_ANCHOR: "两侧 evidence 无共享锚点（同一公司/人/项目）",
     GATE_CODE_LLM_SKIP: "LLM 主动 skip",
     GATE_CODE_INVALID_CAND: "candidate_id 无效",
     GATE_CODE_INVALID_LABEL: "label 不在 17 标签内",
@@ -41,7 +44,7 @@ _GATE_CODE_LABELS: dict[str, str] = {
     GATE_CODE_MISMATCH: "teams/sources 与 evidence 不一致",
     GATE_CODE_DECISION_INCONSISTENT: "Decision 的 relation_type/label/reason 互相矛盾",
     GATE_CODE_DECISION_MISSING: "LLM 未返回 relation_decision（漏答，非 skip）",
-    "gate_would_cooccur": "Gate 提示纯共现风险（不阻断，交 Writer/Owner）",
+    "gate_would_cooccur": "（已废弃）旧版纯共现警告；现改为硬 skip",
     "missing_narrative_title_or_body": "Narrative 缺 title/body",
     "filtered_after_gate": "Gate 通过后又被 pipeline 滤掉",
     "title_dedupe": "Narrative 标题去重",

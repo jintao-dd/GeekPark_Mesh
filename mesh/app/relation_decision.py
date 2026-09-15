@@ -27,6 +27,7 @@ from .relation_decision_audit import (
     GATE_CODE_LLM_SKIP,
     GATE_CODE_MISMATCH,
     GATE_CODE_MISSING_REFS,
+    GATE_CODE_NO_SHARED_ANCHOR,
     GATE_CODE_PROVENANCE,
     GATE_CODE_PURE_CO,
     GATE_CODE_REFS_BAD,
@@ -100,6 +101,66 @@ def is_pure_entity_cooccurrence(cand: dict) -> bool:
     if sec_teams <= 1 and "secondary" in all_hits:
         return True
     return False
+
+
+def _anchor_tokens(text: str) -> set[str]:
+    """从标题/snippet 抽可用于跨队对齐的锚点（公司/人/项目名）。"""
+    import re
+
+    s = text or ""
+    out: set[str] = set()
+    for m in re.findall(r"[A-Za-z][A-Za-z0-9][A-Za-z0-9+.\-]{1,}", s):
+        if len(m) >= 2:
+            out.add(m.lower())
+    for m in re.findall(r"[\u4e00-\u9fff]{2,12}", s):
+        # 过泛的关系/流程词不当锚点
+        if m in (
+            "商业化", "编辑部", "团队", "例会", "选题", "沟通", "记录", "进行中",
+            "受访者", "非核实", "事实", "会议", "判断", "本周", "上周", "发布",
+        ):
+            continue
+        out.add(m)
+    return out
+
+
+def evidence_shared_anchor(evidence: list[dict], *, title: str = "") -> bool:
+    """两侧 evidence 必须共享至少一个实体锚点（优先标题主实体）。
+
+    质量优先：仅「两队都有字」不够；必须是同一公司/人/项目上的双边事实。
+    """
+    by_team: dict[str, str] = {}
+    for e in evidence or []:
+        if not isinstance(e, dict):
+            continue
+        team = (e.get("team") or "").strip()
+        if not team or team.startswith("→") or team.startswith("->"):
+            continue
+        snip = (e.get("snippet") or e.get("quote") or "").strip()
+        if not snip:
+            continue
+        by_team[team] = (by_team.get(team) or "") + "\n" + snip
+    if len(by_team) < 2:
+        return False
+
+    title_s = (title or "").strip()
+    # 标题主实体：取 · / ： 前一段
+    primary = title_s
+    for sep in (" · ", " / ", "：", ":"):
+        if sep in primary:
+            primary = primary.split(sep, 1)[0].strip()
+            break
+    primary = primary.strip()
+    if primary and len(primary) >= 2:
+        hits = sum(1 for blob in by_team.values() if primary in blob or primary.lower() in blob.lower())
+        if hits >= 2:
+            return True
+
+    team_toks = [_anchor_tokens(blob) for blob in by_team.values()]
+    if not team_toks:
+        return False
+    shared = set.intersection(*team_toks) if team_toks else set()
+    # 至少 1 个共享专名；单字英文/过短已在 _anchor_tokens 过滤
+    return bool(shared)
 
 
 def _entity_for_provenance(cand: dict) -> str:
@@ -326,7 +387,16 @@ def apply_evidence_gate(
             _skip(GATE_CODE_PROVENANCE)
             continue
 
+        # 质量优先：纯共现 / 无共享锚点 → 硬 skip（不再只 warning）
         would_cooccur = is_pure_entity_cooccurrence(cand)
+        if would_cooccur:
+            _skip(GATE_CODE_PURE_CO, detail="pure_entity_cooccurrence")
+            continue
+        title_for_anchor = (cand.get("title") or "") or entity
+        if not evidence_shared_anchor(evidence, title=title_for_anchor):
+            _skip(GATE_CODE_NO_SHARED_ANCHOR, detail="no_shared_entity_across_teams")
+            continue
+
         suggested = _code_suggested_teams(cand, evidence, label)
         weak = _derive_weak(label, cand, evidence)
         locked = {
@@ -342,14 +412,12 @@ def apply_evidence_gate(
             "item_ids": sorted({int(e["item_id"]) for e in evidence if e.get("item_id") is not None}),
             "team_facts": _slim_team_facts(cand),
             "provenance_ok": True,
-            "gate_would_cooccur": would_cooccur,
+            "gate_would_cooccur": False,
             "needs_review": True,
             "status": "needs_review",
             "decision_reason": reason,
             "relation_reason": reason,
         }
-        if would_cooccur:
-            locked["needs_review"] = True
         locked = _align_relation_from_evidence(locked, suggested=suggested)
         if not _facts_consistent(locked):
             _skip(GATE_CODE_MISMATCH)
@@ -360,14 +428,12 @@ def apply_evidence_gate(
         row["gate_reason"] = reason
         row["gate_reason_code"] = "gate_pass"
         row["gate_reason_detail"] = reason
-        row["gate_would_cooccur"] = would_cooccur
+        row["gate_would_cooccur"] = False
         row["gate_overrode_llm"] = False
         row["n_evidence"] = len(evidence)
         row["teams"] = locked.get("teams")
         row["label"] = label
         row["decision_tier"] = decision_tier
-        if would_cooccur:
-            row["gate_warning"] = "gate_would_cooccur"
         audit_rows.append(row)
         approved.append(locked)
 

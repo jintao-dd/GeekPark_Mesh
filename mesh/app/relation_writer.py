@@ -289,7 +289,7 @@ def call_writer_llm(objects: list[dict]) -> list[dict]:
     user = (
         f"【relation_objects】\n{json.dumps(payload, ensure_ascii=False)[:llm.budget(20000)]}\n\n"
         "对每个 candidate_id 写一条；遵守该卡 label_hint；不得修改 label/teams/evidence。"
-        " body 写一句话关系总结（非复述某一队 detail）；实在写不出则 body 留空，只写 details。"
+        " body 必须写一句话跨队关系总结（非复述某一队 detail）；写不出则 body 留空（该卡不上读者页）。"
     )
     out = llm.call_json_compliant(system, user, max_tokens=8000)
     rows = list(out.get("relation_writings") or out.get("relation_narratives") or [])

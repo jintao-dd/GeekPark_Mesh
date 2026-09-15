@@ -36,7 +36,7 @@ def _rel_with_evidence(**extra):
 
 def test_normal_narrative_kept():
     rel = _rel_with_evidence(
-        body="商业化团队与编辑部本期均有与飞书、WorkBuddy 相关的记录。",
+        body="商业化与编辑部在飞书 / WorkBuddy 上各有记录，两侧信息互补。",
         details=["商业化团队记录：飞书合作待PR部门走正规流程对接（接触中）"],
     )
     out = verify_relation_narrative(rel)
@@ -47,6 +47,39 @@ def test_normal_narrative_kept():
     from app.relation_verify import body_redundant_with_details
 
     assert not body_redundant_with_details(out.get("body") or "", out.get("details") or [])
+    # 合格 paraphrase 总结应保留
+    assert "飞书" in (out.get("body") or "") or "WorkBuddy" in (out.get("body") or "")
+    assert not out.get("_body_omitted_ungrounded")
+
+
+def test_writer_summary_body_kept():
+    """Writer 跨队总结（含「各知一半」等元词）不得被字面重合误杀。"""
+    rel = _rel_with_evidence(
+        body="同一飞书事项上，商业化侧掌握对接进度，编辑部侧有 WorkBuddy 选题，各知一半。",
+        details=[
+            "商业化团队：飞书合作待PR部门走正规流程对接（接触中）",
+            "编辑部：WorkBuddy 选题待确认",
+        ],
+    )
+    out = verify_relation_narrative(rel)
+    assert "各知一半" in (out.get("body") or "")
+    assert not out.get("_body_omitted_ungrounded")
+
+
+def test_detail_backfill_missing_team():
+    """一侧 detail 未 grounded 被丢后，按队从 evidence 回填。"""
+    rel = _rel_with_evidence(
+        body="飞书与 WorkBuddy 两侧各有进展。",
+        details=[
+            "商业化团队：飞书合作待PR部门走正规流程对接（接触中）",
+            "编辑部：完全编造的并购已上市。",  # 会被 grounding 丢掉
+        ],
+    )
+    out = verify_relation_narrative(rel)
+    blob = " ".join(str(x) for x in out["details"])
+    assert "飞书合作" in blob
+    assert "WorkBuddy" in blob or "选题待确认" in blob
+    assert "并购" not in blob
 
 
 def test_partial_overflow_trimmed():
@@ -123,3 +156,14 @@ def test_display_dedupe_hides_identical_body():
     assert shown["details"] == [same]
     entries = indexed_relations_for_display([rel])
     assert entries[0]["rel"]["body"] == ""
+
+
+def test_empty_body_not_reader_visible():
+    from app.relation_display import reader_visible
+
+    rel = _rel_with_evidence(
+        decision_tier="strong",
+        body="",
+        details=["商业化团队：飞书合作待PR部门走正规流程对接（接触中）"],
+    )
+    assert not reader_visible(rel)

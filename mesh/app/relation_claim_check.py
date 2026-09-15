@@ -180,11 +180,12 @@ MODE_ENFORCE = "enforce"
 
 
 def claim_check_mode(override: str | None = None) -> str:
-    raw = (override if override is not None else os.environ.get("MESH_CLAIM_CHECK_MODE", MODE_SHADOW))
-    m = (raw or MODE_SHADOW).strip().lower()
+    # 质量优先：默认 enforce；可用 MESH_CLAIM_CHECK_MODE=shadow|off 回退
+    raw = (override if override is not None else os.environ.get("MESH_CLAIM_CHECK_MODE", MODE_ENFORCE))
+    m = (raw or MODE_ENFORCE).strip().lower()
     if m in (MODE_OFF, MODE_SHADOW, MODE_ENFORCE):
         return m
-    return MODE_SHADOW
+    return MODE_ENFORCE
 
 
 def max_strength(text: str) -> int:

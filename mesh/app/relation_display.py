@@ -5,7 +5,7 @@
   decision_tier（strong / parallel / watch）只影响**展示排序强度**，不决定可见性。
   skip 不保留。
 
-`reader_visible` 是派生字段：卡完整（evidence + title/body）且非 skip → 读者可见。
+`reader_visible` 是派生字段：卡完整（evidence + title + **非空 body**）且非 skip → 读者可见。
 `build_published_projection(draft)` 是 Publish / Preview-reader 切片的唯一入口。
 """
 from __future__ import annotations
@@ -81,14 +81,14 @@ def normalize_decision_tier(decision: str, label: str, tier: str | None, *, rela
 
 
 def _card_complete(rel: dict) -> bool:
+    """质量优先：读者卡必须有 evidence + title + 非空关系总结 body。"""
     if not (rel.get("evidence") or []):
         return False
     if not (rel.get("title") or "").strip():
         return False
-    # body 可空（与 details 去重后）；有 details 或 body 其一即可
-    if (rel.get("body") or "").strip():
-        return True
-    return any(str(d).strip() for d in (rel.get("details") or []))
+    if not (rel.get("body") or "").strip():
+        return False
+    return True
 
 
 def dedupe_body_vs_details(rel: dict) -> dict:

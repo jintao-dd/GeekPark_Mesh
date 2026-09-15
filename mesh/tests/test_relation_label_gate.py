@@ -25,19 +25,20 @@ def test_label_alias_normalized():
 
 
 def test_gate_accepts_canonical_and_alias_parallel_label():
+    """同一赛道标签（含别名）在共享锚点双边证据下可 keep。"""
     items = [
-        {"id": 1, "source_id": 10, "owner_team": "商业化团队", "pointer": "a", "entities": '["千问"]', "text": "千问A", "source_label": "商业化", "blocked": 0},
-        {"id": 2, "source_id": 11, "owner_team": "视频号团队", "pointer": "b", "entities": '["Claude"]', "text": "ClaudeB", "source_label": "视频号", "blocked": 0},
+        {"id": 1, "source_id": 10, "owner_team": "商业化团队", "pointer": "a", "entities": '["蚂蚁"]', "text": "蚂蚁稿件合作推进中", "source_label": "商业化", "blocked": 0},
+        {"id": 2, "source_id": 11, "owner_team": "编辑部", "pointer": "b", "entities": '["蚂蚁"]', "text": "蚂蚁灵光具身智能现场接触", "source_label": "编辑部", "blocked": 0},
     ]
     for label in ("同一赛道，各自在做", "同一条赛道，各自在做"):
         cand = {
             "candidate_id": "c1",
-            "title": "千问 · Claude",
-            "teams": ["商业化团队", "视频号团队"],
+            "title": "蚂蚁",
+            "teams": ["商业化团队", "编辑部"],
             "item_ids": [1, 2],
             "team_facts": [
-                {"team": "商业化团队", "item_ids": [1], "snippets": ["千问"]},
-                {"team": "视频号团队", "item_ids": [2], "snippets": ["Claude"]},
+                {"team": "商业化团队", "item_ids": [1], "snippets": ["蚂蚁稿件合作推进中"]},
+                {"team": "编辑部", "item_ids": [2], "snippets": ["蚂蚁灵光具身智能现场接触"]},
             ],
         }
         decisions = [{
@@ -46,7 +47,7 @@ def test_gate_accepts_canonical_and_alias_parallel_label():
             "label": label,
             "relation_type": "parallel_tracks",
             "decision_tier": "parallel",
-            "reason": "商业化与视频号分别跟进模型产品，话题并行、可互相参考",
+            "reason": "同一蚂蚁主体上两队各有动作，并行可参考",
             "evidence_refs": [1, 2],
         }]
         approved, audit = apply_evidence_gate(decisions, [cand], items)

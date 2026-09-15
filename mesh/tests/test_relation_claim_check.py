@@ -18,9 +18,9 @@ from app.relation_claim_check import (
 from eval.relation_gold_lib import BASELINE_PATH, load_gold, write_baseline
 
 
-def test_mode_default_shadow(monkeypatch):
+def test_mode_default_enforce(monkeypatch):
     monkeypatch.delenv("MESH_CLAIM_CHECK_MODE", raising=False)
-    assert claim_check_mode() == MODE_SHADOW
+    assert claim_check_mode() == MODE_ENFORCE
 
 
 def test_title_body_details_all_checked():

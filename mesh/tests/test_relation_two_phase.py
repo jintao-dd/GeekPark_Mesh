@@ -42,7 +42,7 @@ def _pok_items():
 
 
 def test_pure_entity_cooccurrence_skipped_at_gate():
-    """千问 · Claude 类：次实体仅一方 snippet 命中 → 纯共现。"""
+    """千问 · Claude 类：次实体仅一方 snippet 命中 → 纯共现 → 硬 skip。"""
     cand = {
         "candidate_id": "c1",
         "title": "千问 · Claude Opus 4.5",
@@ -68,13 +68,51 @@ def test_pure_entity_cooccurrence_skipped_at_gate():
         {"id": 20, "source_id": 2, "owner_team": "视频号团队", "pointer": "b", "entities": '["Claude"]', "text": "Claude", "source_label": "视频号", "blocked": 0},
     ]
     approved, audit = apply_evidence_gate(decisions, [cand], items)
-    assert len(approved) == 1
-    assert approved[0].get("gate_would_cooccur") is True
-    assert audit["rows"][0]["gate_decision"] == "keep"
+    assert approved == []
+    assert audit["rows"][0]["gate_decision"] == "skip"
+    assert audit["rows"][0]["gate_reason_code"] == "pure_entity_cooccurrence"
+    assert audit["rows"][0]["gate_overrode_llm"] is True
     ledger = finalize_decision_audit(audit, [])["candidate_ledger"][0]
-    assert ledger["gate_overrode_llm"] is False
-    assert ledger["gate_would_cooccur"] is True
-    assert ledger["final_outcome"] != "skipped_gate_override"
+    assert ledger["gate_overrode_llm"] is True
+    assert ledger["final_outcome"] == "skipped_gate_override"
+
+
+def test_no_shared_anchor_skipped_at_gate():
+    """两侧无共享实体锚点（拼盘公司）→ 硬 skip。"""
+    from app.relation_decision import evidence_shared_anchor
+
+    ev = [
+        {"team": "编辑部", "snippet": "郭仁杰公司新模型采访提纲已发", "item_id": 1},
+        {"team": "英文站", "snippet": "Seeed Studio Eric Pan 访谈已发布", "item_id": 2},
+    ]
+    assert not evidence_shared_anchor(ev, title="郭仁杰公司新模型稿与 Seeed Studio 访谈")
+    cand = {
+        "candidate_id": "c2",
+        "title": "郭仁杰公司与 Seeed Studio",
+        "teams": ["编辑部", "英文站"],
+        "item_ids": [1, 2],
+        "team_facts": [
+            {"team": "编辑部", "item_ids": [1], "snippets": ["郭仁杰公司新模型采访提纲已发"]},
+            {"team": "英文站", "item_ids": [2], "snippets": ["Seeed Studio Eric Pan 访谈已发布"]},
+        ],
+    }
+    decisions = [{
+        "candidate_id": "c2",
+        "decision": "keep",
+        "label": "同一公司，不同触点",
+        "relation_type": "parallel_tracks",
+        "decision_tier": "parallel",
+        "reason": "两队各有记录",
+        "evidence_refs": [1, 2],
+    }]
+    items = [
+        {"id": 1, "source_id": 1, "owner_team": "编辑部", "pointer": "a", "entities": '["郭仁杰"]', "text": "郭仁杰公司新模型采访提纲已发", "source_label": "编辑部", "blocked": 0},
+        {"id": 2, "source_id": 2, "owner_team": "英文站", "pointer": "b", "entities": '["Seeed"]', "text": "Seeed Studio Eric Pan 访谈已发布", "source_label": "英文站", "blocked": 0},
+    ]
+    approved, audit = apply_evidence_gate(decisions, [cand], items)
+    assert approved == []
+    assert audit["rows"][0]["gate_reason_code"] == "no_shared_anchor"
+
 
 
 def test_decision_inconsistent_warns_but_does_not_block():
