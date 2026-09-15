@@ -317,6 +317,43 @@ def test_enrich_ask_includes_subtree_teammates(monkeypatch):
     assert "一律算「我们团队相关」" not in q
 
 
+def test_enrich_about_me_skips_teammate_dump(monkeypatch):
+    from app.agent.supervisor import workers
+    from app.agent.supervisor.types import PlanStep
+    from app.agent.models import IdentityResult
+
+    monkeypatch.setattr(
+        "app.agent.feishu_hands.org_directory.member_names_for_scope",
+        lambda *a, **k: ["赵思琪", "Sean Shen", "胡清远"],
+    )
+    step = PlanStep(
+        id="s1",
+        worker="published",
+        tool="ask.published",
+        args={"query": "列出最近周报和我有关的内容"},
+    )
+    args = workers.enrich_args(
+        step,
+        identity=IdentityResult(
+            status="bound",
+            primary_team="品牌创意团队",
+            display_hint="杜锦涛",
+        ),
+        context=None,
+        user_text="列出最近周报和我有关的内容",
+    )
+    names = args.get("person_names") or []
+    assert names == ["杜锦涛"]
+    assert "赵思琪" not in names
+
+
+def test_mouth_system_calendar_not_primary_for_progress():
+    from app.agent.supervisor import mouth
+
+    assert "日历" in mouth._SYNTH_SYSTEM
+    assert "禁止把日程列表当主答案" in mouth._SYNTH_SYSTEM
+
+
 def test_mouth_hides_protocol_noise():
     from app.agent.supervisor import mouth
     from app.agent.supervisor.types import TaskGraph, TieredEnvelope

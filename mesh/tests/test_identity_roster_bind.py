@@ -66,3 +66,17 @@ def test_zhangpeng_roster_not_conflict_locked():
     assert ident.status == STATUS_BOUND
     assert ident.display_hint == "张鹏"
     assert ident.primary_team
+
+
+def test_reconcile_soft_picks_feishu_over_mesh():
+    primary, src = idmod.reconcile_primary_team(["商业化团队"], "编辑部")
+    assert primary == "商业化团队"
+    assert src == "feishu_over_mesh"
+
+
+def test_reconcile_multi_pick_prefers_order():
+    primary, src = idmod.reconcile_primary_team(
+        ["社群", "品牌创意团队", "编辑部"], None
+    )
+    assert primary == "品牌创意团队"
+    assert src == "multi_pick"

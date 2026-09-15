@@ -100,10 +100,26 @@ def _tool_args(step: PlanStep) -> dict[str, Any]:
     nested = args.pop("args", None)
     if isinstance(nested, dict):
         args.update(nested)
-    if step.tool.startswith("ask.") or step.tool.startswith("context."):
-        if "query" in args:
-            return {"query": args.get("query") or ""}
     return args
+
+
+# 「我们团队」才扩队友；「和我相关」只钉本人，避免把整棵子树灌进 person_names
+_TEAM_SCOPE_RE = re.compile(
+    r"(我们|咱们)(的)?(团队|部门|组|组里)|团队相关|组里相关|部门相关|本组|本团队"
+)
+_SELF_SCOPE_RE = re.compile(
+    r"(和|与)?我(有关|相关|的周报|最近|这边|的进展)|关于我|我自己|本人"
+)
+
+
+def _ask_person_scope(q: str, *, has_resolved: bool) -> str:
+    if _TEAM_SCOPE_RE.search(q or ""):
+        return "team"
+    if _SELF_SCOPE_RE.search(q or ""):
+        return "self"
+    if has_resolved:
+        return "named"
+    return "default"
 
 
 def enrich_args(
@@ -135,30 +151,45 @@ def enrich_args(
     if step.tool.startswith("ask."):
         q_plan = str(args.get("query") or args.get("q") or "").strip()
         q_full = q_user or q_plan
-        names = list(resolved) + [n for n in _names_from_prior(prior) if n not in resolved]
+        scope = _ask_person_scope(q_full, has_resolved=bool(resolved))
+        names: list[str] = []
+        # 计划里已带的人名保留
+        for n in args.get("person_names") or []:
+            s = str(n).strip()
+            if s and s not in names:
+                names.append(s)
+        for n in resolved:
+            if n not in names:
+                names.append(n)
+        # prior 人名：self 范围不加（避免「和我相关」被上一轮组织列表污染）
+        if scope != "self":
+            for n in _names_from_prior(prior):
+                if n not in names:
+                    names.append(n)
+        # 本人姓名始终进 expand（self / team / default），保证「和我相关」能召回
         if name and name not in names:
             names = [name] + names
-        teammates: list[str] = []
-        if team:
+        if scope == "team" and team:
             try:
                 from ..feishu_hands import org_directory as od
 
-                teammates = od.member_names_for_scope(team, limit=20)
+                teammates = od.member_names_for_scope(team, limit=12)
             except Exception:
                 teammates = []
             for t in teammates:
                 if t and t not in names:
                     names.append(t)
-        # 结构化扩召回；不要把成文指令塞进 FTS query
+        # self / default / named：不灌整棵子树；default 仍可带 prior 人名
         args["query"] = q_full
         args["q"] = q_full
         if names:
-            args["person_names"] = names[:20]
+            args["person_names"] = names[:16]
         # 显式桶过滤才设 team；默认不 apply_team_focus（飞书子树 ≠ 周报桶）
         if str(args.get("team") or args.get("team_filter") or "").strip():
             args.setdefault("apply_team_focus", False)
         log.info(
-            "ask enrich team=%s person_names=%s q_len=%s",
+            "ask enrich scope=%s team=%s person_names=%s q_len=%s",
+            scope,
             team or "-",
             len(names),
             len(q_full),

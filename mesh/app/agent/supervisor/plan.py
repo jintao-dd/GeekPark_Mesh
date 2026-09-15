@@ -73,7 +73,9 @@ _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划�
 5) steps 只用只读工具；写入绝不进 steps。
 6) 检索用工作记忆里的全名/团队，不要要求用户再报一遍。
 7) 步骤 ≤8；有依赖才写 depends_on；可并行的标同一 parallel_group。
-8) 只输出 JSON。
+8) 问周报相关 / 个人或团队进展 → 主步骤用 ask.published（可并行 directory）；
+   不要用 feishu.calendar.* 当主步骤，除非用户明确问日程、会议、忙不忙、空闲。
+9) 只输出 JSON。
 """
 
 

@@ -98,6 +98,10 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
     )
     session = sstore.load(sk)
     session.session_key = sk
+    # 清洗历史污染（周报桶名、时段等非人名），避免工作记忆带偏计划/指代
+    from . import person_resolve as pr
+
+    pr.sanitize_session_people(session)
 
     base_kwargs: dict[str, Any] = {
         "identity": identity.to_dict(),

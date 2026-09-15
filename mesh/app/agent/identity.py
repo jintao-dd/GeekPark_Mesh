@@ -8,7 +8,6 @@ from .models import (
     STATUS_AMBIGUOUS,
     STATUS_ANONYMOUS_WEB,
     STATUS_BOUND,
-    STATUS_BOUND_TEAM_CONFLICT,
     STATUS_BOUND_TEAM_MISSING,
     STATUS_OPEN_ID_MISMATCH,
     STATUS_UNLINKED,
@@ -18,6 +17,19 @@ from .models import (
 
 # 不可作为 Person.primary_team 的占位 / 外部桶
 _NON_BUSINESS = frozenset({"", "其他", "内容中心·数据聚合", "外部媒体"})
+
+# 多队时软选优先级（飞书映射 / 花名册同时命中多队时用；不锁死 conflict）
+_TEAM_PICK_ORDER = (
+    "CEO / 总裁办",
+    "品牌创意团队",
+    "编辑部",
+    "投资团队",
+    "商业化团队",
+    "视频号团队",
+    "音频播客团队",
+    "社群",
+    "Global Partnership",
+)
 
 
 def is_business_team(team: str | None) -> bool:
@@ -35,32 +47,41 @@ def normalize_team(team: str | None) -> str | None:
     return ingest.canonical_team(t) or t
 
 
+def _prefer_team(candidates: list[str]) -> str:
+    pool = [c for c in candidates if c]
+    if not pool:
+        return ""
+    for pref in _TEAM_PICK_ORDER:
+        if pref in pool:
+            return pref
+    return pool[0]
+
+
 def reconcile_primary_team(
     mapped_teams: list[str],
     mesh_users_team: str | None,
 ) -> tuple[str | None, str]:
-    """返回 (primary_team, team_source)。冲突时 primary=None, source=conflict。"""
-    mapped = []
+    """统一主队选择：users / 飞书映射 / 花名册同一套规则。
+
+    不再因多队或 mesh≠mapped 锁死为 conflict（同事轨要能继续查数）。
+    飞书/映射与 users.team 不一致时：优先飞书映射队，source=feishu_over_mesh。
+    """
+    mapped: list[str] = []
     for t in mapped_teams or []:
         n = normalize_team(t)
         if n and n not in mapped:
             mapped.append(n)
     mesh = normalize_team(mesh_users_team)
 
-    if len(mapped) > 1:
-        # 多映射互斥且无法独选
-        if mesh and mesh in mapped and len(set(mapped)) == 1:
+    if mesh and mapped:
+        if mesh in mapped:
             return mesh, "both_agree"
-        if mesh and all(m == mesh for m in mapped):
-            return mesh, "both_agree"
-        return None, "conflict"
-
-    if len(mapped) == 1 and mesh:
-        if mapped[0] == mesh:
-            return mapped[0], "both_agree"
-        return None, "conflict"
+        # 不一致：组织映射优先（飞书树权威），不 lock
+        return mapped[0] if len(mapped) == 1 else _prefer_team(mapped), "feishu_over_mesh"
     if len(mapped) == 1:
         return mapped[0], "feishu_map"
+    if len(mapped) > 1:
+        return _prefer_team(mapped), "multi_pick"
     if mesh:
         return mesh, "mesh_users"
     return None, "none"
@@ -112,16 +133,10 @@ def _identity_from_directory(
     if not mapped:
         mapped = list(roster_teams)
 
-    # 多队：无 users.team 对拍时取第一业务队，避免误判 conflict 锁死工具
-    if len(mapped) > 1:
-        primary, src = mapped[0], "roster_multi"
-        status = STATUS_BOUND
-    elif len(mapped) == 1:
-        primary, src = mapped[0], "roster" if roster_teams else "feishu_map"
-        status = STATUS_BOUND
-    else:
-        primary, src = None, "none"
-        status = STATUS_BOUND_TEAM_MISSING
+    primary, src = reconcile_primary_team(mapped, None)
+    if roster_teams and src in ("feishu_map", "multi_pick", "none"):
+        src = "roster_multi" if len(mapped) > 1 else ("roster" if primary else "none")
+    status = STATUS_BOUND if primary else STATUS_BOUND_TEAM_MISSING
 
     name = str(hit.get("name") or "").strip()
     person: dict[str, Any] = {
@@ -252,9 +267,8 @@ def resolve_identity(con, envelope: AgentEnvelope) -> IdentityResult:
 
     mesh_team = normalize_team(user["team"])
     primary, src = reconcile_primary_team(mapped_in, mesh_team)
-    if src == "conflict":
-        status = STATUS_BOUND_TEAM_CONFLICT
-    elif not primary:
+    # 不再锁死 bound_team_conflict：飞书映射 / 多队时软选，继续放行查数
+    if not primary:
         status = STATUS_BOUND_TEAM_MISSING
     else:
         status = STATUS_BOUND

@@ -187,17 +187,30 @@ def test_unlinked_no_data_tool(db_ready):
     assert "绑定" in r["text"]
 
 
-def test_team_conflict_no_data_tool(db_ready):
-    r = _run(
-        "本周商业化见了谁",
-        feishu_open_id="ou_conflict",
-        mapped_teams=["商业化团队"],
-        contact_sync="ok",
-    )
-    assert r["identity"]["status"] == "bound_team_conflict"
-    assert r["data_tools_called"] == []
-    assert r["refused"] is True
-    assert "冲突" in r["text"]
+def test_team_soft_pick_allows_data_tool(db_ready):
+    """users.team 与飞书映射不一致时软选飞书队，不再 conflict 锁死。"""
+    from app import db
+    from app.agent import identity as idmod
+    from app.agent import permission as permmod
+    from app.agent.models import AgentEnvelope
+
+    con = db.connect()
+    try:
+        env = AgentEnvelope(
+            text="本周商业化见了谁",
+            feishu_open_id="ou_conflict",
+            mapped_teams=["商业化团队"],
+            contact_sync="ok",
+        )
+        identity = idmod.resolve_identity(con, env)
+        assert identity.status == "bound"
+        assert identity.primary_team == "商业化团队"
+        assert identity.team_source == "feishu_over_mesh"
+        permission = permmod.decide_permission(identity)
+        assert permission.agent_access is True
+        assert "conflict" not in (permission.deny_reason or "")
+    finally:
+        con.close()
 
 
 def test_draft_raw_privilege_refused(db_ready):
@@ -342,7 +355,7 @@ def test_real_relations_summary_evidence(db_ready):
 # --- Tool 自防御（不依赖 Agent 上游） ---
 
 
-def test_tool_defends_acl_conflict(db_ready):
+def test_tool_allows_after_feishu_over_mesh_soft_pick(db_ready):
     from app import db
     from app.agent import context as ctxmod
     from app.agent import identity as idmod
@@ -359,16 +372,16 @@ def test_tool_defends_acl_conflict(db_ready):
             contact_sync="ok",
         )
         identity = idmod.resolve_identity(con, env)
-        assert identity.status == "bound_team_conflict"
+        assert identity.status == "bound"
+        assert identity.primary_team == "商业化团队"
+        assert identity.team_source == "feishu_over_mesh"
         chat_team = ctxmod.chat_team_of(con, env.chat_id)
         permission = permmod.decide_permission(identity, chat_team=chat_team)
         context = ctxmod.assemble_context(con, env, identity, permission)
-        # 即便强行 invoke，Tool 也要拒绝
         res = toolsmod.invoke_tool(
             "ask.published", con, identity, permission, context, {"q": "x"}
         )
-        assert res.denied is True
-        assert "acl" in res.error or "identity" in res.error
+        assert res.denied is not True
     finally:
         con.close()
 
