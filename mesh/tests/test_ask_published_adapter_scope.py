@@ -83,12 +83,10 @@ def test_scope_explicit_team_filter_still_works():
 
 
 def test_ask_published_reads_query_and_person_names():
-    captured = {}
+    captured = {"calls": []}
 
     def fake_prepare(con, q, scope, history=None, *, search_q=None, context_refs=None):
-        captured["q"] = q
-        captured["search_q"] = search_q
-        captured["team"] = scope.team
+        captured["calls"].append({"q": q, "search_q": search_q, "team": scope.team})
         return {
             "contexts": [
                 {
@@ -96,7 +94,7 @@ def test_ask_published_reads_query_and_person_names():
                     "章节": "条目",
                     "标题": "赵思琪接触",
                     "内容": "Reverie AI",
-                    "条目ID": 1,
+                    "条目ID": len(captured["calls"]),
                 }
             ],
             "n_hits": 1,
@@ -126,7 +124,44 @@ def test_ask_published_reads_query_and_person_names():
             },
         )
     assert out.ok
-    assert captured["q"] == "最近周报有和我们团队相关的？"
-    assert "赵思琪" in (captured["search_q"] or "")
-    assert captured["team"] == ""
-    assert "赵思琪" in (out.payload.get("answer") or "") or out.payload.get("n_hits", 0) >= 1
+    assert captured["calls"][0]["q"] == "最近周报有和我们团队相关的？"
+    assert captured["calls"][0]["search_q"] == "最近周报有和我们团队相关的？"
+    assert captured["calls"][0]["team"] == ""
+    # expand batches follow
+    assert any("赵思琪" in str(c.get("search_q") or "") for c in captured["calls"][1:])
+    assert out.payload.get("n_hits", 0) >= 1
+
+
+def test_expand_person_contexts_batches_names():
+    calls = []
+
+    def fake_prepare(con, q, scope, history=None, *, search_q=None, context_refs=None):
+        calls.append(search_q or q)
+        return {
+            "contexts": [
+                {
+                    "期号": "2026-09-08",
+                    "章节": "条目",
+                    "标题": search_q or q,
+                    "内容": "x",
+                    "条目ID": len(calls),
+                }
+            ],
+            "n_hits": 1,
+            "n_context": 1,
+            "mode": "lexical",
+        }
+
+    from app.ask_scope import AskScope
+    from app.agent import adapters as ad
+
+    with mock.patch("app.agent.adapters.ask_engine.prepare", fake_prepare):
+        ctxs = ad._expand_person_contexts(
+            None,
+            AskScope(),
+            "最近周报有和我们团队相关的？",
+            ["赵思琪", "杜锦涛", "张山山", "Sean Shen", "胡清远", "彭康林"],
+        )
+    assert len(calls) >= 2
+    assert all("最近周报" not in c for c in calls)
+    assert len(ctxs) >= 2

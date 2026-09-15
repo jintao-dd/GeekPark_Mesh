@@ -83,8 +83,13 @@ def _checks(actor_name: str, text: str, tools: list[str]) -> dict[str, bool]:
     used_crm = any("crm" in x for x in tools)
     used_feishu = any(x.startswith("feishu.") for x in tools)
     false_empty = bool(
-        re.search(r"(没有找到|未找到|没有命中).{0,20}(团队|相关|周报)", t)
-    ) and not bool(re.search(r"(播放|接触|推进|会面|条目|本期|期)", t))
+        re.search(r"(没有找到|未找到|没有命中|都返回空|查不到相关)", t)
+    ) and not bool(
+        re.search(
+            r"(内容打通|播放量|完播|会面|Reverie|Eigent|硅谷 BD|海外拓展|条目：|依据 \d{4})",
+            t,
+        )
+    )
     calendar_heavy = ("日历" in t or "忙碌" in t) and t.count("–") + t.count("-") >= 2 and len(t) < 600
     return {
         "used_ask": used_ask,

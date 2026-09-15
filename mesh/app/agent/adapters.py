@@ -100,6 +100,66 @@ def scope_from_agent(
 _CLUE_MARK = "【检索线索"
 
 
+def _ctx_key(ctx: dict) -> str:
+    if not isinstance(ctx, dict):
+        return ""
+    iid = ctx.get("条目ID") or ctx.get("item_id")
+    if iid is not None and str(iid).strip():
+        return f"item:{iid}"
+    cid = ctx.get("chunk_id") or ctx.get("chunkId")
+    if cid:
+        return f"chunk:{cid}"
+    title = str(ctx.get("标题") or ctx.get("title") or "").strip()
+    issue = str(ctx.get("期号") or ctx.get("issue") or "").strip()
+    body = str(ctx.get("内容") or ctx.get("body") or "").strip()[:80]
+    return f"t:{issue}:{title}:{body}"
+
+
+def _merge_contexts(*groups: list[dict], limit: int = 48) -> list[dict]:
+    out: list[dict] = []
+    seen: set[str] = set()
+    for group in groups:
+        for ctx in group or []:
+            if not isinstance(ctx, dict):
+                continue
+            sec = str(ctx.get("章节") or ctx.get("section") or "")
+            if sec in ("检索范围", "查询说明", "检索说明"):
+                # 保留第一组的范围说明即可
+                key = f"meta:{sec}:{ctx.get('标题')}"
+            else:
+                key = _ctx_key(ctx)
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            out.append(ctx)
+            if len(out) >= limit:
+                return out
+    return out
+
+
+def _expand_person_contexts(
+    con,
+    scope: AskScope,
+    q: str,
+    person_names: list[str],
+) -> list[dict]:
+    """人名扩召回：分批独立 prepare，避免长串人名挤爆单次 FTS。"""
+    names = [n for n in person_names if n and n not in (q or "")]
+    if not names:
+        return []
+    merged: list[dict] = []
+    # 每批 ≤3 个名；最多 4 批，控制成本
+    batches = [names[i : i + 3] for i in range(0, min(len(names), 12), 3)]
+    for batch in batches[:4]:
+        sq = " ".join(batch)
+        try:
+            prep = ask_engine.prepare(con, q, scope, search_q=sq)
+        except Exception:
+            continue
+        merged.extend(list(prep.get("contexts") or []))
+    return merged
+
+
 def _evidence_from_contexts(contexts: list[dict], slug: str) -> list[str]:
     refs: list[str] = []
     for i, ctx in enumerate(contexts or []):
@@ -215,13 +275,9 @@ def ask_published(
         for n in (args.get("person_names") or [])
         if str(n or "").strip()
     ]
-    # 检索串：用户原话 + 人名扩召回；禁止把成文指令散文塞进 FTS
-    search_bits = [user_q]
-    for n in person_names[:16]:
-        if n and n not in user_q:
-            search_bits.append(n)
-    search_q = " ".join(search_bits).strip()[:500] or user_q
     q = user_q  # 时间语义 / claim / 成文都以用户原话为准
+    # 主检索只用用户原话；人名走分批扩召回合并（禁止把整棵子树塞进一条 FTS）
+    search_q = user_q
 
     explicit_team = str(
         args.get("team") or args.get("team_filter") or args.get("owner_team") or ""
@@ -263,14 +319,19 @@ def ask_published(
         )
 
     prepared = ask_engine.prepare(con, q, scope, search_q=search_q)
-    contexts = list(prepared.get("contexts") or [])
+    primary_ctxs = list(prepared.get("contexts") or [])
+    expand_ctxs = _expand_person_contexts(con, scope, q, person_names)
+    contexts = _merge_contexts(primary_ctxs, expand_ctxs)
     from . import claim_support as claim_support_mod
 
     contexts = claim_support_mod.enrich_contexts_for_denial_counter_evidence(
         con, scope, q, contexts
     )
     evidence = _evidence_from_contexts(contexts, slug)
-    n_hits = int(prepared.get("n_hits") or prepared.get("n_context") or 0)
+    n_hits = max(
+        int(prepared.get("n_hits") or prepared.get("n_context") or 0),
+        len([c for c in contexts if isinstance(c, dict) and str(c.get("章节") or "") not in ("检索范围", "查询说明", "检索说明")]),
+    )
 
     support_assess = claim_support_mod.assess_claim_support(
         q, contexts=contexts, evidence_refs=evidence
