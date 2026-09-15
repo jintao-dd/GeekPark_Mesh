@@ -12,8 +12,12 @@ from app import db
 
 def test_brand_creative_children_map_to_same_mesh_team():
     dtm.load_dept_team_map(force=True)
-    for name in ("品牌创意部", "创意视频", "创新技术", "品牌设计", "海外拓展"):
+    for name in ("品牌创意部", "创意视频", "创新技术", "品牌设计"):
         assert dtm.map_department_name(name) == "品牌创意团队", name
+    # 海外拓展 独立为同事轨主队；parent_team 仍是品牌创意团队
+    assert dtm.map_department_name("海外拓展") == "海外拓展"
+    row = (dtm.load_dept_team_map().get("by_name") or {}).get("海外拓展")
+    assert row and row.get("parent_team") == "品牌创意团队"
 
 
 def test_brand_creative_ids():
@@ -41,7 +45,12 @@ def test_normalize_team_accepts_feishu_leaf_names():
     assert db.normalize_team("创意视频") == "品牌创意团队"
     assert db.normalize_team("品牌设计") == "品牌创意团队"
     assert db.normalize_team("创新技术") == "品牌创意团队"
-    assert db.normalize_team("海外拓展") == "品牌创意团队"
+    # 海外拓展 是同事轨独立主队，不进周报质量轨 ingest.TEAMS，db 层不归一到品牌创意
+    assert db.normalize_team("海外拓展") != "品牌创意团队"
+    # 但同事轨 identity 认它为业务队
+    from app.agent import identity as idmod
+
+    assert idmod.normalize_team("海外拓展") == "海外拓展"
 
 
 def test_parent_walk_when_child_missing_from_runtime_lookup():

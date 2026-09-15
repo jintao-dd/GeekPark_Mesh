@@ -255,20 +255,38 @@ def _disk_read(kind: str, key: str) -> dict[str, Any] | None:
         return None
 
 
+def _kv_write(kind: str, key: str, payload: dict[str, Any] | None) -> None:
+    """优先写共享 KV（PG/SQLite，多 worker/多实例一致）；无 DB 时落磁盘。"""
+    from . import session_kv
+
+    used_db = session_kv.write(kind, key, payload)
+    if not used_db:
+        _disk_write(kind, key, payload)
+
+
+def _kv_read(kind: str, key: str) -> dict[str, Any] | None:
+    from . import session_kv
+
+    data = session_kv.read(kind, key)
+    if data is not None:
+        return data
+    return _disk_read(kind, key)
+
+
 def save_pending_write(key: str, pending: dict[str, Any] | None) -> None:
-    """跨 uvicorn worker 共享：内存 + 磁盘（workers>1 时内存不可靠）。"""
+    """跨 uvicorn worker / 多实例共享：共享 KV（PG）+ 内存加速；无 DB 回退磁盘。"""
     if not key:
         return
     now = time.time()
     with _PENDING_LOCK:
         if not pending or not pending.get("tool"):
             _PENDING_STORE.pop(key, None)
-            _disk_write("pending", key, None)
+            _kv_write("pending", key, None)
             return
         blob = dict(pending)
         blob["_saved_at"] = now
         _PENDING_STORE[key] = blob
-        _disk_write("pending", key, blob)
+        _kv_write("pending", key, blob)
 
 
 def load_pending_write(key: str) -> dict[str, Any] | None:
@@ -276,17 +294,17 @@ def load_pending_write(key: str) -> dict[str, Any] | None:
         return None
     now = time.time()
     with _PENDING_LOCK:
-        st = _PENDING_STORE.get(key)
+        st = _kv_read("pending", key)
         if not st:
-            st = _disk_read("pending", key)
-            if st:
-                _PENDING_STORE[key] = st
+            # 共享 KV / 磁盘都没有，再看进程内（可能刚写未落库失败）
+            st = _PENDING_STORE.get(key)
         if not st:
             return None
         if now - float(st.get("_saved_at") or 0) > _PENDING_TTL_SEC:
             _PENDING_STORE.pop(key, None)
-            _disk_write("pending", key, None)
+            _kv_write("pending", key, None)
             return None
+        _PENDING_STORE[key] = st
         out = {k: v for k, v in st.items() if k != "_saved_at"}
         return out if out.get("tool") else None
 
@@ -296,7 +314,7 @@ def clear_pending_write(key: str) -> None:
         return
     with _PENDING_LOCK:
         _PENDING_STORE.pop(key, None)
-        _disk_write("pending", key, None)
+        _kv_write("pending", key, None)
 
 
 def load(session_key: str) -> SessionContextState:
@@ -304,18 +322,16 @@ def load(session_key: str) -> SessionContextState:
         return SessionContextState()
     now = time.time()
     with _LOCK:
-        st = _STORE.get(session_key)
-        if not st:
-            raw = _disk_read("session", session_key)
-            if raw:
-                st = SessionContextState.from_dict(raw)
-                _STORE[session_key] = st
+        # 多实例：始终以共享 KV 为真相源，避免读到本 worker 陈旧内存
+        raw = _kv_read("session", session_key)
+        st = SessionContextState.from_dict(raw) if raw else _STORE.get(session_key)
         if not st:
             return SessionContextState(session_key=session_key)
         if st.updated_at and now - st.updated_at > _TTL_SEC:
             _STORE.pop(session_key, None)
-            _disk_write("session", session_key, None)
+            _kv_write("session", session_key, None)
             return SessionContextState(session_key=session_key)
+        _STORE[session_key] = SessionContextState.from_dict(st.to_dict())
         return SessionContextState.from_dict(st.to_dict())
 
 
@@ -326,20 +342,26 @@ def save(state: SessionContextState) -> None:
     blob = state.to_dict()
     with _LOCK:
         _STORE[state.session_key] = SessionContextState.from_dict(blob)
-        _disk_write("session", state.session_key, blob)
+        _kv_write("session", state.session_key, blob)
 
 
 def clear(session_key: str = "") -> None:
     with _LOCK:
         if session_key:
             _STORE.pop(session_key, None)
-            _disk_write("session", session_key, None)
+            _kv_write("session", session_key, None)
         else:
             _STORE.clear()
     with _PENDING_LOCK:
         if not session_key:
             _PENDING_STORE.clear()
-            # 测试清空：扫盘
+            # 测试清空：共享 KV + 扫盘
+            try:
+                from . import session_kv
+
+                session_kv.clear_all()
+            except Exception:
+                pass
             try:
                 for p in _data_dir().glob("*.json"):
                     p.unlink()

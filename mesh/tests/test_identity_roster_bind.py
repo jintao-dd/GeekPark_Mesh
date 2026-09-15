@@ -34,8 +34,7 @@ def test_roster_open_id_resolves_without_users_row():
     assert ident.display_hint == "赵思琪"
     assert ident.bind_state == "roster_known"
     assert ident.mesh_user_id is None
-    assert ident.primary_team  # 海外拓展 → 品牌创意团队
-    assert "品牌创意" in (ident.primary_team or "")
+    assert ident.primary_team == "海外拓展"  # 独立主队，不再压成品牌创意
 
 
 def test_unknown_open_id_still_unlinked():

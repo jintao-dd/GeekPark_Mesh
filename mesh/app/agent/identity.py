@@ -18,9 +18,14 @@ from .models import (
 # 不可作为 Person.primary_team 的占位 / 外部桶
 _NON_BUSINESS = frozenset({"", "其他", "内容中心·数据聚合", "外部媒体"})
 
+# 同事轨专用主队（不进周报生产 ingest.TEAMS，仅用于认「我们团队」/身份）
+# 例：飞书「海外拓展」挂在品牌创意部下，但作为独立小队更贴近现实归属（思琪）。
+_EXTRA_COLLEAGUE_TEAMS = frozenset({"海外拓展"})
+
 # 多队时软选优先级（飞书映射 / 花名册同时命中多队时用；不锁死 conflict）
 _TEAM_PICK_ORDER = (
     "CEO / 总裁办",
+    "海外拓展",
     "品牌创意团队",
     "编辑部",
     "投资团队",
@@ -36,7 +41,11 @@ def is_business_team(team: str | None) -> bool:
     t = (team or "").strip()
     if not t or t in _NON_BUSINESS:
         return False
+    if t in _EXTRA_COLLEAGUE_TEAMS:
+        return True
     canon = ingest.canonical_team(t) or t
+    if canon in _EXTRA_COLLEAGUE_TEAMS:
+        return True
     return canon in ingest.TEAMS and canon not in _NON_BUSINESS
 
 
@@ -44,7 +53,12 @@ def normalize_team(team: str | None) -> str | None:
     if not is_business_team(team):
         return None
     t = (team or "").strip()
-    return ingest.canonical_team(t) or t
+    if t in _EXTRA_COLLEAGUE_TEAMS:
+        return t
+    canon = ingest.canonical_team(t) or t
+    if canon in _EXTRA_COLLEAGUE_TEAMS:
+        return canon
+    return canon
 
 
 def _prefer_team(candidates: list[str]) -> str:

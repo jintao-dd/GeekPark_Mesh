@@ -151,8 +151,9 @@
       "feishu_department_id": "od-644d40c70347c24aec465ea85bb88d93",
       "name": "海外拓展",
       "parent_department_id": "od-3f2b9310260ff7673d0694fb43060515",
-      "canonical_team": "品牌创意团队",
-      "note": "飞书挂在品牌创意部下（非独立 Mesh 队）"
+      "canonical_team": "海外拓展",
+      "parent_team": "品牌创意团队",
+      "note": "飞书挂在品牌创意部下；主队独立为「海外拓展」，问品牌创意时按 parent_team 仍纳入"
     }
   ]
 }

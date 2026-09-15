@@ -251,7 +251,10 @@ def _dept_ids_for_mesh_team(team: str) -> set[str]:
         from ..dept_team_map import load_dept_team_map
 
         for row in load_dept_team_map().get("departments") or []:
-            if str(row.get("canonical_team") or "").strip() != team:
+            canon = str(row.get("canonical_team") or "").strip()
+            parent_team = str(row.get("parent_team") or "").strip()
+            # 命中：自身 canonical，或作为子队 parent_team（如品牌创意团队含海外拓展）
+            if canon != team and parent_team != team:
                 continue
             oid = str(row.get("feishu_department_id") or "").strip()
             if oid:
@@ -344,7 +347,7 @@ def _roster_people_for_team(team: str) -> list[dict[str, Any]]:
     """飞书 walk 空结果时，用手填花名册按 Mesh 队兜底。"""
     try:
         from ..person_resolve import load_roster
-        from ..dept_team_map import map_department_name
+        from ..dept_team_map import load_dept_team_map, map_department_name
         from ... import db
 
         people = []
@@ -359,6 +362,11 @@ def _roster_people_for_team(team: str) -> list[dict[str, Any]]:
                 ts = str(t or "").strip()
                 mapped = map_department_name(ts) or db.normalize_team(ts)
                 if mapped == team or ts == team:
+                    hit = True
+                    break
+                # 子队并入父业务队：品牌创意团队 应含 海外拓展 花名册成员
+                prow = (load_dept_team_map().get("by_name") or {}).get(ts)
+                if isinstance(prow, dict) and str(prow.get("parent_team") or "").strip() == team:
                     hit = True
                     break
             if not hit:
