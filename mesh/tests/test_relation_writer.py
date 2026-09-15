@@ -152,7 +152,9 @@ def test_write_relations_allows_empty_body_with_details():
     )
     assert skipped == []
     assert len(rels) == 1
-    assert rels[0]["body"] == ""
+    # 空 body + details → 合成一句总结
+    assert (rels[0].get("body") or "").strip()
+    assert rels[0].get("_body_synthesized_from_details") or "另一侧" in (rels[0].get("body") or "")
     assert len(rels[0]["details"]) == 2
 
 
@@ -247,35 +249,36 @@ def test_body_template_cleared():
     )
     assert flags["body_cleared_template"]
     assert flags["title_rebuilt"]
-    assert body == ""
+    # 套话清掉后，用 details 合成总结
+    assert flags.get("body_synthesized_from_details")
+    assert body
     assert "×" not in title
     assert "催初稿" in title
 
 
-def test_body_restates_details_cleared():
+def test_body_restates_kept_and_empty_synthesized():
     details = [
         "商业化团队：京东合同流程中，催初稿",
         "编辑部：京东商务选题进行中，提报 9/10",
     ]
-    assert body_restates_details(
-        "商业化在催初稿；编辑部京东商务选题 9/10 已提报。",
-        details,
-    )
-    # 有跨队增量的一句应保留
-    assert not body_restates_details(
-        "商务选题已提报，合作稿却仍卡在催初稿，两边进度未对齐。",
-        details,
-    )
+    # 概括两侧不再被硬清
     title, body, out_details, flags = enforce_narrative_hygiene(
-        title="京东：合同催初稿 × 商务选题已提报",
+        title="京东合作稿卡在催初稿",
         body="商业化在催初稿；编辑部京东商务选题 9/10 已提报。",
         details=details,
         candidate_title="京东",
     )
-    assert flags["title_rebuilt"]
-    assert flags["body_cleared_restates"]
-    assert body == ""
-    assert "×" not in title
+    assert body
+    assert not flags.get("body_cleared_restates")
+    # 空 body + details → 合成
+    title2, body2, _, flags2 = enforce_narrative_hygiene(
+        title="京东合作稿卡在催初稿",
+        body="",
+        details=details,
+        candidate_title="京东",
+    )
+    assert flags2.get("body_synthesized_from_details")
+    assert "催初稿" in body2 or "选题" in body2
 
 
 def test_dedupe_near_details():
@@ -312,11 +315,11 @@ def test_narrative_violation_codes_and_field_rewrite(monkeypatch):
 
     codes = rw.narrative_violation_codes(
         "京东：催初稿 × 选题提报",
-        "商业化在催初稿；编辑部选题已提报。",
+        "",
         ["商业化团队：催初稿", "编辑部：选题提报"],
     )
     assert "title_formula" in codes
-    assert "body_restates" in codes
+    assert "body_empty" in codes
 
     calls = {"n": 0}
 

@@ -158,7 +158,7 @@ def test_display_dedupe_hides_identical_body():
     assert entries[0]["rel"]["body"] == ""
 
 
-def test_empty_body_not_reader_visible():
+def test_empty_body_reader_visible_with_details():
     from app.relation_display import reader_visible
 
     rel = _rel_with_evidence(
@@ -166,4 +166,4 @@ def test_empty_body_not_reader_visible():
         body="",
         details=["商业化团队：飞书合作待PR部门走正规流程对接（接触中）"],
     )
-    assert not reader_visible(rel)
+    assert reader_visible(rel)

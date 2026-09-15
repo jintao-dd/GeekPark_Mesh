@@ -77,7 +77,8 @@ def test_paraphrase_body_kept_not_hidden():
     assert len(rel.get("details") or []) >= 2
 
 
-def test_no_body_not_formed_silently():
+def test_no_body_kept_when_details_present():
+    """有 details/evidence 时空 body 仍成卡（有来源即可）。"""
     items = _items_oppo()
     draft = {
         "relations": [
@@ -95,10 +96,11 @@ def test_no_body_not_formed_silently():
         ]
     }
     out, not_formed = filter_ungrounded_relations(draft, items)
-    assert "OPPO" in not_formed
-    assert out["relations"] == []
-    assert "_relations_dropped_ungrounded" not in out
-    assert out.get("_relations_not_formed_count") == 1
+    assert not_formed == []
+    assert len(out["relations"]) == 1
+    # sanitize 可能用 details 合成 body
+    rel = out["relations"][0]
+    assert (rel.get("body") or "").strip() or (rel.get("details") or [])
 
 
 def test_suspected_duplicate_warning_keeps_both():

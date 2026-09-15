@@ -33,11 +33,20 @@ def test_skip_or_incomplete_not_visible():
     assert not reader_visible({
         "decision_tier": "skip", "title": "t", "body": "b", "evidence": [{}],
     })
+    # 无 body 也无 details → 不完整
     assert not reader_visible({
         "decision_tier": "strong", "title": "t", "body": "", "evidence": [{}],
     })
     assert not reader_visible({
         "decision_tier": "parallel", "title": "t", "body": "b", "evidence": [],
+    })
+    # 有 details 无 body → 可见
+    assert reader_visible({
+        "decision_tier": "strong",
+        "title": "t",
+        "body": "",
+        "details": ["商业化团队：接触中"],
+        "evidence": [{"item_id": 1}],
     })
 
 

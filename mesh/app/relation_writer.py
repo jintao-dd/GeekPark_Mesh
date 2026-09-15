@@ -376,6 +376,7 @@ def enforce_narrative_hygiene(
         "body_cleared_template": False,
         "body_cleared_restates": False,
         "details_deduped": False,
+        "body_synthesized_from_details": False,
     }
     t = strip_route_meta_copy((title or "").strip())
     b = strip_route_meta_copy((body or "").strip())
@@ -409,11 +410,30 @@ def enforce_narrative_hygiene(
     ):
         b = ""
         flags["body_cleared_template"] = True
-    elif body_restates_details(b, dets):
-        b = ""
-        flags["body_cleared_restates"] = True
+    # 不再因「复读 details」清空 body：有来源的概括总结允许贴近圆点；空壳套话已在上面清理。
+
+    # 仍无 body 但有 details → 用圆点合成一句总结（有来源必有总结的兜底）
+    if not b and dets:
+        syn = synthesize_body_from_details(dets)
+        if syn:
+            b = syn
+            flags["body_synthesized_from_details"] = True
 
     return t, b, dets, flags
+
+
+def synthesize_body_from_details(details: list[str]) -> str:
+    """由已锁定 details 合成一句跨队总结（不引入 evidence 外事实）。"""
+    cores = [_detail_full_core(d) for d in (details or []) if str(d).strip()]
+    cores = [re.sub(r"[。．]+$", "", c).strip() for c in cores if c]
+    cores = [c for c in cores if c]
+    if len(cores) >= 2:
+        a = cores[0][:42]
+        b = cores[1][:42]
+        return f"{a}；另一侧{b}。"
+    if len(cores) == 1:
+        return cores[0][:80] + ("。" if not cores[0].endswith(("。", "！", "？")) else "")
+    return ""
 
 
 # 禁止写入读者文案的路由元叙述 / 标题尾巴
@@ -605,8 +625,9 @@ def narrative_violation_codes(
         and len(b) < 56
     ):
         codes.append("body_template")
-    elif b and body_restates_details(b, dets):
-        codes.append("body_restates")
+    elif not b and dets:
+        # 有圆点无总结 → 优先让模型补一句（不成卡不再因此否决）
+        codes.append("body_empty")
     return codes
 
 
@@ -630,6 +651,8 @@ def _apply_hygiene_to_rel(rel: dict, obj: dict) -> dict:
         rel["_body_omitted_restates_details"] = True
     if flags.get("details_deduped"):
         rel["_details_deduped"] = True
+    if flags.get("body_synthesized_from_details"):
+        rel["_body_synthesized_from_details"] = True
     return rel
 
 
@@ -694,8 +717,8 @@ def call_writer_llm(objects: list[dict]) -> list[dict]:
         f"【relation_objects】\n{json.dumps(payload, ensure_ascii=False)[:llm.budget(20000)]}\n\n"
         "对每个 candidate_id 写一条；遵守该卡 label_hint；不得修改 label/teams/evidence。"
         " title 写短钩子（禁止「A × B」对照表公式与标签词）；"
-        " body 只写圆点之外的跨队增量（禁止把两条 detail 换皮拼成 A…；B…）；"
-        " 无增量则 body 留空。"
+        " body 写一句跨队关系总结（可概括两侧 evidence/details 事实，禁止空壳套话）；"
+        " 有 details 时尽量写出 body；实在写不出再留空。"
     )
     out = llm.call_json_compliant(system, user, max_tokens=8000)
     rows = list(out.get("relation_writings") or out.get("relation_narratives") or [])
@@ -717,8 +740,9 @@ _FIX_CODE_HINTS = {
     "title_formula": "title 禁止再写成「主体：A × B」或一边一边对照表；改短钩子。",
     "title_label_leak": "title 禁止标签词（各知一半/不同触点/已联动等）。",
     "title_empty": "title 不能为空；用主体+最关键事实写短钩子。",
-    "body_template": "body 禁止套话（各掌握一部分/这一合作等）；无增量则留空。",
-    "body_restates": "body 禁止把 details 换皮拼成 A…；B…；只写圆点外的跨队增量，写不出则留空。",
+    "body_template": "body 禁止套话（各掌握一部分/这一合作等）；请改写为一句跨队事实总结。",
+    "body_empty": "已有 details/evidence，请写一句跨队关系总结（可概括两侧事实）；实在写不出再留空。",
+    "body_restates": "body 可概括两侧，但不要整句空壳套话；写成一句读者带走的总结。",
 }
 
 
@@ -790,7 +814,8 @@ def write_relations(
 ) -> tuple[list[dict], list[dict]]:
     """RelationObject 列表 → 合并写作结果；返回 (relations, skipped)。
 
-    流程：一次 Writer → 违规字段局部重写（至多一轮）→ 硬闸兜底。
+    流程：一次 Writer → 违规/空 body 字段重写（最多 2 轮）→ 硬闸；
+    仍无 body 时用 details 合成总结；强卡允许最终 body 为空（有 details 即成卡）。
     """
     objects = [relation_object_from_gate(o) for o in relation_objects if isinstance(o, dict)]
     if writings is None and objects:
@@ -801,51 +826,70 @@ def write_relations(
         if isinstance(w, dict)
     }
 
-    # 先合并不打硬清，便于带坏句去重写
     drafted: list[tuple[dict, dict]] = []
-    rewrite_tasks: list[dict] = []
     for obj in objects:
         cid = (obj.get("candidate_id") or "").strip()
         w = by_id.get(cid) or {}
         rel = merge_writing(obj, w, apply_hygiene=False)
-        codes = narrative_violation_codes(
-            rel.get("title") or "",
-            rel.get("body") or "",
-            list(rel.get("details") or []),
-        )
-        if codes:
+        drafted.append((obj, rel))
+
+    max_rounds = 2
+    rewrite_rounds = 0
+    for _ in range(max_rounds):
+        rewrite_tasks: list[dict] = []
+        for obj, rel in drafted:
+            cid = (obj.get("candidate_id") or "").strip()
+            codes = narrative_violation_codes(
+                rel.get("title") or "",
+                rel.get("body") or "",
+                list(rel.get("details") or []),
+            )
+            if not codes:
+                continue
             fields: list[str] = []
             if any(c.startswith("title_") for c in codes):
                 fields.append("title")
             if any(c.startswith("body_") for c in codes):
                 fields.append("body")
-            if fields:
-                rewrite_tasks.append({
-                    "candidate_id": cid,
-                    "label": obj.get("label"),
-                    "label_hint": label_write_hint(obj.get("label") or ""),
-                    "evidence": list(rel.get("evidence") or [])[:6],
-                    "details_locked": list(rel.get("details") or [])[:6],
-                    "fix_codes": codes,
-                    "fix_fields": fields,
-                    "bad_title": (rel.get("title") or "")[:120],
-                    "bad_body": (rel.get("body") or "")[:240],
-                })
-        drafted.append((obj, rel))
-
-    patches = call_writer_field_rewrite(rewrite_tasks) if rewrite_tasks else {}
+            if not fields:
+                continue
+            rewrite_tasks.append({
+                "candidate_id": cid,
+                "label": obj.get("label"),
+                "label_hint": label_write_hint(obj.get("label") or ""),
+                "evidence": list(rel.get("evidence") or [])[:6],
+                "details_locked": list(rel.get("details") or [])[:6],
+                "fix_codes": codes,
+                "fix_fields": fields,
+                "bad_title": (rel.get("title") or "")[:120],
+                "bad_body": (rel.get("body") or "")[:240],
+            })
+        if not rewrite_tasks:
+            break
+        patches = call_writer_field_rewrite(rewrite_tasks)
+        rewrite_rounds += 1
+        if not patches:
+            break
+        for obj, rel in drafted:
+            cid = (obj.get("candidate_id") or "").strip()
+            patch = patches.get(cid) or {}
+            if not patch:
+                continue
+            if "title" in patch and patch["title"]:
+                rel["title"] = patch["title"]
+            if "body" in patch:
+                rel["body"] = patch["body"]
+            prev = list(rel.get("_writer_field_rewrite") or [])
+            for k in patch.keys():
+                if k not in prev:
+                    prev.append(k)
+            rel["_writer_field_rewrite"] = prev
+            rel["_writer_rewrite_rounds"] = rewrite_rounds
 
     out: list[dict] = []
     skipped: list[dict] = []
     for obj, rel in drafted:
         cid = (obj.get("candidate_id") or "").strip()
-        patch = patches.get(cid) or {}
-        if patch:
-            if "title" in patch and patch["title"]:
-                rel["title"] = patch["title"]
-            if "body" in patch:
-                rel["body"] = patch["body"]
-            rel["_writer_field_rewrite"] = list(patch.keys())
         rel = _apply_hygiene_to_rel(rel, obj)
         title_ok = bool((rel.get("title") or "").strip())
         body_ok = bool((rel.get("body") or "").strip())

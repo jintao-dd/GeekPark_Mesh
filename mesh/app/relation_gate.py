@@ -174,17 +174,15 @@ def relation_fails_grounding(rel: dict, items: list[dict]) -> list[str]:
     weakish = bool(rel.get("weak") or (rel.get("decision_tier") or "").strip().lower() == "watch")
 
     if weakish and (rel.get("evidence") or []):
-        # 观察/弱卡：有 evidence +（body 或 details）即可；不因 paraphrase 门槛整卡否决
+        # 观察/弱卡：有 evidence +（body 或 details）即可
         if not body and not details:
             errs.append(f"关系「{title}」缺少 body/details")
     else:
-        # 读者强卡：必须有非空总结 body
-        if not body:
-            errs.append(f"关系「{title}」缺少关系总结 body")
-        elif not body_summary_grounded(body, rel):
-            errs.append(f"关系「{title}」body 无法由 evidence 证明")
+        # 读者强卡：须有 details（来源论证）；body 有更好，空也可成卡
         if not details:
             errs.append(f"关系「{title}」缺少可用 details")
+        if body and not body_summary_grounded(body, rel):
+            errs.append(f"关系「{title}」body 无法由 evidence 证明")
 
     mini = {"relations": [rel]}
     for e in relation_publish_blockers(mini, items):
