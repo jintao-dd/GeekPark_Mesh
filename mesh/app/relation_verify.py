@@ -324,7 +324,7 @@ def verify_relation_narrative(rel: dict) -> dict:
         body = ""
 
     if not body:
-        # 无 body：读者页不可见（见 relation_display._card_complete）；不塞 snippet
+        # 无 body：有 details 仍可成卡（见 relation_display._card_complete）；不塞 snippet
         if kept_details:
             rel["needs_review"] = False
             rel["status"] = "confirmed"

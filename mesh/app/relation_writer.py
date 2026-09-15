@@ -163,12 +163,25 @@ def title_is_formula(title: str) -> bool:
     return False
 
 
+def _clip_at_boundary(text: str, max_len: int) -> str:
+    """限长时尽量落在标点/空白，避免半截字硬砍。"""
+    s = (text or "").strip()
+    if len(s) <= max_len:
+        return s
+    chunk = s[:max_len]
+    for sep in ("，", ",", "；", ";", "、", " ", "·"):
+        i = chunk.rfind(sep)
+        if i >= max(8, max_len // 3):
+            return chunk[:i].strip()
+    return chunk.rstrip("，,；;、· ")
+
+
 def _detail_fact_core(detail: str, max_len: int = 28) -> str:
     ds = strip_route_meta_copy(str(detail or "").strip())
     m = _DETAIL_TEAM.match(ds)
     core = ds[m.end():].strip() if m else ds
     core = re.split(r"[，,；;。．]", core)[0].strip()
-    return core[:max_len]
+    return _clip_at_boundary(core, max_len)
 
 
 def _detail_full_core(detail: str) -> str:
@@ -346,17 +359,19 @@ def title_from_details(
                 continue
             snip = (e.get("snippet") or e.get("quote") or "").strip()
             if snip:
-                cores.append(re.split(r"[，,；;。．]", snip)[0].strip()[:28])
+                cores.append(
+                    _clip_at_boundary(re.split(r"[，,；;。．]", snip)[0].strip(), 28)
+                )
         cores = [c for c in cores if c]
     subj = _subject_from_candidate(candidate_title)
     if not cores:
-        return (subj or candidate_title or "").strip()[:80]
+        return _clip_at_boundary((subj or candidate_title or "").strip(), 80)
     lead = cores[0]
     if subj:
         title = f"{subj}：{lead}"
     else:
         title = lead
-    return title[:80]
+    return _clip_at_boundary(title, 80)
 
 
 def enforce_narrative_hygiene(
@@ -376,7 +391,6 @@ def enforce_narrative_hygiene(
         "body_cleared_template": False,
         "body_cleared_restates": False,
         "details_deduped": False,
-        "body_synthesized_from_details": False,
     }
     t = strip_route_meta_copy((title or "").strip())
     b = strip_route_meta_copy((body or "").strip())
@@ -410,30 +424,9 @@ def enforce_narrative_hygiene(
     ):
         b = ""
         flags["body_cleared_template"] = True
-    # 不再因「复读 details」清空 body：有来源的概括总结允许贴近圆点；空壳套话已在上面清理。
-
-    # 仍无 body 但有 details → 用圆点合成一句总结（有来源必有总结的兜底）
-    if not b and dets:
-        syn = synthesize_body_from_details(dets)
-        if syn:
-            b = syn
-            flags["body_synthesized_from_details"] = True
+    # 不再因「复读 details」清空 body；也不用截字拼 body——空 body 留给字段重写或最终留空成卡。
 
     return t, b, dets, flags
-
-
-def synthesize_body_from_details(details: list[str]) -> str:
-    """由已锁定 details 合成一句跨队总结（不引入 evidence 外事实）。"""
-    cores = [_detail_full_core(d) for d in (details or []) if str(d).strip()]
-    cores = [re.sub(r"[。．]+$", "", c).strip() for c in cores if c]
-    cores = [c for c in cores if c]
-    if len(cores) >= 2:
-        a = cores[0][:42]
-        b = cores[1][:42]
-        return f"{a}；另一侧{b}。"
-    if len(cores) == 1:
-        return cores[0][:80] + ("。" if not cores[0].endswith(("。", "！", "？")) else "")
-    return ""
 
 
 # 禁止写入读者文案的路由元叙述 / 标题尾巴
@@ -651,8 +644,6 @@ def _apply_hygiene_to_rel(rel: dict, obj: dict) -> dict:
         rel["_body_omitted_restates_details"] = True
     if flags.get("details_deduped"):
         rel["_details_deduped"] = True
-    if flags.get("body_synthesized_from_details"):
-        rel["_body_synthesized_from_details"] = True
     return rel
 
 
@@ -717,8 +708,8 @@ def call_writer_llm(objects: list[dict]) -> list[dict]:
         f"【relation_objects】\n{json.dumps(payload, ensure_ascii=False)[:llm.budget(20000)]}\n\n"
         "对每个 candidate_id 写一条；遵守该卡 label_hint；不得修改 label/teams/evidence。"
         " title 写短钩子（禁止「A × B」对照表公式与标签词）；"
-        " body 写一句跨队关系总结（可概括两侧 evidence/details 事实，禁止空壳套话）；"
-        " 有 details 时尽量写出 body；实在写不出再留空。"
+        " body 按本卡 label_hint + evidence 写一句跨队关系总结（可 paraphrase 两侧事实，禁止空壳套话）；"
+        " 有 details 时尽量写出 body；写不出可留空——系统不会用截字拼 body。"
     )
     out = llm.call_json_compliant(system, user, max_tokens=8000)
     rows = list(out.get("relation_writings") or out.get("relation_narratives") or [])
@@ -741,8 +732,8 @@ _FIX_CODE_HINTS = {
     "title_label_leak": "title 禁止标签词（各知一半/不同触点/已联动等）。",
     "title_empty": "title 不能为空；用主体+最关键事实写短钩子。",
     "body_template": "body 禁止套话（各掌握一部分/这一合作等）；请改写为一句跨队事实总结。",
-    "body_empty": "已有 details/evidence，请写一句跨队关系总结（可概括两侧事实）；实在写不出再留空。",
-    "body_restates": "body 可概括两侧，但不要整句空壳套话；写成一句读者带走的总结。",
+    "body_empty": "请按本卡 label + label_hint + evidence 写一句跨队总结；details_locked 仅作参考勿整段抄写；写不出可留空。",
+    "body_restates": "body 按 label+evidence 概括两侧，勿空壳套话；勿整段抄 details_locked。",
 }
 
 
@@ -783,8 +774,8 @@ def call_writer_field_rewrite(tasks: list[dict]) -> dict[str, dict]:
         return {}
     user = (
         f"【relation_fixes】\n{json.dumps(slim, ensure_ascii=False)[:llm.budget(16000)]}\n\n"
-        "对每条：只重写 fix_fields；必须遵守 evidence 与 details_locked；"
-        "body 若无增量请输出空字符串；禁止复读 details_locked；禁止 A × B 标题公式。"
+        "对每条：只重写 fix_fields；body 以 label_hint + evidence 为准写总结；"
+        "details_locked 只防空壳/抄写，不是拼接原料；写不出 body 可输出空字符串；禁止 A × B 标题公式。"
     )
     try:
         out = llm.call_json_compliant(system, user, max_tokens=4000)
@@ -815,7 +806,7 @@ def write_relations(
     """RelationObject 列表 → 合并写作结果；返回 (relations, skipped)。
 
     流程：一次 Writer → 违规/空 body 字段重写（最多 2 轮）→ 硬闸；
-    仍无 body 时用 details 合成总结；强卡允许最终 body 为空（有 details 即成卡）。
+    仍无 body 不截字合成；强卡允许最终 body 为空（有 details 即成卡）。
     """
     objects = [relation_object_from_gate(o) for o in relation_objects if isinstance(o, dict)]
     if writings is None and objects:

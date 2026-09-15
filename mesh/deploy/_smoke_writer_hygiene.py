@@ -15,6 +15,7 @@ print({"title": t, "body": b, "flags": f})
 assert f.get("title_rebuilt")
 assert "×" not in t
 assert not title_is_formula(t)
-assert b  # synthesized
-assert f.get("body_synthesized_from_details")
-print("HYGIENE_V3_OK")
+assert not title_has_label_leak(t)
+assert b == ""  # no synthesize
+assert not f.get("body_synthesized_from_details")
+print("HYGIENE_V4_OK")

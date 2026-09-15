@@ -139,7 +139,10 @@ def test_merge_writing_preserves_decision_tier_when_writer_omits():
     assert rel["relation_type"] == "parallel_tracks"
 
 
-def test_write_relations_allows_empty_body_with_details():
+def test_write_relations_allows_empty_body_with_details(monkeypatch):
+    from app import relation_writer as rw
+
+    monkeypatch.setattr(rw, "call_writer_field_rewrite", lambda tasks: {})
     obj = _sample_object()
     rels, skipped = write_relations(
         [obj],
@@ -152,9 +155,10 @@ def test_write_relations_allows_empty_body_with_details():
     )
     assert skipped == []
     assert len(rels) == 1
-    # 空 body + details → 合成一句总结
-    assert (rels[0].get("body") or "").strip()
-    assert rels[0].get("_body_synthesized_from_details") or "另一侧" in (rels[0].get("body") or "")
+    # 空 body + details → 成卡；不再截字合成 body
+    assert not (rels[0].get("body") or "").strip()
+    assert not rels[0].get("_body_synthesized_from_details")
+    assert "另一侧" not in (rels[0].get("body") or "")
     assert len(rels[0]["details"]) == 2
 
 
@@ -249,14 +253,14 @@ def test_body_template_cleared():
     )
     assert flags["body_cleared_template"]
     assert flags["title_rebuilt"]
-    # 套话清掉后，用 details 合成总结
-    assert flags.get("body_synthesized_from_details")
-    assert body
+    # 套话清掉后留空；不截字合成
+    assert not flags.get("body_synthesized_from_details")
+    assert body == ""
     assert "×" not in title
     assert "催初稿" in title
 
 
-def test_body_restates_kept_and_empty_synthesized():
+def test_body_restates_kept_and_empty_stays_empty():
     details = [
         "商业化团队：京东合同流程中，催初稿",
         "编辑部：京东商务选题进行中，提报 9/10",
@@ -270,15 +274,15 @@ def test_body_restates_kept_and_empty_synthesized():
     )
     assert body
     assert not flags.get("body_cleared_restates")
-    # 空 body + details → 合成
+    # 空 body + details → 保持空，留给字段重写
     title2, body2, _, flags2 = enforce_narrative_hygiene(
         title="京东合作稿卡在催初稿",
         body="",
         details=details,
         candidate_title="京东",
     )
-    assert flags2.get("body_synthesized_from_details")
-    assert "催初稿" in body2 or "选题" in body2
+    assert not flags2.get("body_synthesized_from_details")
+    assert body2 == ""
 
 
 def test_dedupe_near_details():
