@@ -22,7 +22,7 @@ def test_card_concurrency_clamp(monkeypatch=None):
     os.environ["MESH_PREVIEW_CARD_CONCURRENCY"] = "2"
     assert preview_job._card_concurrency() == 2
     os.environ.pop("MESH_PREVIEW_CARD_CONCURRENCY", None)
-    assert preview_job._card_concurrency() == 1
+    assert preview_job._card_concurrency() == 2
 
 
 def test_parallel_cards_preserve_apply_order_and_profile():

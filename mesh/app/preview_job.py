@@ -28,9 +28,10 @@ KIND = "preview"
 
 def _card_concurrency() -> int:
     try:
-        n = int((os.environ.get("MESH_PREVIEW_CARD_CONCURRENCY") or "1").strip() or "1")
+        # 默认 2：tmesh A/B 验证 cards 段约 1.7×；受 MESH_JOB_LLM_* 槽位上限约束
+        n = int((os.environ.get("MESH_PREVIEW_CARD_CONCURRENCY") or "2").strip() or "2")
     except ValueError:
-        n = 1
+        n = 2
     return max(1, min(8, n))
 
 

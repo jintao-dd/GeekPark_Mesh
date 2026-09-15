@@ -339,3 +339,52 @@ def try_claim(
         return st
     finally:
         con.close()
+
+
+def reclaim_dead_executors(current_holder: str) -> int:
+    """Worker 启动时：回收「running 但执行者已死」的任务，避免僵尸占坑。
+
+    条件：running=1 且 payload._executor 为其它 worker:*（非 pending/空/本进程）。
+    标记 interrupted，清空 executor，便于 force 或人工重跑；不自动重入以免双写。
+    """
+    holder = (current_holder or "").strip()
+    con = db.connect()
+    n = 0
+    try:
+        ensure_table(con)
+        rows = con.execute(
+            "SELECT job_kind, job_key, token, payload_json, running FROM mesh_jobs WHERE running=1"
+        ).fetchall()
+        for row in rows:
+            try:
+                payload = json.loads(row["payload_json"] or "{}") or {}
+            except Exception:
+                payload = {}
+            ex = str(payload.get("_executor") or "").strip()
+            if not ex or ex in ("pending",):
+                continue
+            if holder and ex == holder:
+                continue
+            # 仅回收明确绑定到 worker 进程的执行者
+            if not ex.startswith("worker:"):
+                continue
+            kind = row["job_kind"]
+            key = row["job_key"]
+            defaults = {"running": False, "done": False, "error": None, "token": 0}
+            st = get(kind, key, defaults)
+            st["running"] = False
+            st["done"] = False
+            st["error"] = (
+                f"执行者丢失（原 {ex}），任务已中断；请重新触发 Preview/Pipeline。"
+            )
+            st["final_status"] = "interrupted"
+            st["_executor"] = ""
+            put(kind, key, st)
+            n += 1
+            print(
+                f"[mesh-jobs] reclaim_dead_executor kind={kind} key={key} was={ex}",
+                flush=True,
+            )
+    finally:
+        con.close()
+    return n

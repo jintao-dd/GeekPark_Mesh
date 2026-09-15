@@ -307,6 +307,48 @@ def test_merge_writing_strips_label_from_title():
     assert "豆包" in (rel.get("title") or "") or "AI" in (rel.get("title") or "")
 
 
+def test_narrative_violation_codes_and_field_rewrite(monkeypatch):
+    from app import relation_writer as rw
+
+    codes = rw.narrative_violation_codes(
+        "京东：催初稿 × 选题提报",
+        "商业化在催初稿；编辑部选题已提报。",
+        ["商业化团队：催初稿", "编辑部：选题提报"],
+    )
+    assert "title_formula" in codes
+    assert "body_restates" in codes
+
+    calls = {"n": 0}
+
+    def fake_rewrite(tasks):
+        calls["n"] += 1
+        assert tasks and "title" in tasks[0]["fix_fields"]
+        return {
+            tasks[0]["candidate_id"]: {
+                "title": "京东合作稿卡在催初稿",
+                "body": "商务选题已提报，合作稿却仍卡在催初稿，两边进度未对齐。",
+            }
+        }
+
+    monkeypatch.setattr(rw, "call_writer_field_rewrite", fake_rewrite)
+    obj = _sample_object()
+    writings = [{
+        "candidate_id": "c9",
+        "title": "豆包：终端判断 × 收费视频",
+        "body": "商业化关注豆包终端；视频号有豆包相关视频。",
+        "details": [
+            "商业化团队：豆包 AI 手机判断",
+            "视频号团队：豆包收费视频",
+        ],
+    }]
+    rels, skipped = rw.write_relations([obj], writings=writings)
+    assert calls["n"] == 1
+    assert not skipped
+    assert rels
+    assert "×" not in (rels[0].get("title") or "")
+    assert rels[0].get("_writer_field_rewrite")
+
+
 def test_title_from_details_shape():
     t = title_from_details(
         ["商业化团队：合同催初稿", "编辑部：商务选题已提报"],

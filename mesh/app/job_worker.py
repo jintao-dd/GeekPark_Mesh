@@ -108,7 +108,7 @@ def _tick_once() -> int:
 
 
 def main() -> None:
-    from . import job_runtime
+    from . import job_runtime, job_store
 
     signal.signal(signal.SIGINT, _handle_stop)
     signal.signal(signal.SIGTERM, _handle_stop)
@@ -123,6 +123,13 @@ def main() -> None:
             "[mesh-worker] warn: MESH_JOB_INLINE=1 — Web 也会跑线程；生产请设 INLINE=0",
             flush=True,
         )
+
+    try:
+        n_dead = job_store.reclaim_dead_executors(_holder())
+        if n_dead:
+            print(f"[mesh-worker] reclaimed {n_dead} dead-executor job(s)", flush=True)
+    except Exception:
+        traceback.print_exc()
 
     while not _STOP:
         try:

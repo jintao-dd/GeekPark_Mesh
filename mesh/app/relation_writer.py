@@ -583,6 +583,33 @@ def _normalize_details_for_teams(rel: dict, snap: dict) -> list[str]:
     return ordered[:8]
 
 
+def narrative_violation_codes(
+    title: str,
+    body: str,
+    details: list[str],
+) -> list[str]:
+    """硬闸同款检测，只返回原因码（不改写）。"""
+    codes: list[str] = []
+    t = (title or "").strip()
+    b = (body or "").strip()
+    dets = [str(d).strip() for d in (details or []) if str(d).strip()]
+    if not t:
+        codes.append("title_empty")
+    if title_has_label_leak(t):
+        codes.append("title_label_leak")
+    if title_is_formula(t):
+        codes.append("title_formula")
+    if body_is_template(b) or (
+        b
+        and any(frag in b for frag in ("各知一半", "各掌握一部分", "两侧各知一半"))
+        and len(b) < 56
+    ):
+        codes.append("body_template")
+    elif b and body_restates_details(b, dets):
+        codes.append("body_restates")
+    return codes
+
+
 def _apply_hygiene_to_rel(rel: dict, obj: dict) -> dict:
     """merge 后强制 title/body/details 卫生。"""
     title, body, details, flags = enforce_narrative_hygiene(
@@ -606,7 +633,12 @@ def _apply_hygiene_to_rel(rel: dict, obj: dict) -> dict:
     return rel
 
 
-def merge_writing(obj: dict, writing: dict) -> dict[str, Any]:
+def merge_writing(
+    obj: dict,
+    writing: dict,
+    *,
+    apply_hygiene: bool = True,
+) -> dict[str, Any]:
     """RelationObject + Writer 输出 → 带叙事的 relation（锁字段强制还原）。"""
     snap = _locked_snapshot(obj)
     w = _sanitize_writer_output(writing)
@@ -632,7 +664,14 @@ def merge_writing(obj: dict, writing: dict) -> dict[str, Any]:
         rel["details"] = _align_relation_from_evidence(
             dict(rel), suggested=_suggested_teams(snap),
         ).get("details") or []
-    rel = _apply_hygiene_to_rel(rel, obj)
+    if apply_hygiene:
+        rel = _apply_hygiene_to_rel(rel, obj)
+    else:
+        # 仍做 details 近重，便于重写时带锁定圆点
+        dets = dedupe_near_details(
+            [strip_route_meta_copy(str(d).strip()) for d in (rel.get("details") or []) if str(d).strip()]
+        )
+        rel["details"] = dets
     return rel
 
 
@@ -674,11 +713,85 @@ def call_writer_llm(objects: list[dict]) -> list[dict]:
     return result
 
 
+_FIX_CODE_HINTS = {
+    "title_formula": "title 禁止再写成「主体：A × B」或一边一边对照表；改短钩子。",
+    "title_label_leak": "title 禁止标签词（各知一半/不同触点/已联动等）。",
+    "title_empty": "title 不能为空；用主体+最关键事实写短钩子。",
+    "body_template": "body 禁止套话（各掌握一部分/这一合作等）；无增量则留空。",
+    "body_restates": "body 禁止把 details 换皮拼成 A…；B…；只写圆点外的跨队增量，写不出则留空。",
+}
+
+
+def call_writer_field_rewrite(tasks: list[dict]) -> dict[str, dict]:
+    """违规字段局部重写（一轮）。返回 candidate_id → {title?, body?}。"""
+    from . import llm
+
+    if not tasks:
+        return {}
+    system = (
+        llm.load_prompt("00_base_rules")
+        + "\n\n"
+        + llm.load_prompt("issue_relation_writer")
+        + "\n\n"
+        "你正在做**字段级修补**：只改 fix_fields 列出的字段。"
+        '输出严格 JSON：{"relation_fixes":[{"candidate_id":"...","title":"...","body":"..."}]}'
+        " 未要求修改的字段不要输出；details 禁止输出。"
+    )
+    slim = []
+    for t in tasks:
+        if not isinstance(t, dict):
+            continue
+        codes = list(t.get("fix_codes") or [])
+        fields = list(t.get("fix_fields") or [])
+        slim.append({
+            "candidate_id": t.get("candidate_id"),
+            "label": t.get("label"),
+            "label_hint": t.get("label_hint"),
+            "evidence": t.get("evidence") or [],
+            "details_locked": t.get("details_locked") or [],
+            "fix_codes": codes,
+            "fix_fields": fields,
+            "bad_title": t.get("bad_title") or "",
+            "bad_body": t.get("bad_body") or "",
+            "fix_hints": [_FIX_CODE_HINTS.get(c, c) for c in codes],
+        })
+    if not slim:
+        return {}
+    user = (
+        f"【relation_fixes】\n{json.dumps(slim, ensure_ascii=False)[:llm.budget(16000)]}\n\n"
+        "对每条：只重写 fix_fields；必须遵守 evidence 与 details_locked；"
+        "body 若无增量请输出空字符串；禁止复读 details_locked；禁止 A × B 标题公式。"
+    )
+    try:
+        out = llm.call_json_compliant(system, user, max_tokens=4000)
+    except Exception:
+        return {}
+    rows = list(out.get("relation_fixes") or out.get("relation_writings") or [])
+    by_id: dict[str, dict] = {}
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        cid = (r.get("candidate_id") or "").strip()
+        if not cid:
+            continue
+        patch: dict[str, Any] = {}
+        if "title" in r and r.get("title") is not None:
+            patch["title"] = str(r.get("title") or "").strip()
+        if "body" in r and r.get("body") is not None:
+            patch["body"] = str(r.get("body") or "").strip()
+        if patch:
+            by_id[cid] = patch
+    return by_id
+
+
 def write_relations(
     relation_objects: list[dict],
     writings: list[dict] | None = None,
 ) -> tuple[list[dict], list[dict]]:
-    """RelationObject 列表 → 合并写作结果；返回 (relations, skipped)。"""
+    """RelationObject 列表 → 合并写作结果；返回 (relations, skipped)。
+
+    流程：一次 Writer → 违规字段局部重写（至多一轮）→ 硬闸兜底。
+    """
     objects = [relation_object_from_gate(o) for o in relation_objects if isinstance(o, dict)]
     if writings is None and objects:
         writings = call_writer_llm(objects)
@@ -688,16 +801,55 @@ def write_relations(
         if isinstance(w, dict)
     }
 
-    out: list[dict] = []
-    skipped: list[dict] = []
+    # 先合并不打硬清，便于带坏句去重写
+    drafted: list[tuple[dict, dict]] = []
+    rewrite_tasks: list[dict] = []
     for obj in objects:
         cid = (obj.get("candidate_id") or "").strip()
         w = by_id.get(cid) or {}
-        rel = merge_writing(obj, w)
+        rel = merge_writing(obj, w, apply_hygiene=False)
+        codes = narrative_violation_codes(
+            rel.get("title") or "",
+            rel.get("body") or "",
+            list(rel.get("details") or []),
+        )
+        if codes:
+            fields: list[str] = []
+            if any(c.startswith("title_") for c in codes):
+                fields.append("title")
+            if any(c.startswith("body_") for c in codes):
+                fields.append("body")
+            if fields:
+                rewrite_tasks.append({
+                    "candidate_id": cid,
+                    "label": obj.get("label"),
+                    "label_hint": label_write_hint(obj.get("label") or ""),
+                    "evidence": list(rel.get("evidence") or [])[:6],
+                    "details_locked": list(rel.get("details") or [])[:6],
+                    "fix_codes": codes,
+                    "fix_fields": fields,
+                    "bad_title": (rel.get("title") or "")[:120],
+                    "bad_body": (rel.get("body") or "")[:240],
+                })
+        drafted.append((obj, rel))
+
+    patches = call_writer_field_rewrite(rewrite_tasks) if rewrite_tasks else {}
+
+    out: list[dict] = []
+    skipped: list[dict] = []
+    for obj, rel in drafted:
+        cid = (obj.get("candidate_id") or "").strip()
+        patch = patches.get(cid) or {}
+        if patch:
+            if "title" in patch and patch["title"]:
+                rel["title"] = patch["title"]
+            if "body" in patch:
+                rel["body"] = patch["body"]
+            rel["_writer_field_rewrite"] = list(patch.keys())
+        rel = _apply_hygiene_to_rel(rel, obj)
         title_ok = bool((rel.get("title") or "").strip())
         body_ok = bool((rel.get("body") or "").strip())
         details_ok = any(str(d).strip() for d in (rel.get("details") or []))
-        # body 可空（与 label_hint / Verify 去重契约一致）；须有 title，且 body 或 details 其一
         if not title_ok or not (body_ok or details_ok):
             skipped.append({
                 "candidate_id": cid,
