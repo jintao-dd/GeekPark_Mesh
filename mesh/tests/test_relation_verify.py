@@ -81,8 +81,8 @@ def test_no_evidence_downgraded():
     assert "独家战略合作" in out["body"]
 
 
-def test_ungrounded_body_not_copied_from_details():
-    """body 论证失败时，不得把 details 整段拼回 body。"""
+def test_ungrounded_body_emptied_not_snippet():
+    """body 论证失败时：空 body，不塞 snippet、不抄 details。"""
     detail = "商业化团队记录：飞书合作待PR部门走正规流程对接（接触中）"
     rel = _rel_with_evidence(
         body="完全编造的跨部门并购已完成并上市。",
@@ -90,13 +90,21 @@ def test_ungrounded_body_not_copied_from_details():
     )
     out = verify_relation_narrative(rel)
     assert out.get("needs_review") is False
-    assert detail not in (out.get("body") or "")
-    assert "；".join([detail]) != (out.get("body") or "")
-    # 短 snippet 或空；不得与 detail 同文
+    assert (out.get("body") or "") == ""
+    assert out.get("_body_omitted_ungrounded") is True
+    assert any("飞书合作" in str(d) for d in out["details"])
+
+
+def test_near_dup_body_cleared():
+    """body 是某条 detail 的摘抄/包含关系 → 清空。"""
     from app.relation_verify import body_redundant_with_details
 
-    assert not body_redundant_with_details(out.get("body") or "", out.get("details") or [])
-    assert any("飞书合作" in str(d) for d in out["details"])
+    detail = "商业化团队：选题会研判称邵青对 AgentOS 发展持较悲观判断，认为车企不会把核心调度权交给外部"
+    body = "选题会研判称邵青对 AgentOS 发展持较悲观判断，认为车企不会把核心调度权交给外部"
+    assert body_redundant_with_details(body, [detail])
+    rel = _rel_with_evidence(body=body, details=[detail, "编辑部：受访者陈述称邵青对 Agent OS 较悲观"])
+    out = verify_relation_narrative(rel)
+    assert (out.get("body") or "") == ""
 
 
 def test_display_dedupe_hides_identical_body():

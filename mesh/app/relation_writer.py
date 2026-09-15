@@ -90,6 +90,14 @@ _ROUTE_TAIL = re.compile(
 _ROUTE_SEMI = re.compile(
     r"[；;]\s*(?:对|国内)[^；;。．]{0,48}(?:可承接|可用|用得上|可对接|可关注|可对齐)[。．]?"
 )
+# 「；编辑部用得上」「；投资团队可承接」——分号后队名+路由词（不要求「对/国内」）
+_ROUTE_SEMI_TEAM = re.compile(
+    r"[；;]\s*[^；;。．]{0,36}(?:用得上|可承接|可用|可对接|可关注|可对齐|采访池用得上)[。．]?"
+)
+# 句末孤立「…编辑部用得上」「…可用得上」（无逗号时也能剥）
+_ROUTE_END = re.compile(
+    r"(?:[，,；;]\s*)?[\w\u4e00-\u9fff（）()\s·\-]{0,24}(?:用得上|可用得上|可承接|可对接|可关注)[。．]?$"
+)
 
 
 def strip_route_meta_copy(text: str) -> str:
@@ -104,6 +112,8 @@ def strip_route_meta_copy(text: str) -> str:
         t = _META_ROUTE_COPY2.sub("", t)
         t = _ROUTE_TAIL.sub("", t)
         t = _ROUTE_SEMI.sub("", t)
+        t = _ROUTE_SEMI_TEAM.sub("", t)
+        t = _ROUTE_END.sub("", t)
     t = re.sub(r"[，,]{2,}", "，", t)
     t = re.sub(r"[；;]{2,}", "；", t)
     t = re.sub(r"。{2,}", "。", t)
@@ -278,8 +288,8 @@ def call_writer_llm(objects: list[dict]) -> list[dict]:
     payload = [to_writer_input(obj) for obj in objects]
     user = (
         f"【relation_objects】\n{json.dumps(payload, ensure_ascii=False)[:llm.budget(20000)]}\n\n"
-        "对每个 candidate_id 写一条；遵守该卡 label_hint；不得修改 label/teams/evidence；"
-        "写不出跨队交叉句则 body 留空，只写 details。"
+        "对每个 candidate_id 写一条；遵守该卡 label_hint；不得修改 label/teams/evidence。"
+        " body 写一句话关系总结（非复述某一队 detail）；实在写不出则 body 留空，只写 details。"
     )
     out = llm.call_json_compliant(system, user, max_tokens=8000)
     rows = list(out.get("relation_writings") or out.get("relation_narratives") or [])

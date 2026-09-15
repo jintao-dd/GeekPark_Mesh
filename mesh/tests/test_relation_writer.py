@@ -183,6 +183,13 @@ def test_strip_route_meta_copy_investment_tails():
         "双方约定长期互相对接；国内编辑部选题可用得上。"
     ) == "双方约定长期互相对接"
     assert strip_route_meta_copy("赵越（仙工智能）关注中，投资团队用得上") == "赵越（仙工智能）关注中"
+    # 分号后队名+用得上（线上常见漏网）
+    assert strip_route_meta_copy(
+        "张鹏认为应从更宏观视角看待这波 agent 创业者，记者需呈现多元观点；编辑部用得上"
+    ) == "张鹏认为应从更宏观视角看待这波 agent 创业者，记者需呈现多元观点"
+    assert "用得上" not in strip_route_meta_copy(
+        "选题线索提到高德地图将参加发布会；编辑部用得上"
+    )
     # 不要吞掉分号前的事实动作
     assert "拟联系" in strip_route_meta_copy(
         "有意加入前沿社，先从邀请参加活动开始接触（拟联系）；对编辑部、投资团队可用"
@@ -190,3 +197,5 @@ def test_strip_route_meta_copy_investment_tails():
     assert "拟尽量取得联系" in strip_route_meta_copy(
         "尚未接触，拟尽量取得联系；对编辑部、投资团队可用"
     )
+    # 不要误伤正常「可用」事实句（无用得上类路由词）
+    assert "数据可用" in strip_route_meta_copy("本期报表数据可用")

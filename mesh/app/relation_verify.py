@@ -112,11 +112,16 @@ def _details_from_evidence(rel: dict, limit: int = 6) -> list[str]:
 _TEAM_RECORD_PREFIX = re.compile(
     r"^[\w\u4e00-\u9fff（）()\s·\-]{1,40}(?:团队)?记录[：:]\s*"
 )
+_TEAM_COLON_PREFIX = re.compile(
+    r"^[\w\u4e00-\u9fffA-Za-z0-9（）()\s·\-]{1,40}：\s*"
+)
 
 
 def _strip_team_record_prefix(line: str) -> str:
     s = (line or "").strip()
-    return _TEAM_RECORD_PREFIX.sub("", s).strip() or s
+    s = _TEAM_RECORD_PREFIX.sub("", s).strip() or s
+    s = _TEAM_COLON_PREFIX.sub("", s).strip() or s
+    return s
 
 
 def _first_evidence_snippet(rel: dict, *, max_len: int = 120) -> str:
@@ -130,7 +135,7 @@ def _first_evidence_snippet(rel: dict, *, max_len: int = 120) -> str:
 
 
 def body_redundant_with_details(body: str, details: list | None) -> bool:
-    """body 与 details 实质重复（含 join 回填的旧数据）。"""
+    """body 与 details 实质重复（全等、join 回填、或互为包含的近义摘抄）。"""
     b = (body or "").strip()
     if not b:
         return False
@@ -143,14 +148,21 @@ def body_redundant_with_details(body: str, details: list | None) -> bool:
     if b == joined or b == joined[:500]:
         return True
     b_core = _strip_team_record_prefix(b)
-    if b_core and any(b_core == _strip_team_record_prefix(d) for d in dets):
-        return True
+    for d in dets:
+        d_core = _strip_team_record_prefix(d)
+        if b_core and d_core and b_core == d_core:
+            return True
+        # 近义摘抄：一方包含另一方且较短侧足够长（避免误伤短实体名）
+        if b_core and d_core and len(b_core) >= 16 and len(d_core) >= 16:
+            if b_core in d_core or d_core in b_core:
+                return True
     return False
 
 
 def verify_relation_narrative(rel: dict) -> dict:
     """Verify 只写 needs_review；虚线团队徽章（→）由 normalize 负责，不在整张卡上。"""
     from .owner_guard import normalize_relation_team_badges
+    from .relation_writer import strip_route_meta_copy
 
     rel = normalize_relation_team_badges(dict(rel), suggest_extra_solid=editorial_weak(rel))
     evidence = list(rel.get("evidence") or [])
@@ -162,6 +174,14 @@ def verify_relation_narrative(rel: dict) -> dict:
             rel["details"] = []
         return rel
 
+    # 先剥路由尾巴，再做 grounded / 去重
+    if rel.get("body"):
+        rel["body"] = strip_route_meta_copy(str(rel.get("body") or ""))
+    if rel.get("details"):
+        rel["details"] = [
+            strip_route_meta_copy(str(d)) for d in (rel.get("details") or []) if str(d).strip()
+        ]
+
     kept_details: list[str] = []
     for d in rel.get("details") or []:
         ds = str(d).strip()
@@ -169,33 +189,30 @@ def verify_relation_narrative(rel: dict) -> dict:
             kept_details.append(d)
     if not kept_details:
         kept_details = _details_from_evidence(rel)
+        kept_details = [strip_route_meta_copy(x) for x in kept_details if x]
     rel["details"] = kept_details[:8]
 
     body = (rel.get("body") or "").strip()
+    # 与 details 重复的「总结」直接清空（含近义摘抄）
+    if body and body_redundant_with_details(body, kept_details):
+        rel["body"] = ""
+        rel["_body_omitted_dup"] = True
+        body = ""
+
     needs_review = bool(not body or (body and not line_grounded(body, rel, min_ratio=0.28)))
     if needs_review:
-        # 禁止把 details 整段拼进 body（会造成页面 body/details 双显）。
-        # 优先用 evidence 纯 snippet 写短 body；若仍与 detail 重复则清空 body，靠 details 展示。
-        short = _first_evidence_snippet(rel, max_len=120)
-        if short and not body_redundant_with_details(short, kept_details):
-            rel["body"] = short
-            rel["needs_review"] = False
-            rel["status"] = "confirmed"
-            rel["_body_from_evidence"] = True
-        elif kept_details:
+        # 成卡一般应有关系级总结；论证失败或写不出时留空 body，只靠 details。
+        # 禁止塞第一条 evidence snippet（易与 detail0 撞车，看起来像复述圆点）。
+        if kept_details:
             rel["body"] = ""
             rel["needs_review"] = False
             rel["status"] = "confirmed"
             rel["_body_from_evidence"] = True
-            rel["_body_omitted_dup"] = True
+            rel["_body_omitted_ungrounded"] = True
         else:
             rel["needs_review"] = True
             rel["status"] = "needs_review"
     else:
-        # Writer body 过了论证，但仍可能与 detail 同文 → 去掉 body 重复
-        if body_redundant_with_details(body, kept_details):
-            rel["body"] = ""
-            rel["_body_omitted_dup"] = True
         rel["needs_review"] = False
         rel["status"] = "confirmed"
     return rel
