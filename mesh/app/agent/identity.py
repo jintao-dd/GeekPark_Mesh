@@ -77,6 +77,86 @@ def _row_to_user(row: Any) -> dict[str, Any]:
     }
 
 
+def _identity_from_directory(
+    *,
+    open_id: str,
+    mapped_in: list[str],
+    contact_sync: str,
+    channel: str,
+    chat_id: str,
+) -> IdentityResult:
+    """open_id 已由飞书事件认证；花名册/通讯录能对上则视为已识别同事。
+
+    不要求先在 Mesh users 表 OAuth 绑定。未知 open_id 仍返回 unlinked。
+    """
+    from . import person_resolve as pr
+
+    hit = pr.lookup_by_open_id(open_id)
+    if not hit or not hit.get("name"):
+        return IdentityResult(
+            status=STATUS_UNLINKED,
+            feishu_open_id=open_id,
+            contact_sync=contact_sync,
+            bind_state="unlinked",
+            channel=channel,
+            chat_id=chat_id,
+        )
+
+    roster_teams: list[str] = []
+    for part in str(hit.get("teams") or "").split(","):
+        n = normalize_team(part.strip())
+        if n and n not in roster_teams:
+            roster_teams.append(n)
+
+    mapped = [normalize_team(t) or t for t in (mapped_in or []) if normalize_team(t)]
+    if not mapped:
+        mapped = list(roster_teams)
+
+    # 多队：无 users.team 对拍时取第一业务队，避免误判 conflict 锁死工具
+    if len(mapped) > 1:
+        primary, src = mapped[0], "roster_multi"
+        status = STATUS_BOUND
+    elif len(mapped) == 1:
+        primary, src = mapped[0], "roster" if roster_teams else "feishu_map"
+        status = STATUS_BOUND
+    else:
+        primary, src = None, "none"
+        status = STATUS_BOUND_TEAM_MISSING
+
+    name = str(hit.get("name") or "").strip()
+    person: dict[str, Any] = {
+        "display": name,
+        "name": name,
+        "feishu_open_id": open_id,
+        "source": hit.get("source") or "roster",
+    }
+    if hit.get("job_title"):
+        person["job_title"] = hit["job_title"]
+    if hit.get("employee_no"):
+        person["employee_no"] = hit["employee_no"]
+
+    sync = contact_sync
+    if sync in ("", "skipped_no_scope"):
+        sync = "roster_known"
+
+    return IdentityResult(
+        status=status,
+        mesh_user_id=None,
+        feishu_open_id=open_id,
+        mesh_role="viewer",
+        primary_team=primary,
+        mapped_teams=mapped,
+        mesh_users_team=None,
+        team_source=src,
+        contact_sync=sync,
+        bind_state="roster_known",
+        channel=channel,
+        chat_id=chat_id,
+        display_hint=name,
+        person=person,
+    )
+
+
 def resolve_identity(con, envelope: AgentEnvelope) -> IdentityResult:
     """Harness / 运行时解析。不 upsert 用户；ChatBinding 不进 primary_team。"""
     if envelope.identity_override:
@@ -152,11 +232,11 @@ def resolve_identity(con, envelope: AgentEnvelope) -> IdentityResult:
         if len(rows) == 1:
             user = _row_to_user(rows[0])
         else:
-            return IdentityResult(
-                status=STATUS_UNLINKED,
-                feishu_open_id=open_id,
+            # users 未绑：飞书 open_id 仍可在花名册/通讯录认出 → 同事身份
+            return _identity_from_directory(
+                open_id=open_id,
+                mapped_in=mapped_in,
                 contact_sync=contact_sync,
-                bind_state="unlinked",
                 channel=channel,
                 chat_id=envelope.chat_id,
             )

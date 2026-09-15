@@ -456,6 +456,41 @@ def expand_for_retrieval(text: str, hits: list[PersonHit]) -> str:
     )
 
 
+def lookup_by_open_id(open_id: str) -> dict[str, str] | None:
+    """花名册 / 通讯录按 open_id 认人（不依赖 users 表是否绑过）。"""
+    oid = (open_id or "").strip()
+    if not oid:
+        return None
+    for p in _org_people():
+        if str(p.get("open_id") or "").strip() == oid:
+            return {
+                "name": str(p.get("name") or "").strip(),
+                "open_id": oid,
+                "employee_no": str(p.get("employee_no") or "").strip(),
+                "source": str(p.get("source") or "roster"),
+                "job_title": str(p.get("job_title") or "").strip(),
+                "teams": str(p.get("teams") or "").strip(),
+            }
+    # roster 行可能有 teams 列表；_org_people 已拍扁
+    for row in load_roster().get("people") or []:
+        if str(row.get("open_id") or "").strip() != oid:
+            continue
+        teams = row.get("teams") or []
+        if isinstance(teams, list):
+            team_s = ",".join(str(t).strip() for t in teams if str(t).strip())
+        else:
+            team_s = str(teams or "").strip()
+        return {
+            "name": str(row.get("name") or "").strip(),
+            "open_id": oid,
+            "employee_no": str(row.get("employee_no") or "").strip(),
+            "source": "roster",
+            "job_title": str(row.get("job_title") or "").strip(),
+            "teams": team_s,
+        }
+    return None
+
+
 def filter_known_people(names: list[str] | None, *, people: list[dict[str, str]] | None = None) -> list[str]:
     """只保留通讯录/花名册里的人；助手成文里的「已上线周报」等不算人。"""
     raw = [str(n or "").strip() for n in (names or []) if str(n or "").strip()]

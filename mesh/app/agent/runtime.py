@@ -552,6 +552,39 @@ def _handle_colleague_v3(
         )
 
     use_supervisor = supervisor_enabled()
+    # 花名册/通讯录都认不出的 open_id：不能当同事查数（已知同事走 roster_known，不进这里）
+    if identity.status in (
+        "unlinked",
+        "anonymous_web",
+        "ambiguous",
+        "open_id_mismatch",
+        "bound_team_conflict",
+    ):
+        route = conv.RouteDecision(route="refuse", intent="refuse", notes=f"identity:{identity.status}")
+        return _finish(
+            AgentAnswer(
+                text=_refuse_text(identity.status, text_in, permission.deny_reason),
+                intent="refuse",
+                refused=True,
+                deny_reason=permission.deny_reason or f"identity:{identity.status}",
+                fingerprint=fp.build_fingerprint(
+                    context=context, permission=permission, tool_result=None
+                ),
+                trace={
+                    **fp.build_trace(
+                        intent="refuse",
+                        tool_id=None,
+                        context=context,
+                        identity_status=identity.status,
+                    ),
+                    "colleague_v3": True,
+                    "supervisor": False,
+                    "router_llm_used": False,
+                },
+                **base_kwargs,
+            ),
+            route=route,
+        )
     if use_supervisor:
         from . import supervisor as supermod
 
