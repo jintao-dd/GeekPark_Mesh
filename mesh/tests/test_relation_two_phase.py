@@ -314,8 +314,8 @@ def test_approved_teams_sources_match_evidence():
     assert set(rel["sources"]) == {e["source_label"] for e in rel["evidence"]}
 
 
-def test_gate_allows_routing_single_team():
-    """路由候选：仅 owner 有 evidence 时 Gate 应放行。"""
+def test_gate_skips_routing_single_team():
+    """路由候选：仅 owner 有 evidence → Gate skip，不成卡。"""
     cand = {
         "candidate_id": "c1",
         "title": "可灵",
@@ -350,7 +350,7 @@ def test_gate_allows_routing_single_team():
         "blocked": 0,
     }]
     approved, audit = apply_evidence_gate(decisions, [cand], items)
-    assert len(approved) == 1
-    assert audit["rows"][0]["gate_decision"] == "keep"
-    assert "→ 编辑部" in approved[0]["teams"]
+    assert approved == []
+    assert audit["rows"][0]["gate_decision"] == "skip"
+    assert audit["rows"][0]["gate_reason_code"] == "evidence_single_team"
 

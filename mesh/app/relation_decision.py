@@ -36,8 +36,6 @@ from .relation_decision_audit import (
     parse_gate_reason_code,
 )
 from .relation_decision_consistency import (
-    _ONE_SIDED_LABEL_HINTS,
-    _ONE_SIDED_RELATION_TYPES,
     check_decision_consistency,
     infer_relation_type,
     normalize_decision,
@@ -318,21 +316,15 @@ def apply_evidence_gate(
             continue
 
         ev_teams = _teams_from_evidence(evidence)
-        is_routing = cand.get("candidate_kind") == "routing" or bool(cand.get("routing_targets"))
-        is_one_sided = (
-            is_routing
-            or relation_type in _ONE_SIDED_RELATION_TYPES
-            or any(h in label for h in _ONE_SIDED_LABEL_HINTS)
-        )
+        # 产品：关系卡 = 至少两个实线团队都有 evidence。
+        # 单边/海外/虚线路由（仅 1 队记录 + →建议队）不再成卡——不生成，而不是生成后再藏。
         if len(ev_teams) < 2:
-            if not is_one_sided or len(ev_teams) < 1:
-                _skip(GATE_CODE_SINGLE_TEAM)
-                continue
-        elif len(ev_teams) >= 2:
-            entity = _entity_for_provenance(cand)
-            if entity and not cross_team_provenance_ok(items, entity, ev_teams):
-                _skip(GATE_CODE_PROVENANCE)
-                continue
+            _skip(GATE_CODE_SINGLE_TEAM)
+            continue
+        entity = _entity_for_provenance(cand)
+        if entity and not cross_team_provenance_ok(items, entity, ev_teams):
+            _skip(GATE_CODE_PROVENANCE)
+            continue
 
         would_cooccur = is_pure_entity_cooccurrence(cand)
         suggested = _code_suggested_teams(cand, evidence, label)

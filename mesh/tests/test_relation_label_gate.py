@@ -53,7 +53,8 @@ def test_gate_accepts_canonical_and_alias_parallel_label():
         assert len(approved) == 1, (label, audit["rows"][0].get("gate_reason_code"))
 
 
-def test_one_sided_labels_allow_single_team():
+def test_one_sided_single_team_skipped_not_generated():
+    """单边/海外仅 1 实线团队：Gate skip，不成卡。"""
     one_sided_labels = [
         "一方接触，另一方用得上",
         "一方有需求，另一方尚未接触",
@@ -86,4 +87,5 @@ def test_one_sided_labels_allow_single_team():
             "evidence_refs": [10],
         }]
         approved, audit = apply_evidence_gate(decisions, [cand], items)
-        assert len(approved) == 1, (label, audit["rows"][0].get("gate_reason_code"))
+        assert approved == [], (label, audit["rows"][0])
+        assert audit["rows"][0].get("gate_reason_code") == "evidence_single_team"

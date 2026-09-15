@@ -19,32 +19,33 @@
 
 ## 决策标准（先选标签，再决定 skip）
 
-产品定义：跨团队关系 = **被不止一个团队碰到，或一个团队碰到、另一个明显用得上**。
+产品定义：跨团队关系 = **至少两个团队都有可引用事实**（evidence 覆盖 ≥2 个实线团队）。
 
-**默认倾向 keep 并选贴切标签**；只有「无跨团队信号」才 skip。
+**默认倾向 keep 并选贴切标签**；只有「无双团队事实」或「纯噪声」才 skip。
 
 ### 分类顺序（keep 时）
 1. **事链 / 互补** → `已联动` / `同一件事，两个部门各知一半` / `一方接触了，另一方正在接触` → `decision_tier: strong`
 2. **同赛道 / 并行 / 不同触点** → `同一赛道，各自在做` / `同一公司，不同触点` / `两个部门各有判断` / `采访对象也是客户` / `已公开报道，内部也在用` / `中英文站同周各自成稿` → `decision_tier: parallel`  
    （话题相近但**不是**同一事件 → **keep parallel**，**不要 skip**）
-3. **单边 / 路由 / 海外** → `一方接触，另一方用得上` / `一方有需求，另一方尚未接触` / `海外接触，国内可能承接` / `海外新发现，国内尚未接触` / `一方报道了，另一方在接触`；或候选 `teams` 含 `→ 团队` → `decision_tier: watch`
-4. **弱观察** → `外部在热聊，我们还没碰` / `两处记录待核对` / `已排期，内容侧待安排` → `decision_tier: watch`
-5. **skip 仅当**：纯噪声（同名误命中、无任何跨团队价值），或候选与 snippets 完全对不上
+3. **skip（不成卡）**：
+   - **单边 / 海外 / 虚线路由**：只有一队有记录、另一侧仅是「→ 建议承接」（含 `海外新发现…` / `一方接触，另一方用得上` 等）→ **必须 skip**，不要 keep 成 watch 卡
+   - **弱观察无双边事实**：`外部在热聊，我们还没碰` 等若只有单侧 snippets → skip
+   - 纯噪声（同名误命中、候选与 snippets 完全对不上）→ skip
 
 ### evidence_refs
-- **双团队 / parallel / info_complement / strong**：尽量覆盖 **≥2 个不同团队** 的 item
-- **单边 / 路由 / 海外**（含 `→ 团队`）：**≥1 条** 来自已有记录团队即可
+- **keep 一律**：尽量覆盖 **≥2 个不同团队** 的 item；系统 Gate 也会拦截单团队 keep
+- 不要为「海外线索 / 单边路由」凑 keep
 
 ### 注意
 - label **须从标签库原文 17 选 1**（写「同一赛道，各自在做」，不要写「同一条赛道」）
-- parallel/watch 进 draft backlog 同样有价值；**不要为了「不够 strong」而 skip**
+- **不要**再用 watch 档把单边卡塞进草稿；单边不成卡
 - `keep` 时必须给 `label` + `evidence_refs`
 
 ## relation_type / decision_tier 与 label（keep 时）
 - `已联动` → `event_chain` + `strong`；reason 点明同一事件/活动/对象
 - `同一赛道，各自在做` / `同一公司，不同触点` → `parallel_tracks` + `parallel`；reason 可写「非同一事件、各自推进」
 - `同一件事，两个部门各知一半` → `info_complement` + `strong`
-- `一方接触，另一方用得上` / 海外类 → `one_sided` 或 `overseas_link` + `watch`
+- `一方接触，另一方用得上` / 海外类 → 通常 **skip**（单边不成卡）；仅当 evidence 已覆盖 ≥2 实线团队时可 keep 为对应 label + `watch`/`one_sided`
 - `skip` 时 relation_type 可为空，`decision_tier` 为 `skip`
 
 ## 标签库（不得自创）
