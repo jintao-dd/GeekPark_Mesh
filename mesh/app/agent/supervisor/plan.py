@@ -33,6 +33,45 @@ ALLOWED_WRITE_TOOLS = frozenset(
     }
 )
 
+# 用户明确要日程/忙闲才放行日历工具；否则硬剥离（不靠 Prompt）
+_CALENDAR_ASK_RE = re.compile(
+    r"(日程|日历|会议|忙不忙|空闲|有空|约(?:个|一)?时间|几点开|排期|availability)",
+    re.I,
+)
+
+
+def user_asks_calendar(user_text: str) -> bool:
+    return bool(_CALENDAR_ASK_RE.search(user_text or ""))
+
+
+def _is_calendar_step(step: PlanStep) -> bool:
+    tool = (step.tool or "").strip()
+    if tool.startswith("feishu.calendar"):
+        return True
+    if tool == "feishu.search":
+        rt = str((step.args or {}).get("resource_type") or "").strip().lower()
+        return rt == "calendar"
+    return False
+
+
+def strip_calendar_unless_asked(steps: list[PlanStep], user_text: str) -> list[PlanStep]:
+    """进展/周报类计划里丢掉日历步骤；用户明确问日程则保留。"""
+    if not steps or user_asks_calendar(user_text):
+        return list(steps or [])
+    kept = [s for s in steps if not _is_calendar_step(s)]
+    if len(kept) == len(steps):
+        return kept
+    ids = {s.id for s in kept}
+    for s in kept:
+        s.depends_on = [d for d in (s.depends_on or []) if d in ids and d != s.id]
+    log.info(
+        "planner stripped calendar steps (user did not ask schedule) kept=%s dropped=%s",
+        len(kept),
+        len(steps) - len(kept),
+    )
+    return kept
+
+
 _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划与派工，不对用户说话，不做公司事实断言。
 
 根据用户目标、工作记忆、公司先验，输出一个 JSON：
@@ -314,6 +353,12 @@ def plan_turn(
     steps = _normalize_steps(data.get("steps"), goal=goal or q)
     if not steps and mode == "work":
         steps = _steps_from_decide_shape(data, goal=goal or q)
+    steps = strip_calendar_unless_asked(steps, q)
+    if not steps and mode == "work":
+        steps = _normalize_steps(
+            [{"id": "s1", "tool": "ask.published", "args": {"query": q[:160]}}],
+            goal=q,
+        )
     write_tool = str(data.get("write_tool") or data.get("tool") or "").strip()
     write_args = data.get("write_args") if isinstance(data.get("write_args"), dict) else {}
     write_args = dict(write_args or {})

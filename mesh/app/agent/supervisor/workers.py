@@ -166,8 +166,9 @@ def enrich_args(
             for n in _names_from_prior(prior):
                 if n not in names:
                     names.append(n)
-        # 本人姓名始终进 expand（self / team / default），保证「和我相关」能召回
-        if name and name not in names:
+        # 点名同事（named）只扩被点名的人，不要把提问者自己塞进检索
+        # self / team / default 才钉本人，保证「和我相关」能召回
+        if scope != "named" and name and name not in names:
             names = [name] + names
         if scope == "team" and team:
             try:

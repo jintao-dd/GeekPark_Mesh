@@ -347,6 +347,51 @@ def test_enrich_about_me_skips_teammate_dump(monkeypatch):
     assert "赵思琪" not in names
 
 
+def test_enrich_named_colleague_skips_asker():
+    from app.agent.supervisor.types import PlanStep
+
+    step = PlanStep(
+        id="s1",
+        worker="published",
+        tool="ask.published",
+        args={"query": "思琪最近在忙什么？"},
+    )
+    args = workers.enrich_args(
+        step,
+        identity=IdentityResult(
+            status="bound",
+            primary_team="品牌创意团队",
+            display_hint="杜锦涛",
+        ),
+        context=None,
+        user_text="思琪最近在忙什么？",
+        resolved_names=["赵思琪"],
+    )
+    names = args.get("person_names") or []
+    assert "赵思琪" in names
+    assert "杜锦涛" not in names
+
+
+def test_strip_calendar_unless_asked_progress():
+    from app.agent.supervisor.types import PlanStep
+
+    steps = [
+        PlanStep(id="a", worker="published", tool="ask.published", args={"query": "进展"}),
+        PlanStep(id="b", worker="calendar", tool="feishu.calendar.list", args={}),
+        PlanStep(
+            id="c",
+            worker="org",
+            tool="feishu.search",
+            args={"resource_type": "calendar"},
+            depends_on=["b"],
+        ),
+    ]
+    kept = planmod.strip_calendar_unless_asked(steps, "最近有什么进展")
+    assert [s.tool for s in kept] == ["ask.published"]
+    kept2 = planmod.strip_calendar_unless_asked(steps, "这周我日历上忙不忙")
+    assert len(kept2) == 3
+
+
 def test_mouth_system_calendar_not_primary_for_progress():
     from app.agent.supervisor import mouth
 
