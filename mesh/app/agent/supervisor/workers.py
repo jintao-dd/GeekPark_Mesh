@@ -133,13 +133,9 @@ def enrich_args(
         return args
 
     if step.tool.startswith("ask."):
-        q_plan = str(args.get("query") or "").strip()
+        q_plan = str(args.get("query") or args.get("q") or "").strip()
         q_full = q_user or q_plan
         names = list(resolved) + [n for n in _names_from_prior(prior) if n not in resolved]
-        clues: list[str] = []
-        bits = [b for b in (name, f"Mesh队={team}" if team else "") if b]
-        if bits:
-            clues.append("提问者身份：" + "、".join(bits))
         if name and name not in names:
             names = [name] + names
         teammates: list[str] = []
@@ -150,29 +146,23 @@ def enrich_args(
                 teammates = od.member_names_for_scope(team, limit=20)
             except Exception:
                 teammates = []
-            extra = [t for t in teammates if t not in names]
-            if extra:
-                clues.append(
-                    "提问者飞书部门子树同事（周报可能写在别的桶名下，这些人算「我们团队」）："
-                    + "、".join(extra[:20])
-                )
-                clues.append(
-                    "成文时：凡材料提到上述同事的周报条目一律算「我们团队相关」，"
-                    "即使条目团队标签是「硅谷 BD」等，也禁止因桶名不同而排除。"
-                )
-                names = names + [t for t in extra if t not in names]
+            for t in teammates:
+                if t and t not in names:
+                    names.append(t)
+        # 结构化扩召回；不要把成文指令塞进 FTS query
+        args["query"] = q_full
+        args["q"] = q_full
         if names:
-            clues.append("已解析/已查到的人：" + "、".join(names[:12]))
-        if clues:
-            args["query"] = q_full + "\n\n【检索线索，勿当作用户原话弱化】\n" + "\n".join(clues)
-            log.info(
-                "ask enrich team=%s teammates=%s query_len=%s",
-                team or "-",
-                len(teammates),
-                len(args["query"]),
-            )
-        else:
-            args["query"] = q_full
+            args["person_names"] = names[:20]
+        # 显式桶过滤才设 team；默认不 apply_team_focus（飞书子树 ≠ 周报桶）
+        if str(args.get("team") or args.get("team_filter") or "").strip():
+            args.setdefault("apply_team_focus", False)
+        log.info(
+            "ask enrich team=%s person_names=%s q_len=%s",
+            team or "-",
+            len(names),
+            len(q_full),
+        )
         return args
 
     if step.tool != "feishu.search":

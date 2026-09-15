@@ -35,12 +35,22 @@ def scope_from_agent(
     con=None,
     *,
     query: str = "",
+    team_filter: str = "",
+    apply_team_focus: bool = False,
 ) -> tuple[AskScope, dict]:
-    """构建 AskScope：IssueRef ⊥ TimeWindow（Context 锚点 ≠ 检索硬锁期次）。"""
+    """构建 AskScope：IssueRef ⊥ TimeWindow（Context 锚点 ≠ 检索硬锁期次）。
+
+    team_focus 只是权限侧「默认关注队」，不是周报桶硬 ACL。
+    只有显式 team_filter / apply_team_focus=True 时才按桶过滤；
+    「我们团队」应按飞书子树人名扩召回，不能用 Mesh 队名砍掉其他桶条目。
+    """
     from . import temporal as temporal_mod
 
     qs = permission.query_scope or context.query_scope or {}
-    team = (qs.get("team_focus") or "") if isinstance(qs, dict) else ""
+    focus = (qs.get("team_focus") or "") if isinstance(qs, dict) else ""
+    team = (team_filter or "").strip()
+    if not team and apply_team_focus:
+        team = (focus or "").strip()
     context_slug = ""
     issue_date_from = None
     issue_date_to = None
@@ -85,6 +95,9 @@ def scope_from_agent(
         user_team=identity.primary_team or "",
     )
     return scope, sem.to_dict()
+
+
+_CLUE_MARK = "【检索线索"
 
 
 def _evidence_from_contexts(contexts: list[dict], slug: str) -> list[str]:
@@ -192,9 +205,36 @@ def ask_published(
             ],
         )
 
-    q = str(args.get("q") or context.text or "").strip()
+    # Supervisor 写 query；旧路径写 q。二者都要认。
+    raw = str(args.get("q") or args.get("query") or context.text or "").strip()
+    user_q = raw
+    if _CLUE_MARK in raw:
+        user_q = raw.split(_CLUE_MARK, 1)[0].strip() or raw
+    person_names = [
+        str(n).strip()
+        for n in (args.get("person_names") or [])
+        if str(n or "").strip()
+    ]
+    # 检索串：用户原话 + 人名扩召回；禁止把成文指令散文塞进 FTS
+    search_bits = [user_q]
+    for n in person_names[:16]:
+        if n and n not in user_q:
+            search_bits.append(n)
+    search_q = " ".join(search_bits).strip()[:500] or user_q
+    q = user_q  # 时间语义 / claim / 成文都以用户原话为准
+
+    explicit_team = str(
+        args.get("team") or args.get("team_filter") or args.get("owner_team") or ""
+    ).strip()
+    apply_focus = bool(args.get("apply_team_focus")) or bool(args.get("my_team"))
     scope, sem_dict = scope_from_agent(
-        identity, permission, context, con=con, query=q
+        identity,
+        permission,
+        context,
+        con=con,
+        query=q,
+        team_filter=explicit_team,
+        apply_team_focus=apply_focus,
     )
     sem = TimeSemantics(**{k: sem_dict[k] for k in TimeSemantics.__dataclass_fields__})
 
@@ -222,7 +262,7 @@ def ask_published(
             ],
         )
 
-    prepared = ask_engine.prepare(con, q, scope)
+    prepared = ask_engine.prepare(con, q, scope, search_q=search_q)
     contexts = list(prepared.get("contexts") or [])
     from . import claim_support as claim_support_mod
 

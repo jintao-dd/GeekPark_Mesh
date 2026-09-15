@@ -204,9 +204,8 @@ def test_enrich_about_me_query_uses_identity():
         context=None,
         user_text="列出最近周报和我有关的内容",
     )
-    assert "列出最近周报和我有关的内容" in args["query"]
-    assert "杜锦涛" in args["query"]
-    assert "编辑部" in args["query"]
+    assert args["query"] == "列出最近周报和我有关的内容"
+    assert "杜锦涛" in (args.get("person_names") or [])
 
 
 def test_enrich_user_without_open_id_rewrites_directory():
@@ -256,8 +255,8 @@ def test_enrich_ask_with_prior_member_names():
         user_text="关联这些人的周报",
     )
     assert "关联这些人的周报" in args["query"]
-    assert "杜锦涛" in args["query"]
-    assert "张山山" in args["query"]
+    assert "杜锦涛" in (args.get("person_names") or [])
+    assert "张山山" in (args.get("person_names") or [])
 
 
 def test_mouth_strips_open_ids():
@@ -310,9 +309,12 @@ def test_enrich_ask_includes_subtree_teammates(monkeypatch):
         user_text="最近周报有和我们团队相关的？",
     )
     q = args["query"]
-    assert "赵思琪" in q
-    assert "硅谷 BD" in q
-    assert "一律算「我们团队相关」" in q
+    names = args.get("person_names") or []
+    assert q == "最近周报有和我们团队相关的？"
+    assert "赵思琪" in names
+    assert "Sean Shen" in names
+    assert "【检索线索" not in q
+    assert "一律算「我们团队相关」" not in q
 
 
 def test_mouth_hides_protocol_noise():
