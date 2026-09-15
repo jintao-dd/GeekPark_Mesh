@@ -45,7 +45,7 @@ def test_paraphrase_body_kept_not_hidden():
                 "label": "已联动",
                 "decision_tier": "strong",
                 "teams": ["商业化团队", "编辑部"],
-                "body": "OPPO 商务内容上，商业化团队在沟通、编辑部在推进内容。",
+                "body": "两边都在跟 OPPO 商务内容，沟通名单与选题推进尚未对齐。",
                 "details": [
                     "商业化团队：沟通中含 OPPO。",
                     "编辑部：OPPO 商务内容进行中。",

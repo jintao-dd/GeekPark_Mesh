@@ -97,11 +97,25 @@ _BODY_TEMPLATE = re.compile(
     r"|两边各掌握"
     r"|两侧各知一半"
     r"|两个部门各知一半"
+    r"|一边.{0,16}一边"
+    r"|分别掌握"
+    r"|各写各的"
+)
+
+# 标题公式：乘号对照表 / 一边一边 / A侧B侧填空（整区同构会很难看）
+_TITLE_CROSS = re.compile(r"[：:].{0,40}[×xX].{0,40}$|[：:].+[×xX].+")
+_TITLE_PARALLEL_FILL = re.compile(
+    r"一边.{0,20}一边|A侧|B侧|两侧各自|两队各自|左．+右"
 )
 
 _DETAIL_TEAM = re.compile(r"^(.+?)(?:记录|：|:)")
+_TEAM_NAME_NOISE = re.compile(
+    r"(商业化团队|编辑部|视频号团队|投资团队|硅谷\s*BD\s*团队|"
+    r"Global Partnership\s*团队|总裁办|社群|英文站|外部媒体)"
+)
 _HINT_NO_LABEL_IN_COPY = (
-    "类型只看 flag；title/body 禁止写标签原词（各知一半/不同触点/已联动等）。"
+    "类型只看 flag；title 禁止标签词与「A × B」对照表公式；"
+    "body 只写圆点之外的增量，禁止复述 details。"
 )
 
 
@@ -137,6 +151,18 @@ def body_is_template(body: str) -> bool:
     return False
 
 
+def title_is_formula(title: str) -> bool:
+    """标题是否落入整区同构公式（乘号对照表 / 一边一边等）。"""
+    t = (title or "").strip()
+    if not t:
+        return False
+    if "×" in t or _TITLE_CROSS.search(t):
+        return True
+    if _TITLE_PARALLEL_FILL.search(t):
+        return True
+    return False
+
+
 def _detail_fact_core(detail: str, max_len: int = 28) -> str:
     ds = strip_route_meta_copy(str(detail or "").strip())
     m = _DETAIL_TEAM.match(ds)
@@ -145,17 +171,164 @@ def _detail_fact_core(detail: str, max_len: int = 28) -> str:
     return core[:max_len]
 
 
+def _detail_full_core(detail: str) -> str:
+    ds = strip_route_meta_copy(str(detail or "").strip())
+    m = _DETAIL_TEAM.match(ds)
+    return (ds[m.end():].strip() if m else ds)
+
+
 def _subject_from_candidate(candidate_title: str) -> str:
     t = (candidate_title or "").strip()
     if not t:
         return ""
     t = re.split(r"[·•｜|]", t)[0].strip()
     t = re.split(r"[：:]", t)[0].strip()
-    # 去掉尾部标签腔
     for frag in _LABEL_LEAK_FRAGMENTS:
         if frag in t:
             t = t.split(frag)[0].strip(" ·-—")
     return t[:20]
+
+
+def _text_fingerprint(text: str) -> str:
+    t = strip_route_meta_copy(text or "")
+    t = _DETAIL_TEAM.sub("", t)
+    t = _TEAM_NAME_NOISE.sub("", t)
+    t = re.sub(r"[\s\d/年月日\.，,；;。．：:·\-×xX（）()【】\[\]]+", "", t)
+    return t.lower()
+
+
+def _char_bigrams(s: str) -> set[str]:
+    if len(s) < 2:
+        return {s} if s else set()
+    return {s[i : i + 2] for i in range(len(s) - 1)}
+
+
+def _bigram_jaccard(a: str, b: str) -> float:
+    aa, bb = _char_bigrams(a), _char_bigrams(b)
+    if not aa or not bb:
+        return 0.0
+    return len(aa & bb) / len(aa | bb)
+
+
+_SYNC_MARKERS = (
+    "却", "仍卡", "未对齐", "不对齐", "不同步", "差在", "缺口",
+    "值得同步", "待对齐", "口径", "进度未", "两边进度", "尚未对齐",
+    "卡在同一", "信息互补", "需要同步",
+)
+_GENERIC_TRIGRAMS = frozenset({
+    "进行中", "沟通中", "接触中", "推进中", "已提报", "提报了",
+    "商业化", "编辑部", "视频号", "投资团",
+})
+
+
+def _trigram_overlap(a: str, b: str) -> int:
+    fa, fb = _text_fingerprint(a), _text_fingerprint(b)
+    if len(fa) < 3 or len(fb) < 3:
+        return 0
+    ga = {fa[i : i + 3] for i in range(len(fa) - 2)}
+    gb = {fb[i : i + 3] for i in range(len(fb) - 2)}
+    return len(ga & gb)
+
+
+def _contentful_trigram_hits(a: str, b: str) -> int:
+    fa, fb = _text_fingerprint(a), _text_fingerprint(b)
+    if len(fa) < 3 or len(fb) < 3:
+        return 0
+    ga = {fa[i : i + 3] for i in range(len(fa) - 2)}
+    gb = {fb[i : i + 3] for i in range(len(fb) - 2)}
+    return sum(1 for t in (ga & gb) if t not in _GENERIC_TRIGRAMS)
+
+
+def _soft_overlap(a: str, b: str) -> bool:
+    """半句与一条 detail 是否同指一件事（允许短 paraphrase）。"""
+    if _contentful_trigram_hits(a, b) >= 1:
+        return True
+    if _trigram_overlap(a, b) >= 2:
+        return True
+    fa, fb = _text_fingerprint(a), _text_fingerprint(b)
+    if len(fa) >= 4 and fa[:4] in fb:
+        return True
+    if len(fb) >= 4 and any(fb[i : i + 4] in fa for i in range(0, max(1, len(fb) - 3), 2)):
+        return True
+    return _bigram_jaccard(fa, fb) >= 0.28
+
+
+def body_restates_details(body: str, details: list[str]) -> bool:
+    """body 是否基本是 details 换皮复读（含「A…；B…」拼盘）。
+
+    有跨队增量标记（却/未对齐/值得同步等）的短评可保留；纯两侧事实拼盘一律清。
+    """
+    b = (body or "").strip()
+    if not b or not details:
+        return False
+    cores = [_detail_full_core(d) for d in details if str(d).strip()]
+    cores = [c for c in cores if c]
+    if not cores:
+        return False
+
+    bn = _text_fingerprint(b)
+    if len(bn) < 6:
+        return False
+
+    has_sync = any(m in b for m in _SYNC_MARKERS)
+
+    # 分号/句号拼盘：两半各贴一条 detail → 典型复读
+    halves = [h.strip() for h in re.split(r"[；;]", b) if h.strip()]
+    if len(halves) == 1:
+        # 两句「。。」拼盘也算
+        maybe = [h.strip() for h in re.split(r"[。．]", b) if h.strip()]
+        if len(maybe) >= 2:
+            halves = maybe
+    if len(halves) >= 2 and len(cores) >= 2:
+        used: set[int] = set()
+        matched = 0
+        for h in halves[:4]:
+            for i, c in enumerate(cores):
+                if i in used:
+                    continue
+                if _soft_overlap(h, c):
+                    matched += 1
+                    used.add(i)
+                    break
+        if matched >= 2:
+            return True
+
+    # 无增量标记时：两侧事实指纹都进了 body，或 body 高度覆盖 details
+    hits = sum(1 for c in cores if _soft_overlap(b, c))
+    if not has_sync and hits >= 2:
+        return True
+
+    det_fp = _text_fingerprint("。".join(cores))
+    bg_b, bg_d = _char_bigrams(bn), _char_bigrams(det_fp)
+    if bg_b and bg_d and not has_sync:
+        inter = len(bg_b & bg_d)
+        cov = inter / len(bg_b)
+        if cov >= 0.70 and len(bg_b) >= 8:
+            return True
+    return False
+
+
+def dedupe_near_details(details: list[str]) -> list[str]:
+    """同卡近义 detail 只留一条（解决同队换皮重复）。"""
+    kept: list[str] = []
+    fps: list[str] = []
+    for d in details or []:
+        ds = strip_route_meta_copy(str(d).strip())
+        if not ds:
+            continue
+        fp = _text_fingerprint(ds)
+        drop = False
+        for prev in fps:
+            if not fp or not prev:
+                continue
+            if fp in prev or prev in fp or _bigram_jaccard(fp, prev) >= 0.72:
+                drop = True
+                break
+        if drop:
+            continue
+        kept.append(ds)
+        fps.append(fp)
+    return kept
 
 
 def title_from_details(
@@ -164,10 +337,10 @@ def title_from_details(
     candidate_title: str = "",
     evidence: list[dict] | None = None,
 ) -> str:
-    """用 details/evidence 核拼标题（无标签词）。"""
+    """用 details/evidence 拼短钩子标题（无标签词、无 × 对照表）。"""
     cores = [_detail_fact_core(d) for d in (details or []) if str(d).strip()]
     cores = [c for c in cores if c]
-    if len(cores) < 2 and evidence:
+    if len(cores) < 1 and evidence:
         for e in evidence:
             if not isinstance(e, dict):
                 continue
@@ -176,13 +349,14 @@ def title_from_details(
                 cores.append(re.split(r"[，,；;。．]", snip)[0].strip()[:28])
         cores = [c for c in cores if c]
     subj = _subject_from_candidate(candidate_title)
-    if len(cores) >= 2:
-        if subj:
-            return f"{subj}：{cores[0]} × {cores[1]}"[:80]
-        return f"{cores[0]} × {cores[1]}"[:80]
-    if len(cores) == 1:
-        return f"{subj}：{cores[0]}"[:80] if subj else cores[0][:80]
-    return (subj or candidate_title or "").strip()[:80]
+    if not cores:
+        return (subj or candidate_title or "").strip()[:80]
+    lead = cores[0]
+    if subj:
+        title = f"{subj}：{lead}"
+    else:
+        title = lead
+    return title[:80]
 
 
 def enforce_narrative_hygiene(
@@ -192,32 +366,54 @@ def enforce_narrative_hygiene(
     details: list[str],
     candidate_title: str = "",
     evidence: list[dict] | None = None,
-) -> tuple[str, str, dict[str, bool]]:
-    """确定性收口：剥标签腔标题、清空壳 body。返回 (title, body, flags)。"""
-    flags = {"title_rebuilt": False, "body_cleared_template": False}
+) -> tuple[str, str, list[str], dict[str, bool]]:
+    """确定性收口：去公式标题、清套话/复读 body、去近重 details。
+
+    返回 (title, body, details, flags)。
+    """
+    flags = {
+        "title_rebuilt": False,
+        "body_cleared_template": False,
+        "body_cleared_restates": False,
+        "details_deduped": False,
+    }
     t = strip_route_meta_copy((title or "").strip())
     b = strip_route_meta_copy((body or "").strip())
     dets = [strip_route_meta_copy(str(d).strip()) for d in (details or []) if str(d).strip()]
+    deduped = dedupe_near_details(dets)
+    if len(deduped) < len(dets):
+        flags["details_deduped"] = True
+    dets = deduped
 
-    if (not t) or title_has_label_leak(t):
+    need_title = (not t) or title_has_label_leak(t) or title_is_formula(t)
+    if need_title:
         rebuilt = title_from_details(dets, candidate_title=candidate_title, evidence=evidence)
         if rebuilt:
             t = rebuilt
             flags["title_rebuilt"] = True
-        elif title_has_label_leak(t):
-            # 仍泄标签且无法重建 → 剥掉已知碎片
+        elif title_has_label_leak(t) or title_is_formula(t):
             for frag in _LABEL_LEAK_FRAGMENTS:
                 t = t.replace(frag, "")
+            t = t.replace("×", "，")
             t = re.sub(r"[：:\s·×xX]{2,}", "：", t).strip(" ：:·-—")
+            flags["title_rebuilt"] = True
 
-    if body_is_template(b):
+    if title_is_formula(t):
+        rebuilt = title_from_details(dets, candidate_title=candidate_title, evidence=evidence)
+        if rebuilt and not title_is_formula(rebuilt):
+            t = rebuilt
+            flags["title_rebuilt"] = True
+
+    if body_is_template(b) or (
+        any(frag in b for frag in ("各知一半", "各掌握一部分", "两侧各知一半")) and len(b) < 56
+    ):
         b = ""
         flags["body_cleared_template"] = True
-    elif any(frag in b for frag in ("各知一半", "各掌握一部分", "两侧各知一半")) and len(b) < 56:
+    elif body_restates_details(b, dets):
         b = ""
-        flags["body_cleared_template"] = True
+        flags["body_cleared_restates"] = True
 
-    return t, b, flags
+    return t, b, dets, flags
 
 
 # 禁止写入读者文案的路由元叙述 / 标题尾巴
@@ -388,8 +584,8 @@ def _normalize_details_for_teams(rel: dict, snap: dict) -> list[str]:
 
 
 def _apply_hygiene_to_rel(rel: dict, obj: dict) -> dict:
-    """merge 后强制 title/body 卫生。"""
-    title, body, flags = enforce_narrative_hygiene(
+    """merge 后强制 title/body/details 卫生。"""
+    title, body, details, flags = enforce_narrative_hygiene(
         title=rel.get("title") or "",
         body=rel.get("body") or "",
         details=list(rel.get("details") or []),
@@ -398,10 +594,15 @@ def _apply_hygiene_to_rel(rel: dict, obj: dict) -> dict:
     )
     rel["title"] = title
     rel["body"] = body
+    rel["details"] = details
     if flags.get("title_rebuilt"):
         rel["_title_rebuilt_from_details"] = True
     if flags.get("body_cleared_template"):
         rel["_body_omitted_template"] = True
+    if flags.get("body_cleared_restates"):
+        rel["_body_omitted_restates_details"] = True
+    if flags.get("details_deduped"):
+        rel["_details_deduped"] = True
     return rel
 
 
@@ -453,8 +654,9 @@ def call_writer_llm(objects: list[dict]) -> list[dict]:
     user = (
         f"【relation_objects】\n{json.dumps(payload, ensure_ascii=False)[:llm.budget(20000)]}\n\n"
         "对每个 candidate_id 写一条；遵守该卡 label_hint；不得修改 label/teams/evidence。"
-        " title 只写主体与两侧事实核，禁止各知一半/不同触点/已联动等标签词；"
-        " body 写一句跨队具体事实总结（禁止「这一合作…各掌握一部分」）；写不出则 body 留空。"
+        " title 写短钩子（禁止「A × B」对照表公式与标签词）；"
+        " body 只写圆点之外的跨队增量（禁止把两条 detail 换皮拼成 A…；B…）；"
+        " 无增量则 body 留空。"
     )
     out = llm.call_json_compliant(system, user, max_tokens=8000)
     rows = list(out.get("relation_writings") or out.get("relation_narratives") or [])

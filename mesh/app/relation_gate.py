@@ -131,7 +131,7 @@ def _sanitize_relation_narrative(rel: dict) -> dict:
         kept = [strip_route_meta_copy(x) for x in kept if x]
     out["details"] = kept[:8]
 
-    title, body, flags = enforce_narrative_hygiene(
+    title, body, details, flags = enforce_narrative_hygiene(
         title=out.get("title") or "",
         body=out.get("body") or "",
         details=out["details"],
@@ -140,10 +140,15 @@ def _sanitize_relation_narrative(rel: dict) -> dict:
     )
     out["title"] = title
     out["body"] = body
+    out["details"] = details
     if flags.get("title_rebuilt"):
         out["_title_rebuilt_from_details"] = True
     if flags.get("body_cleared_template"):
         out["_body_omitted_template"] = True
+    if flags.get("body_cleared_restates"):
+        out["_body_omitted_restates_details"] = True
+    if flags.get("details_deduped"):
+        out["_details_deduped"] = True
 
     body = (out.get("body") or "").strip()
     if body and not body_summary_grounded(body, out):
