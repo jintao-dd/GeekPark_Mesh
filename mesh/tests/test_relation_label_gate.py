@@ -54,8 +54,8 @@ def test_gate_accepts_canonical_and_alias_parallel_label():
         assert len(approved) == 1, (label, audit["rows"][0].get("gate_reason_code"))
 
 
-def test_one_sided_single_team_skipped_not_generated():
-    """单边/海外仅 1 实线团队：Gate skip，不成卡。"""
+def test_one_sided_single_team_allowed_as_backlog():
+    """单边/海外仅 1 实线团队：2026-09 改为允许成卡但降级为 watch backlog，不进入读者页。"""
     one_sided_labels = [
         "一方接触，另一方用得上",
         "一方有需求，另一方尚未接触",
@@ -88,5 +88,7 @@ def test_one_sided_single_team_skipped_not_generated():
             "evidence_refs": [10],
         }]
         approved, audit = apply_evidence_gate(decisions, [cand], items)
-        assert approved == [], (label, audit["rows"][0])
-        assert audit["rows"][0].get("gate_reason_code") == "evidence_single_team"
+        assert len(approved) == 1, (label, audit["rows"][0])
+        assert approved[0]["decision_tier"] == "watch"
+        assert approved[0].get("weak") is True
+        assert audit["rows"][0].get("gate_decision") == "keep"

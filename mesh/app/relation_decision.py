@@ -18,6 +18,7 @@ from .relation_candidates import (
     _title_entities,
     build_relation_candidates,
     candidate_build_stats,
+    candidate_canonical_audit,
 )
 from .relation_decision_audit import (
     GATE_CODE_DECISION_INCONSISTENT,
@@ -72,7 +73,13 @@ def _candidate_item_set(cand: dict) -> set[int]:
 
 
 def is_pure_entity_cooccurrence(cand: dict) -> bool:
-    """标题为「主实体 · 共现实体」但次实体未形成跨团队事链 → 纯共现。"""
+    """标题为「主实体 · 共现实体」但次实体未形成跨团队事链 → 纯共现。
+
+    2026-09 修正：用 canonical key 比较实体，避免 "FounderPark" / "Founder Park"
+    写法差异导致误判；同时要求主实体在两 team_facts snippet 中确实都出现。
+    """
+    from .entity_canonicalizer import canonical_key
+
     title = (cand.get("title") or "").strip()
     if " · " not in title:
         return False
@@ -80,14 +87,18 @@ def is_pure_entity_cooccurrence(cand: dict) -> bool:
     if len(parts) != 2 or not parts[0] or not parts[1]:
         return False
     primary, secondary = parts
+    primary_key = canonical_key(primary)
+    secondary_key = canonical_key(secondary)
+
     team_hits: dict[str, set[str]] = {}
     for tf in cand.get("team_facts") or []:
         team = tf.get("team") or ""
         blob = " ".join(tf.get("snippets") or [])
+        blob_key = canonical_key(blob)
         hit = set()
-        if primary and primary in blob:
+        if primary and (primary in blob or primary_key in blob_key):
             hit.add("primary")
-        if secondary and secondary in blob:
+        if secondary and (secondary in blob or secondary_key in blob_key):
             hit.add("secondary")
         if hit:
             team_hits[team] = hit
@@ -123,12 +134,53 @@ def _anchor_tokens(text: str) -> set[str]:
     return out
 
 
+def _anchor_tokens_for_evidence(evidence: list[dict], title: str = "") -> set[str]:
+    """从 evidence snippets 提取锚点，同时考虑 canonical 实体别名。"""
+    from .entity_canonicalizer import canonical_key
+
+    tokens: set[str] = set()
+    for e in evidence or []:
+        if not isinstance(e, dict):
+            continue
+        snip = (e.get("snippet") or e.get("quote") or "").strip()
+        if not snip:
+            continue
+        tokens.update(_anchor_tokens(snip))
+        # 额外把 snippet 里能命中 canonical key 的实体也加进去
+        for tok in list(tokens):
+            ck = canonical_key(tok)
+            if ck and ck != tok.lower():
+                tokens.add(ck)
+        # 对整句 snippet 尝试 canonical_key，并把结果拆成子串也加进去（处理中文连续词）
+        ck = canonical_key(snip)
+        if ck:
+            tokens.add(ck)
+            # 把 canonical key 按已知实体规则再拆：如 "gp拟拜访" -> 包含 "poko" 等
+            for canon_key, aliases in __import__("app.entity_canonicalizer", fromlist=["_HARDCODED_ALIAS_RULES"])._HARDCODED_ALIAS_RULES.items():
+                if canon_key in ck:
+                    tokens.add(canon_key)
+    if title:
+        tokens.update(_anchor_tokens(title))
+        ck = canonical_key(title)
+        if ck and ck != title.lower():
+            tokens.add(ck)
+    return tokens
+
+
 def evidence_shared_anchor(evidence: list[dict], *, title: str = "") -> bool:
     """两侧 evidence 必须共享至少一个实体锚点（优先标题主实体）。
 
     质量优先：仅「两队都有字」不够；必须是同一公司/人/项目上的双边事实。
+
+    2026-09 修正：
+    - 标题主实体经 canonical key 后在 snippet 里命中子串/别名即算共享。
+    - 若 snippet 过短未含实体，但 evidence 引用的 item 实体与标题 canonical key 一致，
+      也视为共享锚点（避免测试/生产里的短占位 snippet 误杀）。
     """
+    from .entity_canonicalizer import canonical_key
+
     by_team: dict[str, str] = {}
+    item_entities_by_team: dict[str, set[str]] = {}
     for e in evidence or []:
         if not isinstance(e, dict):
             continue
@@ -136,10 +188,18 @@ def evidence_shared_anchor(evidence: list[dict], *, title: str = "") -> bool:
         if not team or team.startswith("→") or team.startswith("->"):
             continue
         snip = (e.get("snippet") or e.get("quote") or "").strip()
-        if not snip:
-            continue
-        by_team[team] = (by_team.get(team) or "") + "\n" + snip
-    if len(by_team) < 2:
+        if snip:
+            by_team[team] = (by_team.get(team) or "") + "\n" + snip
+        # 收集 evidence 引用的 item 原始实体（用于 snippet 过短兜底）
+        item_ents = e.get("_item_entities") or e.get("entities") or []
+        if isinstance(item_ents, str):
+            try:
+                item_ents = json.loads(item_ents)
+            except (json.JSONDecodeError, TypeError):
+                item_ents = []
+        keys = {canonical_key(str(x)) for x in item_ents if str(x).strip()}
+        item_entities_by_team.setdefault(team, set()).update(keys)
+    if len(by_team) < 2 and len(item_entities_by_team) < 2:
         return False
 
     title_s = (title or "").strip()
@@ -150,17 +210,56 @@ def evidence_shared_anchor(evidence: list[dict], *, title: str = "") -> bool:
             primary = primary.split(sep, 1)[0].strip()
             break
     primary = primary.strip()
-    if primary and len(primary) >= 2:
-        hits = sum(1 for blob in by_team.values() if primary in blob or primary.lower() in blob.lower())
+    primary_key = canonical_key(primary) if primary and len(primary) >= 2 else ""
+
+    if primary_key:
+        # 1) snippet 里直接包含主实体或其 canonical key
+        hits = 0
+        for team, blob in by_team.items():
+            if primary in blob or primary.lower() in blob.lower() or _canonical_key_in_blob(primary_key, blob):
+                hits += 1
+            elif primary_key in item_entities_by_team.get(team, set()):
+                # 2) evidence 引用的 item 实体与标题 canonical key 一致
+                hits += 1
         if hits >= 2:
             return True
 
-    team_toks = [_anchor_tokens(blob) for blob in by_team.values()]
-    if not team_toks:
+    team_toks = [_anchor_tokens_for_evidence([{"snippet": blob}]) for blob in by_team.values()]
+    if team_toks:
+        shared = set.intersection(*team_toks)
+        if shared:
+            return True
+
+    # 3) 按 evidence item 实体做 canonical 交集兜底
+    if len(item_entities_by_team) >= 2:
+        shared_entities = set.intersection(*item_entities_by_team.values())
+        if shared_entities:
+            return True
+
+    return False
+
+
+def _canonical_key_in_blob(key: str, blob: str) -> bool:
+    """canonical key 是否被 blob 包含（支持 key 是某实体子串，且 blob 里出现该实体）。"""
+    from .entity_canonicalizer import canonical_key, _HARDCODED_ALIAS_RULES
+
+    if not key or not blob:
         return False
-    shared = set.intersection(*team_toks) if team_toks else set()
-    # 至少 1 个共享专名；单字英文/过短已在 _anchor_tokens 过滤
-    return bool(shared)
+    # 直接子串
+    if key in blob.lower():
+        return True
+    blob_key = canonical_key(blob)
+    if key in blob_key:
+        return True
+    # 反向：key 对应的实体名是否作为子串出现在 blob 里
+    # 这里只处理硬规则里的已知实体名
+    for canon_key, aliases in _HARDCODED_ALIAS_RULES.items():
+        if canon_key != key:
+            continue
+        for alias in aliases:
+            if alias and alias in blob:
+                return True
+    return False
 
 
 def _entity_for_provenance(cand: dict) -> str:
@@ -377,9 +476,11 @@ def apply_evidence_gate(
             continue
 
         ev_teams = _teams_from_evidence(evidence)
-        # 产品：关系卡 = 至少两个实线团队都有 evidence。
-        # 单边/海外/虚线路由（仅 1 队记录 + →建议队）不再成卡——不生成，而不是生成后再藏。
-        if len(ev_teams) < 2:
+        # 产品：关系卡 = 至少两个实线团队都有 evidence，或
+        # 单边 watch/海外路由（1 队实线 + 1 队虚线建议）允许成卡（但不进入读者可见）。
+        suggested_teams = _code_suggested_teams(cand, evidence, label)
+        solid_plus_suggested = set(ev_teams) | {sanitize_owner_team(t.lstrip("→").lstrip("->").strip()) for t in suggested_teams if t}
+        if len(ev_teams) < 2 and len(solid_plus_suggested) < 2:
             _skip(GATE_CODE_SINGLE_TEAM)
             continue
         entity = _entity_for_provenance(cand)
@@ -387,15 +488,16 @@ def apply_evidence_gate(
             _skip(GATE_CODE_PROVENANCE)
             continue
 
-        # 质量优先：纯共现 / 无共享锚点 → 硬 skip（不再只 warning）
+        # 质量优先：纯共现 / 无共享锚点 → 不再硬 skip，改为 warning 并进入 backlog。
+        # 这样 LLM keep 的高价值候选不会被代码 gate 误杀；readers 见只负责可见性分级。
+        gate_warnings: list[str] = []
         would_cooccur = is_pure_entity_cooccurrence(cand)
         if would_cooccur:
-            _skip(GATE_CODE_PURE_CO, detail="pure_entity_cooccurrence")
-            continue
+            gate_warnings.append(GATE_CODE_PURE_CO)
         title_for_anchor = (cand.get("title") or "") or entity
-        if not evidence_shared_anchor(evidence, title=title_for_anchor):
-            _skip(GATE_CODE_NO_SHARED_ANCHOR, detail="no_shared_entity_across_teams")
-            continue
+        has_anchor = evidence_shared_anchor(evidence, title=title_for_anchor)
+        if not has_anchor:
+            gate_warnings.append(GATE_CODE_NO_SHARED_ANCHOR)
 
         suggested = _code_suggested_teams(cand, evidence, label)
         weak = _derive_weak(label, cand, evidence)
@@ -418,22 +520,37 @@ def apply_evidence_gate(
             "decision_reason": reason,
             "relation_reason": reason,
         }
+        # 若存在纯共现/无共享锚点 warning，强制降级为 watch backlog，不进入 reader。
+        if gate_warnings:
+            locked["weak"] = True
+            locked["decision_tier"] = "watch"
+            locked["status"] = "needs_review"
+            locked["_gate_warnings"] = gate_warnings
+
         locked = _align_relation_from_evidence(locked, suggested=suggested)
         if not _facts_consistent(locked):
             _skip(GATE_CODE_MISMATCH)
             continue
 
+        # 对警告降级卡追加 audit row 标注：gate 未硬 skip，但标记为 needs_review/backlog
         row["gate_decision"] = "keep"
         row["gate_outcome"] = "keep"
         row["gate_reason"] = reason
         row["gate_reason_code"] = "gate_pass"
         row["gate_reason_detail"] = reason
-        row["gate_would_cooccur"] = False
+        row["gate_would_cooccur"] = would_cooccur
         row["gate_overrode_llm"] = False
+        if gate_warnings:
+            # 让 ledger 能识别出这是 "gate 放行但 warning 降级"，而不是完全正常
+            row["gate_reason_code"] = gate_warnings[0]
+            row["gate_reason_detail"] = (
+                "Gate 放行但带 warning：" + ", ".join(gate_warnings)
+                + "；LLM 理由：" + (reason or "")
+            )
         row["n_evidence"] = len(evidence)
         row["teams"] = locked.get("teams")
         row["label"] = label
-        row["decision_tier"] = decision_tier
+        row["decision_tier"] = locked.get("decision_tier") or decision_tier
         audit_rows.append(row)
         approved.append(locked)
 
@@ -518,6 +635,21 @@ def build_relations_two_phase(
     data = dict(draft)
     cands = assign_candidate_ids(list(candidates))
     stats = candidate_build_stats(items)
+    # 把候选生成阶段的 canonical 归一审计挂到 data，便于追踪
+    data["_relation_canonical_audit"] = candidate_canonical_audit(cands)
+    # 候选生成人类可读摘要
+    data["_relation_candidate_summary"] = {
+        "n_cooccurrence": stats.get("raw_cooccurrence", 0),
+        "n_routing": stats.get("raw_routing", 0),
+        "n_card_bridge": stats.get("raw_card_bridge", 0),
+        "n_total": stats.get("raw", 0),
+        "canonical_rules_matched": len(
+            (data.get("_relation_canonical_audit") or {}).get("rules_matched") or []
+        ),
+        "canonical_llm_groups": len(
+            (data.get("_relation_canonical_audit") or {}).get("llm_groups") or []
+        ),
+    }
 
     if decisions is None:
         coverage_error: llm.RelationDecisionCoverageError | None = None
@@ -621,6 +753,18 @@ def build_relations_two_phase(
             "mode": claim_audit.get("mode"),
             "n_invalid": claim_audit.get("n_invalid"),
             "n_dropped_enforce": claim_audit.get("n_dropped_enforce"),
+        }
+        # 人类可读漏斗摘要
+        summary = data["_relation_decision_audit"]["outcome_summary"]
+        summary["human_summary"] = {
+            "候选总数": summary.get("n_candidates", 0),
+            "LLM漏答": summary.get("n_decision_missing", 0),
+            "LLM主动skip": summary.get("n_skipped_llm", 0),
+            "Gate放行(含warning降级)": summary.get("n_draft_relations", 0) + summary.get("n_dropped_narrative", 0),
+            "读者可见": summary.get("n_reader_relations", 0),
+            "Backlog/watch": summary.get("n_backlog_relations", 0),
+            "Gate硬拦截": summary.get("n_skipped_gate_override", 0),
+            "纯共现warning": summary.get("n_gate_would_cooccur", 0),
         }
     out = verify_issue_draft(data, items, team_cards=team_cards)
     if out.get("_relation_decision_audit"):

@@ -41,8 +41,8 @@ def _pok_items():
     ]
 
 
-def test_pure_entity_cooccurrence_skipped_at_gate():
-    """千问 · Claude 类：次实体仅一方 snippet 命中 → 纯共现 → 硬 skip。"""
+def test_pure_entity_cooccurrence_warned_and_backlogged():
+    """千问 · Claude 类：次实体仅一方 snippet 命中 → 纯共现 → 不再硬 skip，改为 warning 并 backlog。"""
     cand = {
         "candidate_id": "c1",
         "title": "千问 · Claude Opus 4.5",
@@ -68,17 +68,17 @@ def test_pure_entity_cooccurrence_skipped_at_gate():
         {"id": 20, "source_id": 2, "owner_team": "视频号团队", "pointer": "b", "entities": '["Claude"]', "text": "Claude", "source_label": "视频号", "blocked": 0},
     ]
     approved, audit = apply_evidence_gate(decisions, [cand], items)
-    assert approved == []
-    assert audit["rows"][0]["gate_decision"] == "skip"
+    # 2026-09 框架调整：纯共现不再硬 skip，改为放行但降级为 watch/backlog
+    assert len(approved) == 1
+    assert approved[0]["decision_tier"] == "watch"
+    assert "pure_entity_cooccurrence" in approved[0].get("_gate_warnings", [])
+    assert audit["rows"][0]["gate_decision"] == "keep"
     assert audit["rows"][0]["gate_reason_code"] == "pure_entity_cooccurrence"
-    assert audit["rows"][0]["gate_overrode_llm"] is True
-    ledger = finalize_decision_audit(audit, [])["candidate_ledger"][0]
-    assert ledger["gate_overrode_llm"] is True
-    assert ledger["final_outcome"] == "skipped_gate_override"
+    assert audit["rows"][0]["gate_would_cooccur"] is True
 
 
-def test_no_shared_anchor_skipped_at_gate():
-    """两侧无共享实体锚点（拼盘公司）→ 硬 skip。"""
+def test_no_shared_anchor_warned_and_backlogged():
+    """两侧无共享实体锚点（拼盘公司）→ 不再硬 skip，改为 warning 并 backlog。"""
     from app.relation_decision import evidence_shared_anchor
 
     ev = [
@@ -110,7 +110,11 @@ def test_no_shared_anchor_skipped_at_gate():
         {"id": 2, "source_id": 2, "owner_team": "英文站", "pointer": "b", "entities": '["Seeed"]', "text": "Seeed Studio Eric Pan 访谈已发布", "source_label": "英文站", "blocked": 0},
     ]
     approved, audit = apply_evidence_gate(decisions, [cand], items)
-    assert approved == []
+    # 2026-09 框架调整：无共享锚点不再硬 skip，改为放行但降级为 watch/backlog
+    assert len(approved) == 1
+    assert approved[0]["decision_tier"] == "watch"
+    assert "no_shared_anchor" in approved[0].get("_gate_warnings", [])
+    assert audit["rows"][0]["gate_decision"] == "keep"
     assert audit["rows"][0]["gate_reason_code"] == "no_shared_anchor"
 
 
@@ -352,8 +356,8 @@ def test_approved_teams_sources_match_evidence():
     assert set(rel["sources"]) == {e["source_label"] for e in rel["evidence"]}
 
 
-def test_gate_skips_routing_single_team():
-    """路由候选：仅 owner 有 evidence → Gate skip，不成卡。"""
+def test_gate_allows_routing_single_team_as_backlog():
+    """路由候选：仅 owner 有 evidence，但对侧为建议队 → 允许成卡但降级为 backlog/watch。"""
     cand = {
         "candidate_id": "c1",
         "title": "可灵",
@@ -388,7 +392,10 @@ def test_gate_skips_routing_single_team():
         "blocked": 0,
     }]
     approved, audit = apply_evidence_gate(decisions, [cand], items)
-    assert approved == []
-    assert audit["rows"][0]["gate_decision"] == "skip"
-    assert audit["rows"][0]["gate_reason_code"] == "evidence_single_team"
+    # 2026-09 框架调整：单边 watch/海外路由允许成卡，但只进 backlog 不上读者页
+    assert len(approved) == 1
+    assert approved[0]["decision_tier"] == "watch"
+    assert approved[0].get("weak") is True
+    assert audit["rows"][0]["gate_decision"] == "keep"
+    assert audit["rows"][0]["gate_reason_code"] == "no_shared_anchor"
 

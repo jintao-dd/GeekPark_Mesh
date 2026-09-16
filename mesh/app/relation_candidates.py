@@ -6,6 +6,11 @@ import re
 from collections import defaultdict
 
 from .aggregator import sanitize_owner_team
+from .entity_canonicalizer import (
+    canonical_key,
+    canonicalize_entities_in_items,
+    display_name_for_canonical,
+)
 from .owner_guard import (
     filter_draft_relations,
     normalize_relation_team_badges,
@@ -43,9 +48,14 @@ _BRIDGE_NAME_NOISE = frozenset({
 
 
 def _entity_key(name: str) -> str:
-    """轻归一：折空白 + casefold。不做子串/别名库。"""
-    s = re.sub(r"\s+", "", (name or "").strip())
-    return s.casefold()
+    """轻归一：先走 canonical 别名归一，再折空白/大小写。
+
+    注意：候选生成阶段用 canonical key 做 bucket，避免同一实体的不同写法被拆成多个候选。
+    """
+    if not name:
+        return ""
+    # 先按 entity_canonicalizer 的硬规则/LLM fallback 归一
+    return canonical_key(name)
 
 
 def _parse_entities(raw) -> list[str]:
@@ -144,9 +154,11 @@ def _provenance_ok_from_team_map(team_map: dict[str, list[dict]], teams: list[st
 
 
 def _build_entity_cooccurrence_candidates(items: list[dict]) -> list[dict]:
-    """entity 跨团队共现候选（原 raw 路径；索引走 _entity_key）。"""
+    """entity 跨团队共现候选（canonical key 归桶；标题不再强制加 ·）。"""
     active = [dict(x) for x in items if not x.get("blocked")]
-    # key -> team -> rows；另记 display 名
+    # 先跑 canonical 归一，在 items 上写入 _canonical_entities / _entity_canonical_map
+    active, canon_audit = canonicalize_entities_in_items(active, use_llm_fallback=False)
+
     by_entity: dict[str, dict[str, list[dict]]] = defaultdict(lambda: defaultdict(list))
     display_of: dict[str, str] = {}
     for it in active:
@@ -154,15 +166,17 @@ def _build_entity_cooccurrence_candidates(items: list[dict]) -> list[dict]:
         if not ot or ot == "外部媒体":
             continue
         row = _item_row(it)
+        # 用 canonical key 归桶；display 名从原始 entities 里选最佳
+        canon_ents = it.get("_canonical_entities") or []
         for name in row["entities"]:
             if len(name) < _MIN_ENTITY_LEN:
                 continue
             key = _entity_key(name)
-            if not key:
+            if not key or key not in canon_ents:
                 continue
             by_entity[key][ot].append(row)
-            # 偏好更长/含空格的展示名（Field AI > FieldAI）
             prev = display_of.get(key) or ""
+            # 偏好更长/含空格的展示名（Field AI > FieldAI）
             if len(name) > len(prev) or (len(name) == len(prev) and " " in name and " " not in prev):
                 display_of[key] = name
             elif key not in display_of:
@@ -174,7 +188,6 @@ def _build_entity_cooccurrence_candidates(items: list[dict]) -> list[dict]:
         if len(teams) < 2:
             continue
         entity = display_of.get(key) or key
-        # 优先用归桶 rows 校验；同时保留原 API（title=display）作兜底
         if not _provenance_ok_from_team_map(team_map, teams):
             continue
         all_items: list[dict] = []
@@ -200,10 +213,14 @@ def _build_entity_cooccurrence_candidates(items: list[dict]) -> list[dict]:
                 "sources": srcs[:3],
             })
             sources.extend(s for s in srcs if s not in sources)
+
+        # 标题策略：主实体即可，不再强制追加共现实体，避免 "A · B" 触发纯共现误杀。
+        # 若共现实体足够强（跨 ≥2 队且非主实体本身），可附加，但优先简洁。
         title = entity
         co = _coentities(all_items, entity)
-        if co:
-            title = f"{entity} · {co}" if entity not in co else co
+        if co and co != entity and _coentity_cross_teams(all_items, entity, co):
+            title = f"{entity} · {co}"
+
         raw_cands.append({
             "title": title,
             "teams": teams,
@@ -215,8 +232,22 @@ def _build_entity_cooccurrence_candidates(items: list[dict]) -> list[dict]:
             "item_ids": item_ids,
             "provenance_ok": True,
             "entity_key": key,
+            "_canonical_audit": canon_audit,
         })
     return raw_cands
+
+
+def _coentity_cross_teams(all_items: list[dict], primary: str, co: str) -> bool:
+    """共现实体 co 至少在两个团队都有出现，才 worthy 进入标题。"""
+    teams_with_co: set[str] = set()
+    for row in all_items:
+        ot = sanitize_owner_team(row.get("owner_team"))
+        if not ot:
+            continue
+        names = {canonical_key(n) for n in (row.get("entities") or [])}
+        if canonical_key(co) in names:
+            teams_with_co.add(ot)
+    return len(teams_with_co) >= 2
 
 
 def _card_action_lines(card: dict) -> list[tuple[str, str]]:
@@ -281,7 +312,13 @@ def _build_card_bridge_candidates(
     items: list[dict],
     team_cards: list[dict] | None,
 ) -> list[dict]:
-    """卡面 actionable 线索 → 他队 item 实体：弱 routing 形态桥接。"""
+    """卡面 actionable 线索 → 他队 item 实体：弱 routing 形态桥接。
+
+    2026-09 修复：
+    - bucket key 增加 (card_team, entity_key, action_signature) 消除 twin。
+    - action_signature 由卡面行中匹配到的 team/动作/实体组合生成。
+    - 卡方自身 item 必须挂 item_id，否则 _teams_from_evidence 会漏掉卡方团队。
+    """
     if not team_cards:
         return []
 
@@ -311,11 +348,18 @@ def _build_card_bridge_candidates(
     if not by_key:
         return []
 
-    buckets: dict[tuple[str, str], dict] = {}
+    buckets: dict[tuple[str, str, str], dict] = {}
 
-    def _ensure_bucket(card_team: str, key: str, other_teams: list[str], snippet: str) -> dict:
+    def _action_signature(card_team: str, key: str, other_teams: list[str], line: str) -> str:
+        # 用 team set + 行内核心动词/实体生成签名，避免同一行因不同分词产生多个 bucket
+        parts = [card_team, key] + sorted(other_teams)
+        # 抽取动作锚点词
+        verbs = re.findall(r"已沟通|已接触|对接|专访|用得上|尚未接触|在跟进|牵线|采访|合作", line or "")
+        parts += sorted(set(verbs))
+        return "|".join(parts)
+
+    def _ensure_bucket(bkey: tuple[str, str, str], card_team: str, key: str, other_teams: list[str], snippet: str) -> dict:
         display = display_of.get(key) or key
-        bkey = (card_team, key)
         if bkey not in buckets:
             buckets[bkey] = {
                 "title": display,
@@ -323,7 +367,7 @@ def _build_card_bridge_candidates(
                 "weak": True,
                 "candidate_kind": "card_bridge",
                 "routing_targets": [],
-                "suggested_label": _routing_suggest_label(card_team, other_teams[0]),
+                "suggested_label": _routing_suggest_label(card_team, other_teams[0] if other_teams else ""),
                 "team_facts": [{
                     "team": card_team,
                     "item_ids": [],
@@ -387,7 +431,6 @@ def _build_card_bridge_candidates(
                 team_map = by_key[key]
                 other_teams = sorted(t for t in team_map.keys() if t != card_team)
                 if not other_teams:
-                    # 实体仅在卡方：若行内点名他队，或已沟通/对接类叙事，发弱路由
                     named = [
                         t
                         for t in _KNOWN_TEAMS
@@ -403,12 +446,13 @@ def _build_card_bridge_candidates(
                         other_teams = ["编辑部"]
                     else:
                         continue
-                    # 无对侧 item 时仍可用卡方 item 作证据
                     if card_team not in team_map:
                         continue
-                b = _ensure_bucket(card_team, key, other_teams, snippet)
+                sig = _action_signature(card_team, key, other_teams, line)
+                bkey = (card_team, key, sig)
+                b = _ensure_bucket(bkey, card_team, key, other_teams, snippet)
                 _attach_other(b, team_map, other_teams)
-                # 卡方自身 item 也挂上（onesided 时尤其需要）
+                # 卡方自身 item 必须挂 item_id，否则 _teams_from_evidence 会漏掉卡方团队
                 if card_team in team_map:
                     tf0 = b["team_facts"][0]
                     for row in team_map[card_team][:_MAX_SNIPPETS]:
@@ -418,7 +462,7 @@ def _build_card_bridge_candidates(
                         if iid is not None and iid not in tf0["item_ids"]:
                             tf0["item_ids"].append(iid)
                         if row["text"] and row["text"] not in tf0["snippets"]:
-                            tf0["snippets"].append(row["text"][:_SNIP_LEN])
+                            tf0["snippets"].append(row["text"][:120])  # 卡面 snippet 截短
                         if row["source_label"] and row["source_label"] not in tf0["sources"]:
                             tf0["sources"].append(row["source_label"])
                             if row["source_label"] not in b["sources"]:
@@ -538,20 +582,50 @@ def candidate_build_stats(
         "raw_routing": len(route),
         "raw_card_bridge": len(bridge),
         "for_llm": len(raw),
-        # 兼容旧审计字段：Candidate 不再 dedupe/cap
         "deduped": len(raw),
     }
 
 
+def candidate_canonical_audit(candidates: list[dict]) -> dict[str, Any]:
+    """汇总共现候选带来的 canonical 归一审计。"""
+    merged: dict[str, Any] = {"rules_matched": [], "llm_groups": [], "fallback_count": 0}
+    for c in candidates or []:
+        audit = c.get("_canonical_audit")
+        if not isinstance(audit, dict):
+            continue
+        merged["rules_matched"].extend(audit.get("rules_matched") or [])
+        merged["llm_groups"].extend(audit.get("llm_groups") or [])
+        merged["fallback_count"] += int(audit.get("fallback_count") or 0)
+    # 去重
+    merged["rules_matched"] = [
+        dict(t) for t in {tuple(sorted(d.items())) for d in merged["rules_matched"]}
+    ]
+    merged["llm_groups"] = [list(t) for t in {tuple(g) for g in merged["llm_groups"]}]
+    return merged
+
+
 def _coentities(items: list[dict], primary: str) -> str:
+    """找与 primary 共现最多的实体（用 canonical key 比较，避免写法差异）。"""
+    primary_key = canonical_key(primary)
     counts: dict[str, int] = defaultdict(int)
     for row in items:
         for n in row.get("entities") or []:
-            if n != primary and len(n) >= 2:
-                counts[n] += 1
+            n = str(n).strip()
+            if not n or len(n) < 2:
+                continue
+            if canonical_key(n) == primary_key:
+                continue
+            counts[canonical_key(n)] += 1
     if not counts:
         return ""
-    return max(counts.items(), key=lambda x: (x[1], len(x[0])))[0]
+    top_key = max(counts.items(), key=lambda x: (x[1], len(x[0])))[0]
+    # 返回最佳 display 名
+    for row in items:
+        for n in row.get("entities") or []:
+            n = str(n).strip()
+            if canonical_key(n) == top_key:
+                return n
+    return top_key
 
 
 def _suggest_label(teams: list[str], team_facts: list[dict]) -> str:
