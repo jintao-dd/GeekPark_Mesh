@@ -26,7 +26,8 @@ Overnight / v2.1 / v2.2    ✅ 收口
 ⑥ Data Domain              🔒 LOCKED
 
 轻量 Ontology              📌 反推稿（非系统）MESH_LIGHTWEIGHT_ONTOLOGY.md
-LLM Wiki                   ⛔ 延后（Feishu 后评估 · 仅派生视图）
+LLM Wiki（质量轨 Ask）      ⛔ 仍不得替换 Published Retrieval
+Company Wiki（Colleague）   📌 见 COLLEAGUE_AGENT_V4 §1.5 · wiki_context 派生 · 禁冒充 FACT
 ```
 
 ### 执行边界（最终锁定）

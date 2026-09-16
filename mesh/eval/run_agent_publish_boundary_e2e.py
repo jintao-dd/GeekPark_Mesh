@@ -30,7 +30,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 SLUG = "agent-e2e-pub-boundary"
-MARKER_PREFIX = "AGENTPUBMARK"
+MARKER_PREFIX = "验收钉记"
+
 
 
 @contextmanager
@@ -183,8 +184,26 @@ def _publish(con, issue_id: int) -> None:
     con.commit()
 
 
+def _disable_embed_for_e2e() -> None:
+    """E2E 不依赖远端 embedding；避免 tmesh embed timeout 拖死检索。不改产品默认。"""
+    from app import embeddings
+
+    embeddings.embed_one = lambda _t: []  # type: ignore[assignment]
+    embeddings.is_configured = lambda: False  # type: ignore[assignment]
+
+
 def run_once(con) -> dict:
-    marker = f"{MARKER_PREFIX}_{uuid.uuid4().hex[:10]}"
+    _disable_embed_for_e2e()
+    marker = f"{MARKER_PREFIX}_{uuid.uuid4().hex[:8]}"
+    # 可重入：清掉上次残留
+    con.execute("DELETE FROM search_fts WHERE issue_slug=?", (SLUG,))
+    try:
+        con.execute("DELETE FROM chunk_index WHERE issue_slug=?", (SLUG,))
+    except Exception:
+        pass
+    con.execute("DELETE FROM issues WHERE slug=?", (SLUG,))
+    con.execute("DELETE FROM users WHERE feishu_open_id=? OR username=?", ("ou_agent_e2e", "agent_e2e"))
+    con.commit()
     _seed_user(con)
     iid = _upsert_draft(con, marker)
 

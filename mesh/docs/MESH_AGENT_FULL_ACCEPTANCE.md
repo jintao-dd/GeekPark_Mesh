@@ -3,8 +3,8 @@
 > **状态（2026-09-08）**  
 > Layer 1–3 ✅ · **Final Preview E2E ✅**  
 > **Mesh + Agent v1 = GO**  
-> 下一步：⑧ 飞书 MVP（仅接线）  
-> 质量线（Temporal → Recall → Ranking）GO 后另开，不回改 ①–⑦
+> 下一步：⑧ 飞书 MVP（仅接线）∥ 质量线第一刀 Temporal  
+> 质量线规格：**`AGENT_QUALITY_V2.md`**（不回改 ①–⑦）
 
 报告：`eval/reports/MESH_AGENT_FULL_ACCEPTANCE.md`  
 Final 报告：`eval/reports/FINAL_PREVIEW_E2E.tmesh.json`
@@ -17,13 +17,13 @@ Final 报告：`eval/reports/FINAL_PREVIEW_E2E.tmesh.json`
 主线（v1 收口）
   Final Preview E2E ✅ → Mesh+Agent v1 GO → ⑧ 飞书 MVP → 真实使用
 
-质量线（GO 之后，Agent Quality / Retrieval Quality v1）
-  Temporal Grounding → Recall → Ranking → Evidence → Answer Quality
-  → CRM 等第二数据域 → Agent v2
+质量线（Agent Quality / v2）— 详见 AGENT_QUALITY_V2.md
+  Temporal → Recall → Ranking → Evidence → Answer → CRM…
+  目标：回答正确、时间正确、证据充分、召回全面、排序合理、不会瞎说
 ```
 
 **现在发现质量问题 ≠ 现在改架构。**  
-①–⑦ 冻结不动。Temporal / Recall / Ranking **不插进** v1 验收回改。
+①–⑦ 冻结。质量用 Gold + Dashboard 推进，不回改 v1 边界/Contract。
 
 ---
 
@@ -61,7 +61,7 @@ Ask「最近/本周」措辞止血可保留；**正式 Temporal Grounding = GO �
 
 ---
 
-## GO 之后：Temporal Grounding（备忘）
+## GO 之后：见 `AGENT_QUALITY_V2.md`
 
-IssueRef ≠ TimeWindow；优先 Event Time；无 `event_time` → `exact|range|unknown`（unknown 禁止说「最近发生」）。  
-Gold 须带 `time_semantics` + `issue_scope`。排在 Recall/Ranking **之前**。
+第一刀 Temporal：Issue Time ≠ Event Time ≠ Publish Time；`latest_published` ≠「最近发生」。  
+Gold 带 `time_semantics` + `issue_scope`；再进 Recall / Ranking。

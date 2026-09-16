@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "marker": "AGENTPUBMARK_ef3f47bcb6",
+  "marker": "验收钉记_64e2592b",
   "fts_draft": 0,
   "fts_published": 2,
   "before": {
@@ -17,7 +17,7 @@
       "ev:ctx:agent-e2e-pub-boundary:2"
     ],
     "intent": "ask_published",
-    "text_head": "根据已上线语料（与「请查找标记 AGENTPUBMARK_ef3f47bcb6 相关进展」相关）：\n- [agent-e2e-pub-boundary] AGENTPUBMARK_ef3f47bcb6\n- [agent-e2e-pub-boundary] 关系卡含 AGENTPUBMARK_ef3f47bcb6",
+    "text_head": "根据已上线语料（与「请查找标记 验收钉记_64e2592b 相关进展」相关）：\n- [agent-e2e-pub-boundary] 验收钉记_64e2592b\n- [agent-e2e-pub-boundary] 关系卡含 验收钉记_64e2592b",
     "fingerprint": "a28ccc47e5198176a521a7aa",
     "trace": {
       "intent": "ask_published",
@@ -38,5 +38,5 @@
     "ok_before": true,
     "ok_after": true
   },
-  "latency_ms": 880
+  "latency_ms": 789
 }

@@ -86,10 +86,12 @@ Published items / relations / Evidence only。LLM 摘要不得成为第二 truth
         ↓
 ⑤ Feishu UX：出站 + 思考卡 → Patch 终答  ✅ Phase 1 Done（2026-09-10）
         ↓
-⑥ 小规模真实用户 Canary  ← **下一刀（Agent Phase 2 工程化）**
+⑥ 小规模真实用户 Canary  ← **进行中（P0.1 · 像不像同事）**
         ↓
-⑦ 根据真实 failure 决定下一刀
+⑦ 按重复 failure 模式集中打一刀，再 Canary
 ```
+
+记法与场景组：`docs/AGENT_CANARY_P01.md`（本轮只收集、不修；第一性指标 = 用户是否自然追问下一句）。
 
 ### ② Capacity 分阶段
 

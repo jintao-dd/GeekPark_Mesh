@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 OPEN_ID = "ou_agent_final"
-OLD_PUB_SLUG = "2026-8-17"
+DEFAULT_OLD_SLUG = "2026-8-17"
 MARKER_PREFIX = "FinalE2E钉"
 
 
@@ -216,6 +216,11 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--reuse-env-db", action="store_true", required=True)
     ap.add_argument("--slug", default="2026-09-08")
+    ap.add_argument(
+        "--old-slug",
+        default="",
+        help="Published issue used for cross-issue probe (default: 2026-8-17, or 2026-09-08 when testing that slug)",
+    )
     ap.add_argument("--kick-only", action="store_true")
     ap.add_argument("--skip-pipeline", action="store_true")
     ap.add_argument("--skip-preview", action="store_true")
@@ -236,8 +241,12 @@ def main() -> int:
     from app.main import publish_blockers
 
     slug = args.slug.strip()
+    old_slug = (args.old_slug or "").strip()
+    if not old_slug:
+        old_slug = "2026-09-08" if slug == DEFAULT_OLD_SLUG else DEFAULT_OLD_SLUG
     out: dict = {
         "slug": slug,
+        "old_slug": old_slug,
         "started_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "checks": {},
     }
@@ -450,12 +459,13 @@ def main() -> int:
 
         cross = {"skipped": True}
         old = con.execute(
-            "SELECT slug, status FROM issues WHERE slug=?", (OLD_PUB_SLUG,)
+            "SELECT slug, status FROM issues WHERE slug=?", (old_slug,)
         ).fetchone()
-        if old and old["status"] == "published":
-            cross_ans = _ask(con, f"查找标记或实体 {marker}", explicit_issue=OLD_PUB_SLUG)
+        if old and old["status"] == "published" and old_slug != slug:
+            cross_ans = _ask(con, f"查找标记或实体 {marker}", explicit_issue=old_slug)
             cross = {
                 "skipped": False,
+                "old_slug": old_slug,
                 "seen_marker": marker in (cross_ans.get("text") or ""),
                 "issue_slug": (cross_ans.get("context") or {})
                 .get("issue_ref", {})
@@ -472,6 +482,27 @@ def main() -> int:
             "text_head": (refuse.get("text") or "")[:160],
         }
 
+        # Relation probe when draft already has syncable relation cards
+        rel_title = ""
+        for r in draft.get("relations") or []:
+            if isinstance(r, dict) and (r.get("title") or "").strip():
+                rel_title = (r.get("title") or "").strip()
+                break
+        rel_out: dict = {"skipped": True}
+        if rel_title:
+            print(f"[final-e2e] relations ask title={rel_title!r} …", flush=True)
+            rel_ans = _ask(con, f"{rel_title} 有没有联动关系", explicit_issue=slug)
+            rel_out = {
+                "skipped": False,
+                "title": rel_title,
+                "intent": rel_ans.get("intent"),
+                "seen_title": rel_title in (rel_ans.get("text") or ""),
+                "evidence": (rel_ans.get("evidence_refs") or [])[:5],
+                "text_head": (rel_ans.get("text") or "")[:200],
+                "data_tools": rel_ans.get("data_tools_called") or [],
+            }
+        out["relations"] = rel_out
+
         ok_before = (not pre_seen) and fts_pre == 0
         # after: published + fts；marker 可见或至少有 evidence（LLM 可能改写表述）
         ok_after = (
@@ -487,6 +518,9 @@ def main() -> int:
             and not (refuse.get("data_tools_called") or [])
             and not out["draft_probe"]["text_has_marker"]
         )
+        ok_rel = True
+        if not rel_out.get("skipped"):
+            ok_rel = bool(rel_out.get("seen_title") or rel_out.get("evidence"))
         out["checks"] = {
             "ok_gate": gate_ok,
             "ok_before": ok_before,
@@ -495,16 +529,22 @@ def main() -> int:
             "ok_no_cross_issue": ok_cross,
             "ok_no_draft_leak": ok_draft,
             "ok_no_blockers": len(blockers) == 0,
+            "ok_relations": ok_rel,
         }
         out["ok"] = all(out["checks"].values())
         out["finished_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
     finally:
         con.close()
 
-    report = ROOT / "eval" / "reports" / "FINAL_PREVIEW_E2E.tmesh.json"
-    report.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(json.dumps(out, ensure_ascii=False, indent=2))
+    safe = slug.replace("/", "_")
+    report = ROOT / "eval" / "reports" / f"FINAL_PREVIEW_E2E.{safe}.tmesh.json"
+    latest = ROOT / "eval" / "reports" / "FINAL_PREVIEW_E2E.tmesh.json"
+    payload = json.dumps(out, ensure_ascii=False, indent=2)
+    report.write_text(payload, encoding="utf-8")
+    latest.write_text(payload, encoding="utf-8")
+    print(payload)
     print(f"wrote {report}")
+    print(f"wrote {latest}")
     return 0 if out.get("ok") else 1
 
 

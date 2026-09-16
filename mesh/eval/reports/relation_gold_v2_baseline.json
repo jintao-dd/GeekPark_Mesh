@@ -29,9 +29,11 @@
       "expect": "claim_valid",
       "gold_claim_valid": true,
       "gold_claim_invalid": false,
-      "current_line_grounded": true,
+      "current_line_grounded": false,
       "current_gate_result": {
-        "fails_grounding": [],
+        "fails_grounding": [
+          "关系「刘靖康（影石 Insta360）：编辑部已接触，视频号用其出镜内容」body 无法由 evidence 证明"
+        ],
         "gate_kept": true,
         "dropped_titles": []
       },
@@ -50,7 +52,7 @@
       "expect": "claim_valid",
       "gold_claim_valid": true,
       "gold_claim_invalid": false,
-      "current_line_grounded": true,
+      "current_line_grounded": false,
       "current_gate_result": {
         "fails_grounding": [],
         "gate_kept": true,
@@ -95,13 +97,10 @@
       "current_line_grounded": false,
       "current_gate_result": {
         "fails_grounding": [
-          "关系「AGI 2026 现场内容分栏已上线」body 无法由 evidence 证明",
-          "关系「AGI 2026 现场内容分栏已上线」detail unsupported"
+          "关系「AGI 2026 现场内容分栏已上线」body 无法由 evidence 证明"
         ],
-        "gate_kept": false,
-        "dropped_titles": [
-          "AGI 2026 现场内容分栏已上线"
-        ]
+        "gate_kept": true,
+        "dropped_titles": []
       },
       "current_claim_check": {
         "claim_verdict": "invalid",
@@ -121,13 +120,10 @@
       "current_line_grounded": false,
       "current_gate_result": {
         "fails_grounding": [
-          "关系「秒动科技杨硕：两侧触点与选题计划」body 无法由 evidence 证明",
-          "关系「秒动科技杨硕：两侧触点与选题计划」detail unsupported"
+          "关系「秒动科技杨硕：两侧触点与选题计划」body 无法由 evidence 证明"
         ],
-        "gate_kept": false,
-        "dropped_titles": [
-          "秒动科技杨硕：两侧触点与选题计划"
-        ]
+        "gate_kept": true,
+        "dropped_titles": []
       },
       "current_claim_check": {
         "claim_verdict": "invalid",
