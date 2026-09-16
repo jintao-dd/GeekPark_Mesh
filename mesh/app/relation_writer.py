@@ -208,6 +208,37 @@ def title_is_formula(title: str) -> bool:
     return False
 
 
+# 标题动作/叙事锚点：有这些就不是「纯人名」
+_TITLE_ACTION_MARKERS = re.compile(
+    r"沟通|采访|接触|在谈|推进|合作|签约|专访|建联|约稿|催稿|催初|落地|报名|对接|跟进|"
+    r"直播|年框|合同|选题|活动|实测|评测|转写|workshop|Meetup|Demo|"
+    r"任|做|谈|推|签|访|聊|约|见|开|发|报|写|测|排|投"
+)
+# Latin 人名：Arvin Sun / Brad Yuan / Kein Tung（含可选中间名）
+_LATIN_PERSON_TITLE = re.compile(
+    r"^[A-Z][a-z]+(?:\s+[A-Z][a-z'.\-]+){1,3}$"
+)
+
+
+def title_is_bare_person_name(title: str) -> bool:
+    """标题是否只是一个人名（无动作/事实钩子）。
+
+    典型坏例：``Arvin Sun``、``Brad Yuan``。
+    不拦公司短名（xAI / Notta.ai）与带叙事的人名标题（陈宇森任…总经理）。
+    """
+    t = (title or "").strip()
+    if not t or len(t) > 28:
+        return False
+    if _TITLE_ACTION_MARKERS.search(t):
+        return False
+    # 有中文标点/对仗结构 → 已是叙事钩子
+    if any(ch in t for ch in "：:，,。．；;·×|/／、"):
+        return False
+    if _LATIN_PERSON_TITLE.match(t):
+        return True
+    return False
+
+
 def _clip_at_boundary(text: str, max_len: int) -> str:
     """限长时尽量落在标点/空白，避免半截字硬砍。"""
     s = (text or "").strip()
@@ -433,6 +464,7 @@ def enforce_narrative_hygiene(
     """
     flags = {
         "title_rebuilt": False,
+        "title_bare_person": False,
         "body_cleared_template": False,
         "body_cleared_restates": False,
         "body_cleared_cliche": False,
@@ -447,10 +479,15 @@ def enforce_narrative_hygiene(
         flags["details_deduped"] = True
     dets = deduped
 
-    need_title = (not t) or title_has_label_leak(t) or title_is_formula(t)
+    need_title = (
+        (not t)
+        or title_has_label_leak(t)
+        or title_is_formula(t)
+        or title_is_bare_person_name(t)
+    )
     if need_title:
         rebuilt = title_from_details(dets, candidate_title=candidate_title, evidence=evidence)
-        if rebuilt:
+        if rebuilt and not title_is_bare_person_name(rebuilt):
             t = rebuilt
             flags["title_rebuilt"] = True
         elif title_has_label_leak(t) or title_is_formula(t):
@@ -460,11 +497,13 @@ def enforce_narrative_hygiene(
             t = re.sub(r"[：:\s·×xX]{2,}", "：", t).strip(" ：:·-—")
             flags["title_rebuilt"] = True
 
-    if title_is_formula(t):
+    if title_is_formula(t) or title_is_bare_person_name(t):
         rebuilt = title_from_details(dets, candidate_title=candidate_title, evidence=evidence)
-        if rebuilt and not title_is_formula(rebuilt):
+        if rebuilt and not title_is_formula(rebuilt) and not title_is_bare_person_name(rebuilt):
             t = rebuilt
             flags["title_rebuilt"] = True
+    if title_is_bare_person_name(t):
+        flags["title_bare_person"] = True
 
     if body_has_label_leak(b):
         b = ""
@@ -672,6 +711,8 @@ def narrative_violation_codes(
         codes.append("title_label_leak")
     if title_is_formula(t):
         codes.append("title_formula")
+    if title_is_bare_person_name(t):
+        codes.append("title_bare_person")
     if body_has_label_leak(b):
         codes.append("body_label_leak")
     elif body_has_closing_cliche(b):
@@ -795,6 +836,7 @@ def call_writer_llm(objects: list[dict]) -> list[dict]:
 
 _FIX_CODE_HINTS = {
     "title_formula": "title 禁止再写成「主体：A × B」或一边一边对照表；改短钩子。",
+    "title_bare_person": "title 禁止纯人名（如 Arvin Sun）；必须带动作/事实钩子（沟通/投资/专访等）。",
     "title_label_leak": "title 禁止标签词（各知一半/不同触点/已联动等）。",
     "title_empty": "title 不能为空；用主体+最关键事实写短钩子。",
     "body_template": "body 禁止套话（各掌握一部分/这一合作等）；请改写为一句跨队事实总结。",

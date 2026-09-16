@@ -397,6 +397,46 @@ def test_title_dual_colon_formula_and_body_gates():
     assert flags2.get("body_cleared_cliche")
 
 
+def test_bare_person_title_rebuilt_or_flagged():
+    from app.relation_gate import relation_fails_grounding
+    from app.relation_writer import (
+        enforce_narrative_hygiene,
+        narrative_violation_codes,
+        title_is_bare_person_name,
+    )
+
+    assert title_is_bare_person_name("Arvin Sun")
+    assert title_is_bare_person_name("Brad Yuan")
+    assert not title_is_bare_person_name("xAI")
+    assert not title_is_bare_person_name("陈宇森任 Alibaba Cloud LATAM 总经理")
+    assert not title_is_bare_person_name("SunBoy Venture Fund 投资人 Arvin Sun")
+
+    title, _, _, flags = enforce_narrative_hygiene(
+        title="Arvin Sun",
+        body="",
+        details=["硅谷 BD 团队：孙邻家在 SunBoy Venture Fund 做投资"],
+        candidate_title="Arvin Sun",
+    )
+    assert not title_is_bare_person_name(title)
+    assert flags.get("title_rebuilt")
+    assert "投资" in title or "SunBoy" in title or "孙" in title
+
+    # 无法从 details 扩写时 → 仍为人名 → grounding 否决不成卡
+    bad = {
+        "title": "Arvin Sun",
+        "body": "",
+        "details": ["硅谷 BD 团队：Arvin Sun"],
+        "evidence": [{"team": "硅谷 BD 团队", "snippet": "Arvin Sun", "item_id": 1}],
+        "weak": True,
+        "decision_tier": "watch",
+    }
+    # hygiene 可能仍得到人名；violation + fails_grounding 双保险
+    codes = narrative_violation_codes("Arvin Sun", "", ["硅谷 BD 团队：Arvin Sun"])
+    assert "title_bare_person" in codes
+    # 强制用人名标题测 gate
+    assert any("人名" in e for e in relation_fails_grounding(bad, []))
+
+
 def test_writer_audit_trace_on_write(monkeypatch):
     from app import relation_writer as rw
     from app.relation_writer_audit import finalize_writer_audit

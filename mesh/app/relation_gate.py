@@ -172,12 +172,17 @@ def relation_fails_grounding(rel: dict, items: list[dict]) -> list[str]:
     if not isinstance(rel, dict):
         return ["非对象关系"]
     from .relation_verify import body_summary_grounded
+    from .relation_writer import title_is_bare_person_name
 
     errs: list[str] = []
     title = (rel.get("title") or "").strip() or "（无标题）"
     body = (rel.get("body") or "").strip()
     details = [str(d).strip() for d in (rel.get("details") or []) if str(d).strip()]
     weakish = bool(rel.get("weak") or (rel.get("decision_tier") or "").strip().lower() == "watch")
+
+    # 纯人名标题：卫生层应已改写；仍是人名 → 不成卡
+    if title_is_bare_person_name(title):
+        errs.append(f"关系「{title}」标题仅为人名，缺少动作/事实钩子")
 
     if weakish and (rel.get("evidence") or []):
         # 观察/弱卡：有 evidence +（body 或 details）即可
