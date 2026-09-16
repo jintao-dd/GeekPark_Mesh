@@ -559,6 +559,8 @@ def build_relations_two_phase(
     audit["write_skipped"] = write_skipped
     audit["n_narrative_skipped"] = len(write_skipped)
     audit["narrative_skipped"] = write_skipped
+    from .relation_writer_audit import finalize_writer_audit, merge_writer_audit
+    data = merge_writer_audit(data, finalize_writer_audit(rels, skipped=write_skipped))
 
     # Claim Check：必须吃 Writer 原文，再进入会改写 body 的 narrative verify。
     # 契约：Evidence Gate 未通过 / 无 evidence 的卡不得进入 Claim Check

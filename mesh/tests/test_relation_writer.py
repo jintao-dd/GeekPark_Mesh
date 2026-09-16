@@ -365,3 +365,56 @@ def test_title_from_details_shape():
     assert "×" not in t
     assert "各知一半" not in t
     assert "催初稿" in t or "合同" in t
+
+
+def test_title_dual_colon_formula_and_body_gates():
+    from app.relation_writer import (
+        body_has_closing_cliche,
+        body_has_label_leak,
+        enforce_narrative_hygiene,
+        title_is_formula,
+    )
+
+    assert title_is_formula("小宇宙：编辑部计划谈年底合作，商业化在看平台数据")
+    assert not title_is_formula("京东合作稿正在催初稿")
+    assert body_has_label_leak("编辑部记下面壁进度，商业化记的是保持沟通，两边各知一半。")
+    assert body_has_closing_cliche("商业化在催初稿，编辑部已提报，两边进度可对照。")
+    _, body, _, flags = enforce_narrative_hygiene(
+        title="面壁智能直播",
+        body="编辑部记下面壁进度，商业化记的是保持沟通，两边各知一半。",
+        details=["编辑部：面壁 IPO", "商业化团队：保持沟通"],
+        candidate_title="面壁",
+    )
+    assert body == ""
+    assert flags.get("body_cleared_label_leak") or flags.get("body_cleared_template")
+    _, body2, _, flags2 = enforce_narrative_hygiene(
+        title="京东合作稿",
+        body="商业化在催初稿，编辑部选题已提报，两边进度可对照。",
+        details=["商业化团队：催初稿", "编辑部：选题提报"],
+        candidate_title="京东",
+    )
+    assert "可对照" not in body2
+    assert flags2.get("body_cleared_cliche")
+
+
+def test_writer_audit_trace_on_write(monkeypatch):
+    from app import relation_writer as rw
+    from app.relation_writer_audit import finalize_writer_audit
+
+    monkeypatch.setattr(rw, "call_writer_field_rewrite", lambda tasks: {})
+    obj = _sample_object()
+    rels, skipped = rw.write_relations(
+        [obj],
+        writings=[{
+            "candidate_id": "c9",
+            "title": "豆包两条线",
+            "body": "商业化关注终端，视频号有相关视频。",
+            "details": ["商业化团队：豆包 AI 手机判断", "视频号团队：豆包收费视频"],
+        }],
+    )
+    assert not skipped
+    assert rels[0].get("_writer_trace")
+    assert any(e.get("kind") == "first_write" for e in rels[0]["_writer_trace"]["events"])
+    audit = finalize_writer_audit(rels)
+    assert audit["summary"]["n_formed"] == 1
+    assert audit["rows"]

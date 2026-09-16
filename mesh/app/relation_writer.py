@@ -102,6 +102,15 @@ _BODY_TEMPLATE = re.compile(
     r"|各写各的"
 )
 
+# body 收尾套话（半公式）：允许句中叙述，禁止整句甩这类收尾
+_BODY_CLOSING_CLICHE = re.compile(
+    r'[，,；;]?\s*(?:'
+    r'两边进度可对照|两边掌握的部分可对上|两边可对上|两边各握一段|'
+    r'两边对进度的记录可以对上|两条触点指向同一家公司|两边各知一半|'
+    r'两边掌握的进度可对照'
+    r')[。．！？!?]*$'
+)
+
 # 标题公式：乘号对照表 / 一边一边 / A侧B侧填空（整区同构会很难看）
 _TITLE_CROSS = re.compile(r"[：:].{0,40}[×xX].{0,40}$|[：:].+[×xX].+")
 _TITLE_PARALLEL_FILL = re.compile(
@@ -137,11 +146,37 @@ def title_has_label_leak(title: str) -> bool:
     return any(frag in t for frag in _LABEL_LEAK_FRAGMENTS)
 
 
+def body_has_label_leak(body: str) -> bool:
+    """body 是否复读标签原词（与 title 同级禁止）。"""
+    b = (body or "").strip()
+    if not b:
+        return False
+    return any(frag in b for frag in _LABEL_LEAK_FRAGMENTS)
+
+
+def body_has_closing_cliche(body: str) -> bool:
+    b = (body or "").strip()
+    if not b:
+        return False
+    return bool(_BODY_CLOSING_CLICHE.search(b))
+
+
+def strip_body_closing_cliche(body: str) -> str:
+    b = (body or "").strip()
+    if not b:
+        return ""
+    return _BODY_CLOSING_CLICHE.sub("", b).strip(" ，,；;。．")
+
+
 def body_is_template(body: str) -> bool:
     b = (body or "").strip()
     if not b:
         return False
     if _BODY_TEMPLATE.search(b):
+        return True
+    if body_has_label_leak(b):
+        return True
+    if body_has_closing_cliche(b) and len(strip_body_closing_cliche(b)) < 12:
         return True
     # 短句整句复读标签
     if len(b) < 40 and any(
@@ -152,7 +187,7 @@ def body_is_template(body: str) -> bool:
 
 
 def title_is_formula(title: str) -> bool:
-    """标题是否落入整区同构公式（乘号对照表 / 一边一边等）。"""
+    """标题是否落入整区同构公式（乘号对照表 / 一边一边 / 主体：A，B 双列）。"""
     t = (title or "").strip()
     if not t:
         return False
@@ -160,6 +195,16 @@ def title_is_formula(title: str) -> bool:
         return True
     if _TITLE_PARALLEL_FILL.search(t):
         return True
+    # 「主体：左事实，右事实」双列对照（两段都够长才算公式）
+    if "：" in t or ":" in t:
+        after = re.split(r"[：:]", t, maxsplit=1)[-1].strip()
+        parts = re.split(r"[，,]", after, maxsplit=1)
+        if len(parts) == 2:
+            left, right = parts[0].strip(), parts[1].strip()
+            if len(left) >= 6 and len(right) >= 6:
+                teamish = ("编辑部", "商业化", "视频号", "两边", "两队", "一侧", "另一")
+                if any(x in after for x in teamish) or (len(left) >= 8 and len(right) >= 8):
+                    return True
     return False
 
 
@@ -390,6 +435,8 @@ def enforce_narrative_hygiene(
         "title_rebuilt": False,
         "body_cleared_template": False,
         "body_cleared_restates": False,
+        "body_cleared_cliche": False,
+        "body_cleared_label_leak": False,
         "details_deduped": False,
     }
     t = strip_route_meta_copy((title or "").strip())
@@ -419,11 +466,24 @@ def enforce_narrative_hygiene(
             t = rebuilt
             flags["title_rebuilt"] = True
 
-    if body_is_template(b) or (
+    if body_has_label_leak(b):
+        b = ""
+        flags["body_cleared_label_leak"] = True
+        flags["body_cleared_template"] = True
+    elif body_is_template(b) or (
         any(frag in b for frag in ("各知一半", "各掌握一部分", "两侧各知一半")) and len(b) < 56
     ):
         b = ""
         flags["body_cleared_template"] = True
+    elif body_has_closing_cliche(b):
+        stripped = strip_body_closing_cliche(b)
+        if stripped and len(stripped) >= 12:
+            b = stripped
+            flags["body_cleared_cliche"] = True
+        else:
+            b = ""
+            flags["body_cleared_cliche"] = True
+            flags["body_cleared_template"] = True
     # 不再因「复读 details」清空 body；也不用截字拼 body——空 body 留给字段重写或最终留空成卡。
 
     return t, b, dets, flags
@@ -612,7 +672,11 @@ def narrative_violation_codes(
         codes.append("title_label_leak")
     if title_is_formula(t):
         codes.append("title_formula")
-    if body_is_template(b) or (
+    if body_has_label_leak(b):
+        codes.append("body_label_leak")
+    elif body_has_closing_cliche(b):
+        codes.append("body_closing_cliche")
+    elif body_is_template(b) or (
         b
         and any(frag in b for frag in ("各知一半", "各掌握一部分", "两侧各知一半"))
         and len(b) < 56
@@ -639,6 +703,8 @@ def _apply_hygiene_to_rel(rel: dict, obj: dict) -> dict:
     if flags.get("title_rebuilt"):
         rel["_title_rebuilt_from_details"] = True
     if flags.get("body_cleared_template"):
+        rel["_body_omitted_template"] = True
+    if flags.get("body_cleared_cliche") or flags.get("body_cleared_label_leak"):
         rel["_body_omitted_template"] = True
     if flags.get("body_cleared_restates"):
         rel["_body_omitted_restates_details"] = True
@@ -734,6 +800,9 @@ _FIX_CODE_HINTS = {
     "body_template": "body 禁止套话（各掌握一部分/这一合作等）；请改写为一句跨队事实总结。",
     "body_empty": "请按本卡 label + label_hint + evidence 写一句跨队总结；details_locked 仅作参考勿整段抄写；写不出可留空。",
     "body_restates": "body 按 label+evidence 概括两侧，勿空壳套话；勿整段抄 details_locked。",
+    "body_label_leak": "body 禁止标签原词（各知一半/不同触点等）；改写成事实总结。",
+    "body_closing_cliche": "body 禁止「两边可对照/可对上/各握一段」等收尾套话；写清卡点或进度差即可。",
+    "body_ungrounded": "上一句总结无法由 evidence 证明，已清空；请严格按 evidence 重写一句，勿引入新事实。",
 }
 
 
@@ -799,6 +868,87 @@ def call_writer_field_rewrite(tasks: list[dict]) -> dict[str, dict]:
     return by_id
 
 
+def recover_ungrounded_bodies(relations: list[dict], *, max_rounds: int = 1) -> list[dict]:
+    """body 因 ungrounded 被抹且仍有 details → 再 rewrite 最多 max_rounds 轮。"""
+    from .relation_verify import body_summary_grounded
+    from .relation_writer_audit import append_event, new_trace
+
+    rels = [dict(r) for r in (relations or []) if isinstance(r, dict)]
+    if not rels or max_rounds < 1:
+        return rels
+
+    for round_i in range(max_rounds):
+        tasks: list[dict] = []
+        for rel in rels:
+            body = (rel.get("body") or "").strip()
+            details = [str(d).strip() for d in (rel.get("details") or []) if str(d).strip()]
+            needs = bool(rel.get("_body_omitted_ungrounded")) and (not body) and bool(details)
+            if not needs:
+                continue
+            cid = (rel.get("candidate_id") or "").strip() or f"anon-{id(rel)}"
+            if not (rel.get("candidate_id") or "").strip():
+                rel["candidate_id"] = cid
+            tasks.append({
+                "candidate_id": cid,
+                "label": rel.get("label"),
+                "label_hint": label_write_hint(rel.get("label") or ""),
+                "evidence": list(rel.get("evidence") or [])[:6],
+                "details_locked": details[:6],
+                "fix_codes": ["body_ungrounded", "body_empty"],
+                "fix_fields": ["body"],
+                "bad_title": (rel.get("title") or "")[:120],
+                "bad_body": "",
+            })
+        if not tasks:
+            break
+        patches = call_writer_field_rewrite(tasks)
+        if not patches:
+            break
+        for rel in rels:
+            cid = (rel.get("candidate_id") or "").strip()
+            patch = patches.get(cid) or {}
+            new_body = (patch.get("body") or "").strip() if "body" in patch else ""
+            if not new_body:
+                continue
+            trace = rel.get("_writer_trace") if isinstance(rel.get("_writer_trace"), dict) else new_trace(cid)
+            append_event(
+                trace,
+                "ungrounded_rewrite",
+                round=round_i + 1,
+                new_body=new_body,
+            )
+            rel["_writer_trace"] = trace
+            prev = list(rel.get("_writer_field_rewrite") or [])
+            if "body" not in prev:
+                prev.append("body")
+            rel["_writer_field_rewrite"] = prev
+            rel["_writer_rewrite_rounds"] = int(rel.get("_writer_rewrite_rounds") or 0) + 1
+            # 再过 hygiene + grounding
+            title, body, details, flags = enforce_narrative_hygiene(
+                title=rel.get("title") or "",
+                body=new_body,
+                details=list(rel.get("details") or []),
+                candidate_title=rel.get("candidate_title") or rel.get("title") or "",
+                evidence=list(rel.get("evidence") or []),
+            )
+            rel["title"] = title
+            rel["details"] = details
+            if flags.get("body_cleared_template") or flags.get("body_cleared_label_leak"):
+                rel["body"] = ""
+                rel["_body_omitted_template"] = True
+                continue
+            if body and body_summary_grounded(body, rel):
+                rel["body"] = body
+                rel.pop("_body_omitted_ungrounded", None)
+                append_event(trace, "ungrounded_recovered", body=body)
+            else:
+                rel["body"] = ""
+                rel["_body_omitted_ungrounded"] = True
+                append_event(trace, "ungrounded_still_fail", attempted=body or new_body)
+            rel["_writer_trace"] = trace
+    return rels
+
+
 def write_relations(
     relation_objects: list[dict],
     writings: list[dict] | None = None,
@@ -808,6 +958,8 @@ def write_relations(
     流程：一次 Writer → 违规/空 body 字段重写（最多 2 轮）→ 硬闸；
     仍无 body 不截字合成；强卡允许最终 body 为空（有 details 即成卡）。
     """
+    from .relation_writer_audit import append_event, attach_trace_to_rel, new_trace
+
     objects = [relation_object_from_gate(o) for o in relation_objects if isinstance(o, dict)]
     if writings is None and objects:
         writings = call_writer_llm(objects)
@@ -822,6 +974,15 @@ def write_relations(
         cid = (obj.get("candidate_id") or "").strip()
         w = by_id.get(cid) or {}
         rel = merge_writing(obj, w, apply_hygiene=False)
+        trace = new_trace(cid)
+        append_event(
+            trace,
+            "first_write",
+            title=rel.get("title") or "",
+            body=rel.get("body") or "",
+            n_details=len([d for d in (rel.get("details") or []) if str(d).strip()]),
+        )
+        rel["_writer_trace"] = trace
         drafted.append((obj, rel))
 
     max_rounds = 2
@@ -855,6 +1016,16 @@ def write_relations(
                 "bad_title": (rel.get("title") or "")[:120],
                 "bad_body": (rel.get("body") or "")[:240],
             })
+            trace = rel.get("_writer_trace") if isinstance(rel.get("_writer_trace"), dict) else new_trace(cid)
+            append_event(
+                trace,
+                "violation",
+                codes=codes,
+                fields=fields,
+                bad_title=rel.get("title") or "",
+                bad_body=rel.get("body") or "",
+            )
+            rel["_writer_trace"] = trace
         if not rewrite_tasks:
             break
         patches = call_writer_field_rewrite(rewrite_tasks)
@@ -876,22 +1047,42 @@ def write_relations(
                     prev.append(k)
             rel["_writer_field_rewrite"] = prev
             rel["_writer_rewrite_rounds"] = rewrite_rounds
-
+            trace = rel.get("_writer_trace") if isinstance(rel.get("_writer_trace"), dict) else new_trace(cid)
+            append_event(
+                trace,
+                "field_rewrite",
+                round=rewrite_rounds,
+                new_title=patch.get("title") or "",
+                new_body=patch.get("body") if "body" in patch else None,
+            )
+            rel["_writer_trace"] = trace
     out: list[dict] = []
     skipped: list[dict] = []
     for obj, rel in drafted:
         cid = (obj.get("candidate_id") or "").strip()
+        before_body = (rel.get("body") or "").strip()
         rel = _apply_hygiene_to_rel(rel, obj)
+        trace = rel.get("_writer_trace") if isinstance(rel.get("_writer_trace"), dict) else new_trace(cid)
+        if rel.get("_body_omitted_template") or (before_body and not (rel.get("body") or "").strip()):
+            append_event(
+                trace,
+                "hygiene",
+                cleared_template=bool(rel.get("_body_omitted_template")),
+                title_rebuilt=bool(rel.get("_title_rebuilt_from_details")),
+                body_after=rel.get("body") or "",
+            )
+        rel["_writer_trace"] = trace
         title_ok = bool((rel.get("title") or "").strip())
         body_ok = bool((rel.get("body") or "").strip())
         details_ok = any(str(d).strip() for d in (rel.get("details") or []))
         if not title_ok or not (body_ok or details_ok):
+            append_event(trace, "skipped", reason="missing_narrative_title_or_body")
             skipped.append({
                 "candidate_id": cid,
                 "reason": "missing_narrative_title_or_body",
             })
             continue
-        out.append(rel)
+        out.append(attach_trace_to_rel(rel, trace))
     return _dedupe_relations_by_title(out), skipped
 
 

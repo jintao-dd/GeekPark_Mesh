@@ -780,10 +780,18 @@ def _run(slug: str, username: str, token: int = 0) -> None:
         n_dup = sum(
             1
             for r in (data.get("relations") or [])
-            if isinstance(r, dict) and r.get("_draft_warning") == "suspected_duplicate"
+            if isinstance(r, dict) and (
+                r.get("_draft_warning") == "suspected_duplicate"
+                or r.get("has_duplicate_peers")
+            )
         )
-        if n_dup:
-            bits.append(f"{n_dup} 张疑似重复待确认")
+        n_demoted = sum(
+            1
+            for r in (data.get("_relations_backlog") or [])
+            if isinstance(r, dict) and r.get("suspected_duplicate")
+        )
+        if n_dup or n_demoted:
+            bits.append(f"{n_dup + n_demoted} 张疑似重复（已降档 {n_demoted}）")
         if bits:
             msg = "完成（" + "；".join(bits) + "）"
         _set(

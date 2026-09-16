@@ -166,12 +166,16 @@ def body_summary_grounded(body: str, rel: dict) -> bool:
         return False
 
     # 去掉关系元词后再看重合；门槛显著低于 detail
+    # corpus 含 details：总结常 paraphrase 圆点，不应只盯 evidence 原文
     tokens = [t for t in _key_tokens(s) if t not in _BODY_META_STOP]
     if not tokens:
         return True
-    corpus = blob + "\n" + title
+    details_blob = "\n".join(
+        str(d) for d in (rel.get("details") or []) if str(d).strip()
+    )
+    corpus = blob + "\n" + title + "\n" + details_blob
     hits = sum(1 for t in tokens if t in corpus)
-    return hits / len(tokens) >= 0.15
+    return hits / len(tokens) >= 0.12
 
 
 def _details_from_evidence(rel: dict, limit: int = 6) -> list[str]:
@@ -350,4 +354,18 @@ def verify_relation_narrative(rel: dict) -> dict:
 
 
 def verify_relations_narratives(relations: list[dict]) -> list[dict]:
-    return [verify_relation_narrative(r) for r in (relations or [])]
+    from .relation_writer import recover_ungrounded_bodies
+    from .relation_writer_audit import append_event, new_trace
+
+    out = [verify_relation_narrative(r) for r in (relations or [])]
+    for r in out:
+        if not isinstance(r, dict):
+            continue
+        if r.get("_body_omitted_ungrounded"):
+            cid = (r.get("candidate_id") or "").strip()
+            trace = r.get("_writer_trace") if isinstance(r.get("_writer_trace"), dict) else new_trace(cid)
+            append_event(trace, "grounding_wipe", reason="body_ungrounded")
+            r["_writer_trace"] = trace
+    # 抹后重写一轮
+    out = recover_ungrounded_bodies(out, max_rounds=1)
+    return out

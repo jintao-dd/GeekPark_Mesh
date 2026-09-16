@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.relation_gate import (
-    annotate_suspected_duplicates,
+    demote_near_duplicate_relations,
     filter_ungrounded_relations,
 )
 
@@ -103,11 +103,12 @@ def test_no_body_kept_when_details_present():
     assert (rel.get("body") or "").strip() or (rel.get("details") or [])
 
 
-def test_suspected_duplicate_warning_keeps_both():
+def test_suspected_duplicate_demotes_peer_to_backlog():
     rels = [
         {
             "title": "云栖大会博鳌论坛",
             "body": "同一场云栖，两队在推进。",
+            "decision_tier": "strong",
             "details": ["商业化团队：博鳌执行中", "编辑部：圆桌待对思路"],
             "evidence": [
                 {"item_id": 10, "team": "商业化团队", "snippet": "云栖大会博鳌论坛执行中"},
@@ -117,7 +118,8 @@ def test_suspected_duplicate_warning_keeps_both():
         },
         {
             "title": "云栖大会圆桌与深度稿",
-            "body": "同一场云栖，两侧各知一半。",
+            "body": "",
+            "decision_tier": "parallel",
             "details": ["编辑部：圆桌进行中", "商业化团队：博鳌已签约"],
             "evidence": [
                 {"item_id": 11, "team": "编辑部", "snippet": "云栖圆桌待对思路"},
@@ -126,11 +128,13 @@ def test_suspected_duplicate_warning_keeps_both():
             "item_ids": [10, 11],
         },
     ]
-    out = annotate_suspected_duplicates(rels)
-    assert len(out) == 2
-    assert all(r.get("_draft_warning") == "suspected_duplicate" for r in out)
-    assert out[0].get("_dup_peer_titles")
-    assert out[0].get("needs_review") is True
+    kept, demoted = demote_near_duplicate_relations(rels)
+    assert len(kept) == 1
+    assert len(demoted) == 1
+    assert demoted[0].get("suspected_duplicate") is True
+    assert demoted[0].get("duplicate_of")
+    assert kept[0].get("has_duplicate_peers") is True
+    assert kept[0].get("suspected_duplicate") is False
 
 
 def test_filter_ungrounded_drops_card_without_evidence():
