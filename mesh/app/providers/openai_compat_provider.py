@@ -126,6 +126,7 @@ class OpenAICompatProvider(Provider):
                 # 非完整 JSON，尝试 SSE 解析
                 chunks: list[dict[str, Any]] = []
                 raw_samples: list[str] = []
+                last_obj: dict[str, Any] = {}
                 for raw in r.iter_lines(decode_unicode=True):
                     if not raw:
                         continue
@@ -142,6 +143,7 @@ class OpenAICompatProvider(Provider):
                         obj = json.loads(data)
                     except Exception:
                         continue
+                    last_obj = obj
                     choices = obj.get("choices") or []
                     if not choices:
                         continue
@@ -162,6 +164,8 @@ class OpenAICompatProvider(Provider):
                 text = "".join(text_parts)
                 model = self.model
                 raw_snippet = " | ".join(raw_samples)[:400]
+                # 部分厂商把 usage 放在最后一个 chunk 的顶层
+                usage = last_obj.get("usage") or {}
 
             elapsed_ms = int((time.monotonic() - t0) * 1000)
             usage = usage or {}
