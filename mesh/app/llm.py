@@ -4,9 +4,11 @@
 切换模型只改 .env 里的 MESH_LLM_PROVIDER，业务代码零改动。
 """
 import datetime
-import json, re, threading
+import json, re, threading, time, logging
 from pathlib import Path
 from .providers import get_provider, LLMError
+
+log = logging.getLogger("mesh.llm")
 
 PROMPT_DIR = Path(__file__).resolve().parent / "prompts"
 
@@ -172,14 +174,28 @@ def call(
     """模型调用。json_mode 下解析失败会自动再请求一次。task 选固定任务模型配置。"""
     last_err = None
     provider = get_provider(model=model_for_task(task))
+    model = model_for_task(task)
     for attempt in range(2 if json_mode else 1):
-        if hasattr(provider, "complete_detail"):
-            detail = provider.complete_detail(system, user, max_tokens=max_tokens)
-            text = detail.get("content") or ""
-            _accum_usage(detail.get("usage"), attempts=attempt + 1)
-        else:
-            text = provider.complete(system, user, max_tokens=max_tokens)
-            _accum_usage(None, attempts=attempt + 1)
+        t0 = time.monotonic()
+        try:
+            if hasattr(provider, "complete_detail"):
+                detail = provider.complete_detail(system, user, max_tokens=max_tokens)
+                text = detail.get("content") or ""
+                _accum_usage(detail.get("usage"), attempts=attempt + 1)
+            else:
+                text = provider.complete(system, user, max_tokens=max_tokens)
+                _accum_usage(None, attempts=attempt + 1)
+        finally:
+            elapsed_ms = int((time.monotonic() - t0) * 1000)
+            log.info(
+                "llm.call task=%s model=%s attempt=%s elapsed_ms=%s prompt_chars=%s max_tokens=%s",
+                task,
+                model,
+                attempt,
+                elapsed_ms,
+                len(system) + len(user),
+                max_tokens,
+            )
         if not json_mode:
             return text
         try:

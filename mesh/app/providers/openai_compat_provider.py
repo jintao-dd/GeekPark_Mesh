@@ -60,6 +60,7 @@ class OpenAICompatProvider(Provider):
         payload = json.dumps(req, ensure_ascii=False).encode("utf-8")
         last_err = None
         for attempt in range(1, 4):
+            t0 = time.monotonic()
             try:
                 r = requests.post(
                     self.base.rstrip("/") + "/chat/completions",
@@ -68,15 +69,34 @@ class OpenAICompatProvider(Provider):
                     timeout=self.timeout,
                 )
             except requests.RequestException as e:
+                elapsed_ms = int((time.monotonic() - t0) * 1000)
+                logging.getLogger("mesh.llm").info(
+                    "openai_compat.request_failed attempt=%s elapsed_ms=%s error=%s",
+                    attempt, elapsed_ms, e,
+                )
                 last_err = LLMError(f"模型接口网络异常：{e}")
                 if attempt < 3:
                     time.sleep(2 * attempt)
                     continue
                 raise last_err
+            elapsed_ms = int((time.monotonic() - t0) * 1000)
             if r.status_code < 400:
                 body = r.json()
                 choice = (body.get("choices") or [{}])[0]
                 msg = choice.get("message") or {}
+                usage = body.get("usage") or {}
+                logging.getLogger("mesh.llm").info(
+                    "openai_compat.request_ok attempt=%s elapsed_ms=%s status=%s "
+                    "model=%s finish_reason=%s prompt_tokens=%s completion_tokens=%s total_tokens=%s",
+                    attempt,
+                    elapsed_ms,
+                    r.status_code,
+                    body.get("model") or self.model,
+                    choice.get("finish_reason"),
+                    usage.get("prompt_tokens"),
+                    usage.get("completion_tokens"),
+                    usage.get("total_tokens"),
+                )
                 return {
                     "content": msg.get("content") or "",
                     "finish_reason": choice.get("finish_reason"),
@@ -85,6 +105,10 @@ class OpenAICompatProvider(Provider):
                     "raw_response": body,
                     "request_payload": req,
                 }
+            logging.getLogger("mesh.llm").info(
+                "openai_compat.request_error attempt=%s elapsed_ms=%s status=%s body=%s",
+                attempt, elapsed_ms, r.status_code, r.text[:300],
+            )
             last_err = LLMError(f"模型接口返回 {r.status_code}：{r.text[:500]}")
             if attempt < 3 and _transient(r.status_code, r.text):
                 time.sleep(2 * attempt)
