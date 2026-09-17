@@ -284,7 +284,11 @@ def _finalize_cardkit(
     message_id: str = "",
     payload: dict[str, Any] | None = None,
 ) -> None:
-    """完成回答：撤回思考卡片，然后发送一张全新的答案卡片。"""
+    """完成回答：关闭流式状态，然后作为新消息发送一张答案卡片。
+
+    不撤回思考卡片——飞书撤回本身也会触发提示，且保留 spinner 卡片
+    能让用户看到完整的处理过程；新答案卡片会触发通知。
+    """
     body = (display_text or "").strip() or "这期没捞到可引用的证据。"
 
     # 1) 先关闭 streaming（避免后续操作命中 300309）
@@ -303,15 +307,7 @@ def _finalize_cardkit(
         except Exception as e:
             log.warning("feishu close streaming skip: %s", e)
 
-    # 2) 撤回原来的思考卡片消息
-    if message_id:
-        try:
-            feishu_api.delete_message(message_id=message_id)
-            _elog("thinking card recalled message_id=%s", message_id)
-        except Exception as e:
-            log.warning("feishu recall thinking card skip: %s", e)
-
-    # 3) 发送一张全新的答案卡片（作为新消息，会触发飞书通知）
+    # 2) 发送一张全新的答案卡片（作为新消息，会触发飞书通知）
     final = feishu_cards.answer_card_v2(display_text=body, query=query, streaming=False)
     try:
         receive_id, rid_type = _receive_target(payload or {})
