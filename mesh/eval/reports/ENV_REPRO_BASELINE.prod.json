@@ -1,15 +1,15 @@
 {
   "baseline_kind": "environment_reproducibility",
-  "timestamp": "2026-09-17T01:36:48.759715+00:00",
+  "timestamp": "2026-09-17T03:31:26.353599+00:00",
   "in_container": true,
   "identity": {
     "git_commit": "ddb983447763",
     "git_commit_short": "ddb983447763",
     "git_dirty": false,
     "image_tag": "2026-09-17-ddb983447763",
-    "image_id": "sha256:ede764f01015e9e08839531f09177b3d8eaa17f9089361a7b42f52d62434fdaa",
-    "image_digest": "geekpark-mesh@sha256:ede764f01015e9e08839531f09177b3d8eaa17f9089361a7b42f52d62434fdaa",
-    "build_date": "2026-09-17T01:32:05.0540946Z"
+    "image_id": "sha256:a91ab0622c060c76bb917e833dc386267ca9ae6963c031700fd5d393b9f5af7d",
+    "image_digest": "geekpark-mesh@sha256:a91ab0622c060c76bb917e833dc386267ca9ae6963c031700fd5d393b9f5af7d",
+    "build_date": "2026-09-17T03:26:36.2377431Z"
   },
   "runtime": {
     "python": "3.12.14",
@@ -60,10 +60,10 @@
   "feature_flags": {
     "MESH_EMBED_ENABLED": "0",
     "MESH_VECTOR_ENABLED": "0",
-    "MESH_AGENT_USE_LLM": "1",
+    "MESH_AGENT_USE_LLM": "",
     "MESH_CLAIM_SEMANTIC": "",
     "MESH_CLAIM_CHECK_MODE": "enforce",
-    "MESH_ALLOW_PROD_PUBLISH": "1",
+    "MESH_ALLOW_PROD_PUBLISH": "",
     "MESH_JOB_INLINE": "0"
   },
   "versions": {
