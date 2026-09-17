@@ -226,8 +226,9 @@ def _schedule_stage_ticker(
     def _run() -> None:
         stage_index = 0
         tick = 0
-        tick_interval = 2.5  # 每 2.5 秒更新一次，既不会闪也不会卡
-        while not done.wait(tick_interval):
+        spinner_interval = 0.6  # spinner 每 0.6 秒转一帧，视觉上更连贯
+        stage_step_ticks = 4    # 每 4 个 spinner tick（约 2.4s）推进一个阶段文案
+        while not done.wait(spinner_interval):
             if done.is_set():
                 return
             prog = list(progress_holder or [])
@@ -266,8 +267,9 @@ def _schedule_stage_ticker(
                 )
             except Exception as e:
                 log.debug("feishu stage tick skip: %s", e)
-            stage_index += 1
             tick += 1
+            if tick % stage_step_ticks == 0:
+                stage_index += 1
 
     threading.Thread(target=_run, name="feishu-stage-tick", daemon=True).start()
 
@@ -530,7 +532,7 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                         receive_id=receive_id,
                         receive_id_type=rid_type,
                         msg_type="text",
-                        content=reminder_text,
+                        content=json.dumps({"text": reminder_text}, ensure_ascii=False),
                     )
                     _elog("completion reminder sent elapsed_ms=%s", elapsed_ms)
                 except Exception as e:
