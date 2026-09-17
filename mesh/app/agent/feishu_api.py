@@ -87,9 +87,14 @@ def send_message(
     }
     r = requests.post(url, headers=_auth_headers(), json=payload, timeout=20)
     data = r.json() if r.content else {}
-    if r.status_code >= 400 or int(data.get("code") or 0) != 0:
+    code = int(data.get("code") or 0)
+    if r.status_code >= 400 or code != 0:
         log.warning("feishu send_message failed status=%s body=%s", r.status_code, str(data)[:400])
-        raise RuntimeError(f"feishu send_message failed: {data or r.text[:300]}")
+        raise FeishuApiError(
+            f"feishu send_message failed: {data or r.text[:300]}",
+            code=code,
+            data=data,
+        )
     return data.get("data") or {}
 
 
@@ -102,17 +107,36 @@ def patch_message(*, message_id: str, content: dict[str, Any] | str) -> dict[str
     url = f"https://open.feishu.cn/open-apis/im/v1/messages/{mid}"
     r = requests.patch(url, headers=_auth_headers(), json={"content": body_content}, timeout=20)
     data = r.json() if r.content else {}
-    if r.status_code >= 400 or int(data.get("code") or 0) != 0:
+    code = int(data.get("code") or 0)
+    if r.status_code >= 400 or code != 0:
         log.warning("feishu patch_message failed status=%s body=%s", r.status_code, str(data)[:400])
-        raise RuntimeError(f"feishu patch_message failed: {data or r.text[:300]}")
+        raise FeishuApiError(
+            f"feishu patch_message failed: {data or r.text[:300]}",
+            code=code,
+            data=data,
+        )
     return data.get("data") or data
+
+
+class FeishuApiError(RuntimeError):
+    """带飞书错误码的 API 异常。"""
+
+    def __init__(self, message: str, code: int = 0, data: dict[str, Any] | None = None):
+        super().__init__(message)
+        self.code = int(code or 0)
+        self.data = data or {}
 
 
 def _api_json(method: str, url: str, *, payload: dict[str, Any] | None = None) -> dict[str, Any]:
     r = requests.request(method, url, headers=_auth_headers(), json=payload, timeout=20)
     data = r.json() if r.content else {}
-    if r.status_code >= 400 or int(data.get("code") or 0) != 0:
-        raise RuntimeError(f"feishu {method} {url} failed: {data or r.text[:300]}")
+    code = int(data.get("code") or 0)
+    if r.status_code >= 400 or code != 0:
+        raise FeishuApiError(
+            f"feishu {method} {url} failed: {data or r.text[:300]}",
+            code=code,
+            data=data,
+        )
     return data
 
 
@@ -145,6 +169,13 @@ def send_card_entity(
     )
 
 
+class StreamingModeClosedError(FeishuApiError):
+    """CardKit 流式会话已关闭（300309）。"""
+
+    def __init__(self, message: str = "streaming mode is closed", data: dict[str, Any] | None = None):
+        super().__init__(message, code=300309, data=data or {})
+
+
 def stream_card_text(
     *,
     card_id: str,
@@ -157,27 +188,38 @@ def stream_card_text(
         f"https://open.feishu.cn/open-apis/cardkit/v1/cards/{card_id}"
         f"/elements/{element_id}/content"
     )
-    _api_json(
-        "PUT",
-        url,
-        payload={
-            "content": content if content else " ",
-            "sequence": int(sequence),
-        },
-    )
+    try:
+        _api_json(
+            "PUT",
+            url,
+            payload={
+                "content": content if content else " ",
+                "sequence": int(sequence),
+            },
+        )
+    except FeishuApiError as e:
+        if e.code == 300309:
+            raise StreamingModeClosedError(data=e.data) from e
+        raise
 
 
 def update_card_settings(*, card_id: str, settings: dict[str, Any], sequence: int) -> None:
     """PATCH …/cards/:id/settings"""
     url = f"https://open.feishu.cn/open-apis/cardkit/v1/cards/{card_id}/settings"
-    _api_json(
-        "PATCH",
-        url,
-        payload={
-            "settings": json.dumps(settings, ensure_ascii=False),
-            "sequence": int(sequence),
-        },
-    )
+    try:
+        _api_json(
+            "PATCH",
+            url,
+            payload={
+                "settings": json.dumps(settings, ensure_ascii=False),
+                "sequence": int(sequence),
+            },
+        )
+    except FeishuApiError as e:
+        if e.code == 300309:
+            # settings 接口理论上不会返回 300309，但统一兜底
+            raise StreamingModeClosedError(data=e.data) from e
+        raise
 
 
 def update_card_entity(*, card_id: str, card: dict[str, Any], sequence: int) -> None:

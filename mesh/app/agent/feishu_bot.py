@@ -263,35 +263,45 @@ def _finalize_cardkit(
     query: str,
     card_lock: threading.Lock,
 ) -> None:
-    """假流式：一次推全文，交给客户端打字机；很快挂上追问按钮。"""
+    """假流式：一次推全文；立刻关闭 streaming 后再换终答卡。
+
+    顺序必须是：stream_card_text → update_card_settings(streaming_mode=False)
+    → update_card_entity。不能在 streaming 关闭后再次调用 stream_card_text，
+    也不能在 stream_card_text 后 sleep 太久导致服务端超时关闭。
+    """
     body = (display_text or "").strip() or "这期没捞到可引用的证据。"
-    with card_lock:
-        feishu_api.stream_card_text(
-            card_id=card_id,
-            element_id=feishu_cards.BODY_ELEMENT_ID,
-            content=body,
-            sequence=seq.next(),
-        )
-    # 只等一小段打字机，避免「答完了还卡很久才出按钮」
-    time.sleep(feishu_cards.estimate_typewriter_seconds(body))
     final = feishu_cards.answer_card_v2(display_text=body, query=query, streaming=False)
     with card_lock:
-        feishu_api.update_card_entity(card_id=card_id, card=final, sequence=seq.next())
+        try:
+            # 1) 最后一次流式推全文，保留客户端打字机效果
+            feishu_api.stream_card_text(
+                card_id=card_id,
+                element_id=feishu_cards.BODY_ELEMENT_ID,
+                content=body,
+                sequence=seq.next(),
+            )
+        except feishu_api.StreamingModeClosedError:
+            log.warning("finalize stream closed early, fallback to entity update")
+        except Exception as e:
+            log.warning("finalize stream failed: %s", e)
+
+        # 2) 立刻关闭 streaming，避免服务端超时自动关闭后我们再调用流式接口
         try:
             feishu_api.update_card_settings(
                 card_id=card_id,
                 settings={
                     "config": {
                         "streaming_mode": False,
-                        "summary": {
-                            "content": body.strip()[:36] or "Mesh"
-                        },
+                        "summary": {"content": body.strip()[:36] or "Mesh"},
                     }
                 },
                 sequence=seq.next(),
             )
         except Exception as e:
-            log.debug("feishu close streaming skip: %s", e)
+            log.warning("feishu close streaming skip: %s", e)
+
+        # 3) 在非流式模式下全量替换为终答卡（追问按钮等）
+        feishu_api.update_card_entity(card_id=card_id, card=final, sequence=seq.next())
 
 
 def _finalize_legacy(
