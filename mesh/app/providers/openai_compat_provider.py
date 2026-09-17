@@ -56,7 +56,10 @@ class OpenAICompatProvider(Provider):
         }
 
     def complete_detail(self, system: str, user: str, max_tokens: int = 4000) -> dict:
-        """完整 API 响应（诊断用）：content / finish_reason / usage / raw_response。"""
+        """完整 API 响应（诊断用）：content / finish_reason / usage / raw_response。
+
+        使用 SSE 流式接收，便于精确记录 TTFB 和 first_token_ms。
+        """
         if not self.is_configured():
             raise LLMError("未配置 MESH_LLM_API_KEY / MESH_LLM_MODEL / MESH_LLM_BASE_URL（见 .env）")
         req = self._request_payload(system, user, max_tokens)
@@ -64,6 +67,8 @@ class OpenAICompatProvider(Provider):
         last_err = None
         for attempt in range(1, 4):
             t0 = time.monotonic()
+            first_byte_ms: int = -1
+            first_token_ms: int = -1
             try:
                 r = requests.post(
                     self.base.rstrip("/") + "/chat/completions",
@@ -72,55 +77,104 @@ class OpenAICompatProvider(Provider):
                     timeout=self.timeout,
                     stream=True,
                 )
-                # TTFB：从发请求到收到第一个字节（状态行/首包 header）的时间
+                # TTFB：从发请求到收到第一个响应字节（状态行/header）的时间
                 first_byte_ms = int((time.monotonic() - t0) * 1000)
             except requests.RequestException as e:
                 elapsed_ms = int((time.monotonic() - t0) * 1000)
                 log.info(
-                    "openai_compat.request_failed attempt=%s elapsed_ms=%s first_byte_ms=%s error=%s",
-                    attempt, elapsed_ms, -1, e,
+                    "openai_compat.request_failed attempt=%s elapsed_ms=%s first_byte_ms=%s first_token_ms=%s error=%s",
+                    attempt, elapsed_ms, -1, -1, e,
                 )
                 last_err = LLMError(f"模型接口网络异常：{e}")
                 if attempt < 3:
                     time.sleep(2 * attempt)
                     continue
                 raise last_err
-            elapsed_ms = int((time.monotonic() - t0) * 1000)
-            if r.status_code < 400:
-                body = r.json()
-                choice = (body.get("choices") or [{}])[0]
-                msg = choice.get("message") or {}
-                usage = body.get("usage") or {}
+
+            if r.status_code >= 400:
+                elapsed_ms = int((time.monotonic() - t0) * 1000)
                 log.info(
-                    "openai_compat.request_ok attempt=%s elapsed_ms=%s first_byte_ms=%s status=%s "
-                    "model=%s finish_reason=%s prompt_tokens=%s completion_tokens=%s total_tokens=%s",
-                    attempt,
-                    elapsed_ms,
-                    first_byte_ms,
-                    r.status_code,
-                    body.get("model") or self.model,
-                    choice.get("finish_reason"),
-                    usage.get("prompt_tokens"),
-                    usage.get("completion_tokens"),
-                    usage.get("total_tokens"),
+                    "openai_compat.request_error attempt=%s elapsed_ms=%s first_byte_ms=%s first_token_ms=%s status=%s body=%s",
+                    attempt, elapsed_ms, first_byte_ms, -1, r.status_code, r.text[:300],
                 )
-                return {
-                    "content": msg.get("content") or "",
-                    "finish_reason": choice.get("finish_reason"),
-                    "usage": body.get("usage"),
-                    "model": body.get("model") or self.model,
-                    "raw_response": body,
-                    "request_payload": req,
-                }
+                last_err = LLMError(f"模型接口返回 {r.status_code}：{r.text[:500]}")
+                if attempt < 3 and _transient(r.status_code, r.text):
+                    time.sleep(2 * attempt)
+                    continue
+                raise last_err
+
+            # 解析 SSE 流，聚合完整响应，同时记录 first_token_ms
+            r.encoding = "utf-8"
+            chunks: list[dict[str, Any]] = []
+            finish_reason: str | None = None
+            for raw in r.iter_lines(decode_unicode=False):
+                if not raw:
+                    continue
+                try:
+                    line = raw.decode("utf-8")
+                except UnicodeDecodeError:
+                    line = raw.decode("utf-8", errors="replace")
+                if line.startswith("data:"):
+                    data = line[5:].strip()
+                else:
+                    continue
+                if data == "[DONE]":
+                    break
+                try:
+                    obj = json.loads(data)
+                except Exception:
+                    continue
+                choices = obj.get("choices") or []
+                if not choices:
+                    continue
+                delta = choices[0].get("delta") or {}
+                if delta:
+                    chunks.append(delta)
+                    if first_token_ms < 0 and (delta.get("content") or delta.get("reasoning_content")):
+                        first_token_ms = int((time.monotonic() - t0) * 1000)
+                if choices[0].get("finish_reason"):
+                    finish_reason = choices[0].get("finish_reason")
+
+            elapsed_ms = int((time.monotonic() - t0) * 1000)
+            text_parts: list[str] = []
+            reasoning_parts: list[str] = []
+            for c in chunks:
+                if c.get("content"):
+                    text_parts.append(str(c["content"]))
+                if c.get("reasoning_content"):
+                    reasoning_parts.append(str(c["reasoning_content"]))
+            text = "".join(text_parts)
+            # 部分厂商在最后一个非空 chunk 里放 usage
+            usage: dict[str, Any] = {}
+            prompt_tokens = 0
+            completion_tokens = 0
+            total_tokens = 0
+            # 流式通常没有 usage；尝试从最后一个 chunk 的父对象捕获（此处不可行，按缺失处理）
+            model = self.model
+
             log.info(
-                "openai_compat.request_error attempt=%s elapsed_ms=%s first_byte_ms=%s status=%s body=%s",
-                attempt, elapsed_ms, first_byte_ms, r.status_code, r.text[:300],
+                "openai_compat.request_ok attempt=%s elapsed_ms=%s first_byte_ms=%s first_token_ms=%s status=%s "
+                "model=%s finish_reason=%s prompt_tokens=%s completion_tokens=%s total_tokens=%s",
+                attempt,
+                elapsed_ms,
+                first_byte_ms,
+                first_token_ms,
+                r.status_code,
+                model,
+                finish_reason,
+                prompt_tokens,
+                completion_tokens,
+                total_tokens,
             )
-            last_err = LLMError(f"模型接口返回 {r.status_code}：{r.text[:500]}")
-            if attempt < 3 and _transient(r.status_code, r.text):
-                time.sleep(2 * attempt)
-                continue
-            raise last_err
+            return {
+                "content": text,
+                "reasoning_content": "".join(reasoning_parts),
+                "finish_reason": finish_reason,
+                "usage": usage,
+                "model": model,
+                "raw_response": {"chunks": chunks, "finish_reason": finish_reason},
+                "request_payload": req,
+            }
         raise last_err or LLMError("模型接口调用失败")
 
     def complete(self, system: str, user: str, max_tokens: int = 4000) -> str:
