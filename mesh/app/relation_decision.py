@@ -26,6 +26,7 @@ from .relation_decision_audit import (
     GATE_CODE_INVALID_CAND,
     GATE_CODE_INVALID_LABEL,
     GATE_CODE_LLM_SKIP,
+    GATE_CODE_MERE_MENTION,
     GATE_CODE_MISMATCH,
     GATE_CODE_MISSING_REFS,
     GATE_CODE_NO_SHARED_ANCHOR,
@@ -473,6 +474,16 @@ def apply_evidence_gate(
         evidence = _evidence_from_refs(cand, refs, items_by_id)
         if not evidence:
             _skip(GATE_CODE_REFS_BAD)
+            continue
+
+        # 仅点名/身份介绍、无真实沟通对接 → 硬 skip（不成卡）
+        from .relation_gate import evidence_has_real_engagement
+
+        if not evidence_has_real_engagement(
+            evidence,
+            title=(cand.get("title") or ""),
+        ):
+            _skip(GATE_CODE_MERE_MENTION, detail="mere_mention_no_engagement")
             continue
 
         ev_teams = _teams_from_evidence(evidence)

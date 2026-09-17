@@ -24,7 +24,7 @@ def _pok_items():
             "owner_team": "编辑部",
             "pointer": "p1",
             "entities": '["破壳创智"]',
-            "text": "编辑部snippet",
+            "text": "编辑部跟进中：破壳创智选题推进",
             "source_label": "编辑部记录",
             "blocked": 0,
         },
@@ -34,7 +34,7 @@ def _pok_items():
             "owner_team": "Global Partnership 团队",
             "pointer": "p2",
             "entities": '["破壳创智"]',
-            "text": "GP snippet",
+            "text": "GP 已沟通破壳创智，对接中",
             "source_label": "GP周报",
             "blocked": 0,
         },
@@ -136,13 +136,13 @@ def test_decision_inconsistent_warns_but_does_not_block():
         "teams": ["商业化团队", "视频号团队"],
         "item_ids": [1, 2],
         "team_facts": [
-            {"team": "商业化团队", "item_ids": [1], "snippets": ["豆包"]},
-            {"team": "视频号团队", "item_ids": [2], "snippets": ["豆包视频"]},
+            {"team": "商业化团队", "item_ids": [1], "snippets": ["商业化跟进豆包方案，接触中"]},
+            {"team": "视频号团队", "item_ids": [2], "snippets": ["视频号做豆包相关选题推进中"]},
         ],
     }
     items = [
-        {"id": 1, "source_id": 1, "owner_team": "商业化团队", "pointer": "a", "entities": '["豆包"]', "text": "豆包", "source_label": "商业化", "blocked": 0},
-        {"id": 2, "source_id": 2, "owner_team": "视频号团队", "pointer": "b", "entities": '["豆包"]', "text": "豆包", "source_label": "视频号", "blocked": 0},
+        {"id": 1, "source_id": 1, "owner_team": "商业化团队", "pointer": "a", "entities": '["豆包"]', "text": "商业化跟进豆包方案，接触中", "source_label": "商业化", "blocked": 0},
+        {"id": 2, "source_id": 2, "owner_team": "视频号团队", "pointer": "b", "entities": '["豆包"]', "text": "视频号做豆包相关选题推进中", "source_label": "视频号", "blocked": 0},
     ]
     decisions = [{
         "candidate_id": "c9",

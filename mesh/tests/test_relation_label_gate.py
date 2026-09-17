@@ -64,10 +64,10 @@ def test_one_sided_single_team_allowed_as_backlog():
     ]
     items = [{
         "id": 10, "source_id": 1, "owner_team": "Global Partnership 团队",
-        "pointer": "可灵", "entities": '["可灵"]', "text": "GP snippet", "source_label": "GP", "blocked": 0,
+        "pointer": "可灵", "entities": '["可灵"]', "text": "GP 跟进可灵，编辑部用得上", "source_label": "GP", "blocked": 0,
     }]
     for label in one_sided_labels:
-        rtype = infer_relation_type(label, "GP 有记录，编辑部可对齐")
+        rtype = infer_relation_type(label, "GP 有接触记录，编辑部可对齐")
         cand = {
             "candidate_id": "c1",
             "title": "可灵",
@@ -76,7 +76,7 @@ def test_one_sided_single_team_allowed_as_backlog():
             "candidate_kind": "routing",
             "routing_targets": ["编辑部"],
             "item_ids": [10],
-            "team_facts": [{"team": "Global Partnership 团队", "item_ids": [10], "snippets": ["GP snippet"]}],
+            "team_facts": [{"team": "Global Partnership 团队", "item_ids": [10], "snippets": ["GP 跟进可灵，编辑部用得上"]}],
         }
         decisions = [{
             "candidate_id": "c1",

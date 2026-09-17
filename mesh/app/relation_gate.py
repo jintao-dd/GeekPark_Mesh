@@ -16,6 +16,93 @@ from .owner_guard import (
 from .aggregator import sanitize_owner_team
 
 
+# 真实沟通 / 对接 / 双边推进动作（有则算有依据的「互动」）
+_REAL_ENGAGEMENT = re.compile(
+    r"(?:"
+    r"沟通会|沟通过|已沟通|开过.{0,6}会|Zoom|开会|会议聊|视频会议|聊过|"
+    r"采访|专访|约访|约下一步|约稿|催初稿|催稿|"
+    r"已接触|接触中|对接|跟进|见到|见面|拜访|"
+    r"合同|签约|年框|提报|选题进行|"
+    r"实测|评测|试用|"
+    r"约定|互相引荐|长期合作|"
+    r"报名|落地|workshop|Meetup|Demo\s*Day"
+    r")",
+    re.I,
+)
+
+# 仅点名 / 身份 / 名单类（单独出现不够成卡）
+_MERE_MENTION_ONLY = re.compile(
+    r"(?:"
+    r"潜在会员|列为|名单|值得留意|日后可|可介绍|"
+    r"技术成员|投资人|总经理|负责人|创始人(?!.*(?:沟通|采访|接触|对接|约))"
+    r"|任.{0,12}(?:总经理|CEO|CTO)"
+    r"|驻.{0,8}(?:浙江|北京|上海|深圳)"
+    r")"
+)
+
+
+def _relation_evidence_blob(rel_or_evidence, *, title: str = "", details: list | None = None, body: str = "") -> str:
+    """汇总 title/body/details/evidence snippets，供互动强度检测。"""
+    parts: list[str] = []
+    if title:
+        parts.append(str(title))
+    if body:
+        parts.append(str(body))
+    for d in details or []:
+        if str(d).strip():
+            parts.append(str(d))
+    ev = rel_or_evidence
+    if isinstance(rel_or_evidence, dict):
+        ev = rel_or_evidence.get("evidence") or []
+        if not title:
+            parts.insert(0, str(rel_or_evidence.get("title") or ""))
+        if not body:
+            parts.append(str(rel_or_evidence.get("body") or ""))
+        if not details:
+            for d in rel_or_evidence.get("details") or []:
+                if str(d).strip():
+                    parts.append(str(d))
+    for e in ev or []:
+        if not isinstance(e, dict):
+            continue
+        snip = (e.get("snippet") or e.get("quote") or "").strip()
+        if snip:
+            parts.append(snip)
+    return "\n".join(parts)
+
+
+def evidence_has_real_engagement(
+    rel_or_evidence=None,
+    *,
+    title: str = "",
+    details: list | None = None,
+    body: str = "",
+) -> bool:
+    """证据里是否有真实沟通/对接/推进动作（非纯点名）。
+
+    有「沟通/专访/合同/实测…」→ True。
+    仅有「潜在会员/任总经理/技术成员/可介绍」且无互动词 → False。
+    中性描述（两边各有产出但含选题/提报等）靠正向词命中。
+    """
+    blob = _relation_evidence_blob(
+        rel_or_evidence, title=title, details=details, body=body
+    )
+    if not blob.strip():
+        return False
+    if _REAL_ENGAGEMENT.search(blob):
+        return True
+    # 无正向互动：若明显是点名/身份介绍 → 不成卡；否则保守放行
+    # （避免误杀「两边各有判断」类无动词但有实质事实的卡——那些通常有提报/合同等词）
+    if _MERE_MENTION_ONLY.search(blob):
+        return False
+    # 既无互动词也无点名词：要求至少有一点「做事」痕迹，否则不成卡
+    soft = re.search(
+        r"(进行中|推进中|在谈|接触|合作|客户|选题|方案|项目|活动|采访池)",
+        blob,
+    )
+    return bool(soft)
+
+
 def _parse_draft(draft_json: str | dict | None) -> dict:
     if isinstance(draft_json, dict):
         return draft_json
@@ -183,6 +270,10 @@ def relation_fails_grounding(rel: dict, items: list[dict]) -> list[str]:
     # 纯人名标题：卫生层应已改写；仍是人名 → 不成卡
     if title_is_bare_person_name(title):
         errs.append(f"关系「{title}」标题仅为人名，缺少动作/事实钩子")
+
+    # 仅点名、无真实沟通/对接 → 不成卡
+    if not evidence_has_real_engagement(rel):
+        errs.append(f"关系「{title}」证据仅为点名/身份介绍，无真实沟通或对接动作")
 
     if weakish and (rel.get("evidence") or []):
         # 观察/弱卡：有 evidence +（body 或 details）即可

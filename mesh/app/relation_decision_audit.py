@@ -16,6 +16,7 @@ GATE_CODE_PROVENANCE = "cross_team_provenance_failed"
 GATE_CODE_MISMATCH = "evidence_team_source_mismatch"
 GATE_CODE_DECISION_INCONSISTENT = "decision_inconsistent"
 GATE_CODE_DECISION_MISSING = "decision_missing"
+GATE_CODE_MERE_MENTION = "mere_mention_no_engagement"
 
 _KNOWN_GATE_CODES = frozenset({
     GATE_CODE_PURE_CO,
@@ -29,6 +30,7 @@ _KNOWN_GATE_CODES = frozenset({
     GATE_CODE_MISMATCH,
     GATE_CODE_DECISION_INCONSISTENT,
     GATE_CODE_DECISION_MISSING,
+    GATE_CODE_MERE_MENTION,
 })
 
 _GATE_CODE_LABELS: dict[str, str] = {
@@ -44,6 +46,7 @@ _GATE_CODE_LABELS: dict[str, str] = {
     GATE_CODE_MISMATCH: "teams/sources 与 evidence 不一致",
     GATE_CODE_DECISION_INCONSISTENT: "Decision 的 relation_type/label/reason 互相矛盾",
     GATE_CODE_DECISION_MISSING: "LLM 未返回 relation_decision（漏答，非 skip）",
+    GATE_CODE_MERE_MENTION: "仅点名/身份介绍，无真实沟通或对接动作 → 不成卡",
     "gate_would_cooccur": "（已废弃）旧版纯共现警告；现改为硬 skip",
     "missing_narrative_title_or_body": "Narrative 缺 title/body",
     "filtered_after_gate": "Gate 通过后又被 pipeline 滤掉",
