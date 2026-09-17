@@ -281,30 +281,14 @@ def _finalize_cardkit(
     display_text: str,
     query: str,
     card_lock: threading.Lock,
+    message_id: str = "",
+    payload: dict[str, Any] | None = None,
 ) -> None:
-    """假流式：一次推全文；立刻关闭 streaming 后再换终答卡。
-
-    顺序必须是：stream_card_text → update_card_settings(streaming_mode=False)
-    → update_card_entity。不能在 streaming 关闭后再次调用 stream_card_text，
-    也不能在 stream_card_text 后 sleep 太久导致服务端超时关闭。
-    """
+    """完成回答：撤回思考卡片，然后发送一张全新的答案卡片。"""
     body = (display_text or "").strip() or "这期没捞到可引用的证据。"
-    final = feishu_cards.answer_card_v2(display_text=body, query=query, streaming=False)
-    with card_lock:
-        try:
-            # 1) 最后一次流式推全文，保留客户端打字机效果
-            feishu_api.stream_card_text(
-                card_id=card_id,
-                element_id=feishu_cards.BODY_ELEMENT_ID,
-                content=body,
-                sequence=seq.next(),
-            )
-        except feishu_api.StreamingModeClosedError:
-            log.warning("finalize stream closed early, fallback to entity update")
-        except Exception as e:
-            log.warning("finalize stream failed: %s", e)
 
-        # 2) 立刻关闭 streaming，避免服务端超时自动关闭后我们再调用流式接口
+    # 1) 先关闭 streaming（避免后续操作命中 300309）
+    with card_lock:
         try:
             feishu_api.update_card_settings(
                 card_id=card_id,
@@ -319,8 +303,31 @@ def _finalize_cardkit(
         except Exception as e:
             log.warning("feishu close streaming skip: %s", e)
 
-        # 3) 在非流式模式下全量替换为终答卡（追问按钮等）
-        feishu_api.update_card_entity(card_id=card_id, card=final, sequence=seq.next())
+    # 2) 撤回原来的思考卡片消息
+    if message_id:
+        try:
+            feishu_api.delete_message(message_id=message_id)
+            _elog("thinking card recalled message_id=%s", message_id)
+        except Exception as e:
+            log.warning("feishu recall thinking card skip: %s", e)
+
+    # 3) 发送一张全新的答案卡片（作为新消息，会触发飞书通知）
+    final = feishu_cards.answer_card_v2(display_text=body, query=query, streaming=False)
+    try:
+        receive_id, rid_type = _receive_target(payload or {})
+        sent = feishu_api.send_card_entity(
+            receive_id=receive_id,
+            receive_id_type=rid_type,
+            card_id=card_id,
+        )
+        _elog("answer card sent message_id=%s", sent.get("message_id"))
+    except Exception as e:
+        log.warning("feishu send answer card failed: %s", e)
+        # fallback：如果发新消息失败，至少把原卡片更新为答案
+        with card_lock:
+            feishu_api.update_card_entity(
+                card_id=card_id, card=final, sequence=seq.next()
+            )
 
 
 def _finalize_legacy(
@@ -502,6 +509,8 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                     display_text=reply,
                     query=query,
                     card_lock=card_lock,
+                    message_id=card_message_id,
+                    payload=payload,
                 )
             else:
                 receive_id, rid_type = _receive_target(payload)
@@ -513,31 +522,6 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                     receive_id=receive_id,
                     rid_type=rid_type,
                 )
-
-            # 长耗时任务完成后，单独发一条提醒消息触发飞书通知
-            if elapsed_ms >= 5000:
-                try:
-                    receive_id, rid_type = _receive_target(payload)
-                    reminder_text = (
-                        f"Mesh 已回答：「{query[:30]}"
-                        f"{'…' if len(query) > 30 else ''}」"
-                    )
-                    _elog(
-                        "sending completion reminder to=%s type=%s text=%r",
-                        receive_id,
-                        rid_type,
-                        reminder_text,
-                    )
-                    feishu_api.send_message(
-                        receive_id=receive_id,
-                        receive_id_type=rid_type,
-                        msg_type="text",
-                        content=json.dumps({"text": reminder_text}, ensure_ascii=False),
-                    )
-                    _elog("completion reminder sent elapsed_ms=%s", elapsed_ms)
-                except Exception as e:
-                    _elog("completion reminder failed: %s", e)
-                    log.warning("completion reminder failed: %s", e)
 
         return {
             "ok": True,

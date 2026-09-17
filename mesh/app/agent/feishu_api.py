@@ -118,6 +118,22 @@ def patch_message(*, message_id: str, content: dict[str, Any] | str) -> dict[str
     return data.get("data") or data
 
 
+def delete_message(*, message_id: str) -> None:
+    """DELETE /open-apis/im/v1/messages/:message_id — 撤回 Bot 自己发送的消息。"""
+    mid = (message_id or "").strip()
+    if not mid:
+        raise ValueError("message_id required")
+    url = f"https://open.feishu.cn/open-apis/im/v1/messages/{mid}"
+    try:
+        _api_json("DELETE", url)
+    except FeishuApiError as e:
+        # 已被删除或超时也视为可接受
+        if e.code in (230110, 230009, 230026):
+            log.debug("delete_message skipped: %s", e)
+            return
+        raise
+
+
 class FeishuApiError(RuntimeError):
     """带飞书错误码的 API 异常。"""
 
