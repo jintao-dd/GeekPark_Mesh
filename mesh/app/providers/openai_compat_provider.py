@@ -2,9 +2,11 @@
 
 只需在 .env 配 BASE_URL / MODEL / API_KEY，不需要改代码。
 """
+from __future__ import annotations
 import json
 import logging
 import time
+from typing import Any
 import requests
 from .base import Provider, LLMError, env
 
@@ -104,65 +106,113 @@ class OpenAICompatProvider(Provider):
                     continue
                 raise last_err
 
-            # 部分服务端在 stream=True 时仍一次性返回完整 JSON（无 early flush）。
-            # 先尝试按完整 JSON 解析；若看起来像 SSE 则回退到 SSE 解析。
+            # SSE 流式解析：用 iter_content(chunk_size=1) 逐字节读取，避免
+            # requests.iter_lines 的内部缓冲导致多行 chunk 被聚合到同一毫秒。
+            # 先缓存第一行：若是完整 JSON 则 fallback，否则按 SSE 继续解析。
             r.encoding = "utf-8"
             text = ""
             finish_reason: str | None = None
             usage: dict[str, Any] = {}
             raw_snippet = ""
-            try:
-                body = r.json()
-                choice = (body.get("choices") or [{}])[0]
-                msg = choice.get("message") or {}
-                text = str(msg.get("content") or "").strip()
-                finish_reason = choice.get("finish_reason")
-                usage = body.get("usage") or {}
-                model = body.get("model") or self.model
-                # 一次性返回时 first_token 不可测量，标记为 -1
-                first_token_ms = -1
-                raw_snippet = json.dumps(body, ensure_ascii=False)[:400]
-            except Exception:
-                # 非完整 JSON，尝试 SSE 解析
-                chunks: list[dict[str, Any]] = []
-                raw_samples: list[str] = []
-                last_obj: dict[str, Any] = {}
-                chunk_timestamps: list[int] = []
-                chunk_content_len: list[int] = []
-                chunk_count = 0
-                for raw in r.iter_lines(decode_unicode=True):
-                    if not raw:
-                        continue
-                    line = str(raw)
-                    if len(raw_samples) < 3:
-                        raw_samples.append(line[:500])
-                    if line.startswith("data:"):
-                        data = line[5:].strip()
-                    else:
-                        continue
-                    if data == "[DONE]":
-                        break
-                    try:
-                        obj = json.loads(data)
-                    except Exception:
-                        continue
-                    last_obj = obj
-                    choices = obj.get("choices") or []
-                    if not choices:
-                        continue
-                    delta = choices[0].get("delta") or {}
-                    if delta:
-                        chunks.append(delta)
-                        now_ms = int((time.monotonic() - t0) * 1000)
-                        chunk_timestamps.append(now_ms)
-                        content_len = len(str(delta.get("content") or ""))
-                        reasoning_len = len(str(delta.get("reasoning_content") or ""))
-                        chunk_content_len.append(content_len + reasoning_len)
-                        chunk_count += 1
-                        if first_token_ms < 0 and (delta.get("content") or delta.get("reasoning_content")):
-                            first_token_ms = now_ms
-                    if choices[0].get("finish_reason"):
-                        finish_reason = choices[0].get("finish_reason")
+            chunks: list[dict[str, Any]] = []
+            raw_samples: list[str] = []
+            last_obj: dict[str, Any] = {}
+            chunk_timestamps: list[int] = []
+            chunk_content_len: list[int] = []
+            chunk_count = 0
+            line_buffer = bytearray()
+            first_line_done = False
+            is_json_body = False
+            body_buffer = bytearray()
+
+            def _handle_sse_line(line: str) -> None:
+                nonlocal last_obj, finish_reason, chunk_count, first_token_ms
+                if not line:
+                    return
+                if len(raw_samples) < 3:
+                    raw_samples.append(line[:500])
+                if not line.startswith("data:"):
+                    return
+                data = line[5:].strip()
+                if data == "[DONE]":
+                    return
+                try:
+                    obj = json.loads(data)
+                except Exception:
+                    return
+                last_obj = obj
+                choices = obj.get("choices") or []
+                if not choices:
+                    return
+                delta = choices[0].get("delta") or {}
+                if delta:
+                    chunks.append(delta)
+                    now_ms = int((time.monotonic() - t0) * 1000)
+                    chunk_timestamps.append(now_ms)
+                    content_len = len(str(delta.get("content") or ""))
+                    reasoning_len = len(str(delta.get("reasoning_content") or ""))
+                    chunk_content_len.append(content_len + reasoning_len)
+                    chunk_count += 1
+                    if first_token_ms < 0 and (delta.get("content") or delta.get("reasoning_content")):
+                        first_token_ms = now_ms
+                if choices[0].get("finish_reason"):
+                    finish_reason = choices[0].get("finish_reason")
+
+            for byte in r.iter_content(chunk_size=1):
+                if not first_line_done:
+                    body_buffer.extend(byte)
+                    if byte == b"\n":
+                        first_line = bytes(body_buffer).rstrip(b"\r\n")
+                        first_line_done = True
+                        if first_line and not first_line.startswith(b"data:"):
+                            # 非 SSE，按完整 JSON 读取
+                            is_json_body = True
+                            for chunk in r.iter_content(chunk_size=4096):
+                                body_buffer.extend(chunk)
+                            break
+                        # 第一行就是 SSE data:...，直接处理
+                        if first_line:
+                            _handle_sse_line(first_line.decode("utf-8", errors="replace"))
+                    continue
+
+                if is_json_body:
+                    break
+
+                line_buffer.extend(byte)
+                if byte != b"\n":
+                    continue
+                line = bytes(line_buffer).rstrip(b"\r\n").decode("utf-8", errors="replace")
+                line_buffer = bytearray()
+                _handle_sse_line(line)
+
+            if is_json_body:
+                try:
+                    body = json.loads(body_buffer.decode("utf-8", errors="replace"))
+                    choice = (body.get("choices") or [{}])[0]
+                    msg = choice.get("message") or {}
+                    text = str(msg.get("content") or "").strip()
+                    finish_reason = choice.get("finish_reason")
+                    usage = body.get("usage") or {}
+                    model = body.get("model") or self.model
+                    first_token_ms = -1
+                    raw_snippet = json.dumps(body, ensure_ascii=False)[:400]
+                    chunk_count = 0
+                    chunk_timestamps = []
+                    chunk_content_len = []
+                except Exception:
+                    # 解析失败，按 SSE 兜底：把已收集的 chunks 拼接
+                    text_parts: list[str] = []
+                    reasoning_parts: list[str] = []
+                    for c in chunks:
+                        if c.get("content"):
+                            text_parts.append(str(c["content"]))
+                        if c.get("reasoning_content"):
+                            reasoning_parts.append(str(c["reasoning_content"]))
+                    text = "".join(text_parts)
+                    model = self.model
+                    raw_snippet = " | ".join(raw_samples)[:400]
+                    usage = last_obj.get("usage") or {}
+            else:
                 text_parts: list[str] = []
                 reasoning_parts: list[str] = []
                 for c in chunks:
@@ -173,7 +223,6 @@ class OpenAICompatProvider(Provider):
                 text = "".join(text_parts)
                 model = self.model
                 raw_snippet = " | ".join(raw_samples)[:400]
-                # 部分厂商把 usage 放在最后一个 chunk 的顶层
                 usage = last_obj.get("usage") or {}
 
             elapsed_ms = int((time.monotonic() - t0) * 1000)
