@@ -103,57 +103,70 @@ class OpenAICompatProvider(Provider):
                     continue
                 raise last_err
 
-            # 解析 SSE 流，聚合完整响应，同时记录 first_token_ms
+            # 部分服务端在 stream=True 时仍一次性返回完整 JSON（无 early flush）。
+            # 先尝试按完整 JSON 解析；若看起来像 SSE 则回退到 SSE 解析。
             r.encoding = "utf-8"
-            chunks: list[dict[str, Any]] = []
+            text = ""
             finish_reason: str | None = None
-            raw_samples: list[str] = []
-            for raw in r.iter_lines(decode_unicode=True):
-                if not raw:
-                    continue
-                line = str(raw)
-                if line.startswith("data:"):
-                    data = line[5:].strip()
-                else:
-                    continue
-                if len(raw_samples) < 5:
-                    raw_samples.append(line[:500])
-                if data == "[DONE]":
-                    break
-                try:
-                    obj = json.loads(data)
-                except Exception:
-                    continue
-                choices = obj.get("choices") or []
-                if not choices:
-                    continue
-                delta = choices[0].get("delta") or {}
-                if delta:
-                    chunks.append(delta)
-                    if first_token_ms < 0 and (delta.get("content") or delta.get("reasoning_content")):
-                        first_token_ms = int((time.monotonic() - t0) * 1000)
-                if choices[0].get("finish_reason"):
-                    finish_reason = choices[0].get("finish_reason")
+            usage: dict[str, Any] = {}
+            raw_snippet = ""
+            try:
+                body = r.json()
+                choice = (body.get("choices") or [{}])[0]
+                msg = choice.get("message") or {}
+                text = str(msg.get("content") or "").strip()
+                finish_reason = choice.get("finish_reason")
+                usage = body.get("usage") or {}
+                model = body.get("model") or self.model
+                # 一次性返回时 first_token 不可测量，标记为 -1
+                first_token_ms = -1
+                raw_snippet = json.dumps(body, ensure_ascii=False)[:400]
+            except Exception:
+                # 非完整 JSON，尝试 SSE 解析
+                chunks: list[dict[str, Any]] = []
+                raw_samples: list[str] = []
+                for raw in r.iter_lines(decode_unicode=True):
+                    if not raw:
+                        continue
+                    line = str(raw)
+                    if len(raw_samples) < 3:
+                        raw_samples.append(line[:500])
+                    if line.startswith("data:"):
+                        data = line[5:].strip()
+                    else:
+                        continue
+                    if data == "[DONE]":
+                        break
+                    try:
+                        obj = json.loads(data)
+                    except Exception:
+                        continue
+                    choices = obj.get("choices") or []
+                    if not choices:
+                        continue
+                    delta = choices[0].get("delta") or {}
+                    if delta:
+                        chunks.append(delta)
+                        if first_token_ms < 0 and (delta.get("content") or delta.get("reasoning_content")):
+                            first_token_ms = int((time.monotonic() - t0) * 1000)
+                    if choices[0].get("finish_reason"):
+                        finish_reason = choices[0].get("finish_reason")
+                text_parts: list[str] = []
+                reasoning_parts: list[str] = []
+                for c in chunks:
+                    if c.get("content"):
+                        text_parts.append(str(c["content"]))
+                    if c.get("reasoning_content"):
+                        reasoning_parts.append(str(c["reasoning_content"]))
+                text = "".join(text_parts)
+                model = self.model
+                raw_snippet = " | ".join(raw_samples)[:400]
 
             elapsed_ms = int((time.monotonic() - t0) * 1000)
-            text_parts: list[str] = []
-            reasoning_parts: list[str] = []
-            for c in chunks:
-                if c.get("content"):
-                    text_parts.append(str(c["content"]))
-                if c.get("reasoning_content"):
-                    reasoning_parts.append(str(c["reasoning_content"]))
-            text = "".join(text_parts)
-            # 流式通常没有 usage；按缺失处理
-            usage: dict[str, Any] = {}
-            prompt_tokens = 0
-            completion_tokens = 0
-            total_tokens = 0
-            model = self.model
-
+            usage = usage or {}
             log.info(
                 "openai_compat.request_ok attempt=%s elapsed_ms=%s first_byte_ms=%s first_token_ms=%s status=%s "
-                "model=%s finish_reason=%s prompt_tokens=%s completion_tokens=%s total_tokens=%s raw_samples=%s",
+                "model=%s finish_reason=%s prompt_tokens=%s completion_tokens=%s total_tokens=%s raw_snippet=%s",
                 attempt,
                 elapsed_ms,
                 first_byte_ms,
@@ -161,18 +174,17 @@ class OpenAICompatProvider(Provider):
                 r.status_code,
                 model,
                 finish_reason,
-                prompt_tokens,
-                completion_tokens,
-                total_tokens,
-                raw_samples,
+                usage.get("prompt_tokens", 0),
+                usage.get("completion_tokens", 0),
+                usage.get("total_tokens", 0),
+                raw_snippet,
             )
             return {
                 "content": text,
-                "reasoning_content": "".join(reasoning_parts),
                 "finish_reason": finish_reason,
                 "usage": usage,
                 "model": model,
-                "raw_response": {"chunks": chunks, "finish_reason": finish_reason},
+                "raw_response": {"snippet": raw_snippet, "finish_reason": finish_reason},
                 "request_payload": req,
             }
         raise last_err or LLMError("模型接口调用失败")
