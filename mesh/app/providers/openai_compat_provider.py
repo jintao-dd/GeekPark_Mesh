@@ -107,17 +107,17 @@ class OpenAICompatProvider(Provider):
             r.encoding = "utf-8"
             chunks: list[dict[str, Any]] = []
             finish_reason: str | None = None
-            for raw in r.iter_lines(decode_unicode=False):
+            raw_samples: list[str] = []
+            for raw in r.iter_lines(decode_unicode=True):
                 if not raw:
                     continue
-                try:
-                    line = raw.decode("utf-8")
-                except UnicodeDecodeError:
-                    line = raw.decode("utf-8", errors="replace")
+                line = str(raw)
                 if line.startswith("data:"):
                     data = line[5:].strip()
                 else:
                     continue
+                if len(raw_samples) < 5:
+                    raw_samples.append(line[:500])
                 if data == "[DONE]":
                     break
                 try:
@@ -144,17 +144,16 @@ class OpenAICompatProvider(Provider):
                 if c.get("reasoning_content"):
                     reasoning_parts.append(str(c["reasoning_content"]))
             text = "".join(text_parts)
-            # 部分厂商在最后一个非空 chunk 里放 usage
+            # 流式通常没有 usage；按缺失处理
             usage: dict[str, Any] = {}
             prompt_tokens = 0
             completion_tokens = 0
             total_tokens = 0
-            # 流式通常没有 usage；尝试从最后一个 chunk 的父对象捕获（此处不可行，按缺失处理）
             model = self.model
 
             log.info(
                 "openai_compat.request_ok attempt=%s elapsed_ms=%s first_byte_ms=%s first_token_ms=%s status=%s "
-                "model=%s finish_reason=%s prompt_tokens=%s completion_tokens=%s total_tokens=%s",
+                "model=%s finish_reason=%s prompt_tokens=%s completion_tokens=%s total_tokens=%s raw_samples=%s",
                 attempt,
                 elapsed_ms,
                 first_byte_ms,
@@ -165,6 +164,7 @@ class OpenAICompatProvider(Provider):
                 prompt_tokens,
                 completion_tokens,
                 total_tokens,
+                raw_samples,
             )
             return {
                 "content": text,
