@@ -45,10 +45,11 @@ class OpenAICompatProvider(Provider):
     def is_configured(self) -> bool:
         return bool(self.key and self.model and self.base)
 
-    def _request_payload(self, system: str, user: str, max_tokens: int) -> dict:
+    def _request_payload(self, system: str, user: str, max_tokens: int, *, stream: bool = True) -> dict:
         return {
             "model": self.model,
             "max_tokens": max_tokens,
+            "stream": stream,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
