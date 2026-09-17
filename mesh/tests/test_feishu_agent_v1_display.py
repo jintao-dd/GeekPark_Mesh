@@ -182,7 +182,7 @@ def test_thinking_and_answer_cards():
     assert "收到" in t["elements"][0]["text"]["content"]
     assert "你的问题" not in t["elements"][0]["text"]["content"]
     t1 = feishu_cards.thinking_card(query="本期关注谁？", stage=1)
-    assert "周报" in t1["elements"][0]["text"]["content"] or "找证据" in t1["elements"][0]["text"]["content"]
+    assert "理解" in t1["elements"][0]["text"]["content"] or "检索" in t1["elements"][0]["text"]["content"] or "周报" in t1["elements"][0]["text"]["content"] or "找证据" in t1["elements"][0]["text"]["content"]
     a = feishu_cards.answer_card(display_text="答案\n来源：2026-9-8 已上线周报", query="硅谷沟通了谁")
     assert a["config"]["update_multi"] is True
     assert "答案" in a["elements"][0]["text"]["content"]

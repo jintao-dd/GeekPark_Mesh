@@ -21,29 +21,51 @@ def _clip(text: str, n: int = 6000) -> str:
     return t[: n - 20] + "\n…（已截断）"
 
 
-def stage_copy(stage: int, *, query: str = "", progress: list[str] | None = None) -> str:
-    """等待阶段文案。优先展示 Supervisor 派工进度。"""
+# 思考阶段动态轮播文案。阶段数越大越接近完成。
+_THINKING_STAGES: list[str] = [
+    "收到，我看一下…",
+    "在理解你的问题…",
+    "在检索已发布周报…",
+    "在查组织架构和日历…",
+    "在验证证据和关系…",
+    "在整理最终回答…",
+    "马上好…",
+]
+
+
+def stage_copy(
+    *,
+    query: str = "",
+    progress: list[str] | None = None,
+    stage_index: int = 0,
+    total_stages: int = len(_THINKING_STAGES),
+) -> str:
+    """等待阶段文案。优先展示 Supervisor 派工进度，其次按步骤轮播。"""
     q = _clip(query, 80)
     quote = f"\n\n> {q}" if q else ""
+
+    # 真实进度优先
     if progress:
         line = "；".join([p for p in progress if p][:3])
         if line:
-            return f"{line}…{quote}"
+            step = f"[{min(stage_index + 1, total_stages)}/{total_stages}]"
+            return f"{step} 正在：{line}{quote}"
+
+    # 兜底：按 stage_index 轮播固定阶段文案
+    idx = max(0, min(stage_index, len(_THINKING_STAGES) - 1))
+    step = f"[{idx + 1}/{len(_THINKING_STAGES)}]"
+    text = _THINKING_STAGES[idx]
+
     soft = bool(
         re.search(
             r"(写|文章|润色|改写|翻译|帮忙看看|忙死了|哈哈|傻|机械|同事)",
             query or "",
         )
     )
-    if soft:
-        if stage <= 0:
-            return f"嗯，我想一下…{quote}"
-        return f"差不多了…{quote}"
-    if stage <= 0:
-        return f"收到，我看一下…{quote}"
-    if stage == 1:
-        return f"在分派查询（组织 / 日历 / 周报）…{quote}"
-    return f"在整理，马上好…{quote}"
+    if soft and idx == 0:
+        text = "嗯，我想一下…"
+
+    return f"{step} {text}{quote}"
 
 
 def followup_suggestions(query: str = "", *, display_text: str = "") -> list[str]:
@@ -144,10 +166,17 @@ def card_json_v2(
     }
 
 
-def thinking_card_v2(*, query: str = "", stage: int = 0, progress: list[str] | None = None) -> dict[str, Any]:
+def thinking_card_v2(
+    *,
+    query: str = "",
+    stage: int = 0,
+    progress: list[str] | None = None,
+) -> dict[str, Any]:
     return card_json_v2(
         title="Mesh",
-        body_md=stage_copy(stage, query=query, progress=progress),
+        body_md=stage_copy(
+            query=query, progress=progress, stage_index=max(0, stage)
+        ),
         template="wathet",
         streaming=True,
         summary="Mesh 检索中…",
@@ -197,7 +226,9 @@ def thinking_card(*, query: str = "", stage: int = 0, progress: list[str] | None
                 "tag": "div",
                 "text": {
                     "tag": "lark_md",
-                    "content": stage_copy(stage, query=query, progress=progress),
+                    "content": stage_copy(
+                        query=query, progress=progress, stage_index=max(0, stage)
+                    ),
                 },
             }
         ],

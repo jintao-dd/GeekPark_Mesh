@@ -221,36 +221,47 @@ def _schedule_stage_ticker(
     seq: feishu_api.CardSeq | None = None,
     progress_holder: list[str] | None = None,
 ) -> None:
-    """等待中推阶段文案；若有 Supervisor progress 则展示 Worker 进度。"""
+    """等待中动态轮播阶段文案；优先展示 Supervisor progress，无则按步骤递增。"""
 
     def _run() -> None:
-        if done.wait(3.5):
-            return
-        if done.is_set():
-            return
-        prog = list(progress_holder or [])
-        body = feishu_cards.stage_copy(1, query=query, progress=prog or None)
-        try:
-            with card_lock:
-                if done.is_set():
-                    return
-                if mode == "cardkit" and card_id and seq is not None:
-                    feishu_api.stream_card_text(
-                        card_id=card_id,
-                        element_id=feishu_cards.BODY_ELEMENT_ID,
-                        content=body,
-                        sequence=seq.next(),
-                    )
-                elif message_id:
-                    feishu_api.patch_message(
-                        message_id=message_id,
-                        content=feishu_cards.thinking_card(
-                            query=query, stage=1, progress=prog or None
-                        ),
-                    )
-            _elog("stage tick stage=1 mode=%s progress=%s", mode, prog)
-        except Exception as e:
-            log.debug("feishu stage tick skip: %s", e)
+        stage_index = 0
+        tick_interval = 2.5  # 每 2.5 秒更新一次，既不会闪也不会卡
+        while not done.wait(tick_interval):
+            if done.is_set():
+                return
+            prog = list(progress_holder or [])
+            body = feishu_cards.stage_copy(
+                query=query, progress=prog or None, stage_index=stage_index
+            )
+            try:
+                with card_lock:
+                    if done.is_set():
+                        return
+                    if mode == "cardkit" and card_id and seq is not None:
+                        feishu_api.stream_card_text(
+                            card_id=card_id,
+                            element_id=feishu_cards.BODY_ELEMENT_ID,
+                            content=body,
+                            sequence=seq.next(),
+                        )
+                    elif message_id:
+                        feishu_api.patch_message(
+                            message_id=message_id,
+                            content=feishu_cards.thinking_card(
+                                query=query,
+                                stage=stage_index,
+                                progress=prog or None,
+                            ),
+                        )
+                _elog(
+                    "stage tick stage=%s mode=%s progress=%s",
+                    stage_index,
+                    mode,
+                    prog,
+                )
+            except Exception as e:
+                log.debug("feishu stage tick skip: %s", e)
+            stage_index += 1
 
     threading.Thread(target=_run, name="feishu-stage-tick", daemon=True).start()
 
@@ -405,7 +416,9 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
             progress_holder.append(s)
             if done.is_set() or not feishu_api.bot_reply_enabled():
                 return
-            body = feishu_cards.stage_copy(1, query=query, progress=progress_holder)
+            body = feishu_cards.stage_copy(
+                query=query, progress=progress_holder, stage_index=len(progress_holder)
+            )
             try:
                 with card_lock:
                     if done.is_set():
@@ -421,7 +434,9 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                         feishu_api.patch_message(
                             message_id=card_message_id,
                             content=feishu_cards.thinking_card(
-                                query=query, stage=1, progress=progress_holder
+                                query=query,
+                                stage=len(progress_holder),
+                                progress=progress_holder,
                             ),
                         )
             except Exception as e:
@@ -459,6 +474,9 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
             mode,
         )
 
+        started_at: float = payload.get("_mesh_started_at") or 0.0
+        elapsed_ms = int((time.time() - started_at) * 1000) if started_at else 0
+
         if feishu_api.bot_reply_enabled():
             done.set()
             if mode == "cardkit" and card_id:
@@ -479,6 +497,20 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                     receive_id=receive_id,
                     rid_type=rid_type,
                 )
+
+            # 长耗时任务完成后，单独发一条提醒消息触发飞书通知
+            if elapsed_ms >= 5000:
+                try:
+                    receive_id, rid_type = _receive_target(payload)
+                    feishu_api.send_message(
+                        receive_id=receive_id,
+                        receive_id_type=rid_type,
+                        msg_type="text",
+                        content=f"Mesh 已回答：「{query[:30]}{'…' if len(query) > 30 else ''}」",
+                    )
+                    _elog("completion reminder sent elapsed_ms=%s", elapsed_ms)
+                except Exception as e:
+                    log.debug("completion reminder skip: %s", e)
 
         return {
             "ok": True,
@@ -652,6 +684,8 @@ def handle_feishu_event(con, body: dict[str, Any], *, sync: bool = False) -> dic
             _elog("dedup skip message_id=%s", inbound_id)
             log.info("feishu dedup skip message_id=%s", inbound_id)
             return {"ok": True, "skipped": True, "reason": "duplicate_event", "inbound_message_id": inbound_id}
+
+        payload["_mesh_started_at"] = time.time()
 
         if sync:
             # 单测 / 调试：同步执行（仍尽量出站）
