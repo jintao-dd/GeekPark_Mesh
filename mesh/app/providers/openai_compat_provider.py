@@ -70,12 +70,15 @@ class OpenAICompatProvider(Provider):
                     headers={"Authorization": f"Bearer {self.key}", "Content-Type": "application/json"},
                     data=payload,
                     timeout=self.timeout,
+                    stream=True,
                 )
+                # TTFB：从发请求到收到第一个字节（状态行/首包 header）的时间
+                first_byte_ms = int((time.monotonic() - t0) * 1000)
             except requests.RequestException as e:
                 elapsed_ms = int((time.monotonic() - t0) * 1000)
                 log.info(
-                    "openai_compat.request_failed attempt=%s elapsed_ms=%s error=%s",
-                    attempt, elapsed_ms, e,
+                    "openai_compat.request_failed attempt=%s elapsed_ms=%s first_byte_ms=%s error=%s",
+                    attempt, elapsed_ms, -1, e,
                 )
                 last_err = LLMError(f"模型接口网络异常：{e}")
                 if attempt < 3:
@@ -89,10 +92,11 @@ class OpenAICompatProvider(Provider):
                 msg = choice.get("message") or {}
                 usage = body.get("usage") or {}
                 log.info(
-                    "openai_compat.request_ok attempt=%s elapsed_ms=%s status=%s "
+                    "openai_compat.request_ok attempt=%s elapsed_ms=%s first_byte_ms=%s status=%s "
                     "model=%s finish_reason=%s prompt_tokens=%s completion_tokens=%s total_tokens=%s",
                     attempt,
                     elapsed_ms,
+                    first_byte_ms,
                     r.status_code,
                     body.get("model") or self.model,
                     choice.get("finish_reason"),
@@ -109,8 +113,8 @@ class OpenAICompatProvider(Provider):
                     "request_payload": req,
                 }
             log.info(
-                "openai_compat.request_error attempt=%s elapsed_ms=%s status=%s body=%s",
-                attempt, elapsed_ms, r.status_code, r.text[:300],
+                "openai_compat.request_error attempt=%s elapsed_ms=%s first_byte_ms=%s status=%s body=%s",
+                attempt, elapsed_ms, first_byte_ms, r.status_code, r.text[:300],
             )
             last_err = LLMError(f"模型接口返回 {r.status_code}：{r.text[:500]}")
             if attempt < 3 and _transient(r.status_code, r.text):
