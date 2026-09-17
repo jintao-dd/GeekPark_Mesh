@@ -34,6 +34,10 @@ class OpenAICompatProvider(Provider):
             self.context_window = int(env("MESH_LLM_CONTEXT_WINDOW") or 128000)
         except ValueError:
             self.context_window = 128_000
+        try:
+            self.timeout = int(env("MESH_LLM_TIMEOUT") or 60)
+        except ValueError:
+            self.timeout = 60
 
     def is_configured(self) -> bool:
         return bool(self.key and self.model and self.base)
@@ -61,7 +65,7 @@ class OpenAICompatProvider(Provider):
                     self.base.rstrip("/") + "/chat/completions",
                     headers={"Authorization": f"Bearer {self.key}", "Content-Type": "application/json"},
                     data=payload,
-                    timeout=300,
+                    timeout=self.timeout,
                 )
             except requests.RequestException as e:
                 last_err = LLMError(f"模型接口网络异常：{e}")
@@ -103,7 +107,7 @@ class OpenAICompatProvider(Provider):
                 self.base.rstrip("/") + "/chat/completions",
                 headers={"Authorization": f"Bearer {self.key}", "Content-Type": "application/json"},
                 data=payload,
-                timeout=300,
+                timeout=self.timeout,
                 stream=True,
             )
         except requests.RequestException as e:

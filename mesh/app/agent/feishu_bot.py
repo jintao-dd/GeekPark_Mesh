@@ -308,15 +308,23 @@ def _finalize_cardkit(
             log.warning("feishu close streaming skip: %s", e)
 
     # 2) 发送一张全新的答案卡片（作为新消息，会触发飞书通知）
+    # 必须使用新的 card_id：飞书对同一 card_id 的绑定次数有限制，复用旧 ID 会触发
+    # 200780 "card binding biz count over limit"，导致答案发不出去。
     final = feishu_cards.answer_card_v2(display_text=body, query=query, streaming=False)
     try:
         receive_id, rid_type = _receive_target(payload or {})
+        answer_card_id = feishu_api.create_card_entity(final)
         sent = feishu_api.send_card_entity(
             receive_id=receive_id,
             receive_id_type=rid_type,
-            card_id=card_id,
+            card_id=answer_card_id,
         )
-        _elog("answer card sent message_id=%s", sent.get("message_id"))
+        _elog(
+            "answer card sent message_id=%s answer_card_id=%s old_card_id=%s",
+            sent.get("message_id"),
+            answer_card_id,
+            card_id,
+        )
     except Exception as e:
         log.warning("feishu send answer card failed: %s", e)
         # fallback：如果发新消息失败，至少把原卡片更新为答案
