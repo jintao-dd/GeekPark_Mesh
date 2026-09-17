@@ -24,13 +24,30 @@ def _clip(text: str, n: int = 6000) -> str:
 # 思考阶段动态轮播文案。阶段数越大越接近完成。
 _THINKING_STAGES: list[str] = [
     "收到，我看一下…",
-    "在理解你的问题…",
-    "在检索已发布周报…",
-    "在查组织架构和日历…",
-    "在验证证据和关系…",
-    "在整理最终回答…",
+    "理解你的问题…",
+    "检索已发布周报…",
+    "查组织架构和日历…",
+    "验证证据和关系…",
+    "整理最终回答…",
     "马上好…",
 ]
+
+# Braille spinner frames，纯文本转圈效果
+_SPINNER_FRAMES: list[str] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
+
+def _spinner(tick: int) -> str:
+    return _SPINNER_FRAMES[tick % len(_SPINNER_FRAMES)]
+
+
+def _normalize_progress(label: str) -> str:
+    """去掉 progress 文案里重复的'正在'前缀，避免'正在：正在查'。"""
+    s = str(label or "").strip()
+    if s.startswith("正在"):
+        s = s[2:].lstrip("：: ")
+    if s.startswith("在"):
+        s = s[1:].lstrip(" ")
+    return s
 
 
 def stage_copy(
@@ -38,22 +55,21 @@ def stage_copy(
     query: str = "",
     progress: list[str] | None = None,
     stage_index: int = 0,
-    total_stages: int = len(_THINKING_STAGES),
+    tick: int = 0,
 ) -> str:
     """等待阶段文案。优先展示 Supervisor 派工进度，其次按步骤轮播。"""
     q = _clip(query, 80)
     quote = f"\n\n> {q}" if q else ""
+    frame = _spinner(tick)
 
     # 真实进度优先
     if progress:
-        line = "；".join([p for p in progress if p][:3])
+        line = "；".join([_normalize_progress(p) for p in progress if p][:3])
         if line:
-            step = f"[{min(stage_index + 1, total_stages)}/{total_stages}]"
-            return f"{step} 正在：{line}{quote}"
+            return f"{frame} 正在：{line}{quote}"
 
     # 兜底：按 stage_index 轮播固定阶段文案
     idx = max(0, min(stage_index, len(_THINKING_STAGES) - 1))
-    step = f"[{idx + 1}/{len(_THINKING_STAGES)}]"
     text = _THINKING_STAGES[idx]
 
     soft = bool(
@@ -65,7 +81,7 @@ def stage_copy(
     if soft and idx == 0:
         text = "嗯，我想一下…"
 
-    return f"{step} {text}{quote}"
+    return f"{frame} {text}{quote}"
 
 
 def followup_suggestions(query: str = "", *, display_text: str = "") -> list[str]:

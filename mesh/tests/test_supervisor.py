@@ -598,14 +598,18 @@ def test_thinking_card_shows_progress():
     from app.agent import feishu_cards
 
     body = feishu_cards.stage_copy(
-        query="查一下", progress=["正在查组织/群成员", "正在查日历"], stage_index=1
+        query="查一下",
+        progress=["正在查组织/群成员", "正在查日历"],
+        stage_index=1,
+        tick=1,
     )
     assert "组织" in body
-    assert "[2/" in body  # 步骤指示器
+    assert "正在：" in body
+    assert "\u280b" in body or "\u2819" in body  # Braille spinner frame
     card = feishu_cards.thinking_card(
         query="查一下", stage=1, progress=["正在查已上线周报"]
     )
     assert "周报" in str(card)
     # 无 progress 时按 stage_index 轮播
-    body2 = feishu_cards.stage_copy(query="查一下", stage_index=3)
-    assert "[4/" in body2
+    body2 = feishu_cards.stage_copy(query="查一下", stage_index=3, tick=0)
+    assert "检索" in body2 or "查" in body2

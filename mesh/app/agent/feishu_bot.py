@@ -225,13 +225,17 @@ def _schedule_stage_ticker(
 
     def _run() -> None:
         stage_index = 0
+        tick = 0
         tick_interval = 2.5  # 每 2.5 秒更新一次，既不会闪也不会卡
         while not done.wait(tick_interval):
             if done.is_set():
                 return
             prog = list(progress_holder or [])
             body = feishu_cards.stage_copy(
-                query=query, progress=prog or None, stage_index=stage_index
+                query=query,
+                progress=prog or None,
+                stage_index=stage_index,
+                tick=tick,
             )
             try:
                 with card_lock:
@@ -254,14 +258,16 @@ def _schedule_stage_ticker(
                             ),
                         )
                 _elog(
-                    "stage tick stage=%s mode=%s progress=%s",
+                    "stage tick stage=%s tick=%s mode=%s progress=%s",
                     stage_index,
+                    tick,
                     mode,
                     prog,
                 )
             except Exception as e:
                 log.debug("feishu stage tick skip: %s", e)
             stage_index += 1
+            tick += 1
 
     threading.Thread(target=_run, name="feishu-stage-tick", daemon=True).start()
 
@@ -417,7 +423,10 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
             if done.is_set() or not feishu_api.bot_reply_enabled():
                 return
             body = feishu_cards.stage_copy(
-                query=query, progress=progress_holder, stage_index=len(progress_holder)
+                query=query,
+                progress=progress_holder,
+                stage_index=len(progress_holder),
+                tick=len(progress_holder),
             )
             try:
                 with card_lock:
@@ -476,6 +485,11 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
 
         started_at: float = payload.get("_mesh_started_at") or 0.0
         elapsed_ms = int((time.time() - started_at) * 1000) if started_at else 0
+        _elog(
+            "finalize timing started_at=%s elapsed_ms=%s",
+            started_at,
+            elapsed_ms,
+        )
 
         if feishu_api.bot_reply_enabled():
             done.set()
@@ -502,15 +516,26 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
             if elapsed_ms >= 5000:
                 try:
                     receive_id, rid_type = _receive_target(payload)
+                    reminder_text = (
+                        f"Mesh 已回答：「{query[:30]}"
+                        f"{'…' if len(query) > 30 else ''}」"
+                    )
+                    _elog(
+                        "sending completion reminder to=%s type=%s text=%r",
+                        receive_id,
+                        rid_type,
+                        reminder_text,
+                    )
                     feishu_api.send_message(
                         receive_id=receive_id,
                         receive_id_type=rid_type,
                         msg_type="text",
-                        content=f"Mesh 已回答：「{query[:30]}{'…' if len(query) > 30 else ''}」",
+                        content=reminder_text,
                     )
                     _elog("completion reminder sent elapsed_ms=%s", elapsed_ms)
                 except Exception as e:
-                    log.debug("completion reminder skip: %s", e)
+                    _elog("completion reminder failed: %s", e)
+                    log.warning("completion reminder failed: %s", e)
 
         return {
             "ok": True,
