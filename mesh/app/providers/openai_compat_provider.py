@@ -3,9 +3,12 @@
 只需在 .env 配 BASE_URL / MODEL / API_KEY，不需要改代码。
 """
 import json
+import logging
 import time
 import requests
 from .base import Provider, LLMError, env
+
+log = logging.getLogger("uvicorn.error")
 
 
 def _transient(status: int, body: str) -> bool:
@@ -70,7 +73,7 @@ class OpenAICompatProvider(Provider):
                 )
             except requests.RequestException as e:
                 elapsed_ms = int((time.monotonic() - t0) * 1000)
-                logging.getLogger("mesh.llm").info(
+                log.info(
                     "openai_compat.request_failed attempt=%s elapsed_ms=%s error=%s",
                     attempt, elapsed_ms, e,
                 )
@@ -85,7 +88,7 @@ class OpenAICompatProvider(Provider):
                 choice = (body.get("choices") or [{}])[0]
                 msg = choice.get("message") or {}
                 usage = body.get("usage") or {}
-                logging.getLogger("mesh.llm").info(
+                log.info(
                     "openai_compat.request_ok attempt=%s elapsed_ms=%s status=%s "
                     "model=%s finish_reason=%s prompt_tokens=%s completion_tokens=%s total_tokens=%s",
                     attempt,
@@ -105,7 +108,7 @@ class OpenAICompatProvider(Provider):
                     "raw_response": body,
                     "request_payload": req,
                 }
-            logging.getLogger("mesh.llm").info(
+            log.info(
                 "openai_compat.request_error attempt=%s elapsed_ms=%s status=%s body=%s",
                 attempt, elapsed_ms, r.status_code, r.text[:300],
             )

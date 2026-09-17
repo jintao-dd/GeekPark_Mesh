@@ -187,7 +187,7 @@ def call(
                 _accum_usage(None, attempts=attempt + 1)
         finally:
             elapsed_ms = int((time.monotonic() - t0) * 1000)
-            log.info(
+            logging.getLogger("uvicorn.error").info(
                 "llm.call task=%s model=%s attempt=%s elapsed_ms=%s prompt_chars=%s max_tokens=%s",
                 task,
                 model,
