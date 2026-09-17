@@ -127,6 +127,9 @@ class OpenAICompatProvider(Provider):
                 chunks: list[dict[str, Any]] = []
                 raw_samples: list[str] = []
                 last_obj: dict[str, Any] = {}
+                chunk_timestamps: list[int] = []
+                chunk_content_len: list[int] = []
+                chunk_count = 0
                 for raw in r.iter_lines(decode_unicode=True):
                     if not raw:
                         continue
@@ -150,8 +153,14 @@ class OpenAICompatProvider(Provider):
                     delta = choices[0].get("delta") or {}
                     if delta:
                         chunks.append(delta)
+                        now_ms = int((time.monotonic() - t0) * 1000)
+                        chunk_timestamps.append(now_ms)
+                        content_len = len(str(delta.get("content") or ""))
+                        reasoning_len = len(str(delta.get("reasoning_content") or ""))
+                        chunk_content_len.append(content_len + reasoning_len)
+                        chunk_count += 1
                         if first_token_ms < 0 and (delta.get("content") or delta.get("reasoning_content")):
-                            first_token_ms = int((time.monotonic() - t0) * 1000)
+                            first_token_ms = now_ms
                     if choices[0].get("finish_reason"):
                         finish_reason = choices[0].get("finish_reason")
                 text_parts: list[str] = []
@@ -171,7 +180,8 @@ class OpenAICompatProvider(Provider):
             usage = usage or {}
             log.info(
                 "openai_compat.request_ok attempt=%s elapsed_ms=%s first_byte_ms=%s first_token_ms=%s status=%s "
-                "model=%s finish_reason=%s prompt_tokens=%s completion_tokens=%s total_tokens=%s raw_snippet=%s",
+                "model=%s finish_reason=%s prompt_tokens=%s completion_tokens=%s total_tokens=%s "
+                "chunk_count=%s chunk_timestamps=%s chunk_content_len=%s raw_snippet=%s",
                 attempt,
                 elapsed_ms,
                 first_byte_ms,
@@ -182,6 +192,9 @@ class OpenAICompatProvider(Provider):
                 usage.get("prompt_tokens", 0),
                 usage.get("completion_tokens", 0),
                 usage.get("total_tokens", 0),
+                chunk_count,
+                chunk_timestamps,
+                chunk_content_len,
                 raw_snippet,
             )
             return {
@@ -189,7 +202,13 @@ class OpenAICompatProvider(Provider):
                 "finish_reason": finish_reason,
                 "usage": usage,
                 "model": model,
-                "raw_response": {"snippet": raw_snippet, "finish_reason": finish_reason},
+                "raw_response": {
+                    "snippet": raw_snippet,
+                    "finish_reason": finish_reason,
+                    "chunk_count": chunk_count,
+                    "chunk_timestamps": chunk_timestamps,
+                    "chunk_content_len": chunk_content_len,
+                },
                 "request_payload": req,
             }
         raise last_err or LLMError("模型接口调用失败")
