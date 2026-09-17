@@ -374,6 +374,9 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
     progress_holder: list[str] = []
     d: dict[str, Any] = {}
     reply = ""
+    # 阶段耗时埋点：毫秒级，统一在 finalize 时输出
+    timings: dict[str, int] = {}
+    t0 = time.time()
     try:
         if feishu_api.bot_reply_enabled():
             receive_id, rid_type = _receive_target(payload)
@@ -402,17 +405,20 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                 card_message_id = str(sent.get("message_id") or "")
                 mode = "legacy"
 
+            timings["thinking_ms"] = int((time.time() - t0) * 1000)
             log.info(
-                "feishu thinking sent mode=%s message_id=%s card_id=%s",
+                "feishu thinking sent mode=%s message_id=%s card_id=%s thinking_ms=%s",
                 mode,
                 card_message_id,
                 card_id,
+                timings["thinking_ms"],
             )
             _elog(
-                "thinking sent mode=%s message_id=%s card_id=%s",
+                "thinking sent mode=%s message_id=%s card_id=%s thinking_ms=%s",
                 mode,
                 card_message_id,
                 card_id,
+                timings["thinking_ms"],
             )
             _schedule_stage_ticker(
                 mode=mode,
@@ -467,6 +473,7 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
         from .supervisor import progress as progressmod
 
         prog_token = progressmod.set_progress_callback(_on_progress)
+        t_agent = time.time()
         con = db.connect()
         try:
             env = envelope_from_payload(payload)
@@ -476,17 +483,25 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
         finally:
             con.close()
             progressmod.reset_progress_callback(prog_token)
+        timings["agent_ms"] = int((time.time() - t_agent) * 1000)
 
         tr = d.get("trace") if isinstance(d.get("trace"), dict) else {}
         dec = tr.get("decision") if isinstance(tr.get("decision"), dict) else {}
+        # 提取已有内部耗时（controller / supervisor 等）
+        inner_timing: dict[str, Any] = {}
+        if isinstance(tr.get("controller"), dict):
+            inner_timing["controller_ms"] = tr["controller"].get("controller_latency_ms")
+        if isinstance(tr.get("timings"), dict):
+            inner_timing.update(tr["timings"])
         _elog(
-            "agent done open_id=%s intent=%s action=%s pending=%s q=%r chars=%s",
+            "agent done open_id=%s intent=%s action=%s pending=%s q=%r chars=%s timings=%s",
             payload.get("feishu_open_id"),
             d.get("intent"),
             dec.get("action") or "",
             tr.get("pending_write") or "",
             str(payload.get("text") or "")[:60],
             len(reply),
+            inner_timing,
         )
         log.info(
             "feishu_bot reply open_id=%s intent=%s chars=%s mode=%s",
@@ -498,12 +513,15 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
 
         started_at: float = payload.get("_mesh_started_at") or 0.0
         elapsed_ms = int((time.time() - started_at) * 1000) if started_at else 0
+        timings["total_ms"] = elapsed_ms
         _elog(
-            "finalize timing started_at=%s elapsed_ms=%s",
+            "finalize timing started_at=%s elapsed_ms=%s timings=%s",
             started_at,
             elapsed_ms,
+            timings,
         )
 
+        t_finalize = time.time()
         if feishu_api.bot_reply_enabled():
             done.set()
             if mode == "cardkit" and card_id:
@@ -526,6 +544,13 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                     receive_id=receive_id,
                     rid_type=rid_type,
                 )
+        timings["finalize_ms"] = int((time.time() - t_finalize) * 1000)
+        timings["job_ms"] = int((time.time() - t0) * 1000)
+        _elog(
+            "feishu message job finished total_ms=%s timings=%s",
+            timings["job_ms"],
+            timings,
+        )
 
         return {
             "ok": True,
@@ -534,6 +559,7 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
             "card_id": card_id,
             "mode": mode,
             "answer": d,
+            "timings": timings,
         }
     except Exception as e:
         log.exception("feishu message job failed: %s", e)

@@ -35,9 +35,9 @@ class OpenAICompatProvider(Provider):
         except ValueError:
             self.context_window = 128_000
         try:
-            self.timeout = int(env("MESH_LLM_TIMEOUT") or 60)
+            self.timeout = int(env("MESH_LLM_TIMEOUT") or 600)
         except ValueError:
-            self.timeout = 60
+            self.timeout = 600
 
     def is_configured(self) -> bool:
         return bool(self.key and self.model and self.base)

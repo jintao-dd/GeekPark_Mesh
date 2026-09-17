@@ -213,6 +213,8 @@ def handle_turn(
         wr.trace = {**out.trace, **(wr.trace or {}), "hard_write": hard}
         return wr
 
+    timings: dict[str, int] = {}
+    t_plan = time.monotonic()
     graph, pmeta = planmod.plan_turn(
         q,
         company_block=company_block,
@@ -220,6 +222,7 @@ def handle_turn(
         session=session,
         resolved_people=people_res.hits,
     )
+    timings["plan_ms"] = int((time.monotonic() - t_plan) * 1000)
     out.llm_used = bool(pmeta.get("llm_used"))
     out.model = pmeta.get("model")
     out.trace["planner"] = pmeta
@@ -254,6 +257,7 @@ def handle_turn(
         return out
 
     if mode == "speak" or not graph.steps:
+        t_mouth = time.monotonic()
         text, smeta = mouth.speak(
             q,
             identity,
@@ -261,6 +265,7 @@ def handle_turn(
             company_block=company_block,
             hint=graph.speak_hint,
         )
+        timings["mouth_ms"] = int((time.monotonic() - t_mouth) * 1000)
         out.action = "speak"
         out.intent = "casual"
         out.text = text
@@ -268,8 +273,10 @@ def handle_turn(
         if smeta.get("model"):
             out.model = smeta.get("model")
         out.trace["mouth"] = "speak"
+        out.trace["timings"] = timings
         return out
 
+    t_execute = time.monotonic()
     envelopes, tools_called, budget_hit, progress = _execute_graph(
         graph,
         con=con,
@@ -281,6 +288,7 @@ def handle_turn(
         user_text=q,
         resolved_names=resolved_names,
     )
+    timings["execute_ms"] = int((time.monotonic() - t_execute) * 1000)
     out.progress = list(progress)
     out.tools_called = list(tools_called)
     _remember_org_scope(session, envelopes)
@@ -291,8 +299,11 @@ def handle_turn(
         if k in verdict
     }
 
+    t_replan = time.monotonic()
+    replan_count = 0
     while verdict.get("want_replan") and replans_left > 0:
         replans_left -= 1
+        replan_count += 1
         out.trace.setdefault("replans", []).append(verdict.get("replan_reason") or "replan")
         graph2, pmeta2 = planmod.plan_turn(
             q,
@@ -313,6 +324,7 @@ def handle_turn(
         if same_tools and same_args:
             break
         graph = graph2
+        t_reexec = time.monotonic()
         envelopes, tools_called2, budget_hit, progress2 = _execute_graph(
             graph,
             con=con,
@@ -324,6 +336,7 @@ def handle_turn(
             user_text=q,
             resolved_names=resolved_names,
         )
+        timings[f"reexecute_{replan_count}_ms"] = int((time.monotonic() - t_reexec) * 1000)
         out.tools_called.extend(tools_called2)
         for p in progress2:
             if p not in out.progress:
@@ -335,9 +348,12 @@ def handle_turn(
             for k in ("ok_count", "total", "tiers", "cross_bucket", "want_replan", "replan_reason", "unused_sources")
             if k in verdict
         }
+    timings["replan_ms"] = int((time.monotonic() - t_replan) * 1000)
+    timings["replan_count"] = replan_count
 
     skipped = len(graph.steps or []) - len(envelopes)
     partial = bool(budget_hit) or skipped > 0 or any(not e.ok for e in envelopes)
+    t_mouth = time.monotonic()
     text, mouth_meta, columns = mouth.synthesize_work(
         q,
         envelopes,
@@ -348,6 +364,7 @@ def handle_turn(
         partial=partial,
         budget_hit=budget_hit,
     )
+    timings["mouth_ms"] = int((time.monotonic() - t_mouth) * 1000)
     out.llm_used = bool(out.llm_used or mouth_meta.get("llm_used"))
     if mouth_meta.get("model"):
         out.model = mouth_meta.get("model")
@@ -378,11 +395,13 @@ def handle_turn(
     out.trace["progress"] = list(out.progress)
     out.trace["envelopes"] = [e.to_dict() for e in envelopes]
     out.trace["budget_hit"] = budget_hit
+    out.trace["timings"] = timings
     log.info(
-        "supervisor done mode=work band=%s tools=%s chars=%s progress=%s",
+        "supervisor done mode=work band=%s tools=%s chars=%s progress=%s timings=%s",
         graph.band,
         out.tools_called,
         len(out.text or ""),
         out.progress,
+        timings,
     )
     return out
