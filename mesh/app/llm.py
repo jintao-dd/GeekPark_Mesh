@@ -159,9 +159,20 @@ def budget(reserve: int = 20000) -> int:
         win = 128_000
     return max(8000, int((win - reserve) * 1.6))
 
+_prompt_cache: dict[str, str] = {}
+_prompt_cache_lock = threading.Lock()
+
+
 def load_prompt(name: str) -> str:
+    """读取 prompts/*.md；带进程内缓存，避免每次从磁盘读取。"""
+    with _prompt_cache_lock:
+        if name in _prompt_cache:
+            return _prompt_cache[name]
     p = PROMPT_DIR / f"{name}.md"
-    return p.read_text(encoding="utf-8") if p.exists() else ""
+    text = p.read_text(encoding="utf-8") if p.exists() else ""
+    with _prompt_cache_lock:
+        _prompt_cache[name] = text
+    return text
 
 def call(
     system: str,
@@ -179,7 +190,7 @@ def call(
         t0 = time.monotonic()
         try:
             if hasattr(provider, "complete_detail"):
-                detail = provider.complete_detail(system, user, max_tokens=max_tokens)
+                detail = provider.complete_detail(system, user, max_tokens=max_tokens, task=task)
                 text = detail.get("content") or ""
                 _accum_usage(detail.get("usage"), attempts=attempt + 1)
             else:

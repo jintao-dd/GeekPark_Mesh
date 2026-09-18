@@ -221,14 +221,25 @@ def _schedule_stage_ticker(
     seq: feishu_api.CardSeq | None = None,
     progress_holder: list[str] | None = None,
 ) -> None:
-    """等待中动态轮播阶段文案；优先展示 Supervisor progress，无则按步骤递增。"""
+    """等待中动态轮播阶段文案；优先展示 Supervisor progress，无则按步骤递增。
+
+    优化：
+    - 前 3 秒 0.6s/帧保持视觉连贯，之后降到 2s/帧减少 API 调用；
+    - 只有当渲染出的 body 与上次不同时才调用飞书 API；
+    - progress label 变化时会由回调直接驱动刷新，ticker 只在无 progress 时兜底。
+    """
 
     def _run() -> None:
         stage_index = 0
         tick = 0
-        spinner_interval = 0.6  # spinner 每 0.6 秒转一帧，视觉上更连贯
-        stage_step_ticks = 4    # 每 4 个 spinner tick（约 2.4s）推进一个阶段文案
-        while not done.wait(spinner_interval):
+        last_body: str | None = None
+        # 前 3 秒高频 spinner，之后低频兜底
+        fast_interval = 0.6
+        slow_interval = 2.0
+        fast_cutoff_ticks = 5   # 约 3s 后进入慢速
+        stage_step_ticks_fast = 4
+        stage_step_ticks_slow = 1
+        while not done.wait(fast_interval if tick < fast_cutoff_ticks else slow_interval):
             if done.is_set():
                 return
             prog = list(progress_holder or [])
@@ -238,6 +249,14 @@ def _schedule_stage_ticker(
                 stage_index=stage_index,
                 tick=tick,
             )
+            if body == last_body:
+                # body 未变，跳过本次 API 调用，但 stage_index 仍要推进
+                tick += 1
+                step_ticks = stage_step_ticks_fast if tick < fast_cutoff_ticks else stage_step_ticks_slow
+                if tick % step_ticks == 0:
+                    stage_index += 1
+                continue
+            last_body = body
             try:
                 with card_lock:
                     if done.is_set():
@@ -268,7 +287,8 @@ def _schedule_stage_ticker(
             except Exception as e:
                 log.debug("feishu stage tick skip: %s", e)
             tick += 1
-            if tick % stage_step_ticks == 0:
+            step_ticks = stage_step_ticks_fast if tick < fast_cutoff_ticks else stage_step_ticks_slow
+            if tick % step_ticks == 0:
                 stage_index += 1
 
     threading.Thread(target=_run, name="feishu-stage-tick", daemon=True).start()
@@ -434,19 +454,34 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
             log.warning("feishu bot reply disabled; skip outbound")
             _elog("bot reply disabled; skip outbound")
 
-        def _on_progress(label: str) -> None:
-            s = str(label or "").strip()
-            if not s or s in progress_holder:
+        # progress 节流：合并高频 label，最多 1 秒刷新一次卡片
+        _progress_state = {
+            "lock": threading.Lock(),
+            "pending_labels": [],
+            "last_body": None,
+            "last_at": 0.0,
+        }
+
+        def _flush_progress_card() -> None:
+            st = _progress_state
+            with st["lock"]:
+                labels = list(st["pending_labels"])
+                st["pending_labels"].clear()
+            if not labels or done.is_set() or not feishu_api.bot_reply_enabled():
                 return
-            progress_holder.append(s)
-            if done.is_set() or not feishu_api.bot_reply_enabled():
-                return
+            # 避免重复 label 追加
+            for s in labels:
+                if s and s not in progress_holder:
+                    progress_holder.append(s)
             body = feishu_cards.stage_copy(
                 query=query,
                 progress=progress_holder,
                 stage_index=len(progress_holder),
                 tick=len(progress_holder),
             )
+            if body == st["last_body"]:
+                return
+            st["last_body"] = body
             try:
                 with card_lock:
                     if done.is_set():
@@ -467,8 +502,20 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                                 progress=progress_holder,
                             ),
                         )
+                    st["last_at"] = time.time()
             except Exception as e:
                 log.debug("feishu progress patch skip: %s", e)
+
+        def _on_progress(label: str) -> None:
+            s = str(label or "").strip()
+            if not s or s in progress_holder:
+                return
+            st = _progress_state
+            with st["lock"]:
+                st["pending_labels"].append(s)
+            # 如果距离上次刷新已超过 1 秒，立即刷新；否则由后台 ticker 兜底
+            if time.time() - st["last_at"] >= 1.0:
+                _flush_progress_card()
 
         from .supervisor import progress as progressmod
 

@@ -40,9 +40,21 @@ class OpenAICompatProvider(Provider):
         except ValueError:
             self.context_window = 128_000
         try:
-            self.timeout = int(env("MESH_LLM_TIMEOUT") or 600)
+            self.timeout = int(env("MESH_LLM_TIMEOUT") or 120)
         except ValueError:
-            self.timeout = 600
+            self.timeout = 120
+
+    def _timeout_for(self, task: str = "default") -> int:
+        """支持按 task 配置超时：MESH_LLM_TIMEOUT_ANSWER、MESH_LLM_TIMEOUT_DEFAULT 等。"""
+        task_key = (task or "default").upper().replace("-", "_")
+        for key in (f"MESH_LLM_TIMEOUT_{task_key}", "MESH_LLM_TIMEOUT"):
+            val = env(key)
+            if val:
+                try:
+                    return int(val)
+                except ValueError:
+                    continue
+        return self.timeout
 
     def is_configured(self) -> bool:
         return bool(self.key and self.model and self.base)
@@ -58,7 +70,7 @@ class OpenAICompatProvider(Provider):
             ],
         }
 
-    def complete_detail(self, system: str, user: str, max_tokens: int = 4000) -> dict:
+    def complete_detail(self, system: str, user: str, max_tokens: int = 4000, *, task: str = "default") -> dict:
         """完整 API 响应（诊断用）：content / finish_reason / usage / raw_response。
 
         使用 SSE 流式接收，便于精确记录 TTFB 和 first_token_ms。
@@ -67,6 +79,7 @@ class OpenAICompatProvider(Provider):
             raise LLMError("未配置 MESH_LLM_API_KEY / MESH_LLM_MODEL / MESH_LLM_BASE_URL（见 .env）")
         req = self._request_payload(system, user, max_tokens)
         payload = json.dumps(req, ensure_ascii=False).encode("utf-8")
+        timeout = self._timeout_for(task)
         last_err = None
         for attempt in range(1, 4):
             t0 = time.monotonic()
@@ -77,7 +90,7 @@ class OpenAICompatProvider(Provider):
                     self.base.rstrip("/") + "/chat/completions",
                     headers={"Authorization": f"Bearer {self.key}", "Content-Type": "application/json"},
                     data=payload,
-                    timeout=self.timeout,
+                    timeout=timeout,
                     stream=True,
                 )
                 # TTFB：从发请求到收到第一个响应字节（状态行/header）的时间
@@ -265,19 +278,20 @@ class OpenAICompatProvider(Provider):
     def complete(self, system: str, user: str, max_tokens: int = 4000) -> str:
         return self.complete_detail(system, user, max_tokens=max_tokens)["content"]
 
-    def stream(self, system: str, user: str, max_tokens: int = 4000):
+    def stream(self, system: str, user: str, max_tokens: int = 4000, *, task: str = "default"):
         if not self.is_configured():
             raise LLMError("未配置 MESH_LLM_API_KEY / MESH_LLM_MODEL / MESH_LLM_BASE_URL（见 .env）")
         payload = json.dumps({
             "model": self.model, "max_tokens": max_tokens, "stream": True,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
         }, ensure_ascii=False).encode("utf-8")
+        timeout = self._timeout_for(task)
         try:
             r = requests.post(
                 self.base.rstrip("/") + "/chat/completions",
                 headers={"Authorization": f"Bearer {self.key}", "Content-Type": "application/json"},
                 data=payload,
-                timeout=self.timeout,
+                timeout=timeout,
                 stream=True,
             )
         except requests.RequestException as e:
