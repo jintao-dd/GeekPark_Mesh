@@ -8,9 +8,12 @@
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
+import threading
+import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -33,6 +36,11 @@ SEED_ALIASES: dict[str, str] = {
 
 _ROSTER_PATH = Path(__file__).resolve().parent / "data" / "company_people_roster.json"
 _ROSTER_CACHE: dict[str, Any] | None = None
+
+# 组织人员池缓存（roster + 飞书通讯录），按文件 mtime + 通讯录签名缓存 60 秒
+_ORG_PEOPLE_CACHE: tuple[str, float, list[dict[str, str]]] | None = None
+_ORG_PEOPLE_LOCK = threading.Lock()
+_ORG_PEOPLE_TTL_S = 60
 
 _STOP = frozenset(
     {
@@ -212,7 +220,30 @@ def _roster_people() -> list[dict[str, str]]:
     return out
 
 
+def _org_cache_key() -> str:
+    try:
+        mtime = _ROSTER_PATH.stat().st_mtime if _ROSTER_PATH.is_file() else 0.0
+    except Exception:
+        mtime = 0.0
+    try:
+        from .feishu_hands import org_directory
+
+        sig = org_directory.directory_signature()
+    except Exception:
+        sig = ""
+    return hashlib.sha256(f"{mtime:.6f}|{sig}".encode("utf-8")).hexdigest()[:24]
+
+
 def _org_people() -> list[dict[str, str]]:
+    global _ORG_PEOPLE_CACHE
+    now = time.monotonic()
+    cache_key = _org_cache_key()
+    with _ORG_PEOPLE_LOCK:
+        if _ORG_PEOPLE_CACHE is not None:
+            key, ts, people = _ORG_PEOPLE_CACHE
+            if key == cache_key and now - ts < _ORG_PEOPLE_TTL_S:
+                return list(people)
+
     out = _roster_people()  # 离线/无 Hands 时也有全员表
     try:
         from .feishu_hands import org_directory
@@ -242,10 +273,12 @@ def _org_people() -> list[dict[str, str]]:
             else:
                 out.append(row)
                 by_name[name] = row
-        return out
     except Exception as e:
         log.info("person_resolve org unavailable: %s", e)
-        return out
+
+    with _ORG_PEOPLE_LOCK:
+        _ORG_PEOPLE_CACHE = (cache_key, now, out)
+    return out
 
 
 def candidate_tokens(text: str) -> list[str]:

@@ -1,6 +1,10 @@
 """Company Understanding — Ontology + Wiki +（引用）Grounding 提示，同一 Context。"""
 from __future__ import annotations
 
+import hashlib
+import json
+import threading
+import time
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -41,6 +45,44 @@ class CompanyUnderstanding:
         return "\n".join(parts)
 
 
+# 进程内缓存：company_context 构建（Ontology + Wiki）比较重，但同请求/同用户短期内不变
+_CC_CACHE: dict[str, tuple[float, CompanyUnderstanding]] = {}
+_CC_CACHE_LOCK = threading.Lock()
+_CC_CACHE_TTL_S = 60
+
+
+def _cc_cache_key(
+    *,
+    identity: Any = None,
+    permission: Any = None,
+    context: Any = None,
+    session: Any = None,
+    user_text: str = "",
+    org_snapshot: dict[str, Any] | None = None,
+) -> str:
+    oid = str(getattr(identity, "feishu_open_id", "") or "").strip()
+    primary = str(getattr(identity, "primary_team", "") or "").strip()
+    q = (user_text or "").strip()[:200]
+    snap = dict(org_snapshot or {})
+    blob = json.dumps(
+        {
+            "oid": oid,
+            "primary": primary,
+            "query": q,
+            "team_focus": str((getattr(permission, "query_scope", None) or {}).get("team_focus") or "").strip(),
+            "published_only": bool((getattr(permission, "data_visibility", None) or {}).get("published_only", True)),
+            "session_goal": str((getattr(session, "active_goal", None) or {}).get("summary", "")).strip()[:80],
+            "session_team": str(getattr(session, "active_team", "") or "").strip()[:40],
+            "org_digest": sorted(
+                [f"{k}={sorted(v) if isinstance(v, list) else v}" for k, v in snap.items()]
+            ),
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:32]
+
+
 def _session_summary(session: Any) -> str:
     if session is None:
         return ""
@@ -69,6 +111,20 @@ def assemble(
     user_text: str = "",
     org_snapshot: dict[str, Any] | None = None,
 ) -> CompanyUnderstanding:
+    key = _cc_cache_key(
+        identity=identity,
+        permission=permission,
+        context=context,
+        session=session,
+        user_text=user_text,
+        org_snapshot=org_snapshot,
+    )
+    now = time.monotonic()
+    with _CC_CACHE_LOCK:
+        ent = _CC_CACHE.get(key)
+        if ent and now - ent[0] < _CC_CACHE_TTL_S:
+            return ent[1]
+
     snap = dict(org_snapshot or {})
     # 深化 prior：提问者飞书子树同事名（仍标 wiki_prior，非 FACT）
     if not snap.get("teammates"):
@@ -92,8 +148,15 @@ def assemble(
         org_snapshot=snap or None,
     )
     wiki = load_wiki(query=user_text or "")
-    return CompanyUnderstanding(
+    result = CompanyUnderstanding(
         ontology=ont,
         wiki=wiki,
         session_summary=_session_summary(session),
     )
+    with _CC_CACHE_LOCK:
+        _CC_CACHE[key] = (time.monotonic(), result)
+        # 简单 GC：TTL 外淘汰
+        stale = [k for k, v in _CC_CACHE.items() if now - v[0] > _CC_CACHE_TTL_S * 2]
+        for k in stale:
+            _CC_CACHE.pop(k, None)
+    return result

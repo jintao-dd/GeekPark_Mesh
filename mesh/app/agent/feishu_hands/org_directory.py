@@ -134,6 +134,14 @@ def _walk(native_mod: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     return departments, list(people_by_id.values())
 
 
+def directory_signature() -> str:
+    """返回当前缓存的签名，供 person_resolve 判断是否要刷新人员池。"""
+    with _LOCK:
+        at = float(_CACHE.get("at") or 0.0)
+        people_count = len(_CACHE.get("people") or [])
+    return f"{at:.6f}:{people_count}"
+
+
 def load_directory(*, force: bool = False) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     now = time.time()
     with _LOCK:

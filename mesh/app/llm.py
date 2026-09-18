@@ -8,6 +8,7 @@ import json, re, threading, time, logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from .providers import get_provider, LLMError
+from . import llm_cache
 
 log = logging.getLogger("mesh.llm")
 
@@ -187,6 +188,22 @@ def call(
     last_err = None
     provider = get_provider(model=model_for_task(task))
     model = model_for_task(task)
+
+    # 尝试命中缓存（仅非 json_mode，避免重试语义和缓存污染）
+    if not json_mode and model:
+        cached = llm_cache.get_cached(
+            model=model, task=task, system=system, user=user, max_tokens=max_tokens
+        )
+        if cached is not None:
+            logging.getLogger("uvicorn.error").info(
+                "llm.call cache_hit task=%s model=%s prompt_chars=%s max_tokens=%s",
+                task,
+                model,
+                len(system) + len(user),
+                max_tokens,
+            )
+            return cached.get("content") or ""
+
     for attempt in range(2 if json_mode else 1):
         t0 = time.monotonic()
         try:
@@ -209,6 +226,16 @@ def call(
                 max_tokens,
             )
         if not json_mode:
+            # 缓存低风险任务结果
+            if model and hasattr(provider, "complete_detail"):
+                llm_cache.set_cached(
+                    model=model,
+                    task=task,
+                    system=system,
+                    user=user,
+                    max_tokens=max_tokens,
+                    result=detail or {"content": text},
+                )
             return text
         try:
             return parse_json(text)
@@ -519,6 +546,9 @@ def extract_source(
         out: list[dict] = []
         reused = 0
         extracted_n = 0
+
+        # 先分离复用段和需要 LLM 抽取的段
+        to_extract: list[tuple[Any, str]] = []  # (segment, digest)
         for seg in split.segments:
             dig = segment_digest(stype=seg.stype, title=seg.title, text=seg.text or "")
             if dig in prior_by and prior_by[dig]:
@@ -528,18 +558,58 @@ def extract_source(
                     it["_segment_team"] = seg.owner_hint or seg.team
                     out.append(it)
                 reused += 1
-                continue
-            seg_title = f"{title or '数据聚合'} · {seg.title}"[:200]
-            items = extract_items(
-                seg.stype, seg.team, seg_title, seg.text,
-                period_start=period_start, period_end=period_end,
-                period_label=period_label, channel=ch,
-            )
-            for it in items:
-                it["item_stype"] = seg.stype
-                it["_segment_team"] = seg.owner_hint or seg.team
-                out.append(stamp_segment_digest(it, dig))
-            extracted_n += 1
+            else:
+                to_extract.append((seg, dig))
+
+        # 并行抽取独立段落：I/O-bound，受环境变量控制并发度（默认 4）
+        if to_extract:
+            import os
+            max_workers = max(1, min(len(to_extract), int(os.environ.get("MESH_SEGMENT_EXTRACT_WORKERS") or 4)))
+            if len(to_extract) == 1 or max_workers == 1:
+                seg, dig = to_extract[0]
+                seg_title = f"{title or '数据聚合'} · {seg.title}"[:200]
+                items = extract_items(
+                    seg.stype, seg.team, seg_title, seg.text,
+                    period_start=period_start, period_end=period_end,
+                    period_label=period_label, channel=ch,
+                )
+                for it in items:
+                    it["item_stype"] = seg.stype
+                    it["_segment_team"] = seg.owner_hint or seg.team
+                    out.append(stamp_segment_digest(it, dig))
+                extracted_n += 1
+            else:
+                def _extract_seg(args: tuple[Any, str]) -> list[dict]:
+                    seg, dig = args
+                    seg_title = f"{title or '数据聚合'} · {seg.title}"[:200]
+                    try:
+                        items = extract_items(
+                            seg.stype, seg.team, seg_title, seg.text,
+                            period_start=period_start, period_end=period_end,
+                            period_label=period_label, channel=ch,
+                        )
+                    except Exception:
+                        items = []
+                    for it in items:
+                        it["item_stype"] = seg.stype
+                        it["_segment_team"] = seg.owner_hint or seg.team
+                        stamp_segment_digest(it, dig)
+                    return items
+
+                with ThreadPoolExecutor(max_workers=max_workers) as pool:
+                    futs = {pool.submit(_extract_seg, args): args for args in to_extract}
+                    for fut in as_completed(futs):
+                        seg, dig = futs[fut]
+                        try:
+                            items = fut.result()
+                        except Exception:
+                            items = []
+                        for it in items:
+                            it["item_stype"] = seg.stype
+                            it["_segment_team"] = seg.owner_hint or seg.team
+                            out.append(stamp_segment_digest(it, dig))
+                        extracted_n += 1
+
         meta = split.to_meta()
         meta["segment_digests"] = build_segment_digests_meta(split.segments)
         meta["segment_reuse"] = {"reused": reused, "extracted": extracted_n, "total": len(split.segments)}
