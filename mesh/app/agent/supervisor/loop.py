@@ -118,7 +118,9 @@ def _execute_graph(
                 env = _run_one(group_steps[0])
                 done[env.step_id] = env
             else:
-                with ThreadPoolExecutor(max_workers=min(4, len(group_steps))) as pool:
+                # I/O-bound 工具步骤可提高到 8 并行；由环境变量覆盖
+                max_workers = int(os.environ.get("MESH_SUPERVISOR_STEP_WORKERS") or 8)
+                with ThreadPoolExecutor(max_workers=min(max_workers, len(group_steps))) as pool:
                     futs = {pool.submit(_run_one, s): s for s in group_steps}
                     for fut in as_completed(futs):
                         env = fut.result()

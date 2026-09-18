@@ -18,6 +18,19 @@ log = logging.getLogger("mesh.feishu_api")
 _TOKEN_LOCK = threading.Lock()
 _TOKEN_CACHE: dict[str, Any] = {"token": "", "expires_at": 0.0}
 
+# 复用飞书 API 的 TCP 连接
+_FEISHU_SESSION: requests.Session | None = None
+_FEISHU_SESSION_LOCK = threading.Lock()
+
+
+def _feishu_session() -> requests.Session:
+    global _FEISHU_SESSION
+    if _FEISHU_SESSION is None:
+        with _FEISHU_SESSION_LOCK:
+            if _FEISHU_SESSION is None:
+                _FEISHU_SESSION = requests.Session()
+    return _FEISHU_SESSION
+
 
 def feishu_app_credentials() -> tuple[str, str]:
     app_id = (os.environ.get("FEISHU_APP_ID") or "").strip()
@@ -42,19 +55,23 @@ def get_tenant_access_token(*, force: bool = False) -> str:
     with _TOKEN_LOCK:
         if not force and _TOKEN_CACHE["token"] and now < float(_TOKEN_CACHE["expires_at"]) - 60:
             return str(_TOKEN_CACHE["token"])
-        r = requests.post(
-            "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
-            json={"app_id": app_id, "app_secret": app_secret},
-            timeout=15,
-        )
-        r.raise_for_status()
-        data = r.json()
-        if int(data.get("code") or 0) != 0:
-            raise RuntimeError(f"tenant_access_token failed: {data}")
-        token = str(data.get("tenant_access_token") or "")
-        if not token:
-            raise RuntimeError(f"tenant_access_token empty: {data}")
-        expire = float(data.get("expire") or 7200)
+
+    # 在锁外发起 HTTP 请求，避免刷新 token 时阻塞其他飞书 API 调用
+    r = _feishu_session().post(
+        "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+        json={"app_id": app_id, "app_secret": app_secret},
+        timeout=15,
+    )
+    r.raise_for_status()
+    data = r.json()
+    if int(data.get("code") or 0) != 0:
+        raise RuntimeError(f"tenant_access_token failed: {data}")
+    token = str(data.get("tenant_access_token") or "")
+    if not token:
+        raise RuntimeError(f"tenant_access_token empty: {data}")
+    expire = float(data.get("expire") or 7200)
+
+    with _TOKEN_LOCK:
         _TOKEN_CACHE["token"] = token
         _TOKEN_CACHE["expires_at"] = now + expire
         return token
@@ -85,7 +102,7 @@ def send_message(
         "msg_type": msg_type,
         "content": body_content,
     }
-    r = requests.post(url, headers=_auth_headers(), json=payload, timeout=20)
+    r = _feishu_session().post(url, headers=_auth_headers(), json=payload, timeout=20)
     data = r.json() if r.content else {}
     code = int(data.get("code") or 0)
     if r.status_code >= 400 or code != 0:
@@ -105,7 +122,7 @@ def patch_message(*, message_id: str, content: dict[str, Any] | str) -> dict[str
         raise ValueError("message_id required")
     body_content = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
     url = f"https://open.feishu.cn/open-apis/im/v1/messages/{mid}"
-    r = requests.patch(url, headers=_auth_headers(), json={"content": body_content}, timeout=20)
+    r = _feishu_session().patch(url, headers=_auth_headers(), json={"content": body_content}, timeout=20)
     data = r.json() if r.content else {}
     code = int(data.get("code") or 0)
     if r.status_code >= 400 or code != 0:
@@ -144,7 +161,7 @@ class FeishuApiError(RuntimeError):
 
 
 def _api_json(method: str, url: str, *, payload: dict[str, Any] | None = None) -> dict[str, Any]:
-    r = requests.request(method, url, headers=_auth_headers(), json=payload, timeout=20)
+    r = _feishu_session().request(method, url, headers=_auth_headers(), json=payload, timeout=20)
     data = r.json() if r.content else {}
     code = int(data.get("code") or 0)
     if r.status_code >= 400 or code != 0:

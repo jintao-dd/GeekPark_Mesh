@@ -5,12 +5,26 @@
 from __future__ import annotations
 import json
 import logging
+import threading
 import time
 from typing import Any
 import requests
 from .base import Provider, LLMError, env
 
 log = logging.getLogger("uvicorn.error")
+
+# 复用 LLM 连接的 Session
+_LLM_SESSION: requests.Session | None = None
+_LLM_SESSION_LOCK = threading.Lock()
+
+
+def _llm_session() -> requests.Session:
+    global _LLM_SESSION
+    if _LLM_SESSION is None:
+        with _LLM_SESSION_LOCK:
+            if _LLM_SESSION is None:
+                _LLM_SESSION = requests.Session()
+    return _LLM_SESSION
 
 
 def _transient(status: int, body: str) -> bool:
@@ -86,7 +100,7 @@ class OpenAICompatProvider(Provider):
             first_byte_ms: int = -1
             first_token_ms: int = -1
             try:
-                r = requests.post(
+                r = _llm_session().post(
                     self.base.rstrip("/") + "/chat/completions",
                     headers={"Authorization": f"Bearer {self.key}", "Content-Type": "application/json"},
                     data=payload,
@@ -287,7 +301,7 @@ class OpenAICompatProvider(Provider):
         }, ensure_ascii=False).encode("utf-8")
         timeout = self._timeout_for(task)
         try:
-            r = requests.post(
+            r = _llm_session().post(
                 self.base.rstrip("/") + "/chat/completions",
                 headers={"Authorization": f"Bearer {self.key}", "Content-Type": "application/json"},
                 data=payload,

@@ -5,6 +5,7 @@ HTTP 回调必须在数秒内返回；重活进后台线程。
 """
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import base64
 import hashlib
 import json
@@ -17,6 +18,23 @@ from typing import Any
 from . import feishu_api, feishu_cards
 from .harness import envelope_from_payload
 from .runtime import handle_message
+
+# 飞书消息 job 线程池：避免突发流量下无限制创建 OS 线程
+_FEISHU_JOB_POOL: ThreadPoolExecutor | None = None
+_FEISHU_JOB_POOL_LOCK = threading.Lock()
+
+
+def _get_feishu_job_pool() -> ThreadPoolExecutor:
+    global _FEISHU_JOB_POOL
+    if _FEISHU_JOB_POOL is None:
+        with _FEISHU_JOB_POOL_LOCK:
+            if _FEISHU_JOB_POOL is None:
+                max_workers = int(os.environ.get("MESH_FEISHU_JOB_WORKERS") or 32)
+                _FEISHU_JOB_POOL = ThreadPoolExecutor(
+                    max_workers=max_workers,
+                    thread_name_prefix="feishu-bot-msg",
+                )
+    return _FEISHU_JOB_POOL
 
 log = logging.getLogger("mesh.feishu_bot")
 # 保证 docker logs 能看到（uvicorn 下未单独配 handler 时也可能丢）
@@ -654,13 +672,7 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _spawn_message_job(payload: dict[str, Any]) -> None:
-    t = threading.Thread(
-        target=process_feishu_message_job,
-        args=(payload,),
-        name="feishu-bot-msg",
-        daemon=True,
-    )
-    t.start()
+    _get_feishu_job_pool().submit(process_feishu_message_job, payload)
 
 
 def _parse_card_action(event: dict[str, Any]) -> dict[str, Any] | None:

@@ -5,6 +5,7 @@
 """
 import datetime
 import json, re, threading, time, logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from .providers import get_provider, LLMError
 
@@ -337,16 +338,44 @@ def _rewrite_text_field(text: str, context: str, words: list[str]) -> str:
 
 
 def polish_forbidden_fields(obj):
-    """只改写命中禁用词的字符串字段，结构与其余文案不动。"""
+    """只改写命中禁用词的字符串字段，结构与其余文案不动。
+
+    优化：同一轮内多个命中的字段互相独立，使用线程池并行改写。
+    """
     for _ in range(FIELD_REWRITE_ROUNDS):
         batch = _forbidden_field_paths(obj)
         if not batch:
             return obj
-        for path, text, words in batch:
+        if len(batch) == 1:
+            path, text, words = batch[0]
             ctx = _context_for_path(obj, path)
             new_text = _rewrite_text_field(text, ctx, words)
             if new_text and not forbidden_hits(new_text):
                 _set_by_path(obj, path, new_text)
+            continue
+
+        # 并行改写多个字段
+        results = []
+        max_workers = min(4, len(batch))
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futs = {
+                pool.submit(_rewrite_text_field, text, _context_for_path(obj, path), words): (path, text)
+                for path, text, words in batch
+            }
+            for fut in as_completed(futs):
+                path, original_text = futs[fut]
+                try:
+                    new_text = fut.result()
+                except Exception:
+                    continue
+                if new_text and not forbidden_hits(new_text):
+                    results.append((path, new_text))
+                else:
+                    # 改写失败保留原文，避免污染
+                    results.append((path, original_text))
+        # 按原顺序写回，保证确定性
+        for path, new_text in results:
+            _set_by_path(obj, path, new_text)
     return obj
 
 
