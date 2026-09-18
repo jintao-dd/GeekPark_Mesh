@@ -234,10 +234,17 @@ def _org_cache_key() -> str:
     return hashlib.sha256(f"{mtime:.6f}|{sig}".encode("utf-8")).hexdigest()[:24]
 
 
-def _org_people() -> list[dict[str, str]]:
+def _org_people(*, request_cache: Any | None = None) -> list[dict[str, str]]:
     global _ORG_PEOPLE_CACHE
-    now = time.monotonic()
     cache_key = _org_cache_key()
+
+    # 优先请求级缓存
+    if request_cache is not None:
+        cached = request_cache.get(cache_key)
+        if cached is not None:
+            return list(cached)
+
+    now = time.monotonic()
     with _ORG_PEOPLE_LOCK:
         if _ORG_PEOPLE_CACHE is not None:
             key, ts, people = _ORG_PEOPLE_CACHE
@@ -275,6 +282,9 @@ def _org_people() -> list[dict[str, str]]:
                 by_name[name] = row
     except Exception as e:
         log.info("person_resolve org unavailable: %s", e)
+
+    if request_cache is not None:
+        request_cache.set(cache_key, out)
 
     with _ORG_PEOPLE_LOCK:
         _ORG_PEOPLE_CACHE = (cache_key, now, out)
@@ -421,6 +431,7 @@ def resolve_people_in_text(
     session: Any = None,
     people: list[dict[str, str]] | None = None,
     use_org: bool = True,
+    request_cache: Any | None = None,
 ) -> ResolveResult:
     tokens = candidate_tokens(text)
     pool: list[dict[str, str]] = []
@@ -429,7 +440,7 @@ def resolve_people_in_text(
     if people is not None:
         pool.extend(people)
     elif use_org:
-        pool.extend(_org_people())
+        pool.extend(_org_people(request_cache=request_cache))
     # 去重 by name
     by_name: dict[str, dict[str, str]] = {}
     for p in pool:

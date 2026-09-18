@@ -11,6 +11,11 @@ from typing import Any
 from .company_ontology import CompanyOntology, build_ontology
 from .company_wiki import CompanyWiki, load_wiki
 
+# 保留进程内 fallback 缓存：未传入 request_cache 时使用
+_CC_CACHE: dict[str, tuple[float, CompanyUnderstanding]] = {}
+_CC_CACHE_LOCK = threading.Lock()
+_CC_CACHE_TTL_S = 60
+
 
 @dataclass
 class CompanyUnderstanding:
@@ -43,12 +48,6 @@ class CompanyUnderstanding:
         if self.session_summary:
             parts.extend(["", "## 会话工作记忆（非事实）", self.session_summary])
         return "\n".join(parts)
-
-
-# 进程内缓存：company_context 构建（Ontology + Wiki）比较重，但同请求/同用户短期内不变
-_CC_CACHE: dict[str, tuple[float, CompanyUnderstanding]] = {}
-_CC_CACHE_LOCK = threading.Lock()
-_CC_CACHE_TTL_S = 60
 
 
 def _cc_cache_key(
@@ -110,6 +109,7 @@ def assemble(
     session: Any = None,
     user_text: str = "",
     org_snapshot: dict[str, Any] | None = None,
+    request_cache: Any | None = None,
 ) -> CompanyUnderstanding:
     key = _cc_cache_key(
         identity=identity,
@@ -119,6 +119,14 @@ def assemble(
         user_text=user_text,
         org_snapshot=org_snapshot,
     )
+
+    # 优先使用请求级缓存
+    if request_cache is not None:
+        cached = request_cache.get(key)
+        if cached is not None:
+            return cached
+
+    # fallback：进程内短缓存
     now = time.monotonic()
     with _CC_CACHE_LOCK:
         ent = _CC_CACHE.get(key)
@@ -153,6 +161,10 @@ def assemble(
         wiki=wiki,
         session_summary=_session_summary(session),
     )
+
+    if request_cache is not None:
+        request_cache.set(key, result)
+
     with _CC_CACHE_LOCK:
         _CC_CACHE[key] = (time.monotonic(), result)
         # 简单 GC：TTL 外淘汰

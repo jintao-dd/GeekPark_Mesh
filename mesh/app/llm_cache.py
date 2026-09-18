@@ -5,14 +5,17 @@
 - 当前 Mesh 部署在单容器/单进程（uvicorn worker=1），进程内缓存即可命中同进程内重复调用。
 - tmesh/prod 环境均未运行 Redis；新增 Redis 会带来部署、运维、故障面成本。
 - 因此 Batch 3 先用进程内缓存，命中高频重复 LLM 请求；后续若横向扩展为多 worker，再引入 Redis。
+- **重要限制：本缓存是进程内缓存，多个 uvicorn worker / 多个容器实例之间不共享。**
 
 缓存策略
 --------
-- key = sha256(model | task | system | user | max_tokens)[:32]
+- key = sha256(model | task | system | user | max_tokens | temperature | top_p)[:32]
+  使用 JSON + sort_keys 结构化序列化，避免字符串拼接歧义。
 - TTL = 5 分钟（环境变量 MESH_LLM_CACHE_TTL_S，默认 300）
 - 容量上限 = 256 条（环境变量 MESH_LLM_CACHE_MAX，默认 256），LRU 淘汰
 - 只缓存非流式、低风险任务：answer / mouth / default
 - 不缓存：stream、json_mode（抽取/决策等对重试敏感）、write_gate、supervisor plan 等
+- 报错响应（finish_reason=error / 空 content / 无有效结果）禁止写入缓存
 - 命中时 usage 会多带 cache_hit=true，便于监控真实 LLM 调用量
 """
 from __future__ import annotations
@@ -42,7 +45,24 @@ def _cache_max() -> int:
         return 256
 
 
-def _cache_key(*, model: str, task: str, system: str, user: str, max_tokens: int) -> str:
+def _env_float(name: str, default: float) -> float:
+    try:
+        v = (os.environ.get(name) or "").strip()
+        return float(v) if v else default
+    except ValueError:
+        return default
+
+
+def _cache_key(
+    *,
+    model: str,
+    task: str,
+    system: str,
+    user: str,
+    max_tokens: int,
+    temperature: float | None = None,
+    top_p: float | None = None,
+) -> str:
     blob = json.dumps(
         {
             "model": model or "",
@@ -50,6 +70,8 @@ def _cache_key(*, model: str, task: str, system: str, user: str, max_tokens: int
             "system": system or "",
             "user": user or "",
             "max_tokens": max_tokens,
+            "temperature": temperature if temperature is not None else _env_float("MESH_LLM_TEMPERATURE", 0.7),
+            "top_p": top_p if top_p is not None else _env_float("MESH_LLM_TOP_P", 1.0),
         },
         ensure_ascii=False,
         sort_keys=True,
@@ -76,6 +98,23 @@ def cacheable_task(task: str) -> bool:
     return (task or "default").strip().lower() in {"answer", "mouth", "default"}
 
 
+def _result_cacheable(result: dict[str, Any]) -> bool:
+    """报错响应、明显无效响应禁止写入缓存。"""
+    if not isinstance(result, dict):
+        return False
+    raw = result.get("raw_response") or {}
+    finish = str(raw.get("finish_reason") or result.get("finish_reason") or "").lower()
+    if finish in ("error", "content_filter", "length"):
+        return False
+    content = str(result.get("content") or "").strip()
+    if not content:
+        return False
+    # 若 provider 显式返回错误，也不缓存
+    if "error" in str(result.get("model") or "").lower():
+        return False
+    return True
+
+
 def get_cached(
     *,
     model: str,
@@ -83,10 +122,15 @@ def get_cached(
     system: str,
     user: str,
     max_tokens: int,
+    temperature: float | None = None,
+    top_p: float | None = None,
 ) -> dict[str, Any] | None:
     if not cacheable_task(task):
         return None
-    key = _cache_key(model=model, task=task, system=system, user=user, max_tokens=max_tokens)
+    key = _cache_key(
+        model=model, task=task, system=system, user=user, max_tokens=max_tokens,
+        temperature=temperature, top_p=top_p,
+    )
     with _CACHE_LOCK:
         ent = _CACHE.get(key)
         if not ent:
@@ -111,10 +155,17 @@ def set_cached(
     user: str,
     max_tokens: int,
     result: dict[str, Any],
+    temperature: float | None = None,
+    top_p: float | None = None,
 ) -> None:
     if not cacheable_task(task):
         return
-    key = _cache_key(model=model, task=task, system=system, user=user, max_tokens=max_tokens)
+    if not _result_cacheable(result):
+        return
+    key = _cache_key(
+        model=model, task=task, system=system, user=user, max_tokens=max_tokens,
+        temperature=temperature, top_p=top_p,
+    )
     with _CACHE_LOCK:
         _CACHE[key] = {"result": result, "_at": time.monotonic()}
         _gc()

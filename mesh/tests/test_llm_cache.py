@@ -48,3 +48,52 @@ def test_get_set_cached():
         model="m1", task="plan", system="s", user="u", max_tokens=100
     )
     assert miss2 is None
+
+
+def test_error_result_not_cached():
+    """报错响应禁止写入缓存。"""
+    with llm_cache._CACHE_LOCK:
+        llm_cache._CACHE.clear()
+
+    err_result = {"content": "", "finish_reason": "error", "usage": {}}
+    llm_cache.set_cached(
+        model="m1", task="answer", system="s", user="u", max_tokens=100, result=err_result
+    )
+    assert llm_cache.get_cached(
+        model="m1", task="answer", system="s", user="u", max_tokens=100
+    ) is None
+
+    empty_result = {"content": "   ", "usage": {}}
+    llm_cache.set_cached(
+        model="m1", task="answer", system="s", user="u2", max_tokens=100, result=empty_result
+    )
+    assert llm_cache.get_cached(
+        model="m1", task="answer", system="s", user="u2", max_tokens=100
+    ) is None
+
+
+def test_temperature_top_p_affects_key():
+    """temperature / top_p 必须参与 key 计算。"""
+    with llm_cache._CACHE_LOCK:
+        llm_cache._CACHE.clear()
+
+    result = {"content": "hello", "usage": {}}
+    llm_cache.set_cached(
+        model="m1", task="answer", system="s", user="u", max_tokens=100,
+        temperature=0.5, top_p=1.0, result=result,
+    )
+    # 相同参数命中
+    assert llm_cache.get_cached(
+        model="m1", task="answer", system="s", user="u", max_tokens=100,
+        temperature=0.5, top_p=1.0,
+    ) is not None
+    # 不同 temperature 不命中
+    assert llm_cache.get_cached(
+        model="m1", task="answer", system="s", user="u", max_tokens=100,
+        temperature=0.9, top_p=1.0,
+    ) is None
+    # 不同 top_p 不命中
+    assert llm_cache.get_cached(
+        model="m1", task="answer", system="s", user="u", max_tokens=100,
+        temperature=0.5, top_p=0.9,
+    ) is None

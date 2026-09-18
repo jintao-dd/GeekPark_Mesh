@@ -144,6 +144,10 @@ def handle_turn(
     render_tool_result: Callable[..., Any],
 ) -> SupervisorResult:
     from .. import company_context
+    from ...request_cache import RequestCache
+
+    # 请求级缓存：避免同请求内重复构建 company_context / person_resolve
+    request_cache = RequestCache(ttl_s=60.0)
 
     q = (user_text or "").strip()
     company = company_context.assemble(
@@ -152,12 +156,13 @@ def handle_turn(
         context=context,
         session=session,
         user_text=q,
+        request_cache=request_cache,
     )
     company_block = company.prompt_block()
 
     from .. import person_resolve as pr
 
-    people_res = pr.resolve_people_in_text(q, session=session)
+    people_res = pr.resolve_people_in_text(q, session=session, request_cache=request_cache)
     pr.sanitize_session_people(session)
     pr.remember_hits(session, people_res.hits)
     resolved_names = [h.canonical for h in people_res.hits if getattr(h, "canonical", "")]

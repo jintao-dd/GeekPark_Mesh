@@ -10,6 +10,12 @@ from pathlib import Path
 from .providers import get_provider, LLMError
 from . import llm_cache
 
+# segment 抽取全局并发信号量：避免突发大文件同时发起大量 LLM 调用压垮上游
+_SEG_EXTRACT_SEMAPHORE = threading.Semaphore(
+    max(1, int(__import__("os").environ.get("MESH_SEGMENT_EXTRACT_MAX_CONCURRENT") or 4))
+)
+_SEG_EXTRACT_TIMEOUT_S = max(10, int(__import__("os").environ.get("MESH_SEGMENT_EXTRACT_TIMEOUT_S") or 120))
+
 log = logging.getLogger("mesh.llm")
 
 PROMPT_DIR = Path(__file__).resolve().parent / "prompts"
@@ -561,47 +567,50 @@ def extract_source(
             else:
                 to_extract.append((seg, dig))
 
-        # 并行抽取独立段落：I/O-bound，受环境变量控制并发度（默认 4）
+        # 并行抽取独立段落：I/O-bound，受全局信号量 + 线程池双重限流
         if to_extract:
             import os
             max_workers = max(1, min(len(to_extract), int(os.environ.get("MESH_SEGMENT_EXTRACT_WORKERS") or 4)))
-            if len(to_extract) == 1 or max_workers == 1:
-                seg, dig = to_extract[0]
+
+            def _extract_seg(args: tuple[Any, str]) -> list[dict]:
+                seg, dig = args
                 seg_title = f"{title or '数据聚合'} · {seg.title}"[:200]
-                items = extract_items(
-                    seg.stype, seg.team, seg_title, seg.text,
-                    period_start=period_start, period_end=period_end,
-                    period_label=period_label, channel=ch,
-                )
+                # 全局信号量：限制跨请求的同时 LLM 抽取调用数
+                if not _SEG_EXTRACT_SEMAPHORE.acquire(timeout=_SEG_EXTRACT_TIMEOUT_S):
+                    log.warning("segment extract semaphore timeout stype=%s title=%s", seg.stype, seg.title[:40])
+                    return []
+                try:
+                    items = extract_items(
+                        seg.stype, seg.team, seg_title, seg.text,
+                        period_start=period_start, period_end=period_end,
+                        period_label=period_label, channel=ch,
+                    )
+                except Exception:
+                    items = []
+                finally:
+                    _SEG_EXTRACT_SEMAPHORE.release()
+                for it in items:
+                    it["item_stype"] = seg.stype
+                    it["_segment_team"] = seg.owner_hint or seg.team
+                    stamp_segment_digest(it, dig)
+                return items
+
+            if len(to_extract) == 1 or max_workers == 1:
+                items = _extract_seg(to_extract[0])
+                seg, dig = to_extract[0]
                 for it in items:
                     it["item_stype"] = seg.stype
                     it["_segment_team"] = seg.owner_hint or seg.team
                     out.append(stamp_segment_digest(it, dig))
                 extracted_n += 1
             else:
-                def _extract_seg(args: tuple[Any, str]) -> list[dict]:
-                    seg, dig = args
-                    seg_title = f"{title or '数据聚合'} · {seg.title}"[:200]
-                    try:
-                        items = extract_items(
-                            seg.stype, seg.team, seg_title, seg.text,
-                            period_start=period_start, period_end=period_end,
-                            period_label=period_label, channel=ch,
-                        )
-                    except Exception:
-                        items = []
-                    for it in items:
-                        it["item_stype"] = seg.stype
-                        it["_segment_team"] = seg.owner_hint or seg.team
-                        stamp_segment_digest(it, dig)
-                    return items
-
                 with ThreadPoolExecutor(max_workers=max_workers) as pool:
                     futs = {pool.submit(_extract_seg, args): args for args in to_extract}
                     for fut in as_completed(futs):
                         seg, dig = futs[fut]
                         try:
-                            items = fut.result()
+                            # 子任务整体超时：包含排队 + LLM 调用
+                            items = fut.result(timeout=_SEG_EXTRACT_TIMEOUT_S)
                         except Exception:
                             items = []
                         for it in items:
