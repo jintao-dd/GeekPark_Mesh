@@ -1,20 +1,12 @@
 FROM python:3.12-slim
 
-ARG GIT_SHA=unknown
-ARG BUILD_DATE=unknown
-ARG IMAGE_TAG=unknown
-# Pin official CLI for repro; bump deliberately after Adapter 验收
+# Pin official CLI for repro; bump deliberately after Adapter 验收.
+# Keep this ARG next to the layer that uses it — changing it only rebuilds CLI install.
 ARG LARK_CLI_VERSION=1.0.94
 
-LABEL org.opencontainers.image.source="geekpark_mesh" \
-      org.opencontainers.image.revision="${GIT_SHA}" \
-      org.opencontainers.image.created="${BUILD_DATE}" \
-      mesh.image.tag="${IMAGE_TAG}"
-
-ENV MESH_BUILD_GIT_SHA=${GIT_SHA} \
-    MESH_BUILD_DATE=${BUILD_DATE} \
-    MESH_IMAGE_TAG=${IMAGE_TAG} \
-    PYTHONDONTWRITEBYTECODE=1 \
+# Stable runtime knobs only (must NOT include per-build GIT_SHA / BUILD_DATE / IMAGE_TAG,
+# or every ship invalidates pip + node layers).
+ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     LARKSUITE_CLI_BRAND=feishu
 
@@ -41,6 +33,18 @@ COPY app ./app
 COPY eval/emit_repro_baseline.py ./eval/emit_repro_baseline.py
 COPY deploy/docker-entry.sh /docker-entry.sh
 RUN sed -i 's/\r$//' /docker-entry.sh && chmod +x /docker-entry.sh && mkdir -p data/raw eval/reports
+
+# Per-build metadata LAST so code/deps cache stays warm across ships
+ARG GIT_SHA=unknown
+ARG BUILD_DATE=unknown
+ARG IMAGE_TAG=unknown
+LABEL org.opencontainers.image.source="geekpark_mesh" \
+      org.opencontainers.image.revision="${GIT_SHA}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      mesh.image.tag="${IMAGE_TAG}"
+ENV MESH_BUILD_GIT_SHA=${GIT_SHA} \
+    MESH_BUILD_DATE=${BUILD_DATE} \
+    MESH_IMAGE_TAG=${IMAGE_TAG}
 
 EXPOSE 8080
 CMD ["/docker-entry.sh"]
