@@ -50,9 +50,10 @@ def _true_stream_enabled() -> bool:
 
 
 # 混合流：开播门槛 / 续推门槛（字）与最小推送间隔（秒）
-_STREAM_OPEN_CHARS = 120
-_STREAM_STEP_CHARS = 80
-_STREAM_MIN_INTERVAL_S = 0.18
+# 开播门槛不宜过高：短答（<120）从未推送时，若收尾又误判「已同步」会永久停在思考文案。
+_STREAM_OPEN_CHARS = 36
+_STREAM_STEP_CHARS = 60
+_STREAM_MIN_INTERVAL_S = 0.15
 
 # 保证 docker logs 能看到（uvicorn 下未单独配 handler 时也可能丢）
 _uv = logging.getLogger("uvicorn.error")
@@ -260,9 +261,9 @@ def _schedule_stage_ticker(
     """等待中动态轮播阶段文案；优先展示 Supervisor progress，无则按步骤递增。
 
     UX：
-    - spinner ~120ms/帧（假动画，转得要「活」）；
-    - 阶段文案约 1.5s 换一句，避免刷屏；
-    - 约 8s 后降到 ~300ms/帧，控 API；
+    - spinner ~200ms/帧（够活，又不至于打爆飞书 API / 抢答案推送锁）；
+    - 阶段文案约 1.6s 换一句；
+    - 约 8s 后降到 ~400ms/帧；
     - body 未变则跳过飞书调用。
     """
 
@@ -270,12 +271,11 @@ def _schedule_stage_ticker(
         stage_index = 0
         tick = 0
         last_body: str | None = None
-        # 假 loading：转圈要快；阶段文案慢一点换
-        fast_interval = 0.12
-        slow_interval = 0.30
-        fast_cutoff_ticks = 66  # ~8s 后降速
-        stage_step_ticks_fast = 12  # ~1.4s 换一句
-        stage_step_ticks_slow = 7   # ~2.1s 换一句
+        fast_interval = 0.20
+        slow_interval = 0.40
+        fast_cutoff_ticks = 40  # ~8s
+        stage_step_ticks_fast = 8   # ~1.6s 换一句
+        stage_step_ticks_slow = 5   # ~2.0s 换一句
         while not done.wait(fast_interval if tick < fast_cutoff_ticks else slow_interval):
             if done.is_set():
                 return
@@ -345,19 +345,23 @@ def _finalize_cardkit(
     payload: dict[str, Any] | None = None,
     streamed: bool = False,
     streamed_text: str = "",
+    pushed_text: str = "",
 ) -> None:
     """完成回答。
 
-    streamed=True（FEISHU_TRUE_STREAM）：混合流收尾——生成期已大段推过正文，
-    这里只补终稿差异并关 streaming；不整卡换模板、不发新卡。
+    streamed=True（FEISHU_TRUE_STREAM）：混合流收尾——以「飞书上实际推过的正文」为准补齐终稿，
+    再关 streaming；不整卡换模板、不发新卡。
+
+    关键：必须用 pushed_text（真推过的），不能用 streamed_text/final_acc（内存全文）。
+    否则会出现：短答从未开播 → 卡死在思考文案；或末段未推 → 用户看到截断。
     """
     body = (display_text or "").strip() or "这期没捞到可引用的证据。"
 
     if streamed:
-        # 混合流收尾：生成期已大段推过，这里只补终稿差异 + 关 streaming。
-        # 不再从头假流式重播（会像「重复生成」）。
+        on_card = (pushed_text or "").strip()
+        need_push = on_card != body
         try:
-            if (streamed_text or "").strip() != body:
+            if need_push:
                 with card_lock:
                     feishu_api.stream_card_text(
                         card_id=card_id,
@@ -365,17 +369,8 @@ def _finalize_cardkit(
                         content=body,
                         sequence=seq.next(),
                     )
-                time.sleep(min(0.35, feishu_cards.estimate_typewriter_seconds(body)))
-            elif not (streamed_text or "").strip():
-                # 极短答 / 未开播：补一次全文推送
-                with card_lock:
-                    feishu_api.stream_card_text(
-                        card_id=card_id,
-                        element_id=feishu_cards.BODY_ELEMENT_ID,
-                        content=body,
-                        sequence=seq.next(),
-                    )
-                time.sleep(min(0.45, feishu_cards.estimate_typewriter_seconds(body)))
+                # 给客户端一点时间把终稿画完再关 streaming，避免「写到一半被掐断」
+                time.sleep(min(0.55, max(0.2, feishu_cards.estimate_typewriter_seconds(body))))
         except feishu_api.StreamingModeClosedError:
             pass
         except Exception as e:
@@ -610,15 +605,17 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
 
         prog_token = progressmod.set_progress_callback(_on_progress)
 
-        # 混合流上屏：先攒 ~120 字再开播，之后每 ~80 字 / 0.18s 大段续推。
-        # 避免逐 token 顿挫，又不必等全文才看到首字。
+        # 混合流上屏：先攒少量字再开播，之后大段续推。
+        # pushed_text = 飞书卡片上实际推过的正文（收尾必须以它为准，防卡住/截断）。
         stream_state = {
             "lock": threading.Lock(),
             "last_push_at": 0.0,
             "last_len": 0,
             "streamed_any": False,
             "final_acc": "",
+            "pushed_text": "",
             "opened": False,
+            "_answer_cfg": False,
         }
         true_stream_on = _true_stream_enabled() and mode == "cardkit" and bool(card_id)
 
@@ -643,7 +640,7 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                 else:
                     grew = n - st["last_len"]
                     waited = now - st["last_push_at"]
-                    if grew >= _STREAM_STEP_CHARS or (waited >= _STREAM_MIN_INTERVAL_S and grew >= 24):
+                    if grew >= _STREAM_STEP_CHARS or (waited >= _STREAM_MIN_INTERVAL_S and grew >= 20):
                         st["last_push_at"] = now
                         st["last_len"] = n
                         to_push = accumulated
@@ -653,12 +650,28 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                 with card_lock:
                     if done.is_set():
                         return
+                    # 答案首次上屏：切到答案打字机配置（思考卡是瞬上配置）
+                    if not st.get("_answer_cfg"):
+                        st["_answer_cfg"] = True
+                        try:
+                            feishu_api.update_card_settings(
+                                card_id=card_id,
+                                settings={"config": {
+                                    "streaming_mode": True,
+                                    "streaming_config": feishu_cards.streaming_config(),
+                                }},
+                                sequence=seq.next(),
+                            )
+                        except Exception as e:
+                            log.debug("feishu answer streaming_config skip: %s", e)
                     feishu_api.stream_card_text(
                         card_id=card_id,
                         element_id=feishu_cards.BODY_ELEMENT_ID,
                         content=to_push,
                         sequence=seq.next(),
                     )
+                with st["lock"]:
+                    st["pushed_text"] = to_push
             except feishu_api.StreamingModeClosedError:
                 pass
             except Exception as e:
@@ -737,6 +750,7 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                     payload=payload,
                     streamed=bool(stream_state.get("streamed_any")),
                     streamed_text=str(stream_state.get("final_acc") or ""),
+                    pushed_text=str(stream_state.get("pushed_text") or ""),
                 )
             else:
                 receive_id, rid_type = _receive_target(payload)

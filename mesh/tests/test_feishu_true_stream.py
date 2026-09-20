@@ -160,6 +160,7 @@ def test_finalize_cardkit_streamed_does_not_send_new_card(monkeypatch):
         card_lock=threading.Lock(),
         streamed=True,
         streamed_text="最终清洗后的答案。",
+        pushed_text="最终清洗后的答案。",
     )
     kinds = [e[0] for e in events]
     assert "settings" in kinds
@@ -188,10 +189,63 @@ def test_finalize_cardkit_streamed_overwrites_when_final_differs(monkeypatch):
         card_lock=threading.Lock(),
         streamed=True,
         streamed_text="X 已经量产了。",
+        pushed_text="X 已经量产了。",
     )
     stream_events = [e for e in events if e[0] == "stream"]
     assert stream_events, "final differs → must push overwrite"
     assert stream_events[0][1]["content"] == body
+
+
+def test_finalize_pushes_when_never_opened_short_answer(monkeypatch):
+    """短答从未开播：pushed_text 空但 final_acc 有全文 → 必须补推，否则卡死在思考文案。"""
+    from app.agent import feishu_api, feishu_bot
+    import threading
+
+    events = []
+    monkeypatch.setattr(feishu_api, "update_card_settings", lambda **kw: events.append(("settings", kw)))
+    monkeypatch.setattr(feishu_api, "update_card_entity", lambda **kw: events.append(("entity", kw)))
+    monkeypatch.setattr(feishu_api, "stream_card_text", lambda **kw: events.append(("stream", kw)))
+    monkeypatch.setattr(feishu_bot.time, "sleep", lambda *_a, **_k: None)
+
+    body = "可以，我在。"
+    feishu_bot._finalize_cardkit(
+        card_id="c1",
+        seq=feishu_api.CardSeq(1),
+        display_text=body,
+        query="可以了？？？",
+        card_lock=threading.Lock(),
+        streamed=True,
+        streamed_text=body,  # 内存里有全文
+        pushed_text="",      # 飞书上从未推过
+    )
+    stream_events = [e for e in events if e[0] == "stream"]
+    assert stream_events, "never opened → must push full body"
+    assert stream_events[0][1]["content"] == body
+
+
+def test_finalize_pushes_when_last_chunk_truncated(monkeypatch):
+    """末段未推：final_acc==body 但 pushed 更短 → 必须补推，否则用户看到截断。"""
+    from app.agent import feishu_api, feishu_bot
+    import threading
+
+    events = []
+    monkeypatch.setattr(feishu_api, "update_card_settings", lambda **kw: events.append(("settings", kw)))
+    monkeypatch.setattr(feishu_api, "stream_card_text", lambda **kw: events.append(("stream", kw)))
+    monkeypatch.setattr(feishu_bot.time, "sleep", lambda *_a, **_k: None)
+
+    body = "完整答案一共有很多字，最后一段容易丢。后面还有更多内容不会被提前截断才对。"
+    feishu_bot._finalize_cardkit(
+        card_id="c1",
+        seq=feishu_api.CardSeq(1),
+        display_text=body,
+        query="问",
+        card_lock=threading.Lock(),
+        streamed=True,
+        streamed_text=body,
+        pushed_text=body[:12],
+    )
+    stream_events = [e for e in events if e[0] == "stream"]
+    assert stream_events and stream_events[0][1]["content"] == body
 
 
 def test_true_stream_flag(monkeypatch):
