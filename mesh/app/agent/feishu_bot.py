@@ -245,6 +245,7 @@ def _schedule_stage_ticker(
     card_id: str = "",
     seq: feishu_api.CardSeq | None = None,
     progress_holder: list[str] | None = None,
+    answer_started: threading.Event | None = None,
 ) -> None:
     """等待中动态轮播阶段文案；优先展示 Supervisor progress，无则按步骤递增。
 
@@ -266,6 +267,9 @@ def _schedule_stage_ticker(
         stage_step_ticks_slow = 1
         while not done.wait(fast_interval if tick < fast_cutoff_ticks else slow_interval):
             if done.is_set():
+                return
+            # 答案已开始真流式：让出 mesh_body，别再写进度覆盖答案
+            if answer_started is not None and answer_started.is_set():
                 return
             prog = list(progress_holder or [])
             body = feishu_cards.stage_copy(
@@ -337,9 +341,9 @@ def _finalize_cardkit(
     能让用户看到完整的处理过程；新答案卡片会触发通知。
 
     方案 B 真流式（streamed=True）：内容已逐字打字机推到本卡 body。
-    此时不再发新卡（会重复内容），改为在本卡上：
-      1) 若清洗后终稿与已推文本不一致 → stream_card_text 覆盖成终稿；
-      2) 关闭 streaming + 换绿模板 + 追加 followup（整卡 update）。
+    此时不再发新卡、也不整卡换模板（避免每次回答都整卡重绘/闪动）：
+      1) 若清洗后终稿与已推文本不一致 → stream_card_text 覆盖成终稿（合规兜底）；
+      2) 只关 streaming 让打字机定格；卡片外壳保持原样，不 update_card_entity。
     """
     body = (display_text or "").strip() or "这期没捞到可引用的证据。"
 
@@ -358,7 +362,7 @@ def _finalize_cardkit(
             pass
         except Exception as e:
             log.warning("feishu true-stream final overwrite skip: %s", e)
-        # 2) 关闭 streaming 并把整卡转正（绿模板 + followup）
+        # 2) 只关 streaming 让打字机定格；不整卡换模板（这是每次闪动的根因）
         try:
             with card_lock:
                 feishu_api.update_card_settings(
@@ -369,12 +373,6 @@ def _finalize_cardkit(
                 )
         except Exception as e:
             log.warning("feishu true-stream close streaming skip: %s", e)
-        try:
-            final = feishu_cards.answer_card_v2(display_text=body, query=query, streaming=False)
-            with card_lock:
-                feishu_api.update_card_entity(card_id=card_id, card=final, sequence=seq.next())
-        except Exception as e:
-            log.warning("feishu true-stream finalize card skip: %s", e)
         return
 
     # ===== 非流式（原逻辑）：发一张全新答案卡触发通知 =====
@@ -507,6 +505,8 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                 card_id,
                 timings["thinking_ms"],
             )
+            # 真流式：答案首个 chunk 到达后置位，通知进度 ticker/刷新让出 mesh_body
+            answer_started = threading.Event()
             _schedule_stage_ticker(
                 mode=mode,
                 query=query,
@@ -516,10 +516,12 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                 card_id=card_id,
                 seq=seq if mode == "cardkit" else None,
                 progress_holder=progress_holder,
+                answer_started=answer_started,
             )
         else:
             log.warning("feishu bot reply disabled; skip outbound")
             _elog("bot reply disabled; skip outbound")
+            answer_started = threading.Event()
 
         # progress 节流：合并高频 label，最多 1 秒刷新一次卡片
         _progress_state = {
@@ -535,6 +537,9 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                 labels = list(st["pending_labels"])
                 st["pending_labels"].clear()
             if not labels or done.is_set() or not feishu_api.bot_reply_enabled():
+                return
+            # 答案已开始真流式：不再写进度，避免覆盖答案
+            if answer_started.is_set():
                 return
             # 避免重复 label 追加
             for s in labels:
@@ -602,6 +607,9 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
         def _on_answer_delta(delta: str, accumulated: str) -> None:
             if not true_stream_on or done.is_set():
                 return
+            # 首个 chunk：通知进度侧让出 mesh_body
+            if not answer_started.is_set():
+                answer_started.set()
             st = stream_state
             now = time.time()
             with st["lock"]:

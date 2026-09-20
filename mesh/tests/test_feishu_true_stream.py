@@ -111,9 +111,9 @@ def test_finalize_cardkit_streamed_does_not_send_new_card(monkeypatch):
         streamed_text="最终清洗后的答案。",
     )
     kinds = [e[0] for e in events]
-    # 终稿==已推 → 不额外 stream 覆盖；但要关 streaming + 整卡转正
+    # 终稿==已推 → 不额外 stream 覆盖；只关 streaming 定格，不整卡换模板（避免闪动）
     assert "settings" in kinds
-    assert "entity" in kinds
+    assert "entity" not in kinds, "streamed finalize must NOT整卡换模板（会闪）"
 
 
 def test_finalize_cardkit_streamed_overwrites_when_final_differs(monkeypatch):
