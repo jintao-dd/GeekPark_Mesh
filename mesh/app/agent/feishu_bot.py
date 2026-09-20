@@ -40,13 +40,19 @@ log = logging.getLogger("mesh.feishu_bot")
 
 
 def _true_stream_enabled() -> bool:
-    """假流式上屏开关（环境变量名沿用 FEISHU_TRUE_STREAM）。
+    """飞书答案上屏开关（FEISHU_TRUE_STREAM）。
 
-    开启后：mouth 生成期间不把碎 chunk 推飞书；全文齐了再按前缀匀速播一遍
-    （观感接近以前的假流式）。默认关。
+    开启后用「缓冲混合流」：先攒约 120 字再开播，之后按大段续推；
+    兼顾首字速度与匀速观感。默认关。
     """
     flag = (os.environ.get("FEISHU_TRUE_STREAM") or "0").strip().lower()
     return flag in ("1", "true", "yes", "on")
+
+
+# 混合流：开播门槛 / 续推门槛（字）与最小推送间隔（秒）
+_STREAM_OPEN_CHARS = 120
+_STREAM_STEP_CHARS = 80
+_STREAM_MIN_INTERVAL_S = 0.18
 
 # 保证 docker logs 能看到（uvicorn 下未单独配 handler 时也可能丢）
 _uv = logging.getLogger("uvicorn.error")
@@ -341,40 +347,16 @@ def _finalize_cardkit(
 ) -> None:
     """完成回答。
 
-    streamed=True（FEISHU_TRUE_STREAM）：假流式上屏——全文齐了之后，
-    按前缀匀速推送到思考卡，让飞书打字机按固定节奏播一遍（观感像以前的假流式）。
-    不整卡换模板、不发新卡，避免闪动。
+    streamed=True（FEISHU_TRUE_STREAM）：混合流收尾——生成期已大段推过正文，
+    这里只补终稿差异并关 streaming；不整卡换模板、不发新卡。
     """
     body = (display_text or "").strip() or "这期没捞到可引用的证据。"
 
     if streamed:
-        # 假流式上屏：一次推全文（或递增前缀），交给飞书匀速打字机
+        # 混合流收尾：生成期已大段推过，这里只补终稿差异 + 关 streaming。
+        # 不再从头假流式重播（会像「重复生成」）。
         try:
-            prefixes = feishu_cards.fake_stream_prefixes(body, min_chunk=80)
-            # 前缀不宜太多，否则 PUT 往返反而卡；最多 8 段 + 终稿
-            if len(prefixes) > 8:
-                step = max(1, len(prefixes) // 7)
-                prefixes = prefixes[step - 1 :: step]
-                if prefixes[-1] != body:
-                    prefixes.append(body)
-            for i, prefix in enumerate(prefixes):
-                with card_lock:
-                    feishu_api.stream_card_text(
-                        card_id=card_id,
-                        element_id=feishu_cards.BODY_ELEMENT_ID,
-                        content=prefix,
-                        sequence=seq.next(),
-                    )
-                # 段间短暂停顿，让客户端打字机跟得上（最后一段不再睡）
-                if i < len(prefixes) - 1:
-                    time.sleep(0.08)
-            # 给飞书留一点打字机播完的时间（有上限，避免长答干等）
-            time.sleep(min(0.6, feishu_cards.estimate_typewriter_seconds(body)))
-        except feishu_api.StreamingModeClosedError:
-            pass
-        except Exception as e:
-            log.warning("feishu fake-stream playback skip: %s", e)
-            try:
+            if (streamed_text or "").strip() != body:
                 with card_lock:
                     feishu_api.stream_card_text(
                         card_id=card_id,
@@ -382,9 +364,21 @@ def _finalize_cardkit(
                         content=body,
                         sequence=seq.next(),
                     )
-            except Exception:
-                pass
-        # 关 streaming 定格；不整卡换模板
+                time.sleep(min(0.35, feishu_cards.estimate_typewriter_seconds(body)))
+            elif not (streamed_text or "").strip():
+                # 极短答 / 未开播：补一次全文推送
+                with card_lock:
+                    feishu_api.stream_card_text(
+                        card_id=card_id,
+                        element_id=feishu_cards.BODY_ELEMENT_ID,
+                        content=body,
+                        sequence=seq.next(),
+                    )
+                time.sleep(min(0.45, feishu_cards.estimate_typewriter_seconds(body)))
+        except feishu_api.StreamingModeClosedError:
+            pass
+        except Exception as e:
+            log.warning("feishu hybrid-stream final push skip: %s", e)
         try:
             with card_lock:
                 feishu_api.update_card_settings(
@@ -615,42 +609,59 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
 
         prog_token = progressmod.set_progress_callback(_on_progress)
 
-        # 假流式上屏：生成过程中不逐 chunk 推飞书（那是顿挫根因）。
-        # 只在 mouth 开始时停下进度文案；全文齐了再在 finalize 里匀速播一遍。
+        # 混合流上屏：先攒 ~120 字再开播，之后每 ~80 字 / 0.18s 大段续推。
+        # 避免逐 token 顿挫，又不必等全文才看到首字。
         stream_state = {
             "lock": threading.Lock(),
             "last_push_at": 0.0,
             "last_len": 0,
             "streamed_any": False,
             "final_acc": "",
-            "mouth_hint_sent": False,
+            "opened": False,
         }
         true_stream_on = _true_stream_enabled() and mode == "cardkit" and bool(card_id)
 
         def _on_answer_delta(delta: str, accumulated: str) -> None:
             if not true_stream_on or done.is_set():
                 return
-            st = stream_state
-            with st["lock"]:
-                st["final_acc"] = accumulated
-                st["streamed_any"] = True  # 标记走假流式 finalize，不发新卡
-            # 首个 chunk：停进度 + 提示「正在写」，不把碎字推上卡
             if not answer_started.is_set():
                 answer_started.set()
-                if not st["mouth_hint_sent"]:
-                    st["mouth_hint_sent"] = True
-                    try:
-                        with card_lock:
-                            if done.is_set():
-                                return
-                            feishu_api.stream_card_text(
-                                card_id=card_id,
-                                element_id=feishu_cards.BODY_ELEMENT_ID,
-                                content="正在组织答复…",
-                                sequence=seq.next(),
-                            )
-                    except Exception:
-                        pass
+            st = stream_state
+            now = time.time()
+            to_push: str | None = None
+            with st["lock"]:
+                st["final_acc"] = accumulated
+                st["streamed_any"] = True
+                n = len(accumulated)
+                if not st["opened"]:
+                    if n >= _STREAM_OPEN_CHARS:
+                        st["opened"] = True
+                        st["last_push_at"] = now
+                        st["last_len"] = n
+                        to_push = accumulated
+                else:
+                    grew = n - st["last_len"]
+                    waited = now - st["last_push_at"]
+                    if grew >= _STREAM_STEP_CHARS or (waited >= _STREAM_MIN_INTERVAL_S and grew >= 24):
+                        st["last_push_at"] = now
+                        st["last_len"] = n
+                        to_push = accumulated
+            if not to_push:
+                return
+            try:
+                with card_lock:
+                    if done.is_set():
+                        return
+                    feishu_api.stream_card_text(
+                        card_id=card_id,
+                        element_id=feishu_cards.BODY_ELEMENT_ID,
+                        content=to_push,
+                        sequence=seq.next(),
+                    )
+            except feishu_api.StreamingModeClosedError:
+                pass
+            except Exception as e:
+                log.debug("feishu hybrid-stream delta push skip: %s", e)
 
         astream_mod = None
         if true_stream_on:

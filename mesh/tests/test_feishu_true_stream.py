@@ -148,10 +148,10 @@ def test_finalize_cardkit_streamed_does_not_send_new_card(monkeypatch):
 
     monkeypatch.setattr(feishu_api, "create_card_entity", _should_not_call)
     monkeypatch.setattr(feishu_api, "send_card_entity", _should_not_call)
-    # 假流式 playback 里的 sleep 加速
     monkeypatch.setattr(feishu_bot.time, "sleep", lambda *_a, **_k: None)
 
     import threading
+    # 生成期已推过相同正文 → finalize 只关 streaming，不再重播
     feishu_bot._finalize_cardkit(
         card_id="c1",
         seq=feishu_api.CardSeq(1),
@@ -159,13 +159,12 @@ def test_finalize_cardkit_streamed_does_not_send_new_card(monkeypatch):
         query="随便问",
         card_lock=threading.Lock(),
         streamed=True,
-        streamed_text="",
+        streamed_text="最终清洗后的答案。",
     )
     kinds = [e[0] for e in events]
-    # 假流式上屏：至少一次 stream 推正文 + 关 streaming；不整卡换模板
-    assert "stream" in kinds
     assert "settings" in kinds
     assert "entity" not in kinds, "streamed finalize must NOT整卡换模板（会闪）"
+    assert "stream" not in kinds, "same text already on card → no replay"
 
 
 def test_finalize_cardkit_streamed_overwrites_when_final_differs(monkeypatch):
@@ -191,8 +190,8 @@ def test_finalize_cardkit_streamed_overwrites_when_final_differs(monkeypatch):
         streamed_text="X 已经量产了。",
     )
     stream_events = [e for e in events if e[0] == "stream"]
-    assert stream_events, "fake-stream playback must push body"
-    assert any(e[1]["content"] == body or body in str(e[1].get("content") or "") for e in stream_events)
+    assert stream_events, "final differs → must push overwrite"
+    assert stream_events[0][1]["content"] == body
 
 
 def test_true_stream_flag(monkeypatch):
