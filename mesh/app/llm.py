@@ -210,6 +210,39 @@ def call(
             )
             return cached.get("content") or ""
 
+    # 方案 B 端到端真流式：仅 answer 任务、非 json、有活跃回调、provider 支持 stream 时启用。
+    # 逐 chunk 推给飞书打字机；同时把全文攒起来返回，后续清洗/证据校验照常在全文上做。
+    if (
+        not json_mode
+        and task == "answer"
+        and hasattr(provider, "stream")
+    ):
+        try:
+            from .agent import answer_stream
+        except Exception:
+            answer_stream = None
+        if answer_stream is not None and answer_stream.stream_active():
+            t0 = time.monotonic()
+            acc: list[str] = []
+            try:
+                for chunk in provider.stream(system, user, max_tokens=max_tokens, task=task):
+                    if not chunk:
+                        continue
+                    acc.append(chunk)
+                    answer_stream.emit_delta(chunk, "".join(acc))
+                text = "".join(acc)
+            finally:
+                elapsed_ms = int((time.monotonic() - t0) * 1000)
+                logging.getLogger("uvicorn.error").info(
+                    "llm.call stream task=%s model=%s elapsed_ms=%s prompt_chars=%s max_tokens=%s chars=%s",
+                    task, model, elapsed_ms, len(system) + len(user), max_tokens, len(text),
+                )
+            # 流式路径不写缓存（usage 无法从 stream 精确获取；保持与缓存 key 语义一致由非流式负责）
+            if text:
+                return text
+            # 流式空结果 → 落回非流式重试一次
+            log.warning("llm.call stream empty; fallback to non-stream")
+
     for attempt in range(2 if json_mode else 1):
         t0 = time.monotonic()
         try:

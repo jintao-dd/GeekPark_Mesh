@@ -37,6 +37,13 @@ def _get_feishu_job_pool() -> ThreadPoolExecutor:
     return _FEISHU_JOB_POOL
 
 log = logging.getLogger("mesh.feishu_bot")
+
+
+def _true_stream_enabled() -> bool:
+    """方案 B 端到端真流式开关。默认关；tmesh 灰度用 FEISHU_TRUE_STREAM=1 打开。"""
+    flag = (os.environ.get("FEISHU_TRUE_STREAM") or "0").strip().lower()
+    return flag in ("1", "true", "yes", "on")
+
 # 保证 docker logs 能看到（uvicorn 下未单独配 handler 时也可能丢）
 _uv = logging.getLogger("uvicorn.error")
 
@@ -321,14 +328,56 @@ def _finalize_cardkit(
     card_lock: threading.Lock,
     message_id: str = "",
     payload: dict[str, Any] | None = None,
+    streamed: bool = False,
+    streamed_text: str = "",
 ) -> None:
     """完成回答：关闭流式状态，然后作为新消息发送一张答案卡片。
 
     不撤回思考卡片——飞书撤回本身也会触发提示，且保留 spinner 卡片
     能让用户看到完整的处理过程；新答案卡片会触发通知。
+
+    方案 B 真流式（streamed=True）：内容已逐字打字机推到本卡 body。
+    此时不再发新卡（会重复内容），改为在本卡上：
+      1) 若清洗后终稿与已推文本不一致 → stream_card_text 覆盖成终稿；
+      2) 关闭 streaming + 换绿模板 + 追加 followup（整卡 update）。
     """
     body = (display_text or "").strip() or "这期没捞到可引用的证据。"
 
+    if streamed:
+        # 1) 终稿 vs 已推文本：不一致则把 body 覆盖为终稿（合规兜底，用户最终看到清洗版）
+        try:
+            if (streamed_text or "").strip() != body:
+                with card_lock:
+                    feishu_api.stream_card_text(
+                        card_id=card_id,
+                        element_id=feishu_cards.BODY_ELEMENT_ID,
+                        content=body,
+                        sequence=seq.next(),
+                    )
+        except feishu_api.StreamingModeClosedError:
+            pass
+        except Exception as e:
+            log.warning("feishu true-stream final overwrite skip: %s", e)
+        # 2) 关闭 streaming 并把整卡转正（绿模板 + followup）
+        try:
+            with card_lock:
+                feishu_api.update_card_settings(
+                    card_id=card_id,
+                    settings={"config": {"streaming_mode": False,
+                                          "summary": {"content": body.strip()[:36] or "Mesh"}}},
+                    sequence=seq.next(),
+                )
+        except Exception as e:
+            log.warning("feishu true-stream close streaming skip: %s", e)
+        try:
+            final = feishu_cards.answer_card_v2(display_text=body, query=query, streaming=False)
+            with card_lock:
+                feishu_api.update_card_entity(card_id=card_id, card=final, sequence=seq.next())
+        except Exception as e:
+            log.warning("feishu true-stream finalize card skip: %s", e)
+        return
+
+    # ===== 非流式（原逻辑）：发一张全新答案卡触发通知 =====
     # 1) 先关闭 streaming（避免后续操作命中 300309）
     with card_lock:
         try:
@@ -538,6 +587,56 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
         from .supervisor import progress as progressmod
 
         prog_token = progressmod.set_progress_callback(_on_progress)
+
+        # 方案 B 端到端真流式：把 answer 的 LLM chunk 实时打字机推到思考卡 body。
+        # 仅 cardkit 模式 + 开关开启时启用。末尾仍做全文清洗 + 差异覆盖兜底。
+        stream_state = {
+            "lock": threading.Lock(),
+            "last_push_at": 0.0,
+            "last_len": 0,
+            "streamed_any": False,
+            "final_acc": "",
+        }
+        true_stream_on = _true_stream_enabled() and mode == "cardkit" and bool(card_id)
+
+        def _on_answer_delta(delta: str, accumulated: str) -> None:
+            if not true_stream_on or done.is_set():
+                return
+            st = stream_state
+            now = time.time()
+            with st["lock"]:
+                st["final_acc"] = accumulated
+                # 节流：至少 0.28s 或新增 ≥16 字才推一次，避免高频 PUT 被限流
+                if (now - st["last_push_at"] < 0.28) and (len(accumulated) - st["last_len"] < 16):
+                    return
+                st["last_push_at"] = now
+                st["last_len"] = len(accumulated)
+                body = accumulated
+            try:
+                with card_lock:
+                    if done.is_set():
+                        return
+                    feishu_api.stream_card_text(
+                        card_id=card_id,
+                        element_id=feishu_cards.BODY_ELEMENT_ID,
+                        content=body,
+                        sequence=seq.next(),
+                    )
+                    st["streamed_any"] = True
+            except feishu_api.StreamingModeClosedError:
+                pass
+            except Exception as e:
+                log.debug("feishu true-stream delta push skip: %s", e)
+
+        astream_mod = None
+        if true_stream_on:
+            try:
+                from . import answer_stream as astream_mod
+                astream_mod.set_delta_callback(_on_answer_delta)
+            except Exception as e:
+                log.warning("feishu true-stream setup failed: %s", e)
+                astream_mod = None
+
         t_agent = time.time()
         con = db.connect()
         try:
@@ -548,6 +647,8 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
         finally:
             con.close()
             progressmod.reset_progress_callback(prog_token)
+            if astream_mod is not None:
+                astream_mod.reset_delta_callback()
         timings["agent_ms"] = int((time.time() - t_agent) * 1000)
 
         tr = d.get("trace") if isinstance(d.get("trace"), dict) else {}
@@ -598,6 +699,8 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                     card_lock=card_lock,
                     message_id=card_message_id,
                     payload=payload,
+                    streamed=bool(stream_state.get("streamed_any")),
+                    streamed_text=str(stream_state.get("final_acc") or ""),
                 )
             else:
                 receive_id, rid_type = _receive_target(payload)
