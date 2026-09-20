@@ -284,6 +284,9 @@ class OpenAICompatProvider(Provider):
                     "chunk_count": chunk_count,
                     "chunk_timestamps": chunk_timestamps,
                     "chunk_content_len": chunk_content_len,
+                    "elapsed_ms": elapsed_ms,
+                    "first_byte_ms": first_byte_ms,
+                    "first_token_ms": first_token_ms,
                 },
                 "request_payload": req,
             }
