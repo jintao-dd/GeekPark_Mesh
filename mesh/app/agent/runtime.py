@@ -5,6 +5,7 @@ Session Context 只消解指代；事实必须重新 Retrieval / Evidence。
 from __future__ import annotations
 
 import os
+import threading
 from typing import Any
 
 from . import context as ctxmod
@@ -37,6 +38,33 @@ _REFUSE_CAPABILITY = (
     "这个我做不了——我只能查已上线周报，不能改权限、发布或写回数据。"
     "权限相关请找管理员；内容问题可以直接问我人和事。"
 )
+
+# 会话级整轮互斥：session 是「读-改-写」模式（load → 业务改 → save），
+# 同群两条消息并发会互相覆盖 active_entities / active_issue / pending_write。
+# 用进程内 keyed lock 串行化同一会话的整轮；跨进程/多副本场景仍由共享 KV 兜底
+# （见 session_state.save：始终以 KV 为真相源）。
+_SESSION_TURN_LOCKS: dict[str, threading.Lock] = {}
+_SESSION_TURN_LOCKS_GUARD = threading.Lock()
+_SESSION_TURN_LOCKS_MAX = 2048
+
+
+def _session_turn_lock(key: str) -> threading.Lock:
+    k = str(key or "anon")
+    with _SESSION_TURN_LOCKS_GUARD:
+        lk = _SESSION_TURN_LOCKS.get(k)
+        if lk is None:
+            if len(_SESSION_TURN_LOCKS) >= _SESSION_TURN_LOCKS_MAX:
+                # 只清理当前未被持有的锁，避免误清正在用的
+                for kk in list(_SESSION_TURN_LOCKS.keys()):
+                    cand = _SESSION_TURN_LOCKS[kk]
+                    if not cand.locked():
+                        _SESSION_TURN_LOCKS.pop(kk, None)
+                    if len(_SESSION_TURN_LOCKS) < _SESSION_TURN_LOCKS_MAX:
+                        break
+            lk = threading.Lock()
+            _SESSION_TURN_LOCKS[k] = lk
+        return lk
+
 
 
 def colleague_v3_enabled() -> bool:
@@ -108,6 +136,29 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
 
     pr.sanitize_session_people(session)
 
+    # 同一会话整轮串行（load → 业务 → save），避免同群并发互相覆盖状态。
+    with _session_turn_lock(sk):
+        return _handle_message_locked(
+            con,
+            envelope=envelope,
+            identity=identity,
+            permission=permission,
+            context=context,
+            session=session,
+            sk=sk,
+        )
+
+
+def _handle_message_locked(
+    con,
+    *,
+    envelope: AgentEnvelope,
+    identity: Any,
+    permission: Any,
+    context: Any,
+    session: Any,
+    sk: str,
+) -> AgentAnswer:
     base_kwargs: dict[str, Any] = {
         "identity": identity.to_dict(),
         "permission": permission.to_dict(),

@@ -308,6 +308,43 @@ def _startup():
 
     threading.Thread(target=_bg_repro_selfcheck, daemon=True, name="mesh-repro").start()
 
+    # 通讯录后台预热：避免首个飞书请求在请求路径上同步跑全量部门 walk
+    try:
+        from .agent.feishu_hands import org_directory
+
+        org_directory.start_refresh_thread()
+    except Exception as e:
+        print(f"[mesh] org directory prewarm skipped: {e}", flush=True)
+
+    # PG 全文检索 trigram 索引（后台建，避免阻塞启动；无权限则跳过）
+    def _bg_pg_trgm():
+        try:
+            from . import db as _db
+
+            con = _db.connect()
+            try:
+                _db.ensure_pg_trgm_indexes(con)
+            finally:
+                con.close()
+        except Exception as e:
+            print(f"[mesh] pg_trgm index skipped: {e}", flush=True)
+
+    threading.Thread(target=_bg_pg_trgm, daemon=True, name="mesh-pg-trgm").start()
+
+    # KV 表过期回收（session_kv.purge_expired 此前无调用点，表只增不减）
+    def _bg_kv_purge():
+        from .agent import session_kv, session_state
+
+        while True:
+            try:
+                session_kv.purge_expired("session", int(session_state._TTL_SEC))
+                session_kv.purge_expired("pending", int(session_state._PENDING_TTL_SEC))
+            except Exception as e:
+                print(f"[mesh] kv purge failed: {e}", flush=True)
+            time.sleep(6 * 3600)
+
+    threading.Thread(target=_bg_kv_purge, daemon=True, name="mesh-kv-purge").start()
+
 
 @app.get("/api/repro/status")
 def repro_status(request: Request):
@@ -977,7 +1014,8 @@ async def api_feishu_bot_event(request: Request):
     - im.message：立刻 accepted，后台发「思考中」卡片 → Agent → Patch 最终回答
     """
     try:
-        body = await request.json()
+        raw_bytes = await request.body()
+        body = json.loads(raw_bytes.decode("utf-8")) if raw_bytes else {}
     except Exception:
         raise HTTPException(400, "invalid json")
     from .agent.feishu_bot import handle_feishu_event
@@ -990,7 +1028,7 @@ async def api_feishu_bot_event(request: Request):
         bool(raw.get("encrypt")),
         raw.get("type") or (raw.get("header") or {}).get("event_type"),
     )
-    out = handle_feishu_event(None, raw)
+    out = handle_feishu_event(None, raw, headers=request.headers, raw_body=raw_bytes)
     logging.getLogger("uvicorn.error").info(
         "[feishu_bot] outbound ok=%s challenge=%s accepted=%s skipped=%s reason=%s error=%s",
         out.get("ok"),
@@ -1002,6 +1040,8 @@ async def api_feishu_bot_event(request: Request):
     )
     if out.get("error") == "bad_verification_token":
         raise HTTPException(403, "bad_verification_token")
+    if out.get("error") == "bad_signature":
+        raise HTTPException(403, "bad_signature")
     if out.get("error") == "decrypt_failed":
         raise HTTPException(400, "decrypt_failed")
     if "challenge" in out:

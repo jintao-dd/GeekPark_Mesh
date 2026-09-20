@@ -7,6 +7,7 @@ import datetime
 import json, re, threading, time, logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from typing import Any
 from .providers import get_provider, LLMError
 from . import llm_cache
 

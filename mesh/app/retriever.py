@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-
+import contextvars
 
 import datetime
 
@@ -17,6 +17,11 @@ from . import embeddings, item_facts, qa_structured, search
 from .ranking_quality import apply_ranking_v1_4
 
 from .ask_scope import AskScope
+
+# 请求内 chunk owner_team 预取缓存（按 issue_slug），避免逐条命中 N+1 查询
+_ENRICH_TEAM_CACHE: contextvars.ContextVar[dict] = contextvars.ContextVar(
+    "retriever_enrich_team", default=None
+)
 
 from .owner_guard import parse_section_team
 
@@ -91,32 +96,40 @@ def _enrich_owner_team(con, h: dict) -> dict:
         return h
 
     slug = h.get("issue_slug") or ""
-
     if slug and (sec or title):
-
         try:
-
-            row = con.execute(
-
-                """SELECT owner_team FROM chunk_index
-
-                   WHERE issue_slug=? AND section=? AND title=? AND owner_team IS NOT NULL
-
-                     AND owner_team != '' LIMIT 1""",
-
-                (slug, sec, title),
-
-            ).fetchone()
-
-            if row and row["owner_team"]:
-
-                h["owner_team"] = row["owner_team"]
-
+            row = _chunk_owner_lookup(con, slug, sec, title)
+            if row:
+                h["owner_team"] = row
         except Exception:
-
             pass
-
     return h
+
+
+def _chunk_owner_lookup(con, slug: str, sec: str, title: str) -> str:
+    """按 (slug, section, title) 查 owner_team。
+
+    一次批量预取整个 issue 的映射，避免逐条命中各查一次 DB（N+1）。
+    """
+    key = (slug, sec, title)
+    cache = _ENRICH_TEAM_CACHE.get()
+    if cache is None:
+        cache = {}
+        _ENRICH_TEAM_CACHE.set(cache)
+    if slug not in cache:
+        m: dict[tuple[str, str, str], str] = {}
+        try:
+            rows = con.execute(
+                """SELECT section, title, owner_team FROM chunk_index
+                   WHERE issue_slug=? AND owner_team IS NOT NULL AND owner_team != ''""",
+                (slug,),
+            ).fetchall()
+            for r in rows:
+                m[(str(r["section"] or ""), str(r["title"] or ""))] = str(r["owner_team"])
+        except Exception:
+            m = {}
+        cache[slug] = m
+    return cache[slug].get((sec, title), "")
 
 
 

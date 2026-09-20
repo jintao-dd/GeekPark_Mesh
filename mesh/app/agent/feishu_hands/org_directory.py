@@ -26,6 +26,9 @@ log = logging.getLogger("mesh.feishu_hands.org")
 _LOCK = threading.Lock()
 _CACHE: dict[str, Any] = {"at": 0.0, "people": [], "departments": []}
 _TTL_SEC = 15 * 60
+_REFRESHING = False  # singleflight 标记
+_REFRESH_WAIT_S = 20.0  # 等待他人刷新 walk 的最长时间
+_REFRESH_THREAD_STARTED = False
 
 
 def _children(native_mod: Any, dept_id: str) -> list[dict[str, Any]]:
@@ -143,6 +146,12 @@ def directory_signature() -> str:
 
 
 def load_directory(*, force: bool = False) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """读通讯录全量（15min 进程内缓存）。
+
+    并发保护：缓存过期时若多个 job worker 同时命中，历史实现会各自跑一次
+    全量 BFS walk（惊群）。这里用 singleflight：同一时刻只允许一次 walk，
+    其余线程等待复用同一份结果。
+    """
     now = time.time()
     with _LOCK:
         if (
@@ -152,15 +161,78 @@ def load_directory(*, force: bool = False) -> tuple[list[dict[str, Any]], list[d
             and now - float(_CACHE["at"]) < _TTL_SEC
         ):
             return list(_CACHE["departments"]), list(_CACHE["people"])
-    from . import native as native_mod
 
-    departments, people = _walk(native_mod)
+    # singleflight：只让第一个进入的线程真正 walk，其余等待复用结果
+    global _REFRESHING
     with _LOCK:
-        _CACHE["at"] = time.time()
-        _CACHE["departments"] = list(departments)
-        _CACHE["people"] = list(people)
-    log.info("org directory loaded depts=%s people=%s", len(departments), len(people))
-    return departments, people
+        if _REFRESHING:
+            is_owner = False
+        else:
+            _REFRESHING = True
+            is_owner = True
+    if not is_owner:
+        # 等待进行中的刷新（有上限）；期间若缓存已刷新则直接返回
+        deadline = time.time() + _REFRESH_WAIT_S
+        while time.time() < deadline:
+            time.sleep(0.05)
+            with _LOCK:
+                fresh = (
+                    _CACHE["people"]
+                    and _CACHE["at"]
+                    and time.time() - float(_CACHE["at"]) < _TTL_SEC
+                )
+                if fresh:
+                    return list(_CACHE["departments"]), list(_CACHE["people"])
+                if not _REFRESHING:
+                    break
+        with _LOCK:
+            if _REFRESHING:
+                # 他人仍在刷新：先用旧缓存降级，避免重复全量 walk
+                return list(_CACHE["departments"]), list(_CACHE["people"])
+            _REFRESHING = True
+
+    try:
+        from . import native as native_mod
+
+        departments, people = _walk(native_mod)
+        with _LOCK:
+            # 失败/空结果不覆盖已有好数据（避免坏数据被缓存 15min）
+            if people:
+                _CACHE["at"] = time.time()
+                _CACHE["departments"] = list(departments)
+                _CACHE["people"] = list(people)
+            elif not _CACHE["people"]:
+                _CACHE["at"] = time.time()
+                _CACHE["departments"] = list(departments)
+                _CACHE["people"] = list(people)
+            else:
+                log.warning("org directory walk empty; keep previous cache")
+            departments = list(_CACHE["departments"])
+            people = list(_CACHE["people"])
+        log.info("org directory loaded depts=%s people=%s", len(departments), len(people))
+        return departments, people
+    finally:
+        with _LOCK:
+            _REFRESHING = False
+
+
+def start_refresh_thread() -> None:
+    """后台预热通讯录（避免首个请求在请求路径上同步跑全量 walk）。"""
+    global _REFRESH_THREAD_STARTED
+    with _LOCK:
+        if _REFRESH_THREAD_STARTED:
+            return
+        _REFRESH_THREAD_STARTED = True
+
+    def _loop() -> None:
+        while True:
+            try:
+                load_directory()
+            except Exception as e:
+                log.warning("org directory refresh failed: %s", e)
+            time.sleep(max(60.0, _TTL_SEC * 0.6))
+
+    threading.Thread(target=_loop, name="mesh-org-refresh", daemon=True).start()
 
 
 def _descendants(

@@ -8,6 +8,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 import base64
 import hashlib
+import hmac
 import json
 import logging
 import os
@@ -106,18 +107,65 @@ def decrypt_feishu_encrypt(encrypt_b64: str, encrypt_key: str | None = None) -> 
 
 
 def unwrap_feishu_body(body: dict[str, Any]) -> dict[str, Any]:
-    """若推送为 Encrypt Key 密文包，则解密为业务 JSON。"""
+    """若推送为 Encrypt Key 密文包，则解密为业务 JSON。
+
+    安全：只要带 `encrypt` 就**必须**解密。历史实现会在包里同时出现
+    `event`/`header`/`challenge` 时直接当明文放行，攻击者只要在密文包里
+    额外塞一个 `event` 键即可绕过解密与后续校验，故这里一律解密。
+    """
     body = body or {}
     enc = body.get("encrypt")
     if not enc:
-        return body
-    if body.get("event") or body.get("header") or body.get("type") == "url_verification" or "challenge" in body:
         return body
     raw = decrypt_feishu_encrypt(str(enc))
     obj = json.loads(raw)
     if not isinstance(obj, dict):
         raise ValueError("decrypted feishu body is not object")
     return obj
+
+
+def verify_feishu_signature(
+    headers: Any,
+    raw_body: bytes,
+) -> tuple[bool, str]:
+    """校验飞书回调签名（X-Lark-Signature）。
+
+    算法：sha256(timestamp + nonce + encrypt_key + body) 十六进制。
+    - 未配置 Encrypt Key：无从校验，返回 (True, "no_key")；
+    - 带签名头：必须匹配，且时间戳须在 ±FEISHU_SIGNATURE_TTL_S 内（防重放）；
+    - 无签名头：FEISHU_SIGNATURE_REQUIRED=1 时拒绝，否则放行（记警告）。
+    """
+    key_s = _encrypt_key()
+    if not key_s:
+        return True, "no_key"
+    get = getattr(headers, "get", None)
+    if not callable(get):
+        return True, "no_headers"
+    sig = str(get("X-Lark-Signature") or get("x-lark-signature") or "").strip()
+    ts = str(get("X-Lark-Request-Timestamp") or "").strip()
+    nonce = str(get("X-Lark-Request-Nonce") or "").strip()
+    if not sig:
+        required = (os.environ.get("FEISHU_SIGNATURE_REQUIRED") or "0").strip().lower()
+        if required in ("1", "true", "yes", "on"):
+            return False, "missing_signature"
+        log.warning("feishu signature header absent; set FEISHU_SIGNATURE_REQUIRED=1 to enforce")
+        return True, "no_signature"
+    if not ts or not nonce:
+        return False, "missing_timestamp_or_nonce"
+    try:
+        age = abs(time.time() - float(ts))
+    except Exception:
+        return False, "bad_timestamp"
+    ttl = float(os.environ.get("FEISHU_SIGNATURE_TTL_S") or 300)
+    if age > ttl:
+        return False, "stale_timestamp"
+    payload = (ts + nonce + key_s).encode("utf-8") + (raw_body or b"")
+    expect = hashlib.sha256(payload).hexdigest()
+    if not hmac.compare_digest(expect, sig):
+        return False, "bad_signature"
+    if _dedup_seen(f"sig:{nonce}:{int(float(ts))}"):
+        return False, "replayed_nonce"
+    return True, "ok"
 
 
 def _extract_text(content: str) -> str:
@@ -678,10 +726,16 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                 log.debug("feishu hybrid-stream delta push skip: %s", e)
 
         astream_mod = None
+        astream_token = ""
         if true_stream_on:
             try:
                 from . import answer_stream as astream_mod
-                astream_mod.set_delta_callback(_on_answer_delta)
+                # 每个 job 一个 key：并发下回调不互相覆盖/误清（防答案写进别人的卡片）
+                job_stream_key = f"{payload.get('inbound_message_id') or ''}|{id(stream_state)}"
+                astream_mod.set_current_key(job_stream_key)
+                astream_token = astream_mod.set_delta_callback(
+                    _on_answer_delta, key=job_stream_key
+                )
             except Exception as e:
                 log.warning("feishu true-stream setup failed: %s", e)
                 astream_mod = None
@@ -697,7 +751,7 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
             con.close()
             progressmod.reset_progress_callback(prog_token)
             if astream_mod is not None:
-                astream_mod.reset_delta_callback()
+                astream_mod.reset_delta_callback(astream_token)
         timings["agent_ms"] = int((time.time() - t_agent) * 1000)
 
         tr = d.get("trace") if isinstance(d.get("trace"), dict) else {}
@@ -857,17 +911,34 @@ def _parse_card_action(event: dict[str, Any]) -> dict[str, Any] | None:
         chat_id = str(ctx.get("open_chat_id") or ctx.get("chat_id") or "").strip()
     if not chat_id:
         chat_id = str(event.get("open_chat_id") or event.get("chat_id") or "").strip()
+    # 卡片事件自带的 message_id：用它去重，避免连点重复执行
+    mid = ""
+    if isinstance(ctx, dict):
+        mid = str(ctx.get("open_message_id") or ctx.get("message_id") or "").strip()
+    if not mid:
+        mid = str(event.get("open_message_id") or event.get("message_id") or "").strip()
+    # 会话键须与正常飞书消息一致：群 chat_id 前缀 oc_，私聊为 ou_/open_id。
+    # 历史实现固定 channel="feishu"，导致 session_key_of 落到 anon:* 另一个会话，
+    # 按钮追问会丢失上一轮上下文。
+    is_group = chat_id.startswith("oc_")
     return {
         "text": q,
         "feishu_open_id": open_id,
         "chat_id": chat_id,
-        "chat_type": "p2p",
-        "inbound_message_id": f"card_action:{q[:40]}:{int(time.time())}",
-        "channel": "feishu",
+        "chat_type": "group" if is_group else "p2p",
+        "inbound_message_id": mid or f"card_action:{q[:40]}:{int(time.time() * 1000)}",
+        "channel": "feishu_group" if is_group else "feishu_dm",
     }
 
 
-def handle_feishu_event(con, body: dict[str, Any], *, sync: bool = False) -> dict[str, Any]:
+def handle_feishu_event(
+    con,
+    body: dict[str, Any],
+    *,
+    sync: bool = False,
+    headers: Any = None,
+    raw_body: bytes | None = None,
+) -> dict[str, Any]:
     """处理飞书事件回调。
 
     - url_verification → 回 challenge
@@ -881,6 +952,13 @@ def handle_feishu_event(con, body: dict[str, Any], *, sync: bool = False) -> dic
     except Exception as e:
         log.warning("feishu decrypt failed: %s", e)
         return {"ok": False, "error": "decrypt_failed", "detail": str(e)[:200]}
+
+    # 签名校验（防伪造 / 重放）；Encrypt Key 未配置时无从校验
+    if headers is not None or raw_body is not None:
+        ok_sig, sig_reason = verify_feishu_signature(headers, raw_body or b"")
+        if not ok_sig:
+            _elog("feishu signature rejected reason=%s", sig_reason)
+            return {"ok": False, "error": "bad_signature", "reason": sig_reason}
 
     if body.get("type") == "url_verification" or (
         "challenge" in body and not body.get("event") and not body.get("header")

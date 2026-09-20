@@ -158,6 +158,16 @@ def session_key_of(
         base = f"grp:{chat_id}"
     elif ch in ("feishu_dm", "harness") and feishu_open_id:
         base = f"dm:{feishu_open_id}"
+    elif ch == "feishu":
+        # 兜底：历史卡片事件 channel="feishu"（无 chat_type）。按 chat_id 形态判群/私聊，
+        # 避免落到 anon:* 另一个会话而丢失上下文。
+        if str(chat_id or "").startswith("oc_"):
+            base = f"grp:{chat_id}"
+        elif feishu_open_id:
+            base = f"dm:{feishu_open_id}"
+        else:
+            base = f"anon:{session_id or chat_id or 'x'}"
+        return base
     elif mesh_user_id:
         base = f"u:{mesh_user_id}"
     else:

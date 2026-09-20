@@ -625,6 +625,41 @@ def _init_pg_schema(con) -> None:
     con.executescript(schema_path.read_text(encoding="utf-8"))
 
 
+def ensure_pg_trgm_indexes(con) -> bool:
+    """为 PG 全文检索建 pg_trgm GIN 索引。
+
+    fts_pg 的召回是 `%term%` LIKE，普通 B-tree 用不上；trigram GIN 能让
+    子串匹配走索引，避免语料变大后的全表扫描。失败（无权限/扩展不可用）
+    只记日志，不影响主流程。
+    """
+    if getattr(con, "dialect", "sqlite") == "postgresql":
+        pass
+    else:
+        return False
+    try:
+        con.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_search_fts_toks_trgm ON search_fts USING gin (toks gin_trgm_ops)"
+        )
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_search_fts_title_trgm ON search_fts USING gin (title gin_trgm_ops)"
+        )
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_search_fts_body_trgm ON search_fts USING gin (body gin_trgm_ops)"
+        )
+        with write_lock():
+            commit_retry(con)
+        print("[mesh] pg_trgm indexes ensured", flush=True)
+        return True
+    except Exception as e:
+        print(f"[mesh] pg_trgm index skipped: {e}", flush=True)
+        try:
+            con.rollback()
+        except Exception:
+            pass
+        return False
+
+
 def ensure_search_fts_schema(con) -> bool:
     """
     确保 search_fts 含 toks/date_end（中文 MATCH 用）。
@@ -635,6 +670,8 @@ def ensure_search_fts_schema(con) -> bool:
     if cols >= need:
         return False
     if getattr(con, "dialect", "sqlite") == "postgresql":
+        # PG：不重建表，只确保 trigram 索引存在（让 %term% LIKE 能走索引）
+        ensure_pg_trgm_indexes(con)
         return False
     con.execute("DROP TABLE IF EXISTS search_fts")
     con.execute("""CREATE VIRTUAL TABLE search_fts USING fts5(

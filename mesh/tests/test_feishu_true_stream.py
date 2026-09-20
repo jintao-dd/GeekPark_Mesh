@@ -257,3 +257,138 @@ def test_true_stream_flag(monkeypatch):
     assert feishu_bot._true_stream_enabled() is False
     monkeypatch.delenv("FEISHU_TRUE_STREAM", raising=False)
     assert feishu_bot._true_stream_enabled() is False
+
+
+def test_answer_stream_concurrent_jobs_do_not_cross_write():
+    """并发 job：B 覆盖回调后，A 不得再流式写卡（否则写进 B 的卡片）。"""
+    import threading
+
+    from app.agent import answer_stream as A
+
+    got_b: list[str] = []
+    A.reset_delta_callback()
+
+    tok_a = A.set_delta_callback(lambda d, acc: (_ for _ in ()).throw(AssertionError("A must not stream")), key="jobA")
+    tok_b = A.set_delta_callback(lambda d, acc: got_b.append(d), key="jobB")
+
+    # A 线程开闸：应被拒绝（回调已归 B）
+    def _thread_a():
+        A.set_current_key("jobA")
+        assert A.begin_final_stream() is False
+        A.emit_delta("A", "A")
+
+    t = threading.Thread(target=_thread_a)
+    t.start()
+    t.join()
+
+    # B 线程开闸：允许
+    A.set_current_key("jobB")
+    assert A.begin_final_stream() is True
+    A.emit_delta("B", "B")
+    assert got_b == ["B"]
+
+    # A 收尾时用旧 token 注销，不得误清 B 的回调
+    A.reset_delta_callback(tok_a)
+    assert A.stream_active() is True
+    A.emit_delta("B2", "B2")
+    assert got_b == ["B", "B2"]
+
+    A.reset_delta_callback(tok_b)
+    assert A.stream_active() is False
+
+
+def test_unwrap_feishu_body_always_decrypts(monkeypatch):
+    """带 encrypt 就必须解密，不能在包里塞 event 键绕过。"""
+    from app.agent import feishu_bot
+
+    monkeypatch.setattr(feishu_bot, "decrypt_feishu_encrypt", lambda s: '{"header": {"event_type": "x"}}')
+    out = feishu_bot.unwrap_feishu_body({"encrypt": "abc", "event": {"forged": True}})
+    assert "event" not in out
+    assert out["header"]["event_type"] == "x"
+
+
+def test_verify_feishu_signature_ok_and_replay(monkeypatch):
+    import hashlib
+    import time as _t
+
+    from app.agent import feishu_bot
+
+    monkeypatch.setenv("FEISHU_ENCRYPT_KEY", "testkey")
+    feishu_bot._DEDUP.clear()
+    ts = str(int(_t.time()))
+    nonce = "n1"
+    body = b'{"a":1}'
+    sig = hashlib.sha256((ts + nonce + "testkey").encode() + body).hexdigest()
+    headers = {"X-Lark-Signature": sig, "X-Lark-Request-Timestamp": ts, "X-Lark-Request-Nonce": nonce}
+    ok, reason = feishu_bot.verify_feishu_signature(headers, body)
+    assert ok and reason == "ok"
+    # 重放同一 nonce 必须拒绝
+    ok2, reason2 = feishu_bot.verify_feishu_signature(headers, body)
+    assert ok2 is False and reason2 == "replayed_nonce"
+
+
+def test_verify_feishu_signature_bad(monkeypatch):
+    import time as _t
+
+    from app.agent import feishu_bot
+
+    monkeypatch.setenv("FEISHU_ENCRYPT_KEY", "testkey")
+    ts = str(int(_t.time()))
+    headers = {"X-Lark-Signature": "deadbeef", "X-Lark-Request-Timestamp": ts, "X-Lark-Request-Nonce": "n9"}
+    ok, reason = feishu_bot.verify_feishu_signature(headers, b"{}")
+    assert ok is False and reason == "bad_signature"
+
+
+def test_card_action_channel_matches_session_key():
+    """卡片按钮：群/私聊 channel 必须与正常消息一致，否则会丢上下文。"""
+    from app.agent import feishu_bot, session_state as sstore
+
+    ev_group = {
+        "action": {"value": {"q": "继续"}},
+        "operator": {"open_id": "ou_u1"},
+        "context": {"open_chat_id": "oc_chat1", "open_message_id": "om_1"},
+    }
+    p = feishu_bot._parse_card_action(ev_group)
+    assert p["channel"] == "feishu_group"
+    assert p["inbound_message_id"] == "om_1"
+    sk = sstore.session_key_of(channel=p["channel"], feishu_open_id=p["feishu_open_id"], chat_id=p["chat_id"])
+    assert sk == "grp:oc_chat1"
+
+    ev_dm = {
+        "action": {"value": {"q": "继续"}},
+        "operator": {"open_id": "ou_u2"},
+        "context": {"open_chat_id": "ou_u2"},
+    }
+    p2 = feishu_bot._parse_card_action(ev_dm)
+    assert p2["channel"] == "feishu_dm"
+    sk2 = sstore.session_key_of(channel=p2["channel"], feishu_open_id=p2["feishu_open_id"], chat_id=p2["chat_id"])
+    assert sk2 == "dm:ou_u2"
+
+
+def test_session_key_legacy_feishu_channel_falls_back():
+    """历史 channel="feishu" 也要落到正确会话，而不是 anon:*。"""
+    from app.agent import session_state as sstore
+
+    assert (
+        sstore.session_key_of(channel="feishu", feishu_open_id="ou_x", chat_id="oc_c")
+        == "grp:oc_c"
+    )
+    assert (
+        sstore.session_key_of(channel="feishu", feishu_open_id="ou_x", chat_id="ou_x")
+        == "dm:ou_x"
+    )
+
+
+def test_identity_profile_cache_avoids_repeat_lookup():
+    """人像补全缓存：命中即返回，不再每条消息打飞书 API。"""
+    from app.agent import identity as idmod
+
+    idmod.reset_profile_cache_for_tests()
+    assert idmod._person_profile_cached("ou_p1") is None
+    idmod._person_profile_remember("ou_p1", {"display": "杜锦涛", "feishu_open_id": "ou_p1", "snippet": "CEO"})
+    cached = idmod._person_profile_cached("ou_p1")
+    assert cached and cached["display"] == "杜锦涛"
+    assert idmod._person_profile_cached("ou_missing") is None
+    idmod.reset_profile_cache_for_tests()
+    assert idmod._person_profile_cached("ou_p1") is None
+

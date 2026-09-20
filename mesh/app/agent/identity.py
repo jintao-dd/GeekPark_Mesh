@@ -1,6 +1,9 @@
 """② Identity：open_id / mesh_user → IdentityResult（无飞书通讯录副作用）。"""
 from __future__ import annotations
 
+import os
+import threading
+import time
 from typing import Any
 
 from .. import ingest
@@ -35,6 +38,51 @@ _TEAM_PICK_ORDER = (
     "社群",
     "Global Partnership",
 )
+
+
+# 通讯录人像缓存：open_id → {display, feishu_open_id, snippet}
+# 避免每条消息都同步打一次飞书 contact API（8s 超时、零缓存）。
+_PROFILE_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+_PROFILE_CACHE_LOCK = threading.Lock()
+
+
+def _profile_ttl_s() -> float:
+    try:
+        return float(os.environ.get("MESH_FEISHU_PROFILE_TTL_S") or 1800)
+    except Exception:
+        return 1800.0
+
+
+def _person_profile_cached(open_id: str) -> dict[str, Any] | None:
+    oid = str(open_id or "").strip()
+    if not oid:
+        return None
+    now = time.time()
+    with _PROFILE_CACHE_LOCK:
+        hit = _PROFILE_CACHE.get(oid)
+        if hit and now - hit[0] <= _profile_ttl_s():
+            return dict(hit[1])
+        if hit:
+            _PROFILE_CACHE.pop(oid, None)
+    return None
+
+
+def _person_profile_remember(open_id: str, profile: dict[str, Any]) -> None:
+    oid = str(open_id or "").strip()
+    if not oid:
+        return
+    now = time.time()
+    with _PROFILE_CACHE_LOCK:
+        if len(_PROFILE_CACHE) > 4096:
+            for k, v in list(_PROFILE_CACHE.items()):
+                if now - v[0] > _profile_ttl_s():
+                    _PROFILE_CACHE.pop(k, None)
+        _PROFILE_CACHE[oid] = (now, dict(profile))
+
+
+def reset_profile_cache_for_tests() -> None:
+    with _PROFILE_CACHE_LOCK:
+        _PROFILE_CACHE.clear()
 
 
 def is_business_team(team: str | None) -> bool:
@@ -290,31 +338,45 @@ def resolve_identity(con, envelope: AgentEnvelope) -> IdentityResult:
     person: dict[str, Any] = {"display": user["display"], "username": user["username"]}
     sync_status = contact_sync
     oid = open_id or user["feishu_open_id"]
-    # 按需用应用身份补全通讯录人像（非长期 Sync 表；短时缓存见 org_directory）
+    # 按需用应用身份补全通讯录人像。历史实现每条消息都同步打一次飞书 API
+    # （8s 超时、零缓存），是首字延迟的主要来源之一；这里加短 TTL 缓存。
     if oid:
-        try:
-            from .feishu_hands import backends
+        cached = _person_profile_cached(oid)
+        if cached is not None:
+            person = {**person, **cached}
+            sync_status = "cache"
+        else:
+            try:
+                from .feishu_hands import backends
 
-            env = backends.call_tool(
-                "feishu.search",
-                {"query": "", "resource_type": "user", "open_ids": [oid], "max_results": 1},
-                timeout_sec=8,
-                open_id=oid,
-            )
-            if env.ok and env.items:
-                it = env.items[0]
-                person = {
-                    **person,
-                    "display": str(it.get("title") or person.get("display") or ""),
-                    "feishu_open_id": oid,
-                    "snippet": str(it.get("snippet") or ""),
-                }
-                sync_status = "ok"
-            elif sync_status in ("", "skipped_no_scope"):
-                sync_status = "lookup_empty"
-        except Exception:
-            if sync_status in ("", "skipped_no_scope"):
-                sync_status = "lookup_error"
+                env = backends.call_tool(
+                    "feishu.search",
+                    {"query": "", "resource_type": "user", "open_ids": [oid], "max_results": 1},
+                    timeout_sec=8,
+                    open_id=oid,
+                )
+                if env.ok and env.items:
+                    it = env.items[0]
+                    person = {
+                        **person,
+                        "display": str(it.get("title") or person.get("display") or ""),
+                        "feishu_open_id": oid,
+                        "snippet": str(it.get("snippet") or ""),
+                    }
+                    sync_status = "ok"
+                    _person_profile_remember(
+                        oid,
+                        {
+                            "display": person.get("display") or "",
+                            "feishu_open_id": oid,
+                            "snippet": person.get("snippet") or "",
+                        },
+                    )
+                elif sync_status in ("", "skipped_no_scope"):
+                    sync_status = "lookup_empty"
+            except Exception:
+                if sync_status in ("", "skipped_no_scope"):
+                    sync_status = "lookup_error"
 
     return IdentityResult(
         status=status,
