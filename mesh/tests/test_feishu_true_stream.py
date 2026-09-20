@@ -12,10 +12,15 @@ def test_answer_stream_callback_bus():
 
     got = []
     answer_stream.set_delta_callback(lambda d, acc: got.append((d, acc)))
+    # 注册后默认不推（防中间稿抢写）；需 begin_final 才 active
+    assert answer_stream.stream_active() is False
+    answer_stream.begin_final_stream()
     assert answer_stream.stream_active() is True
     answer_stream.emit_delta("你", "你")
     answer_stream.emit_delta("好", "你好")
     assert got == [("你", "你"), ("好", "你好")]
+    answer_stream.end_final_stream()
+    assert answer_stream.stream_active() is False
     answer_stream.reset_delta_callback()
     assert answer_stream.stream_active() is False
     # reset 后 emit 不再触发
@@ -30,8 +35,24 @@ def test_answer_stream_swallows_callback_errors():
         raise RuntimeError("should not propagate")
 
     answer_stream.set_delta_callback(boom)
+    answer_stream.begin_final_stream()
     # 不抛
     answer_stream.emit_delta("a", "a")
+    answer_stream.reset_delta_callback()
+
+
+def test_answer_stream_gate_blocks_intermediate():
+    """未 begin_final 时，即使回调已注册也不推、不走流式。"""
+    from app.agent import answer_stream
+
+    got = []
+    answer_stream.set_delta_callback(lambda d, acc: got.append(d))
+    assert answer_stream.stream_active() is False
+    answer_stream.emit_delta("中间稿", "中间稿")
+    assert got == []
+    answer_stream.begin_final_stream()
+    answer_stream.emit_delta("终答", "终答")
+    assert got == ["终答"]
     answer_stream.reset_delta_callback()
 
 
@@ -52,6 +73,7 @@ def test_llm_call_uses_stream_when_active(monkeypatch):
 
     deltas = []
     answer_stream.set_delta_callback(lambda d, acc: deltas.append(d))
+    answer_stream.begin_final_stream()
     try:
         out = llm.call("sys", "usr", json_mode=False, task="answer")
     finally:
@@ -59,6 +81,32 @@ def test_llm_call_uses_stream_when_active(monkeypatch):
 
     assert out == "Hello!"
     assert deltas == ["Hel", "lo", "!"]
+
+
+def test_llm_call_intermediate_answer_not_streamed(monkeypatch):
+    """回调已注册但未 begin_final → 中间 ask/answer 走非流式，不推飞书。"""
+    from app import llm
+    from app.agent import answer_stream
+
+    class FakeProvider:
+        def stream(self, system, user, max_tokens=4000, *, task="default"):
+            yield "STREAMED"
+
+        def complete_detail(self, system, user, max_tokens=4000, *, task="default"):
+            return {"content": "NONSTREAM", "usage": {}}
+
+    monkeypatch.setattr(llm, "get_provider", lambda *a, **k: FakeProvider())
+    monkeypatch.setattr(llm, "model_for_task", lambda task="default": "fake-model")
+
+    called = []
+    answer_stream.set_delta_callback(lambda d, acc: called.append(d))
+    # 故意不 begin_final
+    try:
+        out = llm.call("sys", "usr", json_mode=False, task="answer")
+    finally:
+        answer_stream.reset_delta_callback()
+    assert out == "NONSTREAM"
+    assert called == []
 
 
 def test_llm_call_non_answer_task_not_streamed(monkeypatch):
@@ -77,6 +125,7 @@ def test_llm_call_non_answer_task_not_streamed(monkeypatch):
 
     called = []
     answer_stream.set_delta_callback(lambda d, acc: called.append(d))
+    answer_stream.begin_final_stream()
     try:
         # task=default 不应走流式
         out = llm.call("sys", "usr", json_mode=False, task="default")

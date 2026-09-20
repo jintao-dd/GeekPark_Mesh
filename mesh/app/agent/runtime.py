@@ -58,6 +58,7 @@ def _colleague_turn(
     response_mode: str = "",
 ) -> tuple[str, dict[str, Any]]:
     """1× Conversation LLM（general / meta / clarify）。不进 Retrieval。"""
+    from . import answer_stream as astream
     from . import colleague_chat
 
     hint = ""
@@ -68,13 +69,17 @@ def _colleague_turn(
             team = str(getattr(identity, "primary_team", None) or "").strip()
             if name:
                 hint = f"{name}" + (f"/{team}" if team else "")
-    return colleague_chat.reply_colleague(
-        user_text,
-        session,
-        mode=mode,
-        identity_hint=hint,
-        response_mode=response_mode,
-    )
+    astream.begin_final_stream()
+    try:
+        return colleague_chat.reply_colleague(
+            user_text,
+            session,
+            mode=mode,
+            identity_hint=hint,
+            response_mode=response_mode,
+        )
+    finally:
+        astream.end_final_stream()
 
 
 def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:

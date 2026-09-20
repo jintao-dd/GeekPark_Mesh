@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable
 
 from ..session_state import SessionContextState
+from .. import answer_stream as astream
 from . import mouth
 from . import plan as planmod
 from . import progress as progressmod
@@ -265,13 +266,17 @@ def handle_turn(
 
     if mode == "speak" or not graph.steps:
         t_mouth = time.monotonic()
-        text, smeta = mouth.speak(
-            q,
-            identity,
-            session,
-            company_block=company_block,
-            hint=graph.speak_hint,
-        )
+        astream.begin_final_stream()
+        try:
+            text, smeta = mouth.speak(
+                q,
+                identity,
+                session,
+                company_block=company_block,
+                hint=graph.speak_hint,
+            )
+        finally:
+            astream.end_final_stream()
         timings["mouth_ms"] = int((time.monotonic() - t_mouth) * 1000)
         out.action = "speak"
         out.intent = "casual"
@@ -361,16 +366,20 @@ def handle_turn(
     skipped = len(graph.steps or []) - len(envelopes)
     partial = bool(budget_hit) or skipped > 0 or any(not e.ok for e in envelopes)
     t_mouth = time.monotonic()
-    text, mouth_meta, columns = mouth.synthesize_work(
-        q,
-        envelopes,
-        identity=identity,
-        session=session,
-        company_block=company_block,
-        graph=graph,
-        partial=partial,
-        budget_hit=budget_hit,
-    )
+    astream.begin_final_stream()
+    try:
+        text, mouth_meta, columns = mouth.synthesize_work(
+            q,
+            envelopes,
+            identity=identity,
+            session=session,
+            company_block=company_block,
+            graph=graph,
+            partial=partial,
+            budget_hit=budget_hit,
+        )
+    finally:
+        astream.end_final_stream()
     timings["mouth_ms"] = int((time.monotonic() - t_mouth) * 1000)
     out.llm_used = bool(out.llm_used or mouth_meta.get("llm_used"))
     if mouth_meta.get("model"):

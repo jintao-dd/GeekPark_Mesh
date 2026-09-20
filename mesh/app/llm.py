@@ -124,6 +124,8 @@ def model_for_task(task: str = "default") -> str | None:
     keys = {
         "semantic": ("MESH_LLM_MODEL_SEMANTIC",),
         "answer": ("MESH_LLM_MODEL_ANSWER",),
+        # ask.published 中间成文：与 answer 同模型，但不走飞书真流式（task!=answer）
+        "ask": ("MESH_LLM_MODEL_ANSWER", "MESH_LLM_MODEL"),
         "sensitive": ("MESH_LLM_MODEL_SENSITIVE", "MESH_LLM_MODEL_ANSWER"),
         "controller": (
             "MESH_LLM_MODEL_CONTROLLER",
@@ -1099,7 +1101,7 @@ def answer_question(
     history: list[dict] | None = None,
     temporal_block: str = "",
     *,
-    task: str = "answer",
+    task: str = "ask",
 ) -> str:
     system, user = _qa_prompt(
         question, contexts, mode, history=history, temporal_block=temporal_block
