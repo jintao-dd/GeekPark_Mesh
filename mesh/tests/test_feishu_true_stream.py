@@ -148,6 +148,8 @@ def test_finalize_cardkit_streamed_does_not_send_new_card(monkeypatch):
 
     monkeypatch.setattr(feishu_api, "create_card_entity", _should_not_call)
     monkeypatch.setattr(feishu_api, "send_card_entity", _should_not_call)
+    # 假流式 playback 里的 sleep 加速
+    monkeypatch.setattr(feishu_bot.time, "sleep", lambda *_a, **_k: None)
 
     import threading
     feishu_bot._finalize_cardkit(
@@ -157,10 +159,11 @@ def test_finalize_cardkit_streamed_does_not_send_new_card(monkeypatch):
         query="随便问",
         card_lock=threading.Lock(),
         streamed=True,
-        streamed_text="最终清洗后的答案。",
+        streamed_text="",
     )
     kinds = [e[0] for e in events]
-    # 终稿==已推 → 不额外 stream 覆盖；只关 streaming 定格，不整卡换模板（避免闪动）
+    # 假流式上屏：至少一次 stream 推正文 + 关 streaming；不整卡换模板
+    assert "stream" in kinds
     assert "settings" in kinds
     assert "entity" not in kinds, "streamed finalize must NOT整卡换模板（会闪）"
 
@@ -174,21 +177,22 @@ def test_finalize_cardkit_streamed_overwrites_when_final_differs(monkeypatch):
     monkeypatch.setattr(feishu_api, "stream_card_text", lambda **kw: events.append(("stream", kw)))
     monkeypatch.setattr(feishu_api, "create_card_entity", lambda **kw: (_ for _ in ()).throw(AssertionError("no new card")))
     monkeypatch.setattr(feishu_api, "send_card_entity", lambda **kw: (_ for _ in ()).throw(AssertionError("no new card")))
+    monkeypatch.setattr(feishu_bot.time, "sleep", lambda *_a, **_k: None)
 
     import threading
+    body = "依据不足，暂不能确认。"
     feishu_bot._finalize_cardkit(
         card_id="c1",
         seq=feishu_api.CardSeq(1),
-        display_text="依据不足，暂不能确认。",   # 终稿
+        display_text=body,
         query="X 量产了吗",
         card_lock=threading.Lock(),
         streamed=True,
-        streamed_text="X 已经量产了。",       # 毛坯（不同）→ 必须覆盖
+        streamed_text="X 已经量产了。",
     )
-    # 终稿 != 已推 → 必须有一次 stream 覆盖成终稿
     stream_events = [e for e in events if e[0] == "stream"]
-    assert stream_events, "final differs from streamed → must overwrite via stream_card_text"
-    assert stream_events[0][1]["content"] == "依据不足，暂不能确认。"
+    assert stream_events, "fake-stream playback must push body"
+    assert any(e[1]["content"] == body or body in str(e[1].get("content") or "") for e in stream_events)
 
 
 def test_true_stream_flag(monkeypatch):

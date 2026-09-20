@@ -124,11 +124,10 @@ def followup_suggestions(query: str = "", *, display_text: str = "") -> list[str
 
 
 def streaming_config() -> dict[str, Any]:
-    # 接近即时上屏：步长大 + 间隔短，避免「挤牙膏」感。
-    # （仍保留 streaming_mode，便于前缀增量续打；不是整卡重绘）
+    # 假流式观感：固定匀速打字机（与 estimate_typewriter_seconds 对齐）
     return {
-        "print_frequency_ms": {"default": 15, "android": 15, "ios": 15, "pc": 15},
-        "print_step": {"default": 80, "android": 80, "ios": 80, "pc": 80},
+        "print_frequency_ms": {"default": 30, "android": 30, "ios": 30, "pc": 30},
+        "print_step": {"default": 20, "android": 20, "ios": 20, "pc": 20},
         "print_strategy": "fast",
     }
 

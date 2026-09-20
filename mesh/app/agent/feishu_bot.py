@@ -40,7 +40,11 @@ log = logging.getLogger("mesh.feishu_bot")
 
 
 def _true_stream_enabled() -> bool:
-    """方案 B 端到端真流式开关。默认关；tmesh 灰度用 FEISHU_TRUE_STREAM=1 打开。"""
+    """假流式上屏开关（环境变量名沿用 FEISHU_TRUE_STREAM）。
+
+    开启后：mouth 生成期间不把碎 chunk 推飞书；全文齐了再按前缀匀速播一遍
+    （观感接近以前的假流式）。默认关。
+    """
     flag = (os.environ.get("FEISHU_TRUE_STREAM") or "0").strip().lower()
     return flag in ("1", "true", "yes", "on")
 
@@ -335,22 +339,42 @@ def _finalize_cardkit(
     streamed: bool = False,
     streamed_text: str = "",
 ) -> None:
-    """完成回答：关闭流式状态，然后作为新消息发送一张答案卡片。
+    """完成回答。
 
-    不撤回思考卡片——飞书撤回本身也会触发提示，且保留 spinner 卡片
-    能让用户看到完整的处理过程；新答案卡片会触发通知。
-
-    方案 B 真流式（streamed=True）：内容已逐字打字机推到本卡 body。
-    此时不再发新卡、也不整卡换模板（避免每次回答都整卡重绘/闪动）：
-      1) 若清洗后终稿与已推文本不一致 → stream_card_text 覆盖成终稿（合规兜底）；
-      2) 只关 streaming 让打字机定格；卡片外壳保持原样，不 update_card_entity。
+    streamed=True（FEISHU_TRUE_STREAM）：假流式上屏——全文齐了之后，
+    按前缀匀速推送到思考卡，让飞书打字机按固定节奏播一遍（观感像以前的假流式）。
+    不整卡换模板、不发新卡，避免闪动。
     """
     body = (display_text or "").strip() or "这期没捞到可引用的证据。"
 
     if streamed:
-        # 1) 终稿 vs 已推文本：不一致则把 body 覆盖为终稿（合规兜底，用户最终看到清洗版）
+        # 假流式上屏：一次推全文（或递增前缀），交给飞书匀速打字机
         try:
-            if (streamed_text or "").strip() != body:
+            prefixes = feishu_cards.fake_stream_prefixes(body, min_chunk=80)
+            # 前缀不宜太多，否则 PUT 往返反而卡；最多 8 段 + 终稿
+            if len(prefixes) > 8:
+                step = max(1, len(prefixes) // 7)
+                prefixes = prefixes[step - 1 :: step]
+                if prefixes[-1] != body:
+                    prefixes.append(body)
+            for i, prefix in enumerate(prefixes):
+                with card_lock:
+                    feishu_api.stream_card_text(
+                        card_id=card_id,
+                        element_id=feishu_cards.BODY_ELEMENT_ID,
+                        content=prefix,
+                        sequence=seq.next(),
+                    )
+                # 段间短暂停顿，让客户端打字机跟得上（最后一段不再睡）
+                if i < len(prefixes) - 1:
+                    time.sleep(0.08)
+            # 给飞书留一点打字机播完的时间（有上限，避免长答干等）
+            time.sleep(min(0.6, feishu_cards.estimate_typewriter_seconds(body)))
+        except feishu_api.StreamingModeClosedError:
+            pass
+        except Exception as e:
+            log.warning("feishu fake-stream playback skip: %s", e)
+            try:
                 with card_lock:
                     feishu_api.stream_card_text(
                         card_id=card_id,
@@ -358,11 +382,9 @@ def _finalize_cardkit(
                         content=body,
                         sequence=seq.next(),
                     )
-        except feishu_api.StreamingModeClosedError:
-            pass
-        except Exception as e:
-            log.warning("feishu true-stream final overwrite skip: %s", e)
-        # 2) 只关 streaming 让打字机定格；不整卡换模板（这是每次闪动的根因）
+            except Exception:
+                pass
+        # 关 streaming 定格；不整卡换模板
         try:
             with card_lock:
                 feishu_api.update_card_settings(
@@ -372,7 +394,7 @@ def _finalize_cardkit(
                     sequence=seq.next(),
                 )
         except Exception as e:
-            log.warning("feishu true-stream close streaming skip: %s", e)
+            log.warning("feishu stream close streaming skip: %s", e)
         return
 
     # ===== 非流式（原逻辑）：发一张全新答案卡触发通知 =====
@@ -593,48 +615,42 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
 
         prog_token = progressmod.set_progress_callback(_on_progress)
 
-        # 方案 B 端到端真流式：把 answer 的 LLM chunk 实时打字机推到思考卡 body。
-        # 仅 cardkit 模式 + 开关开启时启用。末尾仍做全文清洗 + 差异覆盖兜底。
+        # 假流式上屏：生成过程中不逐 chunk 推飞书（那是顿挫根因）。
+        # 只在 mouth 开始时停下进度文案；全文齐了再在 finalize 里匀速播一遍。
         stream_state = {
             "lock": threading.Lock(),
             "last_push_at": 0.0,
             "last_len": 0,
             "streamed_any": False,
             "final_acc": "",
+            "mouth_hint_sent": False,
         }
         true_stream_on = _true_stream_enabled() and mode == "cardkit" and bool(card_id)
 
         def _on_answer_delta(delta: str, accumulated: str) -> None:
             if not true_stream_on or done.is_set():
                 return
-            # 首个 chunk：通知进度侧让出 mesh_body
-            if not answer_started.is_set():
-                answer_started.set()
             st = stream_state
-            now = time.time()
             with st["lock"]:
                 st["final_acc"] = accumulated
-                # 节流极轻：≥40ms 或新增 ≥4 字就推，跟上 gpt-5.4 出字速度
-                if (now - st["last_push_at"] < 0.04) and (len(accumulated) - st["last_len"] < 4):
-                    return
-                st["last_push_at"] = now
-                st["last_len"] = len(accumulated)
-                body = accumulated
-            try:
-                with card_lock:
-                    if done.is_set():
-                        return
-                    feishu_api.stream_card_text(
-                        card_id=card_id,
-                        element_id=feishu_cards.BODY_ELEMENT_ID,
-                        content=body,
-                        sequence=seq.next(),
-                    )
-                    st["streamed_any"] = True
-            except feishu_api.StreamingModeClosedError:
-                pass
-            except Exception as e:
-                log.debug("feishu true-stream delta push skip: %s", e)
+                st["streamed_any"] = True  # 标记走假流式 finalize，不发新卡
+            # 首个 chunk：停进度 + 提示「正在写」，不把碎字推上卡
+            if not answer_started.is_set():
+                answer_started.set()
+                if not st["mouth_hint_sent"]:
+                    st["mouth_hint_sent"] = True
+                    try:
+                        with card_lock:
+                            if done.is_set():
+                                return
+                            feishu_api.stream_card_text(
+                                card_id=card_id,
+                                element_id=feishu_cards.BODY_ELEMENT_ID,
+                                content="正在组织答复…",
+                                sequence=seq.next(),
+                            )
+                    except Exception:
+                        pass
 
         astream_mod = None
         if true_stream_on:
