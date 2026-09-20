@@ -124,10 +124,19 @@ def followup_suggestions(query: str = "", *, display_text: str = "") -> list[str
 
 
 def streaming_config() -> dict[str, Any]:
-    # 假流式观感：固定匀速打字机（与 estimate_typewriter_seconds 对齐）
+    # 答案侧：匀速打字机（与 estimate_typewriter_seconds 对齐）
     return {
-        "print_frequency_ms": {"default": 30, "android": 30, "ios": 30, "pc": 30},
-        "print_step": {"default": 20, "android": 20, "ios": 20, "pc": 20},
+        "print_frequency_ms": {"default": 15, "android": 15, "ios": 15, "pc": 15},
+        "print_step": {"default": 80, "android": 80, "ios": 80, "pc": 80},
+        "print_strategy": "fast",
+    }
+
+
+def thinking_streaming_config() -> dict[str, Any]:
+    """思考/进度卡：几乎瞬间上屏（假流式），避免「收到，我看一下…」逐字蹦。"""
+    return {
+        "print_frequency_ms": {"default": 10, "android": 10, "ios": 10, "pc": 10},
+        "print_step": {"default": 500, "android": 500, "ios": 500, "pc": 500},
         "print_strategy": "fast",
     }
 
@@ -140,6 +149,7 @@ def card_json_v2(
     streaming: bool = True,
     followups: list[str] | None = None,
     summary: str = "",
+    streaming_cfg: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """卡片 JSON 2.0（CardKit）。"""
     elements: list[dict[str, Any]] = [
@@ -169,7 +179,7 @@ def card_json_v2(
         "summary": {"content": summary or ("[生成中…]" if streaming else _clip(body_md, 40))},
     }
     if streaming:
-        cfg["streaming_config"] = streaming_config()
+        cfg["streaming_config"] = streaming_cfg or streaming_config()
 
     return {
         "schema": "2.0",
@@ -195,6 +205,7 @@ def thinking_card_v2(
         ),
         template="wathet",
         streaming=True,
+        streaming_cfg=thinking_streaming_config(),
         summary="Mesh 检索中…",
     )
 
@@ -288,10 +299,10 @@ def error_card(*, message: str, query: str = "") -> dict[str, Any]:
 
 
 def estimate_typewriter_seconds(text: str) -> float:
-    """粗估打字机上屏秒数（与 streaming_config 对齐）。"""
+    """粗估打字机上屏秒数（与 streaming_config 答案侧对齐）。"""
     n = max(1, len(text or ""))
-    step = 20
-    freq_ms = 30
+    step = 80
+    freq_ms = 15
     return min(1.2, max(0.15, (n / step) * (freq_ms / 1000.0)))
 
 

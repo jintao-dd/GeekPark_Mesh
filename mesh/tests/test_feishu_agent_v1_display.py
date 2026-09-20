@@ -195,6 +195,8 @@ def test_cardkit_v2_and_stream_prefixes():
     v2 = feishu_cards.thinking_card_v2(query="最近硅谷团队沟通了哪些人", stage=0)
     assert v2["schema"] == "2.0"
     assert v2["config"]["streaming_mode"] is True
+    # 思考卡用「瞬上」配置，避免进度文案逐字蹦
+    assert v2["config"]["streaming_config"]["print_step"]["default"] >= 200
     assert v2["body"]["elements"][0]["element_id"] == feishu_cards.BODY_ELEMENT_ID
     ans = feishu_cards.answer_card_v2(
         display_text="Alice 与 Bob。\n\n——\n期次：2026-9-8",

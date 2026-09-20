@@ -259,22 +259,23 @@ def _schedule_stage_ticker(
 ) -> None:
     """等待中动态轮播阶段文案；优先展示 Supervisor progress，无则按步骤递增。
 
-    优化：
-    - 前 3 秒 0.6s/帧保持视觉连贯，之后降到 2s/帧减少 API 调用；
-    - 只有当渲染出的 body 与上次不同时才调用飞书 API；
-    - progress label 变化时会由回调直接驱动刷新，ticker 只在无 progress 时兜底。
+    UX：
+    - spinner ~120ms/帧（假动画，转得要「活」）；
+    - 阶段文案约 1.5s 换一句，避免刷屏；
+    - 约 8s 后降到 ~300ms/帧，控 API；
+    - body 未变则跳过飞书调用。
     """
 
     def _run() -> None:
         stage_index = 0
         tick = 0
         last_body: str | None = None
-        # 前 3 秒高频 spinner，之后低频兜底
-        fast_interval = 0.6
-        slow_interval = 2.0
-        fast_cutoff_ticks = 5   # 约 3s 后进入慢速
-        stage_step_ticks_fast = 4
-        stage_step_ticks_slow = 1
+        # 假 loading：转圈要快；阶段文案慢一点换
+        fast_interval = 0.12
+        slow_interval = 0.30
+        fast_cutoff_ticks = 66  # ~8s 后降速
+        stage_step_ticks_fast = 12  # ~1.4s 换一句
+        stage_step_ticks_slow = 7   # ~2.1s 换一句
         while not done.wait(fast_interval if tick < fast_cutoff_ticks else slow_interval):
             if done.is_set():
                 return
