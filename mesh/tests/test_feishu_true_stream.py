@@ -160,6 +160,7 @@ def test_finalize_cardkit_streamed_does_not_send_new_card(monkeypatch):
         card_lock=threading.Lock(),
         streamed=True,
         streamed_text="最终清洗后的答案。",
+        pushed_any=True,
     )
     kinds = [e[0] for e in events]
     assert "settings" in kinds

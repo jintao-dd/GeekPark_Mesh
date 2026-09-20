@@ -301,10 +301,14 @@ def _schedule_stage_ticker(
                     if done.is_set():
                         return
                     if mode == "cardkit" and card_id and seq is not None:
-                        feishu_api.stream_card_text(
+                        # 进度阶段用整卡即时更新（非流式），避免打字机把整卡重打
+                        feishu_api.update_card_entity(
                             card_id=card_id,
-                            element_id=feishu_cards.BODY_ELEMENT_ID,
-                            content=body,
+                            card=feishu_cards.thinking_card_v2(
+                                query=query,
+                                progress=prog or None,
+                                stage=stage_index,
+                            ),
                             sequence=seq.next(),
                         )
                     elif message_id:
@@ -344,6 +348,7 @@ def _finalize_cardkit(
     payload: dict[str, Any] | None = None,
     streamed: bool = False,
     streamed_text: str = "",
+    pushed_any: bool = False,
 ) -> None:
     """完成回答。
 
@@ -355,8 +360,22 @@ def _finalize_cardkit(
     if streamed:
         # 混合流收尾：生成期已大段推过，这里只补终稿差异 + 关 streaming。
         # 不再从头假流式重播（会像「重复生成」）。
+        # 注意：进度阶段 streaming 是关的，短答可能从未开播；先确保开启再补终稿。
         try:
-            if (streamed_text or "").strip() != body:
+            with card_lock:
+                feishu_api.update_card_settings(
+                    card_id=card_id,
+                    settings={"config": {
+                        "streaming_mode": True,
+                        "streaming_config": feishu_cards.streaming_config(),
+                    }},
+                    sequence=seq.next(),
+                )
+        except Exception as e:
+            log.debug("feishu ensure answer streaming skip: %s", e)
+        try:
+            # 从未推送过（短答未开播）：必须补一次全文，否则卡上还是进度文案
+            if (not pushed_any) or (streamed_text or "").strip() != body:
                 with card_lock:
                     feishu_api.stream_card_text(
                         card_id=card_id,
@@ -365,16 +384,6 @@ def _finalize_cardkit(
                         sequence=seq.next(),
                     )
                 time.sleep(min(0.35, feishu_cards.estimate_typewriter_seconds(body)))
-            elif not (streamed_text or "").strip():
-                # 极短答 / 未开播：补一次全文推送
-                with card_lock:
-                    feishu_api.stream_card_text(
-                        card_id=card_id,
-                        element_id=feishu_cards.BODY_ELEMENT_ID,
-                        content=body,
-                        sequence=seq.next(),
-                    )
-                time.sleep(min(0.45, feishu_cards.estimate_typewriter_seconds(body)))
         except feishu_api.StreamingModeClosedError:
             pass
         except Exception as e:
@@ -575,10 +584,14 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                     if done.is_set():
                         return
                     if mode == "cardkit" and card_id:
-                        feishu_api.stream_card_text(
+                        # 进度阶段用整卡即时更新（非流式），避免打字机把整卡重打
+                        feishu_api.update_card_entity(
                             card_id=card_id,
-                            element_id=feishu_cards.BODY_ELEMENT_ID,
-                            content=body,
+                            card=feishu_cards.thinking_card_v2(
+                                query=query,
+                                progress=progress_holder,
+                                stage=len(progress_holder),
+                            ),
                             sequence=seq.next(),
                         )
                     elif card_message_id:
@@ -618,6 +631,8 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
             "streamed_any": False,
             "final_acc": "",
             "opened": False,
+            "_stream_on": False,
+            "pushed_any": False,
         }
         true_stream_on = _true_stream_enabled() and mode == "cardkit" and bool(card_id)
 
@@ -652,12 +667,27 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                 with card_lock:
                     if done.is_set():
                         return
+                    # 答案首次上屏：打开 streaming，让最终答复走打字机
+                    if not st.get("_stream_on"):
+                        st["_stream_on"] = True
+                        try:
+                            feishu_api.update_card_settings(
+                                card_id=card_id,
+                                settings={"config": {
+                                    "streaming_mode": True,
+                                    "streaming_config": feishu_cards.streaming_config(),
+                                }},
+                                sequence=seq.next(),
+                            )
+                        except Exception as e:
+                            log.debug("feishu enable answer streaming skip: %s", e)
                     feishu_api.stream_card_text(
                         card_id=card_id,
                         element_id=feishu_cards.BODY_ELEMENT_ID,
                         content=to_push,
                         sequence=seq.next(),
                     )
+                    st["pushed_any"] = True
             except feishu_api.StreamingModeClosedError:
                 pass
             except Exception as e:
@@ -736,6 +766,7 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
                     payload=payload,
                     streamed=bool(stream_state.get("streamed_any")),
                     streamed_text=str(stream_state.get("final_acc") or ""),
+                    pushed_any=bool(stream_state.get("pushed_any")),
                 )
             else:
                 receive_id, rid_type = _receive_target(payload)

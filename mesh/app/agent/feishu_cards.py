@@ -188,13 +188,15 @@ def thinking_card_v2(
     stage: int = 0,
     progress: list[str] | None = None,
 ) -> dict[str, Any]:
+    # 进度阶段必须即时渲染：streaming_mode 开启会让每次进度刷新都把整卡从头重打一遍，
+    # 观感就是「卡顿/重绘」。答案阶段再由 feishu_bot 打开 streaming 走打字机。
     return card_json_v2(
         title="Mesh",
         body_md=stage_copy(
             query=query, progress=progress, stage_index=max(0, stage)
         ),
         template="wathet",
-        streaming=True,
+        streaming=False,
         summary="Mesh 检索中…",
     )
 
