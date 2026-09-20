@@ -614,8 +614,8 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
             now = time.time()
             with st["lock"]:
                 st["final_acc"] = accumulated
-                # 节流：至少 0.12s 或新增 ≥8 字才推一次（gpt-5.4 出字快，别攒太狠）
-                if (now - st["last_push_at"] < 0.12) and (len(accumulated) - st["last_len"] < 8):
+                # 节流极轻：≥40ms 或新增 ≥4 字就推，跟上 gpt-5.4 出字速度
+                if (now - st["last_push_at"] < 0.04) and (len(accumulated) - st["last_len"] < 4):
                     return
                 st["last_push_at"] = now
                 st["last_len"] = len(accumulated)
