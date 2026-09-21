@@ -176,15 +176,26 @@ def handle_turn(
     # Mouth 也要看见飞书子树同事，避免成文只认周报桶名
     try:
         team = str(getattr(identity, "primary_team", None) or "").strip()
-        if team:
+        oid = str(getattr(identity, "feishu_open_id", None) or "").strip()
+        if oid or team:
             from ..feishu_hands import org_directory as od
 
-            teammates = od.member_names_for_scope(team, limit=16)
+            teammates: list[str] = []
+            label = team
+            if oid:
+                teammates, leaf = od.asker_teammates(oid, limit=16)
+                if leaf:
+                    label = leaf
+            if not teammates and team:
+                teammates = od.member_names_for_scope(team, limit=16)
             if teammates:
                 company_block += (
-                    "\n\n## 提问者飞书子树同事（「我们团队」认人用）\n"
+                    "\n\n## 提问者直属部门同事（「我们团队」只认这一层："
+                    + (label or team)
+                    + "）\n"
                     + "、".join(teammates)
-                    + "\n规则：材料里出现这些人即算团队相关；周报桶名「硅谷 BD」等不得用来排除。"
+                    + "\n规则：只有这些人算提问者的团队；同级其他部门不算。"
+                    + "被问到的人若材料里有「部门:」就直接用，不要说缺部门。"
                 )
     except Exception:
         pass

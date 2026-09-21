@@ -274,7 +274,7 @@ def test_mouth_strips_open_ids():
 def test_mouth_system_keeps_subtree_people_despite_weekly_bucket():
     from app.agent.supervisor import mouth
 
-    assert "飞书子树" in mouth._SYNTH_SYSTEM or "飞书组织子树" in mouth._SYNTH_SYSTEM
+    assert "直属部门" in mouth._SYNTH_SYSTEM
     assert "硅谷 BD" in mouth._SYNTH_SYSTEM
     assert "禁止说成「不属于品牌创意」" in mouth._SYNTH_SYSTEM
 
@@ -287,6 +287,10 @@ def test_enrich_ask_includes_subtree_teammates(monkeypatch):
     def fake_names(query, *, limit=24):
         return ["赵思琪", "Sean Shen", "胡清远", "杜锦涛"]
 
+    monkeypatch.setattr(
+        "app.agent.feishu_hands.org_directory.asker_teammates",
+        lambda *a, **k: ([], ""),
+    )
     monkeypatch.setattr(
         "app.agent.feishu_hands.org_directory.member_names_for_scope",
         fake_names,
@@ -322,6 +326,10 @@ def test_enrich_about_me_skips_teammate_dump(monkeypatch):
     from app.agent.supervisor.types import PlanStep
     from app.agent.models import IdentityResult
 
+    monkeypatch.setattr(
+        "app.agent.feishu_hands.org_directory.asker_teammates",
+        lambda *a, **k: ([], ""),
+    )
     monkeypatch.setattr(
         "app.agent.feishu_hands.org_directory.member_names_for_scope",
         lambda *a, **k: ["赵思琪", "Sean Shen", "胡清远"],

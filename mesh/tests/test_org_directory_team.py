@@ -118,3 +118,66 @@ def test_member_names_for_scope_brand_tree():
     assert "闫晓龙" in names
     assert "彭康林" in names
     assert "李源" not in names
+
+
+def test_asker_teammates_stays_in_leaf_department():
+    """直属「创新技术」时，不把同级的创意视频算进我们团队。"""
+    depts = [
+        {
+            "name": "品牌创意部",
+            "open_department_id": "od-brand",
+            "parent_department_id": "0",
+            "member_count": 1,
+        },
+        {
+            "name": "创新技术",
+            "open_department_id": "od-tech",
+            "parent_department_id": "od-brand",
+            "member_count": 2,
+        },
+        {
+            "name": "创意视频",
+            "open_department_id": "od-video",
+            "parent_department_id": "od-brand",
+            "member_count": 1,
+        },
+    ]
+    people = [
+        {"name": "杜锦涛", "open_id": "ou_djt", "department_ids": ["od-tech"], "job_title": ""},
+        {"name": "同事甲", "open_id": "ou_a", "department_ids": ["od-tech"], "job_title": ""},
+        {"name": "闫晓龙", "open_id": "ou_xl", "department_ids": ["od-video"], "job_title": "编辑"},
+        {"name": "张山山", "open_id": "ou_ss", "department_ids": ["od-brand"], "job_title": "VP"},
+    ]
+
+    def fake_load(*, force=False):
+        return depts, people
+
+    with mock.patch.object(od, "load_directory", fake_load):
+        names, label = od.asker_teammates("ou_djt", limit=20)
+    assert label == "创新技术"
+    assert "杜锦涛" in names
+    assert "同事甲" in names
+    assert "闫晓龙" not in names
+    assert "张山山" not in names
+
+
+def test_person_search_includes_department():
+    depts = DEPTS + [
+        {
+            "name": "媒体业务",
+            "open_department_id": "od-media",
+            "parent_department_id": "0",
+            "member_count": 1,
+        }
+    ]
+
+    def fake_load(*, force=False):
+        return depts, PEOPLE
+
+    with mock.patch.object(od, "load_directory", fake_load):
+        env = od.search_directory("李源", max_results=5)
+    assert env.ok
+    hits = [it for it in (env.items or []) if it.get("title") == "李源"]
+    assert hits
+    assert "部门:媒体业务" in str(hits[0].get("snippet") or "")
+    assert "记者" in str(hits[0].get("snippet") or "")

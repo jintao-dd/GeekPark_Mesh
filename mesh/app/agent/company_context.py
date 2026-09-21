@@ -143,13 +143,21 @@ def assemble(
             team = str(getattr(identity, "primary_team", None) or "").strip()
             if not team and session is not None:
                 team = str(getattr(session, "active_team", "") or "").strip()
-            if team:
+            oid = str(getattr(identity, "feishu_open_id", None) or "").strip()
+            if oid or team:
                 from .feishu_hands import org_directory as od
 
-                names = od.member_names_for_scope(team, limit=20)
+                names: list[str] = []
+                label = team
+                if oid:
+                    names, leaf = od.asker_teammates(oid, limit=20)
+                    if leaf:
+                        label = leaf
+                if not names and team:
+                    names = od.member_names_for_scope(team, limit=20)
                 if names:
                     snap["teammates"] = names
-                    snap["team"] = team
+                    snap["team"] = label or team
         except Exception:
             pass
     ont = build_ontology(

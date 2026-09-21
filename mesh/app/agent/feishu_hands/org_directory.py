@@ -470,8 +470,144 @@ def _roster_people_for_team(team: str) -> list[dict[str, Any]]:
         return []
 
 
+def _parent_map(departments: list[dict[str, Any]]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for d in departments:
+        oid = str(d.get("open_department_id") or "").strip()
+        if oid:
+            out[oid] = str(d.get("parent_department_id") or "").strip()
+    return out
+
+
+def _is_ancestor(ancestor: str, node: str, parent_of: dict[str, str]) -> bool:
+    cur = parent_of.get(node) or ""
+    seen: set[str] = set()
+    while cur and cur not in seen and cur != "0":
+        if cur == ancestor:
+            return True
+        seen.add(cur)
+        cur = parent_of.get(cur) or ""
+    return False
+
+
+def _specific_dept_ids(dept_ids: list[str], departments: list[dict[str, Any]]) -> list[str]:
+    """去掉同时出现的上级部门，只留更具体的直属部门。"""
+    parent_of = _parent_map(departments)
+    raw = [str(x).strip() for x in dept_ids if str(x).strip()]
+    pool = set(raw)
+    out: list[str] = []
+    for did in raw:
+        if any(other != did and _is_ancestor(did, other, parent_of) for other in pool):
+            continue
+        if did not in out:
+            out.append(did)
+    return out
+
+
+def _dept_names(dept_ids: list[str], departments: list[dict[str, Any]]) -> list[str]:
+    wanted = set(dept_ids)
+    names: list[str] = []
+    for d in departments:
+        oid = str(d.get("open_department_id") or "").strip()
+        name = str(d.get("name") or "").strip()
+        if oid in wanted and name and name not in names:
+            names.append(name)
+    return names
+
+
+def _ids_for_exact_dept_names(
+    labels: list[str],
+    departments: list[dict[str, Any]],
+) -> tuple[set[str], str]:
+    """花名册团队名只按部门名精确匹配，不走 canonical_team 并级。"""
+    by_name = {
+        str(d.get("name") or "").strip(): str(d.get("open_department_id") or "").strip()
+        for d in departments
+        if str(d.get("name") or "").strip() and str(d.get("open_department_id") or "").strip()
+    }
+    roots: set[str] = set()
+    hit: list[str] = []
+    for label in labels:
+        oid = by_name.get(label)
+        if oid:
+            roots.add(oid)
+            hit.append(label)
+    if not roots:
+        return set(), ""
+    return _descendants(roots, departments), "、".join(hit)
+
+
+def _roster_team_labels(open_id: str) -> list[str]:
+    try:
+        from ..person_resolve import lookup_by_open_id
+
+        hit = lookup_by_open_id(open_id) or {}
+    except Exception:
+        return []
+    raw = str(hit.get("teams") or "")
+    out: list[str] = []
+    for part in raw.split(","):
+        name = part.strip()
+        if name and name not in out:
+            out.append(name)
+    return out
+
+
+def asker_teammates(open_id: str, *, limit: int = 24) -> tuple[list[str], str]:
+    """提问者直属部门（含子部门）的同事。
+
+    不用 Mesh 粗团队名。杜锦涛在「创新技术」时，不会把同属品牌创意团队的
+    创意视频、品牌设计算进「我们团队」。
+    返回 (人名, 部门标签)；对不上则 ([], "")，调用方再回退粗团队。
+    """
+    oid = (open_id or "").strip()
+    if not oid:
+        return [], ""
+    try:
+        departments, people = load_directory()
+    except Exception as e:
+        log.info("asker_teammates load fail: %s", e)
+        return [], ""
+    person = next(
+        (u for u in people if str(u.get("open_id") or "").strip() == oid),
+        None,
+    )
+    dept_ids = _specific_dept_ids(
+        list((person or {}).get("department_ids") or []),
+        departments,
+    )
+    if dept_ids:
+        scope_ids = _descendants(set(dept_ids), departments)
+        label = "、".join(_dept_names(dept_ids, departments)) or ""
+    else:
+        scope_ids, label = _ids_for_exact_dept_names(_roster_team_labels(oid), departments)
+    if not scope_ids:
+        return [], ""
+    names: list[str] = []
+    for u in _people_in_depts(people, scope_ids):
+        n = str(u.get("name") or "").strip()
+        if n and n not in names:
+            names.append(n)
+        if len(names) >= int(limit):
+            break
+    return names, label
+
+
+def _place_label(person: dict[str, Any], departments: list[dict[str, Any]]) -> str:
+    """查人结果里的部门。直属部门优先，没有则用花名册团队名。"""
+    specific = _specific_dept_ids(list(person.get("department_ids") or []), departments)
+    names = _dept_names(specific, departments)
+    if names:
+        return "部门:" + "、".join(names[:3])
+    oid = str(person.get("open_id") or "").strip()
+    roster = _roster_team_labels(oid)
+    if roster:
+        return "部门:" + "、".join(roster[:3])
+    return ""
+
+
 def member_names_for_scope(query: str, *, limit: int = 24) -> list[str]:
-    """飞书部门/Mesh 队子树里的人名（问「我们团队」时给周报当线索）。"""
+    """飞书部门/Mesh 队子树里的人名（显式问某队时用，会包含同级并入的粗团队）。"""
     q = (query or "").strip()
     if not q:
         return []
@@ -617,7 +753,7 @@ def search_directory(
             or ql in job.lower()
         ):
             continue
-        parts = [p for p in (job, emp, email) if p]
+        parts = [p for p in (_place_label(u, departments), job, emp, email) if p]
         items.append(
             {
                 "title": name or oid or "同事",
