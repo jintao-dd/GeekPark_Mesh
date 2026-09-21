@@ -1,14 +1,23 @@
-"""Planner-lite：纯规则检索规划（无 LLM / ReAct）。
+"""Planner-lite：检索规划（LLM 语义意图 + 规则兜底）。
 
 输出 RetrievalPlan，供 ask_engine.prepare 选择 structured 或 hybrid。
+
+意图判断优先用 LLM（语义理解，适配千变万化问法），失败/关闭时回落纯正则。
+不管走哪条路，最终「算」的部分仍由确定性 SQL（qa_structured.run_structured）完成，
+LLM 只填「要不要做集合运算 / 哪两个队 / 交集还是差集」这张固定表，不参与计算。
 """
 from __future__ import annotations
 
+import json
+import logging
+import os
 import re
 from dataclasses import dataclass, field
 from typing import Literal
 
 from . import qa_structured
+
+log = logging.getLogger("uvicorn.error")
 
 CONFIDENCE_THRESHOLD = 0.7
 
@@ -222,7 +231,11 @@ def _intent_to_plan(intent: dict, confidence: float) -> RetrievalPlan:
 
 
 def plan_retrieval(q: str, refs: dict | None = None) -> RetrievalPlan:
-    """纯规则规划：原始问句 → structured/hybrid + set_op + confidence。"""
+    """问句 → structured/hybrid + set_op + confidence。
+
+    顺序：LLM 语义意图（优先）→ 规则模式 → legacy parse_intent → 纯 hybrid。
+    LLM 结果必须通过校验（type 合法 + 队名可归一）才采用，否则回落规则。
+    """
     q = (q or "").strip()
     if not q:
         return RetrievalPlan()
@@ -232,13 +245,19 @@ def plan_retrieval(q: str, refs: dict | None = None) -> RetrievalPlan:
 
     win = _win(q)
 
+    # 1) LLM 语义意图（可用则优先；校验通过才采用）
+    llm_plan = _llm_intent_plan(q, win)
+    if llm_plan is not None:
+        return llm_plan
+
+    # 2) 规则模式（无 LLM / LLM 失败时的确定性兜底）
     for fn in (_plan_overseas_gap, _plan_by_team, _plan_diff, _plan_intersect):
         hit = fn(q, win)
         if hit:
             intent, conf = hit
             return _intent_to_plan(intent, conf)
 
-    # 兼容已有 parse_intent 覆盖（e01/e09 等）
+    # 3) 兼容已有 parse_intent 覆盖（e01/e09 等）
     legacy = qa_structured.parse_intent(q)
     if legacy and legacy.get("type") != "error":
         t = legacy["type"]
@@ -246,3 +265,122 @@ def plan_retrieval(q: str, refs: dict | None = None) -> RetrievalPlan:
         return _intent_to_plan(legacy, conf)
 
     return RetrievalPlan(path="hybrid", set_op="none", confidence=0.0)
+
+
+def _llm_intent_enabled() -> bool:
+    """默认开启；MESH_ASK_LLM_INTENT=0 可回退纯规则。"""
+    v = (os.environ.get("MESH_ASK_LLM_INTENT") or "1").strip().lower()
+    return v not in ("0", "false", "off", "no")
+
+
+_LLM_INTENT_SYSTEM = """你是检索意图分类器。判断用户问句是否需要「跨团队集合运算」，只输出 JSON，不解释。
+
+集合运算类型：
+- intersect：两个团队都接触/关注/讨论过的「同一批」公司或人（重合、交集、都碰过、同时在跟）。
+- diff：团队 A 接触过、团队 B 没接触过（差集、A 有 B 无、A 跟过但 B 还没）。
+- by_team：某个话题/领域，各团队分别知道/关注了什么（按团队聚合同一主题）。
+- overseas_gap：海外团队接触过、国内团队还没接触的缺口。
+- none：以上都不是（普通检索、单团队、进展、看法、寒暄等）。
+
+规则：
+1) 只有语义上确实要「比较两个团队的名单」才给 intersect/diff；模糊问「关注什么」不是。
+2) team_a/team_b 用问句里出现的团队原词（如「编辑部」「商业化团队」「硅谷」），系统会自己归一。
+3) diff 里 team_a = 有记录的一方，team_b = 没记录的一方。
+4) topic 仅 by_team 用，填被比较的话题词（如「AI 助听器」「硬件」）。
+5) 拿不准就给 none，宁可漏判也不要误判。
+
+输出：{"type": "...", "team_a": "", "team_b": "", "topic": "", "confidence": 0.0-1.0}"""
+
+
+def _llm_intent_plan(q: str, win: dict) -> RetrievalPlan | None:
+    if not _llm_intent_enabled():
+        return None
+    try:
+        from . import llm
+
+        raw = llm.call(
+            _LLM_INTENT_SYSTEM,
+            f"问句：{q}\n只输出 JSON：",
+            max_tokens=200,
+            json_mode=True,
+            task="semantic",
+        )
+        data = raw if isinstance(raw, dict) else json.loads(str(raw or "").strip())
+    except Exception as e:
+        log.info("ask llm-intent failed, fallback rules: %s", e)
+        return None
+
+    if not isinstance(data, dict):
+        return None
+    t = str(data.get("type") or "none").strip().lower()
+    if t not in ("diff", "intersect", "by_team", "overseas_gap"):
+        # LLM 判定普通检索 → 不短路，让规则兜底再决定（避免 LLM 漏掉 legacy 覆盖）
+        return None
+
+    conf = data.get("confidence")
+    try:
+        conf = float(conf)
+    except Exception:
+        conf = 0.8
+    conf = max(0.0, min(1.0, conf))
+    section = qa_structured._infer_section(q)
+    hardware = bool(
+        re.search(r"硬件|" + "|".join(map(re.escape, qa_structured.HARDWARE_HINTS)), q)
+    )
+
+    if t == "overseas_gap":
+        intent = {
+            "type": "overseas_gap",
+            "section": section if section in ("接触", "关注") else "接触",
+            "hardware": hardware,
+            **win,
+        }
+        return _validate_and_plan(intent, max(conf, 0.9), q)
+
+    if t == "by_team":
+        topic = str(data.get("topic") or "").strip(" ，,。的？?")
+        if not topic and hardware:
+            topic = "硬件"
+        if not topic or len(topic) < 2 or topic in qa_structured._BAD_BY_TEAM_TOPICS:
+            return None
+        intent = {
+            "type": "by_team",
+            "topic": topic,
+            "hardware": hardware,
+            "section": section,
+            **win,
+        }
+        return _validate_and_plan(intent, max(conf, 0.85), q)
+
+    # diff / intersect：两个队都必须能归一
+    ta = qa_structured._normalize_team(str(data.get("team_a") or ""))
+    tb = qa_structured._normalize_team(str(data.get("team_b") or ""))
+    if not ta or not tb or ta == tb:
+        log.info("ask llm-intent %s dropped: teams=%r/%r not resolvable", t, data.get("team_a"), data.get("team_b"))
+        return None
+    intent = {
+        "type": t,
+        "team_a": ta,
+        "team_b": tb,
+        "section": section if section in ("接触", "关注", "关系", "看法") else "接触",
+        "hardware": hardware,
+        **win,
+    }
+    return _validate_and_plan(intent, max(conf, 0.85), q)
+
+
+def _validate_and_plan(intent: dict, conf: float, q: str) -> RetrievalPlan | None:
+    """LLM 意图入 structured 前的确定性校验；不通过返回 None 回落规则。"""
+    t = intent.get("type")
+    if t not in ("diff", "intersect", "by_team", "overseas_gap"):
+        return None
+    plan = _intent_to_plan(intent, conf)
+    plan.intent = intent
+    log.info(
+        "ask llm-intent accepted type=%s conf=%.2f teams=%s topic=%s",
+        t,
+        conf,
+        plan.teams,
+        intent.get("topic") or "-",
+    )
+    return plan
