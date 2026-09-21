@@ -1,0 +1,768 @@
+[
+  {
+    "id": "R01",
+    "query": "上周我们和哪些公司有过接触？",
+    "slug": "",
+    "window": [
+      "2026-09-14",
+      "2026-09-20"
+    ],
+    "channel_dist": {
+      "fts": {
+        "n": 11,
+        "min": 0.0,
+        "p50": 0.0,
+        "max": 0.0
+      },
+      "item_facts": {
+        "n": 28,
+        "min": 0.0,
+        "p50": 0.0,
+        "max": 0.0
+      },
+      "vector": {
+        "n": 20,
+        "min": -0.702,
+        "p50": -0.536,
+        "max": -0.504
+      }
+    },
+    "item_facts_neg50_count": 0,
+    "item_facts_neg50_top": [],
+    "after_merge_hits(fts,items)_top": [
+      {
+        "rank": 1,
+        "source": "fts",
+        "score": -0.45,
+        "section": "接触过的人和公司",
+        "chunk": "",
+        "item": null,
+        "snip": "xTool | 珩仪 · pre-IPO AI 硬件与办公工具 身份 激光切割/桌面制造硬件公司（pre-IPO） 要点 已接触 来源 编辑"
+      },
+      {
+        "rank": 2,
+        "source": "fts",
+        "score": -0.45,
+        "section": "接触过的人和公司",
+        "chunk": "",
+        "item": null,
+        "snip": "floatboat | 少卿 AI 硬件与办公工具 身份 AI 硬件方向创业者 要点 已接触 来源 编辑部沟通记录（有原始记录）"
+      },
+      {
+        "rank": 3,
+        "source": "fts",
+        "score": -0.45,
+        "section": "接触过的人和公司",
+        "chunk": "",
+        "item": null,
+        "snip": "未来脑律ZenoWell | 薛耀 AI 硬件与办公工具 身份 脑律/健康方向创业者 要点 已接触 来源 编辑部沟通记录（有原始记录）"
+      },
+      {
+        "rank": 4,
+        "source": "fts",
+        "score": -0.45,
+        "section": "接触过的人和公司",
+        "chunk": "",
+        "item": null,
+        "snip": "OdyssLife | JACK AI 硬件与办公工具 身份 AI 陪伴/生活方向创业者 要点 已接触 来源 编辑部沟通记录（有原始记录）"
+      },
+      {
+        "rank": 5,
+        "source": "fts",
+        "score": -0.45,
+        "section": "接触过的人和公司",
+        "chunk": "",
+        "item": null,
+        "snip": "石马笔记 | 王建明 AI 硬件与办公工具 身份 笔记/工具方向创业者 要点 已接触 来源 编辑部沟通记录（有原始记录）"
+      },
+      {
+        "rank": 6,
+        "source": "fts",
+        "score": -0.45,
+        "section": "接触过的人和公司",
+        "chunk": "",
+        "item": null,
+        "snip": "小鹏 | 刘先明团队 汽车与出行 身份 小鹏机器人相关团队 要点 已接触，对方当前重心先放研发，后续有科技日等阶段节点 来源 编辑部沟通记录"
+      },
+      {
+        "rank": 7,
+        "source": "fts",
+        "score": -0.45,
+        "section": "接触过的人和公司",
+        "chunk": "",
+        "item": null,
+        "snip": "石上阳 | 创业者 新发现 身份 未来 3D 堆叠芯片封装与散热一体化协同平台方向 时间 投资团队拟下月接触 要点 编辑部、投资团队用得上 "
+      },
+      {
+        "rank": 8,
+        "source": "fts",
+        "score": -0.45,
+        "section": "关注了什么",
+        "chunk": "",
+        "item": null,
+        "snip": "具身智能与机器人 |   关注的领域 编辑部 重心往具身智能上下游与偏制造产业链收；越疆、程天科技等一手对话 投资团队 例会跟踪多异构机器人"
+      },
+      {
+        "rank": 9,
+        "source": "fts",
+        "score": -0.45,
+        "section": "关注了什么",
+        "chunk": "",
+        "item": null,
+        "snip": "AI 硬件 |   关注的领域 编辑部 floatboat、xTool、OdyssLife 等接触；手机背面硬件成新关键位判断 投资团队 关"
+      },
+      {
+        "rank": 10,
+        "source": "item_facts",
+        "score": -0.3,
+        "section": "抽取条目",
+        "chunk": "",
+        "item": 4643,
+        "snip": "floatboat | floatboat · 编辑部 · T1 · floatboat · 少卿（创始人&CEO）：已接触，本条无展开要点"
+      }
+    ],
+    "after_merge_with_vector_top": [
+      {
+        "rank": 1,
+        "source": "vector",
+        "score": -1.066,
+        "section": "接触过的人和公司",
+        "chunk": "39d868d9",
+        "item": null,
+        "snip": "比亚迪 | 推进对方内部流程 合同流程中 阶段 合同流程中 来源 商业化团队例会提及"
+      },
+      {
+        "rank": 2,
+        "source": "vector",
+        "score": -1.002,
+        "section": "抽取条目",
+        "chunk": "a5cde5bc",
+        "item": 4802,
+        "snip": "特赞 | 特赞：合作可能性不大，继续跟进（沟通中）"
+      },
+      {
+        "rank": 3,
+        "source": "vector",
+        "score": -0.986,
+        "section": "接触过的人和公司",
+        "chunk": "368f8a1a",
+        "item": null,
+        "snip": "京东 | 开口框架 合同流程中 阶段 合同流程中 来源 商业化团队例会提及"
+      },
+      {
+        "rank": 4,
+        "source": "vector",
+        "score": -0.937,
+        "section": "抽取条目",
+        "chunk": "173a879d",
+        "item": 4798,
+        "snip": "vivo | vivo VDC：约在月中，已在聊合作（沟通中）"
+      },
+      {
+        "rank": 5,
+        "source": "vector",
+        "score": -0.908,
+        "section": "抽取条目",
+        "chunk": "178a1478",
+        "item": 4816,
+        "snip": "XC | XC：上周新增，已在做执行（已签约执行中）"
+      },
+      {
+        "rank": 6,
+        "source": "vector",
+        "score": -0.904,
+        "section": "抽取条目",
+        "chunk": "0e0a3993",
+        "item": 4795,
+        "snip": "亚马逊广告 | 亚马逊广告：时间尚早，本周继续问进度（沟通中）"
+      },
+      {
+        "rank": 7,
+        "source": "vector",
+        "score": -0.903,
+        "section": "抽取条目",
+        "chunk": "31dada67",
+        "item": 4808,
+        "snip": "追觅 | 追觅：初稿已出，方向按对方要求调整后由我方审核（方案待确认）"
+      },
+      {
+        "rank": 8,
+        "source": "fts",
+        "score": -0.9,
+        "section": "接触过的人和公司",
+        "chunk": "",
+        "item": null,
+        "snip": "xTool | 珩仪 · pre-IPO AI 硬件与办公工具 身份 激光切割/桌面制造硬件公司（pre-IPO） 要点 已接触 来源 编辑"
+      },
+      {
+        "rank": 9,
+        "source": "fts",
+        "score": -0.9,
+        "section": "接触过的人和公司",
+        "chunk": "",
+        "item": null,
+        "snip": "floatboat | 少卿 AI 硬件与办公工具 身份 AI 硬件方向创业者 要点 已接触 来源 编辑部沟通记录（有原始记录）"
+      },
+      {
+        "rank": 10,
+        "source": "fts",
+        "score": -0.9,
+        "section": "接触过的人和公司",
+        "chunk": "",
+        "item": null,
+        "snip": "未来脑律ZenoWell | 薛耀 AI 硬件与办公工具 身份 脑律/健康方向创业者 要点 已接触 来源 编辑部沟通记录（有原始记录）"
+      }
+    ],
+    "vector_ranks_in_pool": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      17,
+      18,
+      19
+    ],
+    "final_retrieve_mode": "hybrid",
+    "final_top": [
+      {
+        "rank": 1,
+        "source": "vector",
+        "score": -1.334,
+        "section": "抽取条目",
+        "chunk": "a5cde5bc",
+        "item": 4802,
+        "snip": "特赞 | 特赞：合作可能性不大，继续跟进（沟通中）"
+      },
+      {
+        "rank": 2,
+        "source": "vector",
+        "score": -1.263,
+        "section": "抽取条目",
+        "chunk": "173a879d",
+        "item": 4798,
+        "snip": "vivo | vivo VDC：约在月中，已在聊合作（沟通中）"
+      },
+      {
+        "rank": 3,
+        "source": "vector",
+        "score": -1.232,
+        "section": "抽取条目",
+        "chunk": "178a1478",
+        "item": 4816,
+        "snip": "XC | XC：上周新增，已在做执行（已签约执行中）"
+      },
+      {
+        "rank": 4,
+        "source": "vector",
+        "score": -1.231,
+        "section": "接触过的人和公司",
+        "chunk": "39d868d9",
+        "item": null,
+        "snip": "比亚迪 | 推进对方内部流程 合同流程中 阶段 合同流程中 来源 商业化团队例会提及"
+      },
+      {
+        "rank": 5,
+        "source": "vector",
+        "score": -1.164,
+        "section": "抽取条目",
+        "chunk": "0e0a3993",
+        "item": 4795,
+        "snip": "亚马逊广告 | 亚马逊广告：时间尚早，本周继续问进度（沟通中）"
+      },
+      {
+        "rank": 6,
+        "source": "vector",
+        "score": -1.151,
+        "section": "接触过的人和公司",
+        "chunk": "368f8a1a",
+        "item": null,
+        "snip": "京东 | 开口框架 合同流程中 阶段 合同流程中 来源 商业化团队例会提及"
+      },
+      {
+        "rank": 7,
+        "source": "vector",
+        "score": -1.113,
+        "section": "抽取条目",
+        "chunk": "31dada67",
+        "item": 4808,
+        "snip": "追觅 | 追觅：初稿已出，方向按对方要求调整后由我方审核（方案待确认）"
+      },
+      {
+        "rank": 8,
+        "source": "vector",
+        "score": -1.079,
+        "section": "抽取条目",
+        "chunk": "38df9f80",
+        "item": 4637,
+        "snip": "workbuddy | workbuddy商务：已发布，含商务（提报 8/30）"
+      },
+      {
+        "rank": 9,
+        "source": "vector",
+        "score": -0.989,
+        "section": "抽取条目",
+        "chunk": "21a122cf",
+        "item": 4827,
+        "snip": "tech week | CES/tech week 摸底：已就北美出行问询kimi、瑞宝对接吉利与比亚迪、陈静反馈去美国可能性小；硅谷相关信"
+      },
+      {
+        "rank": 10,
+        "source": "vector",
+        "score": -0.977,
+        "section": "抽取条目",
+        "chunk": "0f89d0f2",
+        "item": 4807,
+        "snip": "外滩大会 | 外滩大会（蚂蚁）：与安全 agent 相关，稿件催办中（沟通中）"
+      }
+    ]
+  },
+  {
+    "id": "R04",
+    "query": "编辑部本周关注了什么方向？",
+    "slug": "",
+    "window": [
+      "2026-09-21",
+      "2026-09-21"
+    ],
+    "channel_dist": {
+      "fts": {
+        "n": 0
+      },
+      "item_facts": {
+        "n": 0
+      },
+      "vector": {
+        "n": 20,
+        "min": -0.618,
+        "p50": -0.503,
+        "max": -0.482
+      }
+    },
+    "item_facts_neg50_count": 0,
+    "item_facts_neg50_top": [],
+    "after_merge_hits(fts,items)_top": [],
+    "after_merge_with_vector_top": [
+      {
+        "rank": 1,
+        "source": "vector",
+        "score": -0.939,
+        "section": "接触过的人和公司",
+        "chunk": "34d23641",
+        "item": null,
+        "snip": "石马笔记 | 王建明 AI 硬件与办公工具 身份 笔记/工具方向创业者 要点 已接触 来源 编辑部沟通记录（有原始记录）"
+      },
+      {
+        "rank": 2,
+        "source": "vector",
+        "score": -0.886,
+        "section": "抽取条目",
+        "chunk": "31dada67",
+        "item": 4808,
+        "snip": "追觅 | 追觅：初稿已出，方向按对方要求调整后由我方审核（方案待确认）"
+      },
+      {
+        "rank": 3,
+        "source": "vector",
+        "score": -0.834,
+        "section": "抽取条目",
+        "chunk": "0e0a3993",
+        "item": 4795,
+        "snip": "亚马逊广告 | 亚马逊广告：时间尚早，本周继续问进度（沟通中）"
+      },
+      {
+        "rank": 4,
+        "source": "vector",
+        "score": -0.829,
+        "section": "抽取条目",
+        "chunk": "238aba13",
+        "item": 4791,
+        "snip": "公众号 | 公众号周报：上周发文24篇（非商务原创14篇、商务3篇），平均阅读人数约1.1万，平均读后关注19个，较上周上升。原创过万文章8"
+      },
+      {
+        "rank": 5,
+        "source": "vector",
+        "score": -0.822,
+        "section": "抽取条目",
+        "chunk": "38df9f80",
+        "item": 4637,
+        "snip": "workbuddy | workbuddy商务：已发布，含商务（提报 8/30）"
+      },
+      {
+        "rank": 6,
+        "source": "vector",
+        "score": -0.804,
+        "section": "可同步的关系",
+        "chunk": "2f38f9d5",
+        "item": null,
+        "snip": "小宇宙 | 同一件事，两个部门各知一半 围绕与小宇宙的合作，编辑部记着拟 10 月前沟通合作方向，商业化团队记着在评估深度合作可能，两侧掌握"
+      },
+      {
+        "rank": 7,
+        "source": "vector",
+        "score": -0.803,
+        "section": "抽取条目",
+        "chunk": "0da33e6c",
+        "item": 4631,
+        "snip": "本周商单内容 | 本周商单内容 2 条按规则不列入排序（小红书×悦普×极客公园对谈、IFA 2026 耐士劳）。"
+      },
+      {
+        "rank": 8,
+        "source": "vector",
+        "score": -0.803,
+        "section": "抽取条目",
+        "chunk": "178a1478",
+        "item": 4816,
+        "snip": "XC | XC：上周新增，已在做执行（已签约执行中）"
+      },
+      {
+        "rank": 9,
+        "source": "vector",
+        "score": -0.8,
+        "section": "抽取条目",
+        "chunk": "0ebbb8a0",
+        "item": 4833,
+        "snip": "豆包 | 会议判断（非核实事实）：豆包在飞书、扣子并入后办公方向更新很快，字节目标明确时运营效率高；阿里千问、千问办公、Coder 三者分属"
+      },
+      {
+        "rank": 10,
+        "source": "vector",
+        "score": -0.793,
+        "section": "抽取条目",
+        "chunk": "0f89d0f2",
+        "item": 4807,
+        "snip": "外滩大会 | 外滩大会（蚂蚁）：与安全 agent 相关，稿件催办中（沟通中）"
+      }
+    ],
+    "vector_ranks_in_pool": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "final_retrieve_mode": "hybrid",
+    "final_top": [
+      {
+        "rank": 1,
+        "source": "vector",
+        "score": -1.218,
+        "section": "抽取条目",
+        "chunk": "31dada67",
+        "item": 4808,
+        "snip": "追觅 | 追觅：初稿已出，方向按对方要求调整后由我方审核（方案待确认）"
+      },
+      {
+        "rank": 2,
+        "source": "vector",
+        "score": -1.155,
+        "section": "抽取条目",
+        "chunk": "238aba13",
+        "item": 4791,
+        "snip": "公众号 | 公众号周报：上周发文24篇（非商务原创14篇、商务3篇），平均阅读人数约1.1万，平均读后关注19个，较上周上升。原创过万文章8"
+      },
+      {
+        "rank": 3,
+        "source": "vector",
+        "score": -1.119,
+        "section": "抽取条目",
+        "chunk": "0e0a3993",
+        "item": 4795,
+        "snip": "亚马逊广告 | 亚马逊广告：时间尚早，本周继续问进度（沟通中）"
+      },
+      {
+        "rank": 4,
+        "source": "vector",
+        "score": -1.107,
+        "section": "抽取条目",
+        "chunk": "38df9f80",
+        "item": 4637,
+        "snip": "workbuddy | workbuddy商务：已发布，含商务（提报 8/30）"
+      },
+      {
+        "rank": 5,
+        "source": "vector",
+        "score": -1.104,
+        "section": "接触过的人和公司",
+        "chunk": "34d23641",
+        "item": null,
+        "snip": "石马笔记 | 王建明 AI 硬件与办公工具 身份 笔记/工具方向创业者 要点 已接触 来源 编辑部沟通记录（有原始记录）"
+      },
+      {
+        "rank": 6,
+        "source": "vector",
+        "score": -1.083,
+        "section": "抽取条目",
+        "chunk": "24ae277b",
+        "item": 4834,
+        "snip": "捷豹 | 选题会研判（受访者陈述，非核实事实）：捷豹一位董事认为汽车发展在往消费方向走，后续选题可多关注座舱智能升级及芯片、电池等架构改变节"
+      },
+      {
+        "rank": 7,
+        "source": "vector",
+        "score": -1.022,
+        "section": "抽取条目",
+        "chunk": "0ebbb8a0",
+        "item": 4833,
+        "snip": "豆包 | 会议判断（非核实事实）：豆包在飞书、扣子并入后办公方向更新很快，字节目标明确时运营效率高；阿里千问、千问办公、Coder 三者分属"
+      },
+      {
+        "rank": 8,
+        "source": "vector",
+        "score": -1.003,
+        "section": "抽取条目",
+        "chunk": "0da33e6c",
+        "item": 4631,
+        "snip": "本周商单内容 | 本周商单内容 2 条按规则不列入排序（小红书×悦普×极客公园对谈、IFA 2026 耐士劳）。"
+      },
+      {
+        "rank": 9,
+        "source": "vector",
+        "score": -1.003,
+        "section": "抽取条目",
+        "chunk": "178a1478",
+        "item": 4816,
+        "snip": "XC | XC：上周新增，已在做执行（已签约执行中）"
+      },
+      {
+        "rank": 10,
+        "source": "vector",
+        "score": -0.964,
+        "section": "可同步的关系",
+        "chunk": "2f38f9d5",
+        "item": null,
+        "snip": "小宇宙 | 同一件事，两个部门各知一半 围绕与小宇宙的合作，编辑部记着拟 10 月前沟通合作方向，商业化团队记着在评估深度合作可能，两侧掌握"
+      }
+    ]
+  },
+  {
+    "id": "R14",
+    "query": "视频号团队本周播放较好的内容",
+    "slug": "2026-09-08",
+    "window": [
+      "2026-09-21",
+      "2026-09-21"
+    ],
+    "channel_dist": {
+      "fts": {
+        "n": 0
+      },
+      "item_facts": {
+        "n": 0
+      },
+      "vector": {
+        "n": 20,
+        "min": -0.676,
+        "p50": -0.485,
+        "max": -0.433
+      }
+    },
+    "item_facts_neg50_count": 0,
+    "item_facts_neg50_top": [],
+    "after_merge_hits(fts,items)_top": [],
+    "after_merge_with_vector_top": [
+      {
+        "rank": 1,
+        "source": "vector",
+        "score": -0.891,
+        "section": "接触过的人和公司",
+        "chunk": "39d868d9",
+        "item": null,
+        "snip": "比亚迪 | 推进对方内部流程 合同流程中 阶段 合同流程中 来源 商业化团队例会提及"
+      },
+      {
+        "rank": 2,
+        "source": "vector",
+        "score": -0.841,
+        "section": "抽取条目",
+        "chunk": "173a879d",
+        "item": 4798,
+        "snip": "vivo | vivo VDC：约在月中，已在聊合作（沟通中）"
+      },
+      {
+        "rank": 3,
+        "source": "vector",
+        "score": -0.831,
+        "section": "抽取条目",
+        "chunk": "34bdc297",
+        "item": 4785,
+        "snip": "AI办公播客 | 播客周报：上周更新AI办公节目（直播转播客），目前播放量3400，完播率46.8%，过半程留存50%以上、尾声30%上下，"
+      },
+      {
+        "rank": 4,
+        "source": "vector",
+        "score": -0.826,
+        "section": "Data Source",
+        "chunk": "01a9a4cb",
+        "item": null,
+        "snip": "视频号团队 | 视频号周数据 · 本周播放前列三条（硅谷 AI 编程、影石、OpenAI 方向）"
+      },
+      {
+        "rank": 5,
+        "source": "vector",
+        "score": -0.82,
+        "section": "抽取条目",
+        "chunk": "0da33e6c",
+        "item": 4631,
+        "snip": "本周商单内容 | 本周商单内容 2 条按规则不列入排序（小红书×悦普×极客公园对谈、IFA 2026 耐士劳）。"
+      },
+      {
+        "rank": 6,
+        "source": "vector",
+        "score": -0.817,
+        "section": "抽取条目",
+        "chunk": "238aba13",
+        "item": 4791,
+        "snip": "公众号 | 公众号周报：上周发文24篇（非商务原创14篇、商务3篇），平均阅读人数约1.1万，平均读后关注19个，较上周上升。原创过万文章8"
+      },
+      {
+        "rank": 7,
+        "source": "vector",
+        "score": -0.794,
+        "section": "抽取条目",
+        "chunk": "1c9f6abc",
+        "item": 4823,
+        "snip": "英伟达 | 英伟达视频播客：我方嘉宾与内容已就绪，卡在对方希望嘉宾念广告的沟通，待对方确认后即可安排录制（方案待确认）"
+      },
+      {
+        "rank": 8,
+        "source": "vector",
+        "score": -0.79,
+        "section": "抽取条目",
+        "chunk": "38df9f80",
+        "item": 4637,
+        "snip": "workbuddy | workbuddy商务：已发布，含商务（提报 8/30）"
+      },
+      {
+        "rank": 9,
+        "source": "vector",
+        "score": -0.785,
+        "section": "抽取条目",
+        "chunk": "0e0a3993",
+        "item": 4795,
+        "snip": "亚马逊广告 | 亚马逊广告：时间尚早，本周继续问进度（沟通中）"
+      },
+      {
+        "rank": 10,
+        "source": "vector",
+        "score": -0.78,
+        "section": "抽取条目",
+        "chunk": "178a1478",
+        "item": 4816,
+        "snip": "XC | XC：上周新增，已在做执行（已签约执行中）"
+      }
+    ],
+    "vector_ranks_in_pool": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "final_retrieve_mode": "hybrid",
+    "final_top": [
+      {
+        "rank": 1,
+        "source": "vector",
+        "score": -1.214,
+        "section": "抽取条目",
+        "chunk": "34bdc297",
+        "item": 4785,
+        "snip": "AI办公播客 | 播客周报：上周更新AI办公节目（直播转播客），目前播放量3400，完播率46.8%，过半程留存50%以上、尾声30%上下，"
+      },
+      {
+        "rank": 2,
+        "source": "vector",
+        "score": -1.183,
+        "section": "抽取条目",
+        "chunk": "173a879d",
+        "item": 4798,
+        "snip": "vivo | vivo VDC：约在月中，已在聊合作（沟通中）"
+      },
+      {
+        "rank": 3,
+        "source": "vector",
+        "score": -1.152,
+        "section": "抽取条目",
+        "chunk": "0da33e6c",
+        "item": 4631,
+        "snip": "本周商单内容 | 本周商单内容 2 条按规则不列入排序（小红书×悦普×极客公园对谈、IFA 2026 耐士劳）。"
+      },
+      {
+        "rank": 4,
+        "source": "vector",
+        "score": -1.077,
+        "section": "抽取条目",
+        "chunk": "238aba13",
+        "item": 4791,
+        "snip": "公众号 | 公众号周报：上周发文24篇（非商务原创14篇、商务3篇），平均阅读人数约1.1万，平均读后关注19个，较上周上升。原创过万文章8"
+      },
+      {
+        "rank": 5,
+        "source": "vector",
+        "score": -1.056,
+        "section": "接触过的人和公司",
+        "chunk": "39d868d9",
+        "item": null,
+        "snip": "比亚迪 | 推进对方内部流程 合同流程中 阶段 合同流程中 来源 商业化团队例会提及"
+      },
+      {
+        "rank": 6,
+        "source": "vector",
+        "score": -1.004,
+        "section": "抽取条目",
+        "chunk": "1c9f6abc",
+        "item": 4823,
+        "snip": "英伟达 | 英伟达视频播客：我方嘉宾与内容已就绪，卡在对方希望嘉宾念广告的沟通，待对方确认后即可安排录制（方案待确认）"
+      },
+      {
+        "rank": 7,
+        "source": "vector",
+        "score": -1.0,
+        "section": "抽取条目",
+        "chunk": "38df9f80",
+        "item": 4637,
+        "snip": "workbuddy | workbuddy商务：已发布，含商务（提报 8/30）"
+      },
+      {
+        "rank": 8,
+        "source": "vector",
+        "score": -0.991,
+        "section": "Data Source",
+        "chunk": "01a9a4cb",
+        "item": null,
+        "snip": "视频号团队 | 视频号周数据 · 本周播放前列三条（硅谷 AI 编程、影石、OpenAI 方向）"
+      },
+      {
+        "rank": 9,
+        "source": "vector",
+        "score": -0.928,
+        "section": "抽取条目",
+        "chunk": "0e0a3993",
+        "item": 4795,
+        "snip": "亚马逊广告 | 亚马逊广告：时间尚早，本周继续问进度（沟通中）"
+      },
+      {
+        "rank": 10,
+        "source": "vector",
+        "score": -0.921,
+        "section": "抽取条目",
+        "chunk": "178a1478",
+        "item": 4816,
+        "snip": "XC | XC：上周新增，已在做执行（已签约执行中）"
+      }
+    ]
+  }
+]

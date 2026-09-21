@@ -1,0 +1,68 @@
+{
+  "status": "ok",
+  "gold": "retrieval_gold_v2.jsonl",
+  "fts_only": {
+    "macro_recall@5": 0.8328,
+    "macro_recall@10": 0.9028,
+    "macro_recall@20": 0.95,
+    "macro_chunk_recall@5": 0.0,
+    "macro_chunk_recall@10": 0.0,
+    "macro_chunk_in_pool": 0.0
+  },
+  "fts_plus_vector": {
+    "macro_recall@5": 0.8328,
+    "macro_recall@10": 0.9028,
+    "macro_recall@20": 0.95,
+    "macro_chunk_recall@5": 0.3033,
+    "macro_chunk_recall@10": 0.3033,
+    "macro_chunk_in_pool": 0.3033
+  },
+  "delta": {
+    "macro_recall@5": 0.0,
+    "macro_recall@10": 0.0,
+    "macro_recall@20": 0.0,
+    "macro_chunk_recall@5": 0.3033,
+    "macro_chunk_recall@10": 0.3033,
+    "macro_chunk_in_pool": 0.3033
+  },
+  "recommendation": "consider optional vector lane (still not default)",
+  "new_relevant": [],
+  "noise_increase": [
+    {
+      "id": "R01",
+      "top5_noise_delta": 2
+    },
+    {
+      "id": "R02",
+      "top5_noise_delta": 2
+    },
+    {
+      "id": "R03",
+      "top5_noise_delta": 4
+    },
+    {
+      "id": "R07",
+      "top5_noise_delta": 2
+    },
+    {
+      "id": "R17",
+      "top5_noise_delta": 4
+    },
+    {
+      "id": "R24",
+      "top5_noise_delta": 2
+    },
+    {
+      "id": "R26",
+      "top5_noise_delta": 4
+    },
+    {
+      "id": "R27",
+      "top5_noise_delta": 3
+    },
+    {
+      "id": "R29",
+      "top5_noise_delta": 4
+    }
+  ]
+}
