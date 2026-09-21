@@ -194,7 +194,7 @@ def _infer_section(q: str) -> str:
         return "关注"
     if re.search(r"看法|观点", q):
         return "看法"
-    if re.search(r"关系|可同步", q):
+    if re.search(r"关系|可同步|同步|重合|重叠|交集", q):
         return "关系"
     return "接触"
 
@@ -361,6 +361,51 @@ def _entity_norm(name: str) -> str:
     return s.lower()
 
 
+# 复合主体名拆分：事实表里同一行常塞多个主体（"A / B / C"、"A、B"、"X · Y"、
+# "X：说明文字"、"X（Y）"）。精确等值匹配会整串落空 → 交集/差集漏判。
+_COMPOSITE_SEP_RE = re.compile(r"[／/、|｜]")
+_TITLE_DOT_RE = re.compile(r"[·•]")
+_LIST_PREFIX_RE = re.compile(r"^(?:等|以及|和|与)\s*")
+_COLON_TAIL_RE = re.compile(r"[：:].*$")
+_PAREN_RE = re.compile(r"[（(]([^）)]*)[）)]")
+
+
+def _split_entity_aliases(name: str) -> list[str]:
+    """把复合主体名拆成原子别名候选（含原始整串，整串放最后）。
+
+    "灵瑙科技 / 飞声助听器 / 亲宝宝 / 氧刻 / 影眸科技"
+        → ["灵瑙科技", "飞声助听器", "亲宝宝", "氧刻", "影眸科技", 原串]
+    "刘靖康（影石 Insta360）：编辑部接触、视频号出镜"
+        → ["刘靖康", "影石 Insta360", 原串]
+    "擎羽科技（晴雨科技）" → ["擎羽科技", "晴雨科技", 原串]
+    """
+    raw = (name or "").strip()
+    if not raw:
+        return []
+    parts: list[str] = []
+    for chunk in _COMPOSITE_SEP_RE.split(raw):
+        for sub in _TITLE_DOT_RE.split(chunk):
+            sub = _LIST_PREFIX_RE.sub("", sub.strip())
+            sub = _COLON_TAIL_RE.sub("", sub).strip()
+            # 括号内容也是候选别名（通常是公司/全称），如 "擎羽科技（晴雨科技）"
+            for m in _PAREN_RE.finditer(sub):
+                inner = _LIST_PREFIX_RE.sub("", m.group(1).strip()).strip()
+                if len(inner) >= 2:
+                    parts.append(inner)
+            sub = _PAREN_RE.sub("", sub).strip()
+            if len(sub) >= 2:
+                parts.append(sub)
+    parts.append(raw)
+    return list(dict.fromkeys(parts))
+
+
+def _entity_keys(name: str) -> set[str]:
+    """主体名的全部匹配 key（含复合串拆分），intersect/diff 匹配用。"""
+    keys = {_entity_norm(p) for p in _split_entity_aliases(name)}
+    keys.discard("")
+    return keys
+
+
 def _fetch_team_section_rows(
     con,
     team: str,
@@ -388,15 +433,15 @@ def _fetch_team_section_rows(
 def query_diff(con, team_a: str, team_b: str, date_from: str | None, section: str = "接触",
                hardware: bool = False, date_to: str | None = None) -> tuple[list[dict], int]:
     rows_a = _fetch_team_section_rows(con, team_a, section, date_from, date_to, hardware=hardware)
-    keys_b = {_entity_norm(r["name"]) for r in _fetch_team_section_rows(
-        con, team_b, section, date_from, date_to, hardware=hardware,
-    )}
+    keys_b: set[str] = set()
+    for r in _fetch_team_section_rows(con, team_b, section, date_from, date_to, hardware=hardware):
+        keys_b |= _entity_keys(r["name"])
     seen, uniq = set(), []
     for r in rows_a:
-        k = _entity_norm(r["name"])
-        if not k or k in keys_b or k in seen:
+        ks = _entity_keys(r["name"])
+        if not ks or (ks & keys_b) or (ks & seen):
             continue
-        seen.add(k)
+        seen |= ks
         uniq.append(r)
     return _rows_to_contexts(uniq)
 
@@ -404,15 +449,15 @@ def query_diff(con, team_a: str, team_b: str, date_from: str | None, section: st
 def query_intersect(con, team_a: str, team_b: str, date_from: str | None, section: str = "接触",
                     hardware: bool = False, date_to: str | None = None) -> tuple[list[dict], int]:
     rows_a = _fetch_team_section_rows(con, team_a, section, date_from, date_to, hardware=hardware)
-    keys_b = {_entity_norm(r["name"]) for r in _fetch_team_section_rows(
-        con, team_b, section, date_from, date_to, hardware=hardware,
-    )}
+    keys_b: set[str] = set()
+    for r in _fetch_team_section_rows(con, team_b, section, date_from, date_to, hardware=hardware):
+        keys_b |= _entity_keys(r["name"])
     seen, uniq = set(), []
     for r in rows_a:
-        k = _entity_norm(r["name"])
-        if not k or k not in keys_b or k in seen:
+        ks = _entity_keys(r["name"])
+        if not ks or not (ks & keys_b) or (ks & seen):
             continue
-        seen.add(k)
+        seen |= ks
         uniq.append(r)
     ctxs, total = _rows_to_contexts(uniq)
     for c in ctxs:
@@ -429,14 +474,14 @@ def query_overseas_gap(con, date_from: str | None, section: str = "接触",
     keys_domestic: set[str] = set()
     for dt in d_teams:
         for r in _fetch_team_section_rows(con, dt, section, date_from, date_to, hardware=hardware):
-            keys_domestic.add(_entity_norm(r["name"]))
+            keys_domestic |= _entity_keys(r["name"])
     seen, uniq = set(), []
     for ot in o_teams:
         for r in _fetch_team_section_rows(con, ot, section, date_from, date_to, hardware=hardware):
-            k = _entity_norm(r["name"])
-            if not k or k in keys_domestic or k in seen:
+            ks = _entity_keys(r["name"])
+            if not ks or (ks & keys_domestic) or (ks & seen):
                 continue
-            seen.add(k)
+            seen |= ks
             uniq.append(r)
     return _rows_to_contexts(uniq)
 

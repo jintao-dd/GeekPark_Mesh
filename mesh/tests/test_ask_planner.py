@@ -60,11 +60,31 @@ def test_e01_intersect_still_works():
     assert p.path == "structured"
 
 
-def test_e15_stays_hybrid_not_intersect():
+def test_e15_rule_path_stays_hybrid():
+    """规则路径（LLM 关）仍不识别 e15 的改述交集——这是 LLM 层存在的理由。"""
     q = "编辑部和商业化团队两边同时跟进了哪些客户？"
     p = plan_retrieval(q)
     assert p.set_op == "none"
     assert p.path == "hybrid"
+
+
+def test_e15_llm_intent_recognizes_intersect(monkeypatch):
+    """LLM 意图层把「两边同时跟进」正确识别为 intersect（规则漏判）。"""
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "1")
+    q = "编辑部和商业化团队两边同时跟进了哪些客户？"
+    payload = {
+        "type": "intersect",
+        "team_a": "编辑部",
+        "team_b": "商业化团队",
+        "topic": "",
+        "confidence": 0.93,
+    }
+    with mock.patch("app.llm.call", _mock_llm(payload)):
+        p = plan_retrieval(q)
+    assert p.set_op == "intersect"
+    assert p.path == "structured"
+    assert p.intent["team_a"] == "编辑部"
+    assert p.intent["team_b"] == "商业化团队"
 
 
 def test_followup_skips_planner_structured():
