@@ -462,6 +462,61 @@ def test_strip_calendar_unless_asked_progress():
     assert len(kept2) == 3
 
 
+def test_parse_acting_team_commercial_roleplay():
+    assert planmod.parse_acting_team(
+        "作为商业化团队的你，过去这段时间极客公园有哪些可能要关注的人或事？"
+    ) == "商业化团队"
+    assert planmod.parse_acting_team(
+        "你看清楚我的问题了吗？我说做为商业化的你应该关注的"
+    ) == "商业化团队"
+    assert planmod.parse_acting_team("硅谷团队最近在做什么？") == ""
+
+
+def test_strip_crm_unless_asked_commercial_focus():
+    from app.agent.supervisor.types import PlanStep
+
+    steps = [
+        PlanStep(id="a", worker="published", tool="ask.published", args={"query": "关注"}),
+        PlanStep(id="b", worker="crm", tool="crm.search", args={"query": "赵思琪"}),
+    ]
+    q = "作为商业化团队的你，过去这段时间极客公园有哪些可能要关注的人或事？"
+    kept = planmod.strip_crm_unless_asked(steps, q)
+    assert [s.tool for s in kept] == ["ask.published"]
+    kept2 = planmod.strip_crm_unless_asked(steps, "硅谷团队最近在做什么？")
+    assert len(kept2) == 2
+
+
+def test_enrich_ask_acting_team_focuses_bucket(monkeypatch):
+    from app.agent.supervisor import workers
+    from app.agent.supervisor.types import PlanStep
+    from app.agent.models import IdentityResult
+
+    monkeypatch.setattr(
+        "app.agent.feishu_hands.org_directory.our_team_members",
+        lambda team, *, limit=24: (["商业化甲", "商业化乙"][:limit], team),
+    )
+    step = PlanStep(
+        id="s1",
+        worker="published",
+        tool="ask.published",
+        args={"query": "该关注什么"},
+    )
+    args = workers.enrich_args(
+        step,
+        identity=IdentityResult(
+            status="bound",
+            primary_team="品牌创意团队",
+            display_hint="杜锦涛",
+        ),
+        context=None,
+        user_text="作为商业化团队的你，过去这段时间极客公园有哪些可能要关注的人或事？",
+    )
+    assert args.get("team") == "商业化团队"
+    assert args.get("apply_team_focus") is True
+    # 角色扮演：不钉提问者本人进 person_names
+    assert "杜锦涛" not in (args.get("person_names") or [])
+
+
 def test_mouth_system_calendar_not_primary_for_progress():
     from app.agent.supervisor import mouth
 

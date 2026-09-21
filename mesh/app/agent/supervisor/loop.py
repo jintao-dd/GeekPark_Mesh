@@ -173,14 +173,28 @@ def handle_turn(
         if ident_team and not str(getattr(session, "active_team", "") or "").strip():
             session.active_team = ident_team
 
-    # Mouth：「我们团队」= Mesh 业务队同事（primary_team），不按飞书叶子切
+    # Mouth：「我们团队」= Mesh 业务队；若用户「作为某队」则本轮用视角队，不串提问者主队
     try:
-        team = str(getattr(identity, "primary_team", None) or "").strip()
+        from .plan import parse_acting_team
+
+        acting = parse_acting_team(q)
+        team = acting or str(getattr(identity, "primary_team", None) or "").strip()
         if team:
             from ..feishu_hands import org_directory as od
 
             teammates, label = od.our_team_members(team, limit=16)
-            if teammates:
+            if acting:
+                company_block += (
+                    "\n\n## 本轮用户指定视角（角色扮演，≠提问者主队）\n"
+                    f"按「{acting}」视角回答「该关注 / 我们」；"
+                    "不要用提问者主队同事名单，也不要把硅谷 CRM 当默认关注名单"
+                    "（除非用户明确问硅谷/人脉/BD）。\n"
+                )
+                if teammates:
+                    company_block += (
+                        f"{acting}同事参考：" + "、".join(teammates) + "\n"
+                    )
+            elif teammates:
                 company_block += (
                     "\n\n## 提问者业务队同事（「我们团队」= Mesh 业务队："
                     + (label or team)

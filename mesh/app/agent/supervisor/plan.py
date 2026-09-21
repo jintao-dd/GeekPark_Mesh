@@ -39,9 +39,48 @@ _CALENDAR_ASK_RE = re.compile(
     re.I,
 )
 
+# 用户明确要硅谷/对外人脉才放行 crm.search；否则硬剥离
+# （会话里残留人名时 Planner 爱顺手加 CRM，把「商业化该关注」答成 CRM 名单）
+_CRM_ASK_RE = re.compile(
+    r"(硅谷|CRM|人脉库|对外人脉|创业者库|Notion\s*CRM|思琪侧|海外\s*BD|\bBD\b|湾区)",
+    re.I,
+)
+
+# 「作为商业化的你 / 做为编辑部视角」→ 本轮回答视角（可与提问者主队不同）
+_ACTING_TEAM_RE = re.compile(
+    r"(?:作|做)为(?:一个|一名)?(?P<label>[\u4e00-\u9fffA-Za-z0-9 ·/]{2,24}?)"
+    r"(?:团队|部)?"
+    r"(?:的你|的角度|视角|身份|来看|来说|来讲|该关注)",
+    re.I,
+)
+
 
 def user_asks_calendar(user_text: str) -> bool:
     return bool(_CALENDAR_ASK_RE.search(user_text or ""))
+
+
+def user_asks_crm(user_text: str) -> bool:
+    return bool(_CRM_ASK_RE.search(user_text or ""))
+
+
+def parse_acting_team(user_text: str) -> str:
+    """用户指定本轮回答视角队名；解析失败返回空串。不改 identity.primary_team。"""
+    m = _ACTING_TEAM_RE.search(user_text or "")
+    if not m:
+        return ""
+    label = str(m.group("label") or "").strip(" 的地得")
+    if not label:
+        return ""
+    try:
+        from ... import db
+
+        for cand in (label, label + "团队", label.rstrip("团队") + "团队"):
+            hit = db.normalize_team(cand)
+            if hit:
+                return hit
+    except Exception:
+        pass
+    return ""
 
 
 def _is_calendar_step(step: PlanStep) -> bool:
@@ -66,6 +105,24 @@ def strip_calendar_unless_asked(steps: list[PlanStep], user_text: str) -> list[P
         s.depends_on = [d for d in (s.depends_on or []) if d in ids and d != s.id]
     log.info(
         "planner stripped calendar steps (user did not ask schedule) kept=%s dropped=%s",
+        len(kept),
+        len(steps) - len(kept),
+    )
+    return kept
+
+
+def strip_crm_unless_asked(steps: list[PlanStep], user_text: str) -> list[PlanStep]:
+    """非硅谷/人脉问法里丢掉 crm.search；用户明确问才保留。"""
+    if not steps or user_asks_crm(user_text):
+        return list(steps or [])
+    kept = [s for s in steps if (s.tool or "").strip() != "crm.search"]
+    if len(kept) == len(steps):
+        return kept
+    ids = {s.id for s in kept}
+    for s in kept:
+        s.depends_on = [d for d in (s.depends_on or []) if d in ids and d != s.id]
+    log.info(
+        "planner stripped crm steps (user did not ask CRM/硅谷) kept=%s dropped=%s",
         len(kept),
         len(steps) - len(kept),
     )
@@ -106,13 +163,15 @@ _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划�
 
 规划原则：
 1) 需要查数、多源、关联、组织、对外人脉 → mode=work。按意图选源，禁止假设固定问法。
-2) 工作记忆里已有具体同事（全名）时：即使问看法/建议，也必须 mode=work，先用这些全名检索（crm.search 与/或 ask.published），Mouth 再基于材料谈判断。没有人名、没有组织范围、没有上一轮事实争议的纯寒暄才 speak。
-3) 组织归属（某组算不算某队、我们团队有谁）→ feishu.search directory；「我们团队」按提问者 Mesh 业务队（工作记忆里的主团队），不按飞书叶子部门再切。周报桶名不是飞书上级。
+2) 工作记忆里已有具体同事（全名）时：即使问看法/建议，也必须 mode=work，先用这些全名走 ask.published（必要时 directory）；
+   只有用户明确问硅谷/BD/对外人脉/CRM 时才加 crm.search。不要因为会话里残留人名就默认灌 CRM。
+3) 组织归属（某组算不算某队、我们团队有谁）→ feishu.search directory；默认「我们团队」按提问者 Mesh 业务队；
+   若用户说「作为/做为某队的你」则本轮按该视角队理解，不要用提问者主队同事名单顶替。周报桶名不是飞书上级。
 4) 要写入飞书 → prepare_write（系统会再请用户确认）。
 5) steps 只用只读工具；写入绝不进 steps。
 6) 检索用工作记忆里的全名/团队，不要要求用户再报一遍。
 7) 步骤 ≤8；有依赖才写 depends_on；可并行的标同一 parallel_group。
-8) 问周报相关 / 个人或团队进展 → 主步骤用 ask.published（可并行 directory）；
+8) 问周报相关 / 个人或团队进展 /「该关注什么」→ 主步骤用 ask.published（可并行 directory）；
    不要用 feishu.calendar.* 当主步骤，除非用户明确问日程、会议、忙不忙、空闲。
 9) 只输出 JSON。
 """
@@ -192,6 +251,20 @@ def work_memory_block(
             if text:
                 lines.append(f"- {role}: {text[:220]}")
     return "\n".join(lines)
+
+
+def _acting_team_memory_line(user_text: str, identity: Any = None) -> str:
+    acting = parse_acting_team(user_text)
+    if not acting:
+        return ""
+    asker = str(getattr(identity, "primary_team", None) or "").strip()
+    if asker and asker != acting:
+        return (
+            f"本轮用户指定回答视角：{acting}"
+            f"（提问者主队是 {asker}，不要用主队同事/「我们团队」顶替此视角；"
+            "除非用户明确问硅谷/人脉，不要加 crm.search）。"
+        )
+    return f"本轮用户指定回答视角：{acting}（按该队周报材料答；勿默认灌 CRM）。"
 
 
 def _parse_json(raw: Any) -> dict[str, Any]:
@@ -298,6 +371,10 @@ def plan_turn(
         session=session,
         resolved_people=resolved_people,
     )
+    acting_line = _acting_team_memory_line(q, identity)
+    if acting_line:
+        user += "\n" + acting_line + "\n"
+        meta["acting_team"] = parse_acting_team(q)
     user += f"\n用户目标：{q}\n"
     if isinstance(pending, dict) and pending.get("tool"):
         user += (
@@ -354,6 +431,7 @@ def plan_turn(
     if not steps and mode == "work":
         steps = _steps_from_decide_shape(data, goal=goal or q)
     steps = strip_calendar_unless_asked(steps, q)
+    steps = strip_crm_unless_asked(steps, q)
     if not steps and mode == "work":
         steps = _normalize_steps(
             [{"id": "s1", "tool": "ask.published", "args": {"query": q[:160]}}],

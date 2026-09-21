@@ -148,6 +148,11 @@ def enrich_args(
     prior = list(prior or [])
     q_user = (user_text or "").strip()
     resolved = [str(n).strip() for n in (resolved_names or []) if str(n).strip()]
+    from .plan import parse_acting_team
+
+    acting_team = parse_acting_team(q_user)
+    # 本轮视角队（角色扮演）优先于提问者主队，仅影响本轮检索扩召回
+    scope_team = acting_team or team
 
     if step.tool == "crm.search":
         q_plan = str(args.get("query") or "").strip()
@@ -175,19 +180,21 @@ def enrich_args(
             if n not in names:
                 names.append(n)
         # prior 人名：self 范围不加（避免「和我相关」被上一轮组织列表污染）
-        if scope != "self":
+        # 指定了其他队视角时也不灌 prior（常是硅谷人名残留）
+        if scope != "self" and not acting_team:
             for n in _names_from_prior(prior):
                 if n not in names:
                     names.append(n)
         # 点名同事（named）只扩被点名的人，不要把提问者自己塞进检索
         # self / team / default 才钉本人，保证「和我相关」能召回
-        if scope != "named" and name and name not in names:
+        # 角色扮演其他队时不钉提问者本人
+        if scope != "named" and name and name not in names and not acting_team:
             names = [name] + names
-        if scope == "team" and team:
+        if scope == "team" and scope_team:
             try:
                 from ..feishu_hands import org_directory as od
 
-                teammates, _label = od.our_team_members(team, limit=12)
+                teammates, _label = od.our_team_members(scope_team, limit=12)
             except Exception:
                 teammates = []
             for t in teammates:
@@ -202,13 +209,17 @@ def enrich_args(
             args["q"] = q_full
         if names:
             args["person_names"] = names[:16]
-        # 显式桶过滤才设 team；默认不 apply_team_focus（飞书子树 ≠ 周报桶）
-        if str(args.get("team") or args.get("team_filter") or "").strip():
+        # 显式桶过滤：用户指定视角队 → 按该队周报桶检索
+        if acting_team:
+            args["team"] = acting_team
+            args["apply_team_focus"] = True
+        elif str(args.get("team") or args.get("team_filter") or "").strip():
             args.setdefault("apply_team_focus", False)
         log.info(
-            "ask enrich scope=%s team=%s person_names=%s q_len=%s",
+            "ask enrich scope=%s team=%s acting=%s person_names=%s q_len=%s",
             scope,
-            team or "-",
+            scope_team or "-",
+            acting_team or "-",
             len(names),
             len(q_full),
         )
