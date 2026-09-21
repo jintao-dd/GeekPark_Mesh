@@ -135,8 +135,8 @@ def test_ask_published_reads_query_and_person_names():
 def test_expand_person_contexts_batches_names():
     calls = []
 
-    def fake_prepare(con, q, scope, history=None, *, search_q=None, context_refs=None):
-        calls.append(search_q or q)
+    def fake_prepare(con, q, scope, history=None, *, search_q=None, context_refs=None, use_vector=True):
+        calls.append({"sq": search_q or q, "use_vector": use_vector})
         return {
             "contexts": [
                 {
@@ -163,5 +163,7 @@ def test_expand_person_contexts_batches_names():
             ["赵思琪", "杜锦涛", "张山山", "Sean Shen", "胡清远", "彭康林"],
         )
     assert len(calls) >= 2
-    assert all("最近周报" not in c for c in calls)
+    assert all("最近周报" not in c["sq"] for c in calls)
+    # 人名扩召回不得重复走向量（避免每批一次全量 cosine）
+    assert all(c["use_vector"] is False for c in calls)
     assert len(ctxs) >= 2

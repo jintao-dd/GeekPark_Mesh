@@ -153,7 +153,13 @@ def _expand_person_contexts(
     for batch in batches[:4]:
         sq = " ".join(batch)
         try:
-            prep = ask_engine.prepare(con, q, scope, search_q=sq)
+            prep = ask_engine.prepare(con, q, scope, search_q=sq, use_vector=False)
+        except TypeError:
+            # 兼容旧签名
+            try:
+                prep = ask_engine.prepare(con, q, scope, search_q=sq)
+            except Exception:
+                continue
         except Exception:
             continue
         merged.extend(list(prep.get("contexts") or []))

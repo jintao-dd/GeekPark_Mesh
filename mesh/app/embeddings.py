@@ -10,6 +10,7 @@ import heapq
 import json
 import math
 import re
+import threading
 from typing import Any, Literal
 
 import requests
@@ -17,6 +18,48 @@ import requests
 from .providers.base import env
 
 _HTTP = requests.Session()
+
+# 向量矩阵进程内缓存：941 条 × 4096 维 JSON 约 86MB，每次查询重新解析会白花数秒。
+# 按 (model, 语料指纹) 缓存一次解析结果，语料变更时重建。
+_VEC_CACHE: dict[str, Any] = {"key": "", "rows": [], "norms": []}
+_VEC_CACHE_LOCK = threading.Lock()
+
+
+def _corpus_key(con: Any, model: str) -> str:
+    try:
+        row = con.execute(
+            "SELECT COUNT(*) AS c, COALESCE(SUM(LENGTH(vector_json)),0) AS n "
+            "FROM chunk_embeddings WHERE model=?",
+            (model,),
+        ).fetchone()
+        return f"{model}:{int(row['c'])}:{int(row['n'])}"
+    except Exception:
+        return ""
+
+
+def _cached_matrix(con: Any, model: str, sql: str, params: list[Any]) -> tuple[list, list]:
+    """返回 (rows, norms)；rows 为 (chunk_meta_tuple, vector)。"""
+    key = _corpus_key(con, model)
+    with _VEC_CACHE_LOCK:
+        if key and _VEC_CACHE["key"] == key:
+            return _VEC_CACHE["rows"], _VEC_CACHE["norms"]
+    rows: list[Any] = []
+    norms: list[float] = []
+    for r in con.execute(sql, params):
+        try:
+            vec = json.loads(r["vector_json"])
+        except Exception:
+            continue
+        if not isinstance(vec, list) or not vec:
+            continue
+        rows.append((r, vec))
+        norms.append(math.sqrt(sum(x * x for x in vec)))
+    with _VEC_CACHE_LOCK:
+        if key:
+            _VEC_CACHE["key"] = key
+            _VEC_CACHE["rows"] = rows
+            _VEC_CACHE["norms"] = norms
+    return rows, norms
 
 RetrievalMode = Literal["structured", "lexical", "hybrid"]
 
@@ -203,15 +246,16 @@ def vector_search(
         sql += " AND c.date_end <= ?"
         params.append(date_to)
     top_k = max(limit * 4, limit)
+    rows, norms = _cached_matrix(con, model, sql, params)
+    qn = math.sqrt(sum(x * x for x in query_vec))
+    if qn <= 0:
+        return []
     heap: list[tuple[float, dict]] = []
-    for r in con.execute(sql, params):
-        try:
-            vec = json.loads(r["vector_json"])
-        except Exception:
+    for (r, vec), rn in zip(rows, norms):
+        if rn <= 0 or len(vec) != len(query_vec):
             continue
-        if not isinstance(vec, list):
-            continue
-        sc = cosine(query_vec, vec)
+        dot = sum(x * y for x, y in zip(query_vec, vec))
+        sc = dot / (qn * rn)
         if sc <= 0.05:
             continue
         hit = {

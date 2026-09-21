@@ -34,10 +34,12 @@ def prepare(
     *,
     search_q: str | None = None,
     context_refs: dict | None = None,
+    use_vector: bool = True,
 ) -> dict:
     """检索并组装 LLM 上下文（不调模型）。
 
     history 参数保留兼容，但不再用于成文；追问检索靠 search_q / context_refs。
+    use_vector=False 时强制 lexical（人名批量扩召回用，避免重复 embed + 全量 cosine）。
     """
     t0 = time.time()
     q = (q or "").strip()
@@ -89,6 +91,8 @@ def prepare(
     exec_mode = embeddings.retrieval_execution_mode(
         structured_candidate=structured_candidate
     )
+    if not use_vector and exec_mode == "hybrid":
+        exec_mode = "lexical"
     # Vector OFF → 不进入 embedding（含 denial 二次 prepare）；禁止「打 API 失败再 fallback」
     if exec_mode == "hybrid":
         query_vec = embeddings.embed_one(sq)
