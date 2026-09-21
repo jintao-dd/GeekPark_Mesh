@@ -7,12 +7,14 @@
     "Global Partnership 团队",
     "英文站",
     "品牌创意团队",
+    "海外拓展",
     "社群",
     "投资团队",
     "音频播客团队",
     "视频号团队",
     "CEO / 总裁办"
   ],
+  "_weekly_only_note": "硅谷 BD / 英文站 / 音频播客 / 视频号：周报生产队，飞书通讯录可能无独立部门；人不在 roster 挂这些队名属预期，靠周报 owner_team 交叉。",
   "departments": [
     {
       "feishu_department_id": "od-aa20d8c6258aac06f2f6afb93bf166ec",
@@ -153,7 +155,7 @@
       "parent_department_id": "od-3f2b9310260ff7673d0694fb43060515",
       "canonical_team": "海外拓展",
       "parent_team": "品牌创意团队",
-      "note": "飞书挂在品牌创意部下；主队独立为「海外拓展」，问品牌创意时按 parent_team 仍纳入"
+      "note": "飞书挂在品牌创意部下；已正式进入 ingest.TEAMS。问品牌创意时按 parent_team 仍纳入人员。"
     }
   ]
 }

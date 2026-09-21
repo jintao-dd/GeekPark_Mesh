@@ -325,18 +325,32 @@ def feishu_auto_role(info: dict) -> str | None:
         return "admin"
     return None
 
+def _sanitize_feishu_display(name: str) -> str:
+    """清理飞书显示名：去掉「中文名+长串数字」这类脏后缀（如 杜锦涛54564545）。"""
+    import re
+
+    n = (name or "").strip()
+    if not n:
+        return n
+    m = re.fullmatch(r"([\u4e00-\u9fff]{2,8})\d{5,}", n)
+    if m:
+        return m.group(1)
+    return n
+
+
 def upsert_feishu_user(info: dict) -> dict:
     """飞书用户首次登录默认 viewer；命中 open_id 白名单时自动提权。
-    已有显示名不会被飞书昵称覆盖；已有更高/自定义角色不会被 open_id 白名单降权，
+    已有显示名不会被飞书昵称覆盖（除非已有名是脏后缀）；已有更高/自定义角色不会被 open_id 白名单降权，
     仅允许提权到 admin/owner。"""
     auto_role = feishu_auto_role(info)
     default_role = auto_role or "viewer"
+    clean_name = _sanitize_feishu_display(info.get("name") or "飞书用户")
     con = db.connect()
     r = con.execute("SELECT * FROM users WHERE feishu_open_id=?", (info["open_id"],)).fetchone()
     if not r:
         uname = "fs_" + info["open_id"][-10:]
         con.execute("INSERT INTO users(username,display,role,feishu_open_id) VALUES(?,?,?,?)",
-                    (uname, info["name"], default_role, info["open_id"]))
+                    (uname, clean_name, default_role, info["open_id"]))
         con.commit()
         r = con.execute("SELECT * FROM users WHERE feishu_open_id=?", (info["open_id"],)).fetchone()
     else:
@@ -344,8 +358,10 @@ def upsert_feishu_user(info: dict) -> dict:
             con.execute("UPDATE users SET role=? WHERE id=?", (auto_role, r["id"]))
             con.commit()
             r = con.execute("SELECT * FROM users WHERE feishu_open_id=?", (info["open_id"],)).fetchone()
-        elif not (r["display"] or "").strip():
-            con.execute("UPDATE users SET display=? WHERE id=?", (info["name"], r["id"]))
+        cur_disp = (r["display"] or "").strip()
+        # 空名，或脏后缀名：用飞书干净名覆盖
+        if not cur_disp or _sanitize_feishu_display(cur_disp) != cur_disp:
+            con.execute("UPDATE users SET display=? WHERE id=?", (clean_name, r["id"]))
             con.commit()
             r = con.execute("SELECT * FROM users WHERE feishu_open_id=?", (info["open_id"],)).fetchone()
     con.close()

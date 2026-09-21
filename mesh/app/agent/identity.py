@@ -6,7 +6,6 @@ import threading
 import time
 from typing import Any
 
-from .. import ingest
 from .models import (
     STATUS_AMBIGUOUS,
     STATUS_ANONYMOUS_WEB,
@@ -21,11 +20,8 @@ from .models import (
 # 不可作为 Person.primary_team 的占位 / 外部桶
 _NON_BUSINESS = frozenset({"", "其他", "内容中心·数据聚合", "外部媒体"})
 
-# 同事轨专用主队（不进周报生产 ingest.TEAMS，仅用于认「我们团队」/身份）
-# 例：飞书「海外拓展」挂在品牌创意部下，但作为独立小队更贴近现实归属（思琪）。
-_EXTRA_COLLEAGUE_TEAMS = frozenset({"海外拓展"})
-
 # 多队时软选优先级（飞书映射 / 花名册同时命中多队时用；不锁死 conflict）
+# 「海外拓展」优先于「品牌创意团队」：子队独立主队，避免被父业务队吞掉。
 _TEAM_PICK_ORDER = (
     "CEO / 总裁办",
     "海外拓展",
@@ -33,10 +29,12 @@ _TEAM_PICK_ORDER = (
     "编辑部",
     "投资团队",
     "商业化团队",
+    "硅谷 BD 团队",
     "视频号团队",
     "音频播客团队",
     "社群",
-    "Global Partnership",
+    "Global Partnership 团队",
+    "英文站",
 )
 
 
@@ -86,27 +84,28 @@ def reset_profile_cache_for_tests() -> None:
 
 
 def is_business_team(team: str | None) -> bool:
-    t = (team or "").strip()
-    if not t or t in _NON_BUSINESS:
-        return False
-    if t in _EXTRA_COLLEAGUE_TEAMS:
-        return True
-    canon = ingest.canonical_team(t) or t
-    if canon in _EXTRA_COLLEAGUE_TEAMS:
-        return True
-    return canon in ingest.TEAMS and canon not in _NON_BUSINESS
+    """是否可作为身份主队 / 业务过滤队。
+
+    唯一口径：db.normalize_team → ingest.TEAMS，并排除占位桶。
+    不再维护 identity 私有队名单（曾导致「海外拓展」身份认、周报不认）。
+    """
+    return normalize_team(team) is not None
 
 
 def normalize_team(team: str | None) -> str | None:
-    if not is_business_team(team):
-        return None
+    """人/身份/权限统一的业务队归一 —— 委托 db.normalize_team，禁止分叉。
+
+    返回 ingest.TEAMS 中的规范名；占位桶（其他/外部媒体/内容中心）返回 None。
+    """
     t = (team or "").strip()
-    if t in _EXTRA_COLLEAGUE_TEAMS:
-        return t
-    canon = ingest.canonical_team(t) or t
-    if canon in _EXTRA_COLLEAGUE_TEAMS:
-        return canon
-    return canon
+    if not t or t in _NON_BUSINESS:
+        return None
+    from .. import db
+
+    n = db.normalize_team(t)
+    if not n or n in _NON_BUSINESS:
+        return None
+    return n
 
 
 def _prefer_team(candidates: list[str]) -> str:

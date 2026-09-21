@@ -45,12 +45,13 @@ def test_normalize_team_accepts_feishu_leaf_names():
     assert db.normalize_team("创意视频") == "品牌创意团队"
     assert db.normalize_team("品牌设计") == "品牌创意团队"
     assert db.normalize_team("创新技术") == "品牌创意团队"
-    # 海外拓展 是同事轨独立主队，不进周报质量轨 ingest.TEAMS，db 层不归一到品牌创意
-    assert db.normalize_team("海外拓展") != "品牌创意团队"
-    # 但同事轨 identity 认它为业务队
+    # 海外拓展 已正式进入 ingest.TEAMS：身份与周报同一口径
+    assert db.normalize_team("海外拓展") == "海外拓展"
     from app.agent import identity as idmod
 
     assert idmod.normalize_team("海外拓展") == "海外拓展"
+    # 两套入口不得分叉
+    assert db.normalize_team("海外拓展") == idmod.normalize_team("海外拓展")
 
 
 def test_parent_walk_when_child_missing_from_runtime_lookup():
