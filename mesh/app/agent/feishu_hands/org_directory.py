@@ -574,11 +574,10 @@ def _roster_team_labels(open_id: str) -> list[str]:
 
 
 def asker_teammates(open_id: str, *, limit: int = 24) -> tuple[list[str], str]:
-    """提问者直属部门（含子部门）的同事。
+    """提问者飞书直属部门（含子部门）的同事。
 
-    不用 Mesh 粗团队名。杜锦涛在「创新技术」时，不会把同属品牌创意团队的
-    创意视频、品牌设计算进「我们团队」。
-    返回 (人名, 部门标签)；对不上则 ([], "")，调用方再回退粗团队。
+    仅用于「显式问某叶子部门有谁」。小公司「我们团队」请用 our_team_members，
+    按 Mesh 业务队（primary_team）统一口径，不再按叶子切。
     """
     oid = (open_id or "").strip()
     if not oid:
@@ -611,6 +610,20 @@ def asker_teammates(open_id: str, *, limit: int = 24) -> tuple[list[str], str]:
         if len(names) >= int(limit):
             break
     return names, label
+
+
+def our_team_members(team: str, *, limit: int = 24) -> tuple[list[str], str]:
+    """「我们团队」成员：只认 Mesh 业务队（identity.primary_team）。
+
+    全局统一：品牌创意 / 编辑部 / 商业化 / 海外拓展… 同一规则。
+    不按飞书叶子（创新技术 vs 创意视频）再切一层。
+    返回 (人名, 队标签)。
+    """
+    t = (team or "").strip()
+    if not t:
+        return [], ""
+    names = member_names_for_scope(t, limit=limit)
+    return names, t
 
 
 def _place_label(person: dict[str, Any], departments: list[dict[str, Any]]) -> str:

@@ -121,7 +121,7 @@ def test_member_names_for_scope_brand_tree():
 
 
 def test_asker_teammates_stays_in_leaf_department():
-    """直属「创新技术」时，不把同级的创意视频算进我们团队。"""
+    """asker_teammates 仍按叶子部门列人（显式问部门时用）；「我们团队」不走它。"""
     depts = [
         {
             "name": "品牌创意部",
@@ -159,6 +159,20 @@ def test_asker_teammates_stays_in_leaf_department():
     assert "同事甲" in names
     assert "闫晓龙" not in names
     assert "张山山" not in names
+
+
+def test_our_team_members_uses_mesh_biz_team(monkeypatch):
+    """「我们团队」= Mesh 业务队：品牌创意应含叶子部门同事。"""
+    monkeypatch.setattr(
+        od,
+        "member_names_for_scope",
+        lambda query, *, limit=24: ["杜锦涛", "闫晓龙", "张山山"][:limit],
+    )
+    names, label = od.our_team_members("品牌创意团队", limit=20)
+    assert label == "品牌创意团队"
+    assert "杜锦涛" in names
+    assert "闫晓龙" in names
+    assert "张山山" in names
 
 
 def test_person_search_includes_department():

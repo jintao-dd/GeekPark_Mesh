@@ -173,28 +173,20 @@ def handle_turn(
         if ident_team and not str(getattr(session, "active_team", "") or "").strip():
             session.active_team = ident_team
 
-    # Mouth 也要看见飞书子树同事，避免成文只认周报桶名
+    # Mouth：「我们团队」= Mesh 业务队同事（primary_team），不按飞书叶子切
     try:
         team = str(getattr(identity, "primary_team", None) or "").strip()
-        oid = str(getattr(identity, "feishu_open_id", None) or "").strip()
-        if oid or team:
+        if team:
             from ..feishu_hands import org_directory as od
 
-            teammates: list[str] = []
-            label = team
-            if oid:
-                teammates, leaf = od.asker_teammates(oid, limit=16)
-                if leaf:
-                    label = leaf
-            if not teammates and team:
-                teammates = od.member_names_for_scope(team, limit=16)
+            teammates, label = od.our_team_members(team, limit=16)
             if teammates:
                 company_block += (
-                    "\n\n## 提问者直属部门同事（「我们团队」只认这一层："
+                    "\n\n## 提问者业务队同事（「我们团队」= Mesh 业务队："
                     + (label or team)
                     + "）\n"
                     + "、".join(teammates)
-                    + "\n规则：只有这些人算提问者的团队；同级其他部门不算。"
+                    + "\n规则：这些人算提问者的团队；同业务队下各飞书叶子部门都算。"
                     + "被问到的人若材料里有「部门:」就直接用，不要说缺部门。"
                 )
     except Exception:

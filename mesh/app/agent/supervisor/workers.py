@@ -183,15 +183,11 @@ def enrich_args(
         # self / team / default 才钉本人，保证「和我相关」能召回
         if scope != "named" and name and name not in names:
             names = [name] + names
-        if scope == "team" and (self_oid or team):
+        if scope == "team" and team:
             try:
                 from ..feishu_hands import org_directory as od
 
-                teammates: list[str] = []
-                if self_oid:
-                    teammates, _leaf = od.asker_teammates(self_oid, limit=12)
-                if not teammates and team:
-                    teammates = od.member_names_for_scope(team, limit=12)
+                teammates, _label = od.our_team_members(team, limit=12)
             except Exception:
                 teammates = []
             for t in teammates:

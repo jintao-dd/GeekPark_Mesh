@@ -273,10 +273,10 @@ def test_mouth_strips_open_ids():
     assert "杜锦涛" in cleaned
 
 
-def test_mouth_system_keeps_subtree_people_despite_weekly_bucket():
+def test_mouth_system_keeps_biz_team_people_despite_weekly_bucket():
     from app.agent.supervisor import mouth
 
-    assert "直属部门" in mouth._SYNTH_SYSTEM
+    assert "业务队" in mouth._SYNTH_SYSTEM
     assert "硅谷 BD" in mouth._SYNTH_SYSTEM
     assert "赵思琪" in mouth._SYNTH_SYSTEM
     assert "不要注水" in mouth._SYNTH_SYSTEM
@@ -289,21 +289,17 @@ def test_mouth_max_tokens_capped():
     assert mouth._mouth_max_tokens() >= 400
 
 
-def test_enrich_ask_includes_subtree_teammates(monkeypatch):
+def test_enrich_ask_includes_biz_team_teammates(monkeypatch):
     from app.agent.supervisor import workers
     from app.agent.supervisor.types import PlanStep
     from app.agent.models import IdentityResult
 
-    def fake_names(query, *, limit=24):
-        return ["赵思琪", "Sean Shen", "胡清远", "杜锦涛"]
+    def fake_our_team(team, *, limit=24):
+        return (["赵思琪", "Sean Shen", "胡清远", "杜锦涛"][:limit], team)
 
     monkeypatch.setattr(
-        "app.agent.feishu_hands.org_directory.asker_teammates",
-        lambda *a, **k: ([], ""),
-    )
-    monkeypatch.setattr(
-        "app.agent.feishu_hands.org_directory.member_names_for_scope",
-        fake_names,
+        "app.agent.feishu_hands.org_directory.our_team_members",
+        fake_our_team,
     )
     step = PlanStep(
         id="s1",
@@ -397,12 +393,8 @@ def test_enrich_about_me_skips_teammate_dump(monkeypatch):
     from app.agent.models import IdentityResult
 
     monkeypatch.setattr(
-        "app.agent.feishu_hands.org_directory.asker_teammates",
-        lambda *a, **k: ([], ""),
-    )
-    monkeypatch.setattr(
-        "app.agent.feishu_hands.org_directory.member_names_for_scope",
-        lambda *a, **k: ["赵思琪", "Sean Shen", "胡清远"],
+        "app.agent.feishu_hands.org_directory.our_team_members",
+        lambda *a, **k: (["赵思琪", "Sean Shen", "胡清远"], "品牌创意团队"),
     )
     step = PlanStep(
         id="s1",

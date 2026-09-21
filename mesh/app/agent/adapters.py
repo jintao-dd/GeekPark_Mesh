@@ -42,7 +42,7 @@ def scope_from_agent(
 
     team_focus 只是权限侧「默认关注队」，不是周报桶硬 ACL。
     只有显式 team_filter / apply_team_focus=True 时才按桶过滤；
-    「我们团队」应按飞书子树人名扩召回，不能用 Mesh 队名砍掉其他桶条目。
+    「我们团队」按 Mesh 业务队人名扩召回，不能用叶子部门把同队其他组砍掉。
     """
     from . import temporal as temporal_mod
 

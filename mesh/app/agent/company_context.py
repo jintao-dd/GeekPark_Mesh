@@ -137,24 +137,16 @@ def assemble(
             return ent[1]
 
     snap = dict(org_snapshot or {})
-    # 深化 prior：提问者飞书子树同事名（仍标 wiki_prior，非 FACT）
+    # 深化 prior：「我们团队」= Mesh 业务队同事（仍标 wiki_prior，非 FACT）
     if not snap.get("teammates"):
         try:
             team = str(getattr(identity, "primary_team", None) or "").strip()
             if not team and session is not None:
                 team = str(getattr(session, "active_team", "") or "").strip()
-            oid = str(getattr(identity, "feishu_open_id", None) or "").strip()
-            if oid or team:
+            if team:
                 from .feishu_hands import org_directory as od
 
-                names: list[str] = []
-                label = team
-                if oid:
-                    names, leaf = od.asker_teammates(oid, limit=20)
-                    if leaf:
-                        label = leaf
-                if not names and team:
-                    names = od.member_names_for_scope(team, limit=20)
+                names, label = od.our_team_members(team, limit=20)
                 if names:
                     snap["teammates"] = names
                     snap["team"] = label or team

@@ -49,6 +49,16 @@ PYTHONPATH=. python eval/check_org_team_consistency.py
 3. 叶子部门 `创新技术/创意视频/品牌设计` → `品牌创意团队`（不变）
 4. roster 70 人每人至少落一个业务队
 
+## 「我们团队」口径（全局，2026-09-22）
+
+**一律 = Mesh `primary_team`（业务队）**，全公司同一规则：
+
+- 品牌创意下创新技术 / 创意视频 / 品牌设计 → 问「我们团队」= 整队品牌创意，**不再按叶子切**
+- 编辑部 / 商业化 / 海外拓展 / … 同理：只认 `identity.primary_team`，不走飞书叶子
+- 显式问「创新技术有谁」仍走 `asker_teammates`（通讯录树）
+
+实现：`org_directory.our_team_members`；调用方 loop / workers / company_context / mouth / ontology / adapters / plan。
+
 ## 仍须理解的边界（不是 bug）
 
 - **飞书部门 ≠ 周报桶**：创新技术的人，身份主队是品牌创意（部门映射）；问「创新技术有谁」走通讯录树，问「品牌创意周报」走 owner_team

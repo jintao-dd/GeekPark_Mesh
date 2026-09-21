@@ -119,10 +119,10 @@ def build_ontology(
 
         notes.append(brand_creative_tree_note())
         notes.append(
-            "飞书树 ≠ 周报桶，但业务队名已统一（含「海外拓展」∈ ingest.TEAMS）。"
-            "周报「硅谷 BD 团队」仍是内容标签；飞书「海外拓展」挂在品牌创意部下（parent_team）。"
-            "问「我们团队」按提问者飞书子树的人检索，材料里出现子树同事即算相关，"
-            "禁止因周报桶名不同而排除。"
+            "飞书树 ≠ 周报桶，但「我们团队」统一认 Mesh 业务队（primary_team）。"
+            "品牌创意下创新技术/创意视频/品牌设计不再按叶子切「我们团队」。"
+            "海外拓展为独立业务队；问品牌创意时仍可按 parent_team 纳入其人。"
+            "材料里出现业务队同事即算相关，禁止因周报桶名不同而排除。"
         )
     except Exception:
         pass
