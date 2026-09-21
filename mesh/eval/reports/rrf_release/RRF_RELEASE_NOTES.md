@@ -124,9 +124,25 @@ python eval/run_ranking_calib_vec.py --reuse-env-db --compare-only
 | `RANKING_calib_vec_{A,B,C}_latest.json` | 三臂完整报告 |
 | `../../run_ranking_calib_vec.py` | 可复跑校准入口 |
 
+## 生产发布（已执行）
+
+| 项 | 值 |
+|---|---|
+| 时间 | 2026-09-22 |
+| commit | `8da5456` |
+| image | `geekpark-mesh:2026-09-22-8da5456e10d6` |
+| digest | `sha256:82fa39d6e4a81b11740fc4569f36bb29c7edc56382053b57f75809733901c039` |
+| REPRO | PASS |
+| 向量 | ON（`MESH_EMBED/VECTOR=1`） |
+| 冒烟 | `home=307`（非 404） |
+| 入口 | https://mesh.geekpark.ai |
+| 观察窗 | 发布起 **24h**；MRR 跌幅告警线相对基线 **≤ -0.05** → 回滚 |
+
+回滚镜像 tag（本发布前）：以服务器上上一成功 baseline 为准；应急热开关 `MESH_FUSION=legacy`。
+
 ## 结论
 
 1. 生产走 **B**（RRF + 关补丁 + 覆盖率兜底）。
 2. 向量全开 Gate **PASS**；MRR 代价可接受，且轻于关向量口径。
-3. 上线后开 **24h** 观察；超阈值回滚镜像或 `MESH_FUSION=legacy`。
+3. **已上 prod**；开 **24h** 观察；超阈值回滚镜像或 `MESH_FUSION=legacy`。
 4. 校准脚本已入库，后续复现勿再手写临时脚本。
