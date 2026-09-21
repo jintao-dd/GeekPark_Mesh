@@ -24,6 +24,10 @@ param(
 
   [switch]$AllowDirty,
 
+  # 显式打开向量检索用于 tmesh 对比实验。默认保持 Vector frozen OFF（可复现基线）。
+  # 生产若要开，必须先在 tmesh 验证召回质量。
+  [switch]$EnableVector,
+
   [string]$DeployHost = $(if ($env:MESH_DEPLOY_HOST) { $env:MESH_DEPLOY_HOST } else { "104.250.53.182" }),
   [string]$DeployPort = $(if ($env:MESH_DEPLOY_PORT) { $env:MESH_DEPLOY_PORT } else { "22341" })
 )
@@ -70,6 +74,10 @@ if ($Target -eq "tmesh") {
 
 $WebCtr = $Containers[0]
 $BaselineName = "ENV_REPRO_BASELINE.$Target"
+$VectorFlag = if ($EnableVector) { "1" } else { "0" }
+if ($EnableVector) {
+  Write-Host "WARNING: -EnableVector set; deploying with MESH_EMBED_ENABLED=1 (experimental, not frozen baseline)" -ForegroundColor Yellow
+}
 
 Write-Host "==> ship_image Target=$Target tag=geekpark-mesh:$ImageTag sha=$GitShort web=$WebCtr"
 
@@ -110,8 +118,8 @@ tar -xzf /tmp/mesh_image_ctx.tgz
 grep -q '^MESH_IMAGE_TAG=' .env 2>/dev/null && sed -i "s|^MESH_IMAGE_TAG=.*|MESH_IMAGE_TAG=`$TAG|" .env || echo "MESH_IMAGE_TAG=`$TAG" >> .env
 grep -q '^MESH_GIT_SHA=' .env 2>/dev/null && sed -i "s|^MESH_GIT_SHA=.*|MESH_GIT_SHA=`$SHORT|" .env || echo "MESH_GIT_SHA=`$SHORT" >> .env
 grep -q '^MESH_EXPECTED_GIT_SHA=' .env 2>/dev/null && sed -i "s|^MESH_EXPECTED_GIT_SHA=.*|MESH_EXPECTED_GIT_SHA=`$SHORT|" .env || echo "MESH_EXPECTED_GIT_SHA=`$SHORT" >> .env
-grep -q '^MESH_EMBED_ENABLED=' .env 2>/dev/null && sed -i 's|^MESH_EMBED_ENABLED=.*|MESH_EMBED_ENABLED=0|' .env || echo 'MESH_EMBED_ENABLED=0' >> .env
-grep -q '^MESH_VECTOR_ENABLED=' .env 2>/dev/null && sed -i 's|^MESH_VECTOR_ENABLED=.*|MESH_VECTOR_ENABLED=0|' .env || echo 'MESH_VECTOR_ENABLED=0' >> .env
+grep -q '^MESH_EMBED_ENABLED=' .env 2>/dev/null && sed -i 's|^MESH_EMBED_ENABLED=.*|MESH_EMBED_ENABLED=$VectorFlag|' .env || echo 'MESH_EMBED_ENABLED=$VectorFlag' >> .env
+grep -q '^MESH_VECTOR_ENABLED=' .env 2>/dev/null && sed -i 's|^MESH_VECTOR_ENABLED=.*|MESH_VECTOR_ENABLED=$VectorFlag|' .env || echo 'MESH_VECTOR_ENABLED=$VectorFlag' >> .env
 
 export MESH_IMAGE_TAG=`$TAG
 export MESH_GIT_SHA=`$SHORT
