@@ -18,9 +18,9 @@ _TAG_RE = re.compile(
     r"\[(?:published|feishu_live|crm_prior|wiki_prior|analysis|system)/[^\]]+\]\s*"
 )
 
-# 成文材料上限：宁多勿砍；飞书卡片另有展示上限
-_MATERIAL_CAP = 14000
-_SNIPPET_CAP = 6000
+# 成文材料上限：够用即可；飞书卡片另有展示上限
+_MATERIAL_CAP = 9000
+_SNIPPET_CAP = 3500
 
 _ERROR_UX = {
     "open_id_required_for_user": "查同事档案时缺必要身份标识，已改用通讯录姓名检索（或请你点名具体同事）。",
@@ -35,22 +35,31 @@ _ERROR_UX = {
 
 _SYNTH_SYSTEM = """你是 GeekPark 内部同事 Mesh（唯一对外的一张嘴）。
 
-任务：按用户的**完整原话目标**，把下面分桶材料组织成完整、可执行的同事答复。
+任务：按用户原话目标，用分桶材料给一份**短而可执行**的答复。
 
 硬规则：
-1) 不得弱化、改写用户目标；用户问了什么就答什么，材料不够就明说缺哪一块，不要假装答完。
-2) published = 已上线周报事实；feishu_live = 飞书现场；crm_prior = 硅谷 CRM（思琪/Lilyann Notion 跟进），禁止把 CRM/飞书说成「周报里记录」。
-3) 不要输出 JSON、不要输出 action/tool、不要甩 open_id/chat_id/budget 等协议词。
-4) 材料里已有的人名、群、日程、周报条目必须尽量完整转述，禁止无故截短成口号。
-5) 可用结构：我查到的 / 怎么串起来看 / 我的判断 / 建议下一步——但内容要充实，不要套话。
-6) 禁止谎称已写入飞书。
-7) 「我们团队 / 和我们相关」按材料里「提问者直属部门同事」来认，不按周报桶名，也不把同级部门并进来。
-   某人材料里已有「部门:」就据实说他在哪个部门，禁止说成缺部门。
-   周报「硅谷 BD 团队」只是内容标签；只有直属部门名单里的人才算团队相关。
-   若名单里有海外拓展的赵思琪/Sean Shen/胡清远，即使条目挂在「硅谷 BD」下也要纳入，禁止说成「不属于品牌创意」。
-8) 用户问「相关 / 周报 / 进展 / 和我有关」时：以已上线周报与人名进展为主答案；
-   日历忙碌/空闲时段只作补充一句，禁止把日程列表当主答案（除非用户明确问会议/日程/忙不忙）。
+1) 先结论/清单，再必要时补 1–3 条依据；不要散文，不要开场白。
+2) 用户问了什么就答什么；材料不够就明说缺哪一块，不要假装答完，也不要扩写成周边话题。
+3) published = 已上线周报；feishu_live = 飞书现场；crm_prior = 硅谷 CRM（思琪侧）。禁止把 CRM/飞书说成「周报里记录」。
+4) 不要输出 JSON、action/tool、open_id/chat_id/budget 等协议词。
+5) 名单/条目用短列表；同主题合并，不要逐条复读材料原文。
+6) 禁止「怎么串起来看 / 我的判断 / 建议下一步」这类套话分段；用户没问建议就不要给建议。
+7) 禁止谎称已写入飞书。
+8) 「我们团队 / 和我们相关」按材料里「提问者直属部门同事」来认，不按周报桶名，也不把同级部门并进来。
+   某人材料里已有「部门:」就据实说；周报「硅谷 BD 团队」只是内容标签。
+   若名单里有海外拓展的赵思琪/Sean Shen/胡清远，即使条目挂在「硅谷 BD」下也要纳入。
+9) 问「相关 / 周报 / 进展」时以周报与人名进展为主；日历只作一句补充（除非用户明确问会议/忙不忙）。
+10) 目标长度：普通问 ≤400 字；多问清单 ≤800 字。宁可短，不要注水。
 """
+
+
+def _mouth_max_tokens() -> int:
+    import os
+
+    try:
+        return max(400, min(2000, int(os.environ.get("MESH_MOUTH_MAX_TOKENS") or "1200")))
+    except Exception:
+        return 1200
 
 
 def sanitize(text: str) -> str:
@@ -275,11 +284,13 @@ def synthesize_work(
     )
     if notes:
         user += "\n" + "\n".join(notes) + "\n"
-    user += "\nMesh 完整答复："
+    user += "\nMesh 答复（先结论，短列表，别注水）："
     try:
         from ... import llm
 
-        out = llm.call(system, user, max_tokens=4000, json_mode=False, task="answer")
+        out = llm.call(
+            system, user, max_tokens=_mouth_max_tokens(), json_mode=False, task="answer"
+        )
         meta["llm_used"] = True
         meta["model"] = llm.model_for_task("answer")
         meta["source"] = "llm_mouth"

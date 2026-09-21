@@ -278,7 +278,15 @@ def test_mouth_system_keeps_subtree_people_despite_weekly_bucket():
 
     assert "直属部门" in mouth._SYNTH_SYSTEM
     assert "硅谷 BD" in mouth._SYNTH_SYSTEM
-    assert "禁止说成「不属于品牌创意」" in mouth._SYNTH_SYSTEM
+    assert "赵思琪" in mouth._SYNTH_SYSTEM
+    assert "不要注水" in mouth._SYNTH_SYSTEM
+
+
+def test_mouth_max_tokens_capped():
+    from app.agent.supervisor import mouth
+
+    assert mouth._mouth_max_tokens() <= 2000
+    assert mouth._mouth_max_tokens() >= 400
 
 
 def test_enrich_ask_includes_subtree_teammates(monkeypatch):
@@ -466,7 +474,7 @@ def test_mouth_system_calendar_not_primary_for_progress():
     from app.agent.supervisor import mouth
 
     assert "日历" in mouth._SYNTH_SYSTEM
-    assert "禁止把日程列表当主答案" in mouth._SYNTH_SYSTEM
+    assert "补充" in mouth._SYNTH_SYSTEM
 
 
 def test_mouth_hides_protocol_noise():
@@ -640,7 +648,7 @@ def test_write_gate_prepare_and_confirm_via_writer(monkeypatch):
 
     def fake_render(result, intent, status):
         return ("文档已创建", [], [])
-
+    
     monkeypatch.setattr(
         "app.agent.supervisor.mouth.speak",
         lambda *a, **k: ("写好了，文档已创建。", {"llm_used": False}),

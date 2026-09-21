@@ -1,6 +1,7 @@
 """Feishu Agent v1 · display_text / Evidence 对齐（纯单元，无 DB）。"""
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -104,6 +105,30 @@ def test_parse_im_message_dm():
     assert p["feishu_open_id"] == "ou_x"
     assert p["channel"] == "feishu_dm"
     assert "具身智能" in p["text"]
+
+
+def test_parse_im_message_post_rich_text():
+    """飞书富文本输入是 message_type=post，不能当 unsupported 丢掉。"""
+    event = {
+        "sender": {"sender_type": "user", "sender_id": {"open_id": "ou_x"}},
+        "message": {
+            "chat_id": "oc_1",
+            "chat_type": "p2p",
+            "message_type": "post",
+            "message_id": "om_post",
+            "content": json.dumps(
+                {
+                    "title": "",
+                    "content": [[{"tag": "text", "text": "你好啊，最近有什么进展"}]],
+                },
+                ensure_ascii=False,
+            ),
+        },
+    }
+    p = parse_im_message(event)
+    assert p is not None
+    assert "你好啊" in p["text"]
+    assert "进展" in p["text"]
 
 
 def test_parse_im_message_mentions():

@@ -175,10 +175,53 @@ def _extract_text(content: str) -> str:
     try:
         obj = json.loads(raw)
         if isinstance(obj, dict):
-            return str(obj.get("text") or obj.get("content") or "").strip()
+            t = str(obj.get("text") or "").strip()
+            if t:
+                return t
+            if obj.get("content") is not None:
+                return _extract_post_text(obj)
+            # 已是 JSON 对象但 text 为空 → 空串，不要把整段 JSON 当正文
+            return ""
     except Exception:
         pass
     return raw
+
+
+def _extract_post_text(obj: Any) -> str:
+    """飞书 post 富文本 → 纯文本。"""
+    if obj is None:
+        return ""
+    if isinstance(obj, str):
+        try:
+            obj = json.loads(obj)
+        except Exception:
+            return obj.strip()
+    if not isinstance(obj, dict):
+        return str(obj).strip()
+    title = str(obj.get("title") or "").strip()
+    parts: list[str] = []
+    if title:
+        parts.append(title)
+    blocks = obj.get("content")
+    if isinstance(blocks, list):
+        for row in blocks:
+            if not isinstance(row, list):
+                continue
+            for cell in row:
+                if not isinstance(cell, dict):
+                    continue
+                tag = str(cell.get("tag") or "")
+                if tag in ("text", "a", "emotion"):
+                    t = str(cell.get("text") or cell.get("content") or "").strip()
+                    if t:
+                        parts.append(t)
+                elif tag == "at":
+                    name = str(cell.get("user_name") or cell.get("text") or "").strip()
+                    if name:
+                        parts.append("@" + name)
+    elif isinstance(blocks, str):
+        parts.append(blocks.strip())
+    return " ".join(parts).strip()
 
 
 def parse_im_message(event: dict[str, Any]) -> dict[str, Any] | None:
@@ -186,27 +229,69 @@ def parse_im_message(event: dict[str, Any]) -> dict[str, Any] | None:
     event = event or {}
     # 兼容少数把 message 摊平在 event 根上的形态
     msg = event.get("message") or {}
+    if isinstance(msg, str):
+        try:
+            msg = json.loads(msg)
+        except Exception:
+            msg = {}
+    if not isinstance(msg, dict):
+        msg = {}
     if not msg and event.get("message_type") and (event.get("chat_id") or event.get("content") is not None):
         msg = event
     sender = event.get("sender") or {}
+    if isinstance(sender, str):
+        try:
+            sender = json.loads(sender)
+        except Exception:
+            sender = {}
+    if not isinstance(sender, dict):
+        sender = {}
     sender_id = sender.get("sender_id") or {}
+    if isinstance(sender_id, str):
+        try:
+            sender_id = json.loads(sender_id)
+        except Exception:
+            sender_id = {}
+    if not isinstance(sender_id, dict):
+        sender_id = {}
     if not sender_id and event.get("open_id"):
         sender_id = {"open_id": event.get("open_id")}
     sender_type = str(sender.get("sender_type") or event.get("sender_type") or "user").strip().lower()
     if sender_type and sender_type not in ("user",):
+        log.info(
+            "feishu parse skip sender_type=%s keys=%s",
+            sender_type,
+            list(event.keys())[:8],
+        )
         return None
-    open_id = str(sender_id.get("open_id") or event.get("open_id") or "").strip()
+    # 优先 open_id；少数租户回调只给 user_id
+    open_id = str(
+        sender_id.get("open_id")
+        or sender_id.get("user_id")
+        or event.get("open_id")
+        or ""
+    ).strip()
     chat_id = str(msg.get("chat_id") or event.get("chat_id") or "").strip()
     chat_type = str(msg.get("chat_type") or event.get("chat_type") or "").strip().lower()
     msg_type = str(msg.get("message_type") or event.get("message_type") or "").strip().lower()
     message_id = str(msg.get("message_id") or event.get("message_id") or "").strip()
-    if msg_type and msg_type != "text":
+    # text + post（飞书富文本输入）都收；图片/文件等暂不处理
+    if msg_type and msg_type not in ("text", "post"):
+        log.info(
+            "feishu parse skip msg_type=%s message_id=%s",
+            msg_type,
+            message_id[:24],
+        )
         return None
     content = msg.get("content") if "content" in msg else event.get("content")
     if isinstance(content, dict):
-        text = str(content.get("text") or content.get("content") or "").strip()
+        if msg_type == "post":
+            text = _extract_post_text(content)
+        else:
+            text = str(content.get("text") or "").strip() or _extract_post_text(content)
     else:
-        text = _extract_text(str(content or ""))
+        raw_c = str(content or "")
+        text = _extract_post_text(raw_c) if msg_type == "post" else _extract_text(raw_c)
     mentions = _parse_mentions(msg.get("mentions") or event.get("mentions") or [])
     # 群聊 @机器人 会留下 @_user_1；不剥掉则确认写整句匹配失败
     if text:
@@ -228,7 +313,19 @@ def parse_im_message(event: dict[str, Any]) -> dict[str, Any] | None:
         if labels:
             text = (" ".join(labels) + (" " + text if text else "")).strip()
     if not text and not open_id:
+        log.info(
+            "feishu parse skip empty text/open_id msg_type=%s chat=%s message_id=%s",
+            msg_type or "-",
+            chat_id[:16],
+            message_id[:24],
+        )
         return None
+    if not text:
+        log.info(
+            "feishu parse empty text keep open_id msg_type=%s message_id=%s",
+            msg_type or "-",
+            message_id[:24],
+        )
     channel = "feishu_group" if chat_type == "group" else "feishu_dm"
     return {
         "text": text,
@@ -1009,6 +1106,24 @@ def handle_feishu_event(
     ) or (isinstance(event, dict) and (event.get("message") or event.get("message_type"))):
         payload = parse_im_message(event)
         if not payload:
+            # 可诊断：msg_type / sender_type / 是否有 content，便于定位「有回调无回复」
+            try:
+                msg0 = event.get("message") if isinstance(event, dict) else {}
+                if not isinstance(msg0, dict):
+                    msg0 = {}
+                sender0 = event.get("sender") if isinstance(event, dict) else {}
+                if not isinstance(sender0, dict):
+                    sender0 = {}
+                log.info(
+                    "feishu unsupported_or_empty msg_type=%s sender_type=%s "
+                    "has_content=%s message_keys=%s",
+                    str(msg0.get("message_type") or event.get("message_type") or "-"),
+                    str(sender0.get("sender_type") or "-"),
+                    "content" in msg0 or "content" in (event or {}),
+                    list(msg0.keys())[:10],
+                )
+            except Exception:
+                pass
             return {"ok": True, "skipped": True, "reason": "unsupported_or_empty"}
         inbound_id = str(payload.get("inbound_message_id") or "")
         if _dedup_seen(inbound_id):
