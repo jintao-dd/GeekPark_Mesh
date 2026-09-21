@@ -254,7 +254,9 @@ def test_enrich_ask_with_prior_member_names():
         prior=prior,
         user_text="关联这些人的周报",
     )
-    assert "关联这些人的周报" in args["query"]
+    # Planner 改写后的检索词优先；用户原话只作兜底线索
+    assert args["query"] == "近期周报"
+    assert "关联这些人的周报" in args["q"]
     assert "杜锦涛" in (args.get("person_names") or [])
     assert "张山山" in (args.get("person_names") or [])
 
@@ -319,6 +321,66 @@ def test_enrich_ask_includes_subtree_teammates(monkeypatch):
     assert "Sean Shen" in names
     assert "【检索线索" not in q
     assert "一律算「我们团队相关」" not in q
+
+
+def test_enrich_prefers_planner_query_over_raw_utterance():
+    """Planner 按工作记忆改写的检索词优先；原话不得覆盖它。"""
+    from app.agent.supervisor import workers
+    from app.agent.supervisor.types import PlanStep
+    from app.agent.models import IdentityResult
+
+    step = PlanStep(
+        id="s1",
+        worker="published",
+        tool="ask.published",
+        args={"query": "杜锦涛 最近进展"},
+    )
+    args = workers.enrich_args(
+        step,
+        identity=IdentityResult(status="bound", display_hint="杜锦涛"),
+        context=None,
+        user_text="他后来呢",
+    )
+    assert args["query"] == "杜锦涛 最近进展"
+    assert args["q"].startswith("杜锦涛 最近进展")
+    assert "【检索线索" in args["q"]
+    assert "他后来呢" in args["q"]
+
+
+def test_enrich_falls_back_to_utterance_when_planner_empty():
+    from app.agent.supervisor import workers
+    from app.agent.supervisor.types import PlanStep
+    from app.agent.models import IdentityResult
+
+    step = PlanStep(
+        id="s1",
+        worker="published",
+        tool="ask.published",
+        args={},
+    )
+    args = workers.enrich_args(
+        step,
+        identity=IdentityResult(status="bound", display_hint="杜锦涛"),
+        context=None,
+        user_text="最近谁在跟进具身智能",
+    )
+    assert args["query"] == "最近谁在跟进具身智能"
+
+
+def test_mouth_history_block_renders_recent_turns():
+    from app.agent.supervisor import mouth
+    from app.agent.session_state import SessionContextState
+
+    st = SessionContextState(session_key="dm:ou_x")
+    st.recent_turns = [
+        {"role": "user", "text": "杜锦涛最近怎么样"},
+        {"role": "assistant", "text": "他在推具身智能这条线。"},
+    ]
+    block = mouth._history_block(st)
+    assert "此前对话" in block
+    assert "杜锦涛最近怎么样" in block
+    assert "不是事实来源" in block
+    assert mouth._history_block(None) == ""
 
 
 def test_enrich_about_me_skips_teammate_dump(monkeypatch):
@@ -517,7 +579,6 @@ def test_progress_callback_emits_during_work(monkeypatch):
     finally:
         progressmod.reset_progress_callback(token)
 
-
 def test_write_gate_prepare_and_confirm_via_writer(monkeypatch):
     from app.agent.supervisor import write_gate
     from app.agent.supervisor.types import TaskGraph
@@ -621,3 +682,4 @@ def test_thinking_card_shows_progress():
     # 无 progress 时按 stage_index 轮播
     body2 = feishu_cards.stage_copy(query="查一下", stage_index=3, tick=0)
     assert "检索" in body2 or "查" in body2
+

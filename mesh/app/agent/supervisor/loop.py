@@ -300,6 +300,24 @@ def handle_turn(
         return out
 
     t_execute = time.monotonic()
+    # 主管路径补会话线索：会话状态 + 已解析人名，仅喂检索（不进成文原话）
+    search_user_text = q
+    try:
+        parts: list[str] = []
+        team_ctx = str(getattr(session, "active_team", "") or "").strip()
+        if team_ctx:
+            parts.append(team_ctx)
+        ents = list(getattr(session, "active_entities", None) or [])[:6]
+        if ents:
+            parts.append("、".join(str(x) for x in ents if str(x).strip()))
+        prev = str(getattr(session, "last_query", "") or "").strip()
+        if prev and prev != q:
+            parts.append(prev[:120])
+        extra = " ".join(p for p in parts if p).strip()
+        if extra:
+            search_user_text = f"{q} {extra}"[:400]
+    except Exception:
+        search_user_text = q
     envelopes, tools_called, budget_hit, progress = _execute_graph(
         graph,
         con=con,
@@ -308,7 +326,7 @@ def handle_turn(
         context=context,
         invoke_tool=invoke_tool,
         render_tool_result=render_tool_result,
-        user_text=q,
+        user_text=search_user_text,
         resolved_names=resolved_names,
     )
     timings["execute_ms"] = int((time.monotonic() - t_execute) * 1000)
@@ -356,7 +374,7 @@ def handle_turn(
             context=context,
             invoke_tool=invoke_tool,
             render_tool_result=render_tool_result,
-            user_text=q,
+            user_text=search_user_text,
             resolved_names=resolved_names,
         )
         timings[f"reexecute_{replan_count}_ms"] = int((time.monotonic() - t_reexec) * 1000)

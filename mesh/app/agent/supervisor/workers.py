@@ -17,6 +17,9 @@ from .types import PlanStep, TieredEnvelope
 
 log = logging.getLogger("uvicorn.error")
 
+# 与 adapters 同口径：这部分只喂检索，不进成文
+_CLUE_MARK = "【检索线索"
+
 WORKER_FOR_TOOL = {
     "ask.published": "published",
     "ask.relations_summary": "published",
@@ -158,8 +161,10 @@ def enrich_args(
 
     if step.tool.startswith("ask."):
         q_plan = str(args.get("query") or args.get("q") or "").strip()
-        q_full = q_user or q_plan
-        scope = _ask_person_scope(q_full, has_resolved=bool(resolved))
+        # Planner 已按工作记忆改写检索词；原话只是兜底。
+        # 历史实现 q_user or q_plan 会让「他后来呢」这类原话覆盖 Planner 改写。
+        q_full = q_plan or q_user
+        scope = _ask_person_scope(q_user or q_full, has_resolved=bool(resolved))
         names: list[str] = []
         # 计划里已带的人名保留
         for n in args.get("person_names") or []:
@@ -194,7 +199,11 @@ def enrich_args(
                     names.append(t)
         # self / default / named：不灌整棵子树；default 仍可带 prior 人名
         args["query"] = q_full
-        args["q"] = q_full
+        # 用户原话额外带上，供成文/时间语义使用；检索侧 adapters 会切掉这段
+        if q_user and q_user != q_full:
+            args["q"] = f"{q_full}\n\n{_CLUE_MARK}】{q_user}"[:500]
+        else:
+            args["q"] = q_full
         if names:
             args["person_names"] = names[:16]
         # 显式桶过滤才设 team；默认不 apply_team_focus（飞书子树 ≠ 周报桶）

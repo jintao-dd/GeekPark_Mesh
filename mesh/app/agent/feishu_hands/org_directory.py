@@ -59,12 +59,14 @@ def _children(native_mod: Any, dept_id: str) -> list[dict[str, Any]]:
 
 
 def _users_of(native_mod: Any, dept_open_id: str) -> list[dict[str, Any]]:
+    """列部门直属成员。根部门（"0"）须用 department_id 口径，否则接口不返回。"""
+    is_root = str(dept_open_id).strip() == "0"
     out: list[dict[str, Any]] = []
     page_token = ""
     while True:
         params: dict[str, Any] = {
             "department_id": dept_open_id,
-            "department_id_type": "open_department_id",
+            "department_id_type": "department_id" if is_root else "open_department_id",
             "page_size": 50,
             "user_id_type": "open_id",
         }
@@ -115,6 +117,24 @@ def _walk(native_mod: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
             )
             queue.append(oid)
         if did == "0":
+            # 根部门直属（不挂任何子部门）的人也要采，否则永远漏。
+            try:
+                root_us = _users_of(native_mod, did)
+            except Exception as e:
+                log.warning("org users fail dept=%s err=%s", did, e)
+                root_us = []
+            for u in root_us:
+                oid = str(u.get("open_id") or "").strip()
+                if not oid:
+                    continue
+                people_by_id[oid] = {
+                    "name": str(u.get("name") or "").strip(),
+                    "open_id": oid,
+                    "employee_no": str(u.get("employee_no") or "").strip(),
+                    "enterprise_email": str(u.get("enterprise_email") or "").strip(),
+                    "job_title": str(u.get("job_title") or "").strip(),
+                    "department_ids": list(u.get("department_ids") or []),
+                }
             continue
         try:
             us = _users_of(native_mod, did)

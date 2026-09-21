@@ -220,6 +220,27 @@ def render_work_answer(columns: dict[str, str]) -> str:
     return sanitize("\n\n".join(blocks).strip())
 
 
+def _history_block(session: Any, *, limit: int = 6) -> str:
+    """此前对话（供指代消解与话题延续）。只作上下文，不作事实。"""
+    if session is None:
+        return ""
+    turns = list(getattr(session, "recent_turns", None) or [])[-limit:]
+    lines: list[str] = []
+    for t in turns:
+        if not isinstance(t, dict):
+            continue
+        role = "用户" if t.get("role") == "user" else "Mesh"
+        text = str(t.get("text") or "").strip()
+        if text:
+            lines.append(f"{role}：{text[:220]}")
+    if not lines:
+        return ""
+    return (
+        "此前对话（仅用于理解指代和延续话题，不是事实来源；"
+        "公司事实仍以本轮分桶材料为准）：\n" + "\n".join(lines)
+    )
+
+
 def synthesize_work(
     user_text: str,
     envelopes: list[TieredEnvelope],
@@ -246,8 +267,10 @@ def synthesize_work(
     system = _SYNTH_SYSTEM
     if company_block:
         system += "\n\n" + company_block
+    hist = _history_block(session)
     user = (
-        f"用户完整原话（不得弱化）：\n{(user_text or '').strip()}\n\n"
+        (hist + "\n\n" if hist else "")
+        + f"用户完整原话（不得弱化）：\n{(user_text or '').strip()}\n\n"
         f"分桶材料：\n{material}\n"
     )
     if notes:
