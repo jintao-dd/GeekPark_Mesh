@@ -1,0 +1,542 @@
+{
+  "repaired": [
+    {
+      "id": "R07",
+      "old_items": [
+        "4429"
+      ],
+      "new_items": [
+        "4649"
+      ],
+      "new_chunks": [
+        "93e4016f053383aa7f3a"
+      ],
+      "count_changed": false,
+      "confidence": "high"
+    },
+    {
+      "id": "R08",
+      "old_items": [
+        "4423",
+        "4424",
+        "4425"
+      ],
+      "new_items": [
+        "4646",
+        "4644",
+        "4645"
+      ],
+      "new_chunks": [
+        "adee9fb5f5fab83a74e9",
+        "3f1e3c84a1df5cfe6609",
+        "536b6cc0b38b1bf16ad1"
+      ],
+      "count_changed": false,
+      "confidence": "high"
+    },
+    {
+      "id": "R09",
+      "old_items": [
+        "4428"
+      ],
+      "new_items": [
+        "4648"
+      ],
+      "new_chunks": [
+        "f71a56f20a635d71070f"
+      ],
+      "count_changed": false,
+      "confidence": "high"
+    },
+    {
+      "id": "R10",
+      "old_items": [
+        "4431"
+      ],
+      "new_items": [
+        "4651"
+      ],
+      "new_chunks": [
+        "fffe2c2ac2ab36f74689"
+      ],
+      "count_changed": false,
+      "confidence": "high"
+    },
+    {
+      "id": "R14",
+      "old_items": [
+        "4408",
+        "4409",
+        "4410",
+        "4411",
+        "4412"
+      ],
+      "new_items": [
+        "4632",
+        "4864",
+        "4633"
+      ],
+      "new_chunks": [
+        "868d5349faa2d39fa649",
+        "42294932fc2ad7890893",
+        "e1f7d159e222637742af"
+      ],
+      "count_changed": true,
+      "confidence": "low"
+    },
+    {
+      "id": "R15",
+      "old_items": [
+        "4416",
+        "4417"
+      ],
+      "new_items": [
+        "4639",
+        "4640"
+      ],
+      "new_chunks": [
+        "c542de2900a0b2a44783",
+        "125ec66086dc65c9b004"
+      ],
+      "count_changed": false,
+      "confidence": "medium"
+    },
+    {
+      "id": "R17",
+      "old_items": [
+        "4426",
+        "4427"
+      ],
+      "new_items": [
+        "4647"
+      ],
+      "new_chunks": [
+        "115830562a984a7e076f"
+      ],
+      "count_changed": true,
+      "confidence": "low"
+    },
+    {
+      "id": "R21",
+      "old_items": [
+        "4402",
+        "4404"
+      ],
+      "new_items": [
+        "4711",
+        "4709"
+      ],
+      "new_chunks": [
+        "8cd1613055d069276946",
+        "32ea780a8c7955bfc2e0"
+      ],
+      "count_changed": false,
+      "confidence": "high"
+    },
+    {
+      "id": "R22",
+      "old_items": [
+        "4405"
+      ],
+      "new_items": [
+        "4695"
+      ],
+      "new_chunks": [
+        "0bb73dbee1404f2a35f5"
+      ],
+      "count_changed": false,
+      "confidence": "high"
+    },
+    {
+      "id": "R29",
+      "old_items": [
+        "4421"
+      ],
+      "new_items": [
+        "4866"
+      ],
+      "new_chunks": [
+        "315c399e39f6687f82f5"
+      ],
+      "count_changed": false,
+      "confidence": "high"
+    },
+    {
+      "id": "R30",
+      "old_items": [
+        "4420"
+      ],
+      "new_items": [
+        "4643"
+      ],
+      "new_chunks": [
+        "967da9d8a6f87203d114"
+      ],
+      "count_changed": false,
+      "confidence": "high"
+    }
+  ],
+  "unchanged": [
+    {
+      "id": "R01",
+      "items": [
+        "4251",
+        "4259",
+        "4260"
+      ],
+      "chunks": [
+        "d2ad48a6d8294b74fbbc",
+        "fe2cc89029efdc05267c",
+        "4192697fb4b46401c232"
+      ]
+    },
+    {
+      "id": "R02",
+      "items": [
+        "4251",
+        "4259",
+        "4260"
+      ],
+      "chunks": [
+        "d2ad48a6d8294b74fbbc",
+        "fe2cc89029efdc05267c",
+        "4192697fb4b46401c232"
+      ]
+    },
+    {
+      "id": "R03",
+      "items": [
+        "4356"
+      ],
+      "chunks": [
+        "03eb4ede0d6493b0e262"
+      ]
+    },
+    {
+      "id": "R04",
+      "items": [
+        "4112",
+        "4115",
+        "4116",
+        "4118",
+        "4120"
+      ],
+      "chunks": [
+        "266c607bec49467a6fd0",
+        "e4b534b96655b86e45ec",
+        "4eb606f25b9735f670e9",
+        "b48f0e83e535396a2916",
+        "584a9705b070915706ff"
+      ]
+    },
+    {
+      "id": "R05",
+      "items": [
+        "4141",
+        "4142",
+        "4143",
+        "4144",
+        "4145"
+      ],
+      "chunks": [
+        "1dba837c7e598cac0b46",
+        "c0bd959ffa6f2f004af0",
+        "93315c2175f863bcfe8c",
+        "cce614a238988368eb2f",
+        "872a8699d207fb5f02a4"
+      ]
+    },
+    {
+      "id": "R06",
+      "items": [
+        "4147",
+        "4148",
+        "4149",
+        "4150",
+        "4151"
+      ],
+      "chunks": [
+        "02f7220d80710f3462d3",
+        "96d63a7eef95125d2194",
+        "9dc73717bf62fce4fd9b",
+        "78ab20c6e009a039aa39",
+        "c72b4c67c6d9654e25e4"
+      ]
+    },
+    {
+      "id": "R11",
+      "items": [
+        "4105",
+        "4106"
+      ],
+      "chunks": [
+        "ef322a1998d729c7221b",
+        "aab8a2cc537ef64e5fcd"
+      ]
+    },
+    {
+      "id": "R12",
+      "items": [
+        "4116",
+        "4120",
+        "4125",
+        "4128"
+      ],
+      "chunks": [
+        "4eb606f25b9735f670e9",
+        "584a9705b070915706ff",
+        "bb5f1c3357e14fff70bb",
+        "6b2377c933c9c2b95317"
+      ]
+    },
+    {
+      "id": "R13",
+      "items": [
+        "4154",
+        "4155",
+        "4156"
+      ],
+      "chunks": [
+        "5399a0cb558a209bb5c3",
+        "fa623bcc9d44f172d11e",
+        "0a982bc33bc9af926a62"
+      ]
+    },
+    {
+      "id": "R16",
+      "items": [
+        "4125",
+        "4126",
+        "4127",
+        "4131"
+      ],
+      "chunks": [
+        "bb5f1c3357e14fff70bb",
+        "745c00da0beac4f6f655",
+        "d1c9715b1f54573bb967",
+        "7db589ebd88cdc9284cf"
+      ]
+    },
+    {
+      "id": "R18",
+      "items": [
+        "4358",
+        "4271"
+      ],
+      "chunks": [
+        "7f73d8b8ba87e09d02bc",
+        "5cd815553c4706809f5d"
+      ]
+    },
+    {
+      "id": "R19",
+      "items": [
+        "4368"
+      ],
+      "chunks": [
+        "361dcb60adb6c6503cb9"
+      ]
+    },
+    {
+      "id": "R20",
+      "items": [
+        "4356"
+      ],
+      "chunks": [
+        "03eb4ede0d6493b0e262"
+      ]
+    },
+    {
+      "id": "R23",
+      "items": [
+        "4251"
+      ],
+      "chunks": [
+        "d2ad48a6d8294b74fbbc"
+      ]
+    },
+    {
+      "id": "R24",
+      "items": [
+        "4356"
+      ],
+      "chunks": [
+        "03eb4ede0d6493b0e262"
+      ]
+    },
+    {
+      "id": "R25",
+      "items": [
+        "4251"
+      ],
+      "chunks": [
+        "d2ad48a6d8294b74fbbc"
+      ]
+    },
+    {
+      "id": "R26",
+      "items": [
+        "4110"
+      ],
+      "chunks": [
+        "92ac346bd9569a86d861"
+      ]
+    },
+    {
+      "id": "R27",
+      "items": [
+        "4135",
+        "4136"
+      ],
+      "chunks": [
+        "fe527c12e83e4382f898",
+        "8779323a08378a9658b0"
+      ]
+    },
+    {
+      "id": "R28",
+      "items": [
+        "4140"
+      ],
+      "chunks": [
+        "fafe1f92949977fa8d07"
+      ]
+    }
+  ],
+  "chunk_truth": {
+    "R01": [
+      "d2ad48a6d8294b74fbbc",
+      "fe2cc89029efdc05267c",
+      "4192697fb4b46401c232"
+    ],
+    "R02": [
+      "d2ad48a6d8294b74fbbc",
+      "fe2cc89029efdc05267c",
+      "4192697fb4b46401c232"
+    ],
+    "R03": [
+      "03eb4ede0d6493b0e262"
+    ],
+    "R04": [
+      "266c607bec49467a6fd0",
+      "e4b534b96655b86e45ec",
+      "4eb606f25b9735f670e9",
+      "b48f0e83e535396a2916",
+      "584a9705b070915706ff"
+    ],
+    "R05": [
+      "1dba837c7e598cac0b46",
+      "c0bd959ffa6f2f004af0",
+      "93315c2175f863bcfe8c",
+      "cce614a238988368eb2f",
+      "872a8699d207fb5f02a4"
+    ],
+    "R06": [
+      "02f7220d80710f3462d3",
+      "96d63a7eef95125d2194",
+      "9dc73717bf62fce4fd9b",
+      "78ab20c6e009a039aa39",
+      "c72b4c67c6d9654e25e4"
+    ],
+    "R07": [
+      "93e4016f053383aa7f3a"
+    ],
+    "R08": [
+      "adee9fb5f5fab83a74e9",
+      "3f1e3c84a1df5cfe6609",
+      "536b6cc0b38b1bf16ad1"
+    ],
+    "R09": [
+      "f71a56f20a635d71070f"
+    ],
+    "R10": [
+      "fffe2c2ac2ab36f74689"
+    ],
+    "R11": [
+      "ef322a1998d729c7221b",
+      "aab8a2cc537ef64e5fcd"
+    ],
+    "R12": [
+      "4eb606f25b9735f670e9",
+      "584a9705b070915706ff",
+      "bb5f1c3357e14fff70bb",
+      "6b2377c933c9c2b95317"
+    ],
+    "R13": [
+      "5399a0cb558a209bb5c3",
+      "fa623bcc9d44f172d11e",
+      "0a982bc33bc9af926a62"
+    ],
+    "R14": [
+      "868d5349faa2d39fa649",
+      "42294932fc2ad7890893",
+      "e1f7d159e222637742af"
+    ],
+    "R15": [
+      "c542de2900a0b2a44783",
+      "125ec66086dc65c9b004"
+    ],
+    "R16": [
+      "bb5f1c3357e14fff70bb",
+      "745c00da0beac4f6f655",
+      "d1c9715b1f54573bb967",
+      "7db589ebd88cdc9284cf"
+    ],
+    "R17": [
+      "115830562a984a7e076f"
+    ],
+    "R18": [
+      "7f73d8b8ba87e09d02bc",
+      "5cd815553c4706809f5d"
+    ],
+    "R19": [
+      "361dcb60adb6c6503cb9"
+    ],
+    "R20": [
+      "03eb4ede0d6493b0e262"
+    ],
+    "R21": [
+      "8cd1613055d069276946",
+      "32ea780a8c7955bfc2e0"
+    ],
+    "R22": [
+      "0bb73dbee1404f2a35f5"
+    ],
+    "R23": [
+      "d2ad48a6d8294b74fbbc"
+    ],
+    "R24": [
+      "03eb4ede0d6493b0e262"
+    ],
+    "R25": [
+      "d2ad48a6d8294b74fbbc"
+    ],
+    "R26": [
+      "92ac346bd9569a86d861"
+    ],
+    "R27": [
+      "fe527c12e83e4382f898",
+      "8779323a08378a9658b0"
+    ],
+    "R28": [
+      "fafe1f92949977fa8d07"
+    ],
+    "R29": [
+      "315c399e39f6687f82f5"
+    ],
+    "R30": [
+      "967da9d8a6f87203d114"
+    ]
+  },
+  "summary": {
+    "total": 30,
+    "repaired": 11,
+    "unchanged": 19,
+    "with_chunk_truth": 30,
+    "missing_chunk_truth": [],
+    "count_downgraded": [
+      "R14",
+      "R17"
+    ]
+  }
+}

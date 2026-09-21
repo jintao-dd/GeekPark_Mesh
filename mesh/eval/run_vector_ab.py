@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import subprocess
@@ -14,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _run(embed: bool, tag: str) -> Path:
+def _run(embed: bool, tag: str, gold: str = "") -> Path:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(ROOT)
     env["MESH_RECALL_USE_EMBED"] = "1" if embed else "0"
@@ -22,10 +23,14 @@ def _run(embed: bool, tag: str) -> Path:
         sys.executable,
         str(ROOT / "eval" / "run_recall_baseline.py"),
         "--reuse-env-db",
+        "--tag",
+        f"vector_ab_{tag}",
     ]
+    if gold:
+        cmd += ["--gold", gold]
     print("RUN", tag, "embed=", embed, flush=True)
     subprocess.check_call(cmd, cwd=str(ROOT), env=env)
-    src = ROOT / "eval" / "reports" / "RECALL_BASELINE_latest.json"
+    src = ROOT / "eval" / "reports" / f"RECALL_vector_ab_{tag}_latest.json"
     out_dir = ROOT / "eval" / "reports" / "experiments" / "vector_ab"
     out_dir.mkdir(parents=True, exist_ok=True)
     dst = out_dir / f"RECALL_{tag}.json"
@@ -37,10 +42,15 @@ def _run(embed: bool, tag: str) -> Path:
 
 
 def main() -> int:
-    fts = _run(False, "fts_only")
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--gold", default="", help="gold jsonl 路径")
+    ap.add_argument("--tag", default="", help="输出标签前缀")
+    args = ap.parse_args()
+    pre = f"{args.tag}_" if args.tag else ""
+    fts = _run(False, f"{pre}fts_only", gold=args.gold)
     # Vector may be slow / unavailable — still attempt
     try:
-        vec = _run(True, "fts_plus_vector")
+        vec = _run(True, f"{pre}fts_plus_vector", gold=args.gold)
     except Exception as e:
         out_dir = ROOT / "eval" / "reports" / "experiments" / "vector_ab"
         delta = {
@@ -49,7 +59,7 @@ def main() -> int:
             "fts_only": str(fts),
             "recommendation": "keep FTS-only mainline",
         }
-        (out_dir / "VECTOR_AB_DELTA.json").write_text(
+        (out_dir / f"{pre}VECTOR_AB_DELTA.json").write_text(
             json.dumps(delta, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         print(json.dumps(delta, ensure_ascii=False, indent=2))
@@ -57,9 +67,17 @@ def main() -> int:
 
     a = json.loads(fts.read_text(encoding="utf-8"))
     b = json.loads(vec.read_text(encoding="utf-8"))
-    keys = ["macro_recall@5", "macro_recall@10", "macro_recall@20"]
+    keys = [
+        "macro_recall@5",
+        "macro_recall@10",
+        "macro_recall@20",
+        "macro_chunk_recall@5",
+        "macro_chunk_recall@10",
+        "macro_chunk_in_pool",
+    ]
     delta = {
         "status": "ok",
+        "gold": a.get("gold"),
         "fts_only": {k: a.get(k) for k in keys},
         "fts_plus_vector": {k: b.get(k) for k in keys},
         "delta": {k: round(float(b.get(k) or 0) - float(a.get(k) or 0), 4) for k in keys},
@@ -94,7 +112,7 @@ def main() -> int:
             noise.append({"id": qid, "top5_noise_delta": bn - an})
     delta["new_relevant"] = new_hits
     delta["noise_increase"] = noise
-    out = ROOT / "eval" / "reports" / "experiments" / "vector_ab" / "VECTOR_AB_DELTA.json"
+    out = ROOT / "eval" / "reports" / "experiments" / "vector_ab" / f"{pre}VECTOR_AB_DELTA.json"
     out.write_text(json.dumps(delta, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(delta, ensure_ascii=False, indent=2))
     print("wrote", out)

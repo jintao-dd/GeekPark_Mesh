@@ -37,9 +37,10 @@ from app.ranking_quality import (  # noqa: E402
 GOLD_PATH = ROOT / "eval" / "ranking_gold_v1.jsonl"
 
 
-def _load_gold() -> list[dict]:
+def _load_gold(path: Path | None = None) -> list[dict]:
     rows = []
-    for line in GOLD_PATH.read_text(encoding="utf-8").splitlines():
+    src = path or GOLD_PATH
+    for line in src.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
@@ -160,12 +161,16 @@ def main() -> int:
     ap.add_argument("--tag", default="")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--ids", default="")
+    ap.add_argument("--gold", default="", help="gold jsonl 路径（默认 ranking_gold_v1）")
     args = ap.parse_args()
 
     _disable_embed()
     from app import db
 
-    gold = _load_gold()
+    gold_path = Path(args.gold) if args.gold else GOLD_PATH
+    if not gold_path.is_absolute():
+        gold_path = ROOT / gold_path
+    gold = _load_gold(gold_path)
     if args.ids.strip():
         want = {x.strip() for x in args.ids.split(",") if x.strip()}
         gold = [r for r in gold if r.get("id") in want]
@@ -247,6 +252,7 @@ def main() -> int:
         "phase": "ranking",
         "profile": args.profile,
         "tag": tag,
+        "gold": gold_path.name,
         "n": len(results),
         "macro_mrr": round(mean(r["metrics"]["mrr"] for r in results), 4),
         "macro_ndcg@10": round(mean(r["metrics"]["ndcg@10"] for r in results), 4),
