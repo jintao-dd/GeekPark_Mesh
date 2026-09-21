@@ -119,7 +119,9 @@ def handle_message(con, envelope: AgentEnvelope) -> AgentAnswer:
         explicit_team=envelope.explicit_team,
         chat_team=chat_team,
     )
-    context = ctxmod.assemble_context(con, envelope, identity, permission)
+    context = ctxmod.assemble_context(
+        con, envelope, identity, permission, chat_team=chat_team
+    )
 
     sk = sstore.session_key_of(
         channel=envelope.channel or identity.channel or "web",

@@ -113,9 +113,16 @@ def assemble_context(
     envelope: AgentEnvelope,
     identity: IdentityResult,
     permission: PermissionDecision,
+    *,
+    chat_team: str = "",
 ) -> AgentContext:
-    """组装 Context；不改写 Identity.primary_team。"""
-    chat_team = chat_team_of(con, envelope.chat_id)
+    """组装 Context；不改写 Identity.primary_team。
+
+    chat_team 可由调用方传入（runtime 已为权限判定查过一次），避免同一条消息
+    重复查 feishu_chat_bindings。
+    """
+    if not chat_team:
+        chat_team = chat_team_of(con, envelope.chat_id)
     # Permission 已算 query_scope；若群视角与 primary 不同，以 Permission 为准
     # （decide_permission 已传入 chat_team）
     issue = resolve_issue_ref(con, envelope)

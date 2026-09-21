@@ -36,11 +36,16 @@ SEED_ALIASES: dict[str, str] = {
 
 _ROSTER_PATH = Path(__file__).resolve().parent / "data" / "company_people_roster.json"
 _ROSTER_CACHE: dict[str, Any] | None = None
+_ROSTER_MTIME: float = -1.0
 
 # 组织人员池缓存（roster + 飞书通讯录），按文件 mtime + 通讯录签名缓存 60 秒
 _ORG_PEOPLE_CACHE: tuple[str, float, list[dict[str, str]]] | None = None
 _ORG_PEOPLE_LOCK = threading.Lock()
 _ORG_PEOPLE_TTL_S = 60
+
+# open_id → person 索引。历史实现 lookup_by_open_id 线性扫描全员池，
+# 全员通讯录下每条消息遍历数千人；这里按缓存 key 建一次索引复用。
+_ORG_BY_OPEN_ID: tuple[str, dict[str, dict[str, str]]] | None = None
 
 _STOP = frozenset(
     {
@@ -152,10 +157,21 @@ def _session_people(session: Any) -> list[dict[str, str]]:
     return out
 
 
+def _roster_mtime() -> float:
+    try:
+        return _ROSTER_PATH.stat().st_mtime if _ROSTER_PATH.is_file() else 0.0
+    except Exception:
+        return 0.0
+
+
 def load_roster(*, force: bool = False) -> dict[str, Any]:
-    """加载手填别名表；失败返回空结构。"""
-    global _ROSTER_CACHE
-    if _ROSTER_CACHE is not None and not force:
+    """加载手填别名表；失败返回空结构。
+
+    除 force 外，文件 mtime 变化也会自动失效——运维改花名册不必重启进程。
+    """
+    global _ROSTER_CACHE, _ROSTER_MTIME
+    mtime = _roster_mtime()
+    if _ROSTER_CACHE is not None and not force and mtime == _ROSTER_MTIME:
         return _ROSTER_CACHE
     data: dict[str, Any] = {"people": [], "alias_to_name": {}}
     try:
@@ -186,6 +202,7 @@ def load_roster(*, force: bool = False) -> dict[str, Any]:
     except Exception as e:
         log.warning("person_resolve roster load failed: %s", e)
     _ROSTER_CACHE = data
+    _ROSTER_MTIME = mtime
     return data
 
 
@@ -207,13 +224,19 @@ def _roster_people() -> list[dict[str, str]]:
         name = str(row.get("name") or "").strip()
         if not name:
             continue
+        teams = row.get("teams") or []
+        teams_s = (
+            ",".join(str(t).strip() for t in teams if str(t).strip())
+            if isinstance(teams, list)
+            else str(teams or "").strip()
+        )
         out.append(
             {
                 "name": name,
                 "open_id": str(row.get("open_id") or "").strip(),
                 "employee_no": str(row.get("employee_no") or "").strip(),
                 "job_title": str(row.get("job_title") or "").strip(),
-                "teams": ",".join(row.get("teams") or []),
+                "teams": teams_s,
                 "source": "roster",
             }
         )
@@ -288,7 +311,34 @@ def _org_people(*, request_cache: Any | None = None) -> list[dict[str, str]]:
 
     with _ORG_PEOPLE_LOCK:
         _ORG_PEOPLE_CACHE = (cache_key, now, out)
+        _remember_org_index(cache_key, out)
     return out
+
+
+def _remember_org_index(cache_key: str, people: list[dict[str, str]]) -> None:
+    """按缓存 key 建 open_id → person 索引（O(n) 一次，后续 O(1)）。"""
+    global _ORG_BY_OPEN_ID
+    idx: dict[str, dict[str, str]] = {}
+    for p in people:
+        oid = str(p.get("open_id") or "").strip()
+        if oid and oid not in idx:
+            idx[oid] = p
+    _ORG_BY_OPEN_ID = (cache_key, idx)
+
+
+def _org_by_open_id() -> dict[str, dict[str, str]]:
+    """取当前人员池的 open_id 索引；池过期则重建（顺带刷新池）。"""
+    key = _org_cache_key()
+    ent = _ORG_BY_OPEN_ID
+    if ent is not None and ent[0] == key:
+        return ent[1]
+    people = _org_people()
+    with _ORG_PEOPLE_LOCK:
+        ent = _ORG_BY_OPEN_ID
+        if ent is not None and ent[0] == key:
+            return ent[1]
+        _remember_org_index(key, people)
+        return _ORG_BY_OPEN_ID[1] if _ORG_BY_OPEN_ID else {}
 
 
 def candidate_tokens(text: str) -> list[str]:
@@ -505,17 +555,17 @@ def lookup_by_open_id(open_id: str) -> dict[str, str] | None:
     oid = (open_id or "").strip()
     if not oid:
         return None
-    for p in _org_people():
-        if str(p.get("open_id") or "").strip() == oid:
-            return {
-                "name": str(p.get("name") or "").strip(),
-                "open_id": oid,
-                "employee_no": str(p.get("employee_no") or "").strip(),
-                "source": str(p.get("source") or "roster"),
-                "job_title": str(p.get("job_title") or "").strip(),
-                "teams": str(p.get("teams") or "").strip(),
-            }
-    # roster 行可能有 teams 列表；_org_people 已拍扁
+    hit = _org_by_open_id().get(oid)
+    if hit:
+        return {
+            "name": str(hit.get("name") or "").strip(),
+            "open_id": oid,
+            "employee_no": str(hit.get("employee_no") or "").strip(),
+            "source": str(hit.get("source") or "roster"),
+            "job_title": str(hit.get("job_title") or "").strip(),
+            "teams": str(hit.get("teams") or "").strip(),
+        }
+    # roster 行可能有 teams 列表；_org_people 已拍扁，这里只是兜底
     for row in load_roster().get("people") or []:
         if str(row.get("open_id") or "").strip() != oid:
             continue

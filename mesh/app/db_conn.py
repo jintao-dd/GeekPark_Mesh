@@ -42,8 +42,13 @@ def get_pg_pool():
         if _PG_POOL is None:
             from psycopg2 import pool as pg_pool
 
+            # 池上限低于并发时，高并发会卡在 getconn() 等待，表现为「整轮变慢」。
+            # 默认对齐 web 侧飞书 job 并发（MESH_FEISHU_JOB_WORKERS 默认 32）；
+            # max 只是上限、按需增长，worker 进程实际不会占满。
+            # 注意：PG max_connections=100，且 web+worker 共用一份 .env，
+            # 所以默认值不能贴着并发数往上加；可用 MESH_DB_POOL_MAX 覆盖。
             mn = max(1, int(os.environ.get("MESH_DB_POOL_MIN", "2") or "2"))
-            mx = max(mn, int(os.environ.get("MESH_DB_POOL_MAX", "20") or "20"))
+            mx = max(mn, int(os.environ.get("MESH_DB_POOL_MAX", "32") or "32"))
             _PG_POOL = pg_pool.ThreadedConnectionPool(mn, mx, MESH_DB_URL)
             print(f"[mesh] pg pool min={mn} max={mx}", flush=True)
         return _PG_POOL

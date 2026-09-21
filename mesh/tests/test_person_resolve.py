@@ -99,3 +99,64 @@ def test_filter_known_people_drops_answer_chrome():
     assert "张鹏" in kept
     assert "已上线周报" not in kept
     assert "缺的那一块" not in kept
+
+
+def test_lookup_by_open_id_uses_index(monkeypatch):
+    """open_id 索引：O(1) 命中，且 teams 列表被拍成逗号串（身份解析要用）。"""
+    people = [
+        {"name": "杜锦涛", "open_id": "ou_a", "employee_no": "1001", "source": "org",
+         "teams": "编辑部"},
+        {"name": "赵思琪", "open_id": "ou_b", "employee_no": "1002", "source": "org",
+         "teams": "品牌创意团队,海外拓展"},
+    ]
+    monkeypatch.setattr(pr, "_org_cache_key", lambda: "test-key")
+    monkeypatch.setattr(pr, "_org_people", lambda **kw: people)
+    monkeypatch.setattr(pr, "_ORG_PEOPLE_CACHE", None)
+    monkeypatch.setattr(pr, "_ORG_BY_OPEN_ID", None)
+
+    got = pr.lookup_by_open_id("ou_b")
+    assert got is not None
+    assert got["name"] == "赵思琪"
+    assert got["teams"] == "品牌创意团队,海外拓展"
+    assert got["source"] == "org"
+
+    # 索引已建立：再次调用不应重建（_org_people 调用计数为 0）
+    calls = {"n": 0}
+
+    def _count(**kw):
+        calls["n"] += 1
+        return people
+
+    monkeypatch.setattr(pr, "_org_people", _count)
+    assert pr.lookup_by_open_id("ou_a")["name"] == "杜锦涛"
+    assert calls["n"] == 0
+
+
+def test_org_index_rebuilt_when_cache_key_changes(monkeypatch):
+    monkeypatch.setattr(pr, "_ORG_PEOPLE_CACHE", ("stale-key", 0.0, [{"name": "旧人", "open_id": "ou_old"}]))
+    monkeypatch.setattr(pr, "_ORG_BY_OPEN_ID", ("stale-key", {"ou_old": {"name": "旧人", "open_id": "ou_old"}}))
+    monkeypatch.setattr(pr, "_org_cache_key", lambda: "fresh-key")
+    monkeypatch.setattr(pr, "_org_people", lambda **kw: [{"name": "新人", "open_id": "ou_new"}])
+
+    idx = pr._org_by_open_id()
+    assert "ou_new" in idx
+    assert "ou_old" not in idx
+    assert pr._ORG_BY_OPEN_ID is not None
+    assert pr._ORG_BY_OPEN_ID[0] == "fresh-key"
+
+
+def test_roster_cache_invalidated_on_mtime_change(monkeypatch, tmp_path):
+    """运维改花名册文件后无需重启：mtime 变化即失效。"""
+    import json
+    import os as _os
+
+    p = tmp_path / "roster.json"
+    p.write_text(json.dumps({"people": [{"name": "甲", "aliases": ["jia"]}]}), encoding="utf-8")
+    monkeypatch.setattr(pr, "_ROSTER_PATH", p)
+    monkeypatch.setattr(pr, "_ROSTER_CACHE", None)
+    monkeypatch.setattr(pr, "_ROSTER_MTIME", -1.0)
+
+    assert pr.alias_map().get("jia") == "甲"
+    p.write_text(json.dumps({"people": [{"name": "乙", "aliases": ["yi"]}]}), encoding="utf-8")
+    _os.utime(p, (p.stat().st_atime, p.stat().st_mtime + 10))
+    assert pr.alias_map().get("yi") == "乙"

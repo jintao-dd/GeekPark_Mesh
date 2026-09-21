@@ -43,7 +43,15 @@ _TABLE_READY = False
 
 
 def ensure_table(con) -> None:
+    """建表检查只做一次（进程内）。
+
+    历史实现每次 read/write 都执行 CREATE TABLE IF NOT EXISTS：
+    PG 下会拿 AccessExclusiveLock，每消息多次 DDL 检查既是往返也是锁竞争。
+    失败（无权限等）不置位，下次仍会重试。
+    """
     global _TABLE_READY
+    if _TABLE_READY:
+        return
     dialect = getattr(con, "dialect", "sqlite")
     if dialect == "postgresql":
         con.execute(

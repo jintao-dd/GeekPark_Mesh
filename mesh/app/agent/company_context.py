@@ -15,6 +15,9 @@ from .company_wiki import CompanyWiki, load_wiki
 _CC_CACHE: dict[str, tuple[float, CompanyUnderstanding]] = {}
 _CC_CACHE_LOCK = threading.Lock()
 _CC_CACHE_TTL_S = 60
+# 缓存键含用户问句前 200 字 → 几乎每次都 miss，无上限时会持续堆积。
+# 这里设容量上限 + LRU 淘汰，避免长时间运行后内存单调增长。
+_CC_CACHE_MAX = 512
 
 
 @dataclass
@@ -167,8 +170,10 @@ def assemble(
 
     with _CC_CACHE_LOCK:
         _CC_CACHE[key] = (time.monotonic(), result)
-        # 简单 GC：TTL 外淘汰
+        # 简单 GC：TTL 外淘汰 + 容量上限（LRU 近似：按插入序淘汰最旧）
         stale = [k for k, v in _CC_CACHE.items() if now - v[0] > _CC_CACHE_TTL_S * 2]
         for k in stale:
             _CC_CACHE.pop(k, None)
+        while len(_CC_CACHE) > _CC_CACHE_MAX:
+            _CC_CACHE.pop(next(iter(_CC_CACHE)), None)
     return result
