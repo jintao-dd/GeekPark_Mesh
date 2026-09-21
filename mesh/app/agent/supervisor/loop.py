@@ -307,21 +307,29 @@ def handle_turn(
 
     t_execute = time.monotonic()
     # 主管路径补会话线索：会话状态 + 已解析人名，仅喂检索（不进成文原话）
+    # 用户「作为某队」角色扮演时不要灌提问者主队 / 会话残留人名，否则周报召回被带跑。
     search_user_text = q
     try:
-        parts: list[str] = []
-        team_ctx = str(getattr(session, "active_team", "") or "").strip()
-        if team_ctx:
-            parts.append(team_ctx)
-        ents = list(getattr(session, "active_entities", None) or [])[:6]
-        if ents:
-            parts.append("、".join(str(x) for x in ents if str(x).strip()))
-        prev = str(getattr(session, "last_query", "") or "").strip()
-        if prev and prev != q:
-            parts.append(prev[:120])
-        extra = " ".join(p for p in parts if p).strip()
-        if extra:
-            search_user_text = f"{q} {extra}"[:400]
+        from .plan import _ACTING_TEAM_RE, parse_acting_team
+
+        acting = parse_acting_team(q)
+        if acting:
+            bare = _ACTING_TEAM_RE.sub("", q).strip(" ，,。.?？") or q
+            search_user_text = f"{acting} {bare}"[:400]
+        else:
+            parts: list[str] = []
+            team_ctx = str(getattr(session, "active_team", "") or "").strip()
+            if team_ctx:
+                parts.append(team_ctx)
+            ents = list(getattr(session, "active_entities", None) or [])[:6]
+            if ents:
+                parts.append("、".join(str(x) for x in ents if str(x).strip()))
+            prev = str(getattr(session, "last_query", "") or "").strip()
+            if prev and prev != q:
+                parts.append(prev[:120])
+            extra = " ".join(p for p in parts if p).strip()
+            if extra:
+                search_user_text = f"{q} {extra}"[:400]
     except Exception:
         search_user_text = q
     envelopes, tools_called, budget_hit, progress = _execute_graph(

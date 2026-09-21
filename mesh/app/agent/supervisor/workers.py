@@ -169,6 +169,14 @@ def enrich_args(
         # Planner 已按工作记忆改写检索词；原话只是兜底。
         # 历史实现 q_user or q_plan 会让「他后来呢」这类原话覆盖 Planner 改写。
         q_full = q_plan or q_user
+        if acting_team:
+            from .plan import _ACTING_TEAM_RE as _re_act
+
+            bare = _re_act.sub("", q_full).strip(" ，,。.?？") or q_full
+            if acting_team not in bare:
+                q_full = f"{acting_team} {bare}"
+            else:
+                q_full = bare
         scope = _ask_person_scope(q_user or q_full, has_resolved=bool(resolved))
         names: list[str] = []
         # 计划里已带的人名保留

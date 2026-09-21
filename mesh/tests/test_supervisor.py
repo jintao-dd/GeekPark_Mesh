@@ -486,6 +486,27 @@ def test_strip_crm_unless_asked_commercial_focus():
     assert len(kept2) == 2
 
 
+def test_strip_directory_unless_roster_asked_focus_question():
+    from app.agent.supervisor.types import PlanStep
+
+    steps = [
+        PlanStep(id="a", worker="published", tool="ask.published", args={"query": "关注"}),
+        PlanStep(
+            id="b",
+            worker="org",
+            tool="feishu.search",
+            args={"resource_type": "directory", "keyword": "商业化团队"},
+        ),
+    ]
+    q = "作为商业化团队的你，过去这段时间极客公园有哪些可能要关注的人或事？"
+    kept = planmod.strip_directory_unless_roster_asked(steps, q)
+    assert [s.tool for s in kept] == ["ask.published"]
+    kept2 = planmod.strip_directory_unless_roster_asked(
+        steps, "商业化团队都有谁？"
+    )
+    assert len(kept2) == 2
+
+
 def test_enrich_ask_acting_team_focuses_bucket(monkeypatch):
     from app.agent.supervisor import workers
     from app.agent.supervisor.types import PlanStep
@@ -515,6 +536,9 @@ def test_enrich_ask_acting_team_focuses_bucket(monkeypatch):
     assert args.get("apply_team_focus") is True
     # 角色扮演：不钉提问者本人进 person_names
     assert "杜锦涛" not in (args.get("person_names") or [])
+    # 检索词应去掉「作为…的你」壳并带视角队
+    assert "作为" not in (args.get("query") or "")
+    assert "商业化团队" in (args.get("query") or "")
 
 
 def test_mouth_system_calendar_not_primary_for_progress():

@@ -46,6 +46,12 @@ _CRM_ASK_RE = re.compile(
     re.I,
 )
 
+# 用户明确问组织花名册/有谁才放行 directory；「关注的人或事」不要变成通讯录点名
+_ORG_ROSTER_ASK_RE = re.compile(
+    r"(有谁|都有谁|谁在|几个人|成员名单|通讯录|花名册|组织架构|编制|都有哪些人)",
+    re.I,
+)
+
 # 「作为商业化的你 / 做为编辑部视角」→ 本轮回答视角（可与提问者主队不同）
 _ACTING_TEAM_RE = re.compile(
     r"(?:作|做)为(?:一个|一名)?(?P<label>[\u4e00-\u9fffA-Za-z0-9 ·/]{2,24}?)"
@@ -61,6 +67,10 @@ def user_asks_calendar(user_text: str) -> bool:
 
 def user_asks_crm(user_text: str) -> bool:
     return bool(_CRM_ASK_RE.search(user_text or ""))
+
+
+def user_asks_org_roster(user_text: str) -> bool:
+    return bool(_ORG_ROSTER_ASK_RE.search(user_text or ""))
 
 
 def parse_acting_team(user_text: str) -> str:
@@ -123,6 +133,38 @@ def strip_crm_unless_asked(steps: list[PlanStep], user_text: str) -> list[PlanSt
         s.depends_on = [d for d in (s.depends_on or []) if d in ids and d != s.id]
     log.info(
         "planner stripped crm steps (user did not ask CRM/硅谷) kept=%s dropped=%s",
+        len(kept),
+        len(steps) - len(kept),
+    )
+    return kept
+
+
+def _is_directory_step(step: PlanStep) -> bool:
+    if (step.tool or "").strip() != "feishu.search":
+        return False
+    rt = str((step.args or {}).get("resource_type") or "").strip().lower()
+    return rt in ("directory", "member", "user")
+
+
+def strip_directory_unless_roster_asked(
+    steps: list[PlanStep], user_text: str
+) -> list[PlanStep]:
+    """「关注的人或事」不要变成通讯录点名；显式问有谁/花名册才保留 directory。"""
+    if not steps or user_asks_org_roster(user_text):
+        return list(steps or [])
+    # 角色扮演「该关注什么」时尤其要剥 directory
+    if not parse_acting_team(user_text) and not re.search(
+        r"关注的?(人|事|人或事|线索|选题)", user_text or ""
+    ):
+        return list(steps or [])
+    kept = [s for s in steps if not _is_directory_step(s)]
+    if len(kept) == len(steps):
+        return kept
+    ids = {s.id for s in kept}
+    for s in kept:
+        s.depends_on = [d for d in (s.depends_on or []) if d in ids and d != s.id]
+    log.info(
+        "planner stripped directory steps (not a roster ask) kept=%s dropped=%s",
         len(kept),
         len(steps) - len(kept),
     )
@@ -432,6 +474,7 @@ def plan_turn(
         steps = _steps_from_decide_shape(data, goal=goal or q)
     steps = strip_calendar_unless_asked(steps, q)
     steps = strip_crm_unless_asked(steps, q)
+    steps = strip_directory_unless_roster_asked(steps, q)
     if not steps and mode == "work":
         steps = _normalize_steps(
             [{"id": "s1", "tool": "ask.published", "args": {"query": q[:160]}}],
