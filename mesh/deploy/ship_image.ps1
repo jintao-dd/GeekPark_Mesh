@@ -217,7 +217,21 @@ $remoteScript = $remoteScript -replace "`r`n", "`n"
 $localSh = Join-Path $env:TEMP "mesh_ship_image_$Target.sh"
 [System.IO.File]::WriteAllText($localSh, $remoteScript)
 & scp -P $DeployPort -o StrictHostKeyChecking=no $localSh "root@${DeployHost}:$remotePath"
-& ssh -p $DeployPort -o StrictHostKeyChecking=no "root@$DeployHost" "bash $remotePath"
+
+# 远程脚本的进度/告警走 stderr（docker build 每步输出都在 stderr）。
+# Windows PowerShell 5.1 在 $ErrorActionPreference='Stop' 下会把原生命令的 stderr
+# 当终止错误抛出，导致构建刚开始就中断。这里只在真正非零退出码时才失败。
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+try {
+  & ssh -p $DeployPort -o StrictHostKeyChecking=no "root@$DeployHost" "bash $remotePath"
+  $sshExit = $LASTEXITCODE
+} finally {
+  $ErrorActionPreference = $prevEap
+}
+if ($sshExit -ne 0) {
+  throw "ship_image $Target failed on remote (exit=$sshExit). See output above."
+}
 
 Write-Host "DONE $Target geekpark-mesh:$ImageTag"
 Write-Host "Pull baseline: $RemoteBase/eval/reports/$BaselineName.json"
