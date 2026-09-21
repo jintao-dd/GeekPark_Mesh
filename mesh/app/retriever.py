@@ -6,6 +6,8 @@ import contextvars
 
 import datetime
 
+import os
+
 import re
 
 from typing import Any
@@ -184,14 +186,18 @@ def rerank_hits(
     """规则 rerank：legacy 专名/来源/时效 + Quality Ranking v1.4 后置（冻结）。
 
     评测 candidate 路径是 legacy → v1.4；合入必须同序，禁止用纯 v1.4 替换 legacy。
-    apply_quality=None 时读 MESH_RANKING_QUALITY（默认 1）。
+    apply_quality=None 时读 MESH_RANKING_QUALITY（默认 0：RRF 上线后四层补丁关闭）。
     """
 
     import os
 
     if apply_quality is None:
 
-        apply_quality = os.environ.get("MESH_RANKING_QUALITY", "1").strip() != "0"
+        apply_quality = os.environ.get("MESH_RANKING_QUALITY", "0").strip() != "0"
+    # RRF 融合后 score 是 rank 倒数和（≈0.016/rank）；旧 bonus 按 BM25 量纲调的，
+    # 直接相减会淹没排序。统一按 RRF 单位缩放（legacy 融合时保持 1.0）。
+    fusion_legacy = (os.environ.get("MESH_FUSION") or "rrf").strip().lower() == "legacy"
+    u = 1.0 if fusion_legacy else search.rrf_unit()
 
     terms = set(re.findall(r"[\u4e00-\u9fff]{2,}|[A-Za-z]{3,}", q or ""))
 
@@ -219,25 +225,25 @@ def rerank_hits(
 
             if tl in title:
 
-                bonus += 0.25
+                bonus += 0.25 * u
 
             elif tl in body:
 
-                bonus += 0.08
+                bonus += 0.08 * u
 
         src = h.get("source") or ""
 
         if src == "item_entity_facts":
 
-            bonus += 0.35
+            bonus += 0.35 * u
 
         elif src == "vector":
 
-            bonus += 0.12
+            bonus += 0.12 * u
 
         elif src == "item_facts":
 
-            bonus += 0.18
+            bonus += 0.18 * u
 
         try:
 
@@ -245,7 +251,7 @@ def rerank_hits(
 
             age = max(0, (today - d).days)
 
-            bonus -= min(age, 365) * 0.002
+            bonus -= min(age, 365) * 0.002 * u
 
         except Exception:
 
@@ -255,19 +261,26 @@ def rerank_hits(
 
         if seeds and str(h.get("chunk_id") or "") in seeds and overlap >= 0.12:
 
-            bonus += 0.15
+            bonus += 0.15 * u
 
         iid = str(h.get("item_id") or "")
 
         if seed_items and iid and iid in seed_items and overlap >= 0.08:
 
-            bonus += 0.2
+            bonus += 0.2 * u
 
-        h["score"] = float(h.get("score") or 0) - bonus
+        # 量纲约定：legacy 融合「越小越好」→ 减 bonus；RRF「越大越好」→ 加 bonus
+        if fusion_legacy:
+
+            h["score"] = float(h.get("score") or 0) - bonus
+
+        else:
+
+            h["score"] = float(h.get("score") or 0) + bonus
 
         out.append(h)
 
-    out.sort(key=lambda x: float(x.get("score") or 0))
+    out.sort(key=lambda x: float(x.get("score") or 0), reverse=not fusion_legacy)
 
     if apply_quality:
 
@@ -360,6 +373,11 @@ def _hybrid_recall(
 
     all_hits: list[dict] = []
 
+    # 各通道独立候选池：RRF 需要「通道内位次」，不能把多通道拼成一个列表再排序
+    fts_pool: list[dict] = []
+    items_pool: list[dict] = []
+    vec_pool: list[dict] = []
+
     used_vector = False
 
     variants = embeddings.expand_query(search_q)
@@ -381,6 +399,10 @@ def _hybrid_recall(
             limit=limit // 2 + 8,
 
         )
+
+        fts_pool.extend(fts)
+
+        items_pool.extend(items)
 
         merged = search.merge_hits(fts, items, limit=limit)
 
@@ -410,9 +432,18 @@ def _hybrid_recall(
 
             )
 
+            vec_pool.extend(vec_hits)
+
             all_hits.extend(vec_hits)
 
-    deduped = search.merge_hits(all_hits, limit=limit * 2)
+    fusion_mode = (os.environ.get("MESH_FUSION") or "rrf").strip().lower()
+    if fusion_mode == "legacy":
+        # 旧路径：单列表按位置融合（与历史 A/B 口径一致）
+        deduped = search.merge_hits(all_hits, limit=limit * 2)
+    else:
+        if team:
+            fts_pool = [h for h in fts_pool if _hit_team_allowed(h, team)]
+        deduped = search.merge_hits(fts_pool, items_pool, vec_pool, limit=limit * 2)
 
     deduped = _enrich_hits(con, deduped)
 

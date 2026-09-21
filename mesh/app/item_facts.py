@@ -12,11 +12,30 @@ SECTION = "抽取条目"
 _SNIP = 480
 _NAME_RE = re.compile(r"[\u4e00-\u9fff]{2,24}|[A-Za-z][A-Za-z0-9 .&\-]{2,40}")
 
-# 召回兜底分（P1 止血）：只做「比噪声 MATCH 略好」的弱提示，不再用 -50 钉榜首。
-# 约定：分数越小越靠前。噪声 MATCH = -1.0（命中 1 词）→ 兜底取 -1.5。
-_FALLBACK_SCORE = -1.5
-# 完全无词法命中时的兜底（原 -0.5，同样错误地排在 -1.0 之前）→ 退到 -1.2。
-_FALLBACK_SCORE_NO_HIT = -1.2
+# LIKE 兜底分（P1 止血 → 粗排质量）：不再用全局硬编码常量，而是按「查询词加权覆盖率」打分。
+# 约定与 MATCH 一致：分数越小越靠前。权重用词长 —— 专名/长词比泛词更能定题
+# （避免泛词「培训」把专名「英伟达」的行挤下去）。
+# 依据：兜底池是「有命中但未过 FTS AND」的平池，原先全并列 → 通道内无相关性序，
+# RRF 只吃位次时整池退化（R21 的 The Verge 条目从 Top5 掉到 10+）。
+_FALLBACK_BASE = 1.2
+# 完全无词法命中时的兜底基准（略弱于有任何覆盖率命中者）
+_FALLBACK_BASE_NO_HIT = 1.2
+
+
+def _coverage_score(row: dict, terms: list[str]) -> float:
+    """查询词加权覆盖率 ∈ [0,1]：命中词长和 / 全部查询词长和。"""
+    if not terms:
+        return 0.0
+    blob = " ".join(
+        str(row.get(k) or "") for k in ("primary_name", "text_snippet", "toks", "source_label")
+    ).lower()
+    tot = sum(len(t) for t in terms) or 1
+    got = sum(len(t) for t in terms if t.lower() in blob)
+    return got / tot
+
+
+def _fallback_score(row: dict, terms: list[str], *, base: float = _FALLBACK_BASE) -> float:
+    return -(base + _coverage_score(row, terms))
 
 
 def _parse_json_list(raw: str | None) -> list[str]:
@@ -304,6 +323,8 @@ def search(
     match_q = tok.build_match_query(q)
     params: list[Any] = []
     hits: list[dict] = []
+    # 兜底池打分用（覆盖两个兜底分支）
+    fb_terms = [t for t in tok.query_terms(q, limit=8) if len(t) >= 2]
 
     if match_q:
         if getattr(con, "dialect", "sqlite") == "postgresql":
@@ -392,7 +413,9 @@ def search(
                 key = (d["issue_slug"], d.get("item_id"))
                 if key in seen:
                     continue
-                hits.append(_row_to_hit(d, q, score=_FALLBACK_SCORE_NO_HIT))
+                hits.append(
+                    _row_to_hit(d, q, score=_fallback_score(d, fb_terms, base=_FALLBACK_BASE_NO_HIT))
+                )
 
     # MATCH 已饱和时仍用 query_terms 补召回（并列主题/专名常被宽 OR 噪声挤出）
     terms_extra = tok.query_terms(q, limit=4)
@@ -430,17 +453,21 @@ def search(
                 key = (d["issue_slug"], d.get("item_id"))
                 if key in seen:
                     continue
-                # P1 止血：原为 -50.0，在「越小越好」约定下反而钉榜首（符号写反）。
-                # 改为略优于噪声 MATCH 的弱提示，真实词法命中不再被挤出候选池。
-                extras.append(_row_to_hit(d, q, score=_FALLBACK_SCORE))
+                # P1 止血 → 粗排质量：原为全局硬编码 -50.0（符号写反，钉榜首）；
+                # 现按查询词加权覆盖率打分，让兜底平池恢复通道内相关性序。
+                extras.append(_row_to_hit(d, q, score=_fallback_score(d, fb_terms)))
                 seen.add(key)
-            # 短词命中优先（端侧/座舱），避免被「模型/智能」宽匹配占满 LIMIT
+            # 兜底池内部：先按查询词覆盖率（分数越小越好），同分再让短词命中优先
             def _extra_key(h: dict) -> tuple:
                 body = (h.get("body") or "") + (h.get("title") or "")
                 short_hit = any(
                     len(t) <= 2 and t in body for t in terms_extra
                 )
-                return (0 if short_hit else 1, str(h.get("item_id") or ""))
+                return (
+                    float(h.get("score") or 0.0),
+                    0 if short_hit else 1,
+                    str(h.get("item_id") or ""),
+                )
 
             extras.sort(key=_extra_key)
             hits = extras + hits
