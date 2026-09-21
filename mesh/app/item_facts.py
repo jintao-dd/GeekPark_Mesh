@@ -308,7 +308,7 @@ def search(
     if match_q:
         if getattr(con, "dialect", "sqlite") == "postgresql":
             from . import fts_pg
-            filt, fp, score_expr = fts_pg.build_toks_filter(
+            filt, fp, sp, score_expr = fts_pg.build_toks_filter(
                 match_q, ["toks", "primary_name", "text_snippet"]
             )
             if filt:
@@ -318,7 +318,8 @@ def search(
                            -({score_expr}) AS score
                     FROM item_facts_fts WHERE {filt}
                 """
-                params = list(fp)
+                # 占位符按 SQL 文本顺序：SELECT 的 score_expr 在前，WHERE 的 filt 在后
+                params = list(sp) + list(fp)
                 if slug:
                     sql += " AND issue_slug = %s"
                     params.append(slug)
@@ -329,7 +330,8 @@ def search(
                     sql += " AND stype = %s"
                     params.append(stype)
                 sql += _date_clause(date_from, date_to, params)
-                sql += f" ORDER BY score DESC LIMIT %s"
+                # score = -(命中词计数)：越小越相关，须 ASC（DESC 会在截断时丢掉最相关行）
+                sql += f" ORDER BY score ASC LIMIT %s"
                 params.append(max(limit * 2, limit))
                 try:
                     for r in con.execute(sql, params):

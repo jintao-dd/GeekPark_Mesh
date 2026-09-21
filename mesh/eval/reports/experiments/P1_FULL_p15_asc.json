@@ -1,0 +1,2930 @@
+{
+  "label": "p15_asc",
+  "embed": false,
+  "n": 30,
+  "macro_recall@5": 0.8922,
+  "macro_recall@10": 0.9333,
+  "macro_recall@20": 0.9583,
+  "macro_chunk_recall@5": 0.0944,
+  "macro_chunk_recall@10": 0.1522,
+  "macro_chunk_recall@20": 0.23,
+  "macro_chunk_in_pool": 0.305,
+  "rows": [
+    {
+      "id": "R01",
+      "query": "锦涛做了什么",
+      "relevant": [
+        "4251",
+        "4259",
+        "4260"
+      ],
+      "relevant_ranks": {
+        "4260": 1,
+        "4251": 2,
+        "4259": 3
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.3333,
+        "chunk_recall@10": 0.3333,
+        "chunk_recall@20": 0.3333,
+        "chunk_in_pool": 0.3333
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -3.157,
+          "item_id": "4260",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "item_facts",
+          "score": -2.057,
+          "item_id": "4251",
+          "is_relevant": true
+        },
+        {
+          "rank": 3,
+          "source": "item_facts",
+          "score": -2.05,
+          "item_id": "4259",
+          "is_relevant": true
+        },
+        {
+          "rank": 4,
+          "source": "vector",
+          "score": -1.372,
+          "item_id": "4260",
+          "is_relevant": true
+        },
+        {
+          "rank": 5,
+          "source": "vector",
+          "score": -0.944,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "vector",
+          "score": -0.933,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "vector",
+          "score": -0.913,
+          "item_id": "4313",
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "vector",
+          "score": -0.878,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "vector",
+          "score": -0.855,
+          "item_id": "4355",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "vector",
+          "score": -0.831,
+          "item_id": "4284",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R02",
+      "query": "锦涛最近做了什么",
+      "relevant": [
+        "4251",
+        "4259",
+        "4260"
+      ],
+      "relevant_ranks": {
+        "4260": 1,
+        "4251": 2,
+        "4259": 3
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.3333,
+        "chunk_recall@20": 0.3333,
+        "chunk_in_pool": 0.3333
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -2.096,
+          "item_id": "4260",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "item_facts",
+          "score": -2.047,
+          "item_id": "4251",
+          "is_relevant": true
+        },
+        {
+          "rank": 3,
+          "source": "item_facts",
+          "score": -2.044,
+          "item_id": "4259",
+          "is_relevant": true
+        },
+        {
+          "rank": 4,
+          "source": "item_entity_facts",
+          "score": -1.517,
+          "item_id": "4251",
+          "is_relevant": true
+        },
+        {
+          "rank": 5,
+          "source": "item_entity_facts",
+          "score": -1.514,
+          "item_id": "4259",
+          "is_relevant": true
+        },
+        {
+          "rank": 6,
+          "source": "vector",
+          "score": -1.309,
+          "item_id": "4260",
+          "is_relevant": true
+        },
+        {
+          "rank": 7,
+          "source": "vector",
+          "score": -0.931,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "vector",
+          "score": -0.911,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "vector",
+          "score": -0.831,
+          "item_id": "4328",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "vector",
+          "score": -0.83,
+          "item_id": "4355",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R03",
+      "query": "破壳创智有什么进展",
+      "relevant": [
+        "4356"
+      ],
+      "relevant_ranks": {
+        "4356": 1
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 1.0,
+        "chunk_recall@10": 1.0,
+        "chunk_recall@20": 1.0,
+        "chunk_in_pool": 1.0
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -4.246,
+          "item_id": "4356",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "fts",
+          "score": -3.927,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 3,
+          "source": "fts",
+          "score": -3.327,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "vector",
+          "score": -1.635,
+          "item_id": "4356",
+          "is_relevant": true
+        },
+        {
+          "rank": 5,
+          "source": "vector",
+          "score": -1.141,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "vector",
+          "score": -1.135,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "vector",
+          "score": -1.065,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "vector",
+          "score": -1.062,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "vector",
+          "score": -1.014,
+          "item_id": "4387",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "vector",
+          "score": -0.991,
+          "item_id": "4328",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R04",
+      "query": "面壁智能接触了什么",
+      "relevant": [
+        "4112",
+        "4115",
+        "4116",
+        "4118",
+        "4120"
+      ],
+      "relevant_ranks": {
+        "4115": 1,
+        "4116": 2,
+        "4120": 5,
+        "4118": 9,
+        "4112": 10
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 0.6,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -4.246,
+          "item_id": "4115",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "item_facts",
+          "score": -4.093,
+          "item_id": "4116",
+          "is_relevant": true
+        },
+        {
+          "rank": 3,
+          "source": "item_facts",
+          "score": -4.089,
+          "item_id": "4122",
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "item_facts",
+          "score": -3.99,
+          "item_id": "4117",
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "item_facts",
+          "score": -3.978,
+          "item_id": "4120",
+          "is_relevant": true
+        },
+        {
+          "rank": 6,
+          "source": "item_facts",
+          "score": -3.959,
+          "item_id": "4123",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "fts",
+          "score": -3.927,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "item_facts",
+          "score": -3.905,
+          "item_id": "4167",
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "item_facts",
+          "score": -3.896,
+          "item_id": "4124",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "item_facts",
+          "score": -3.891,
+          "item_id": "4118",
+          "is_relevant": true
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R05",
+      "query": "PPIO 姚欣说了什么",
+      "relevant": [
+        "4141",
+        "4142",
+        "4143",
+        "4144",
+        "4145"
+      ],
+      "relevant_ranks": {
+        "4141": 1,
+        "4142": 2,
+        "4143": 3,
+        "4144": 4,
+        "4145": 5
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.2,
+        "chunk_recall@20": 0.2,
+        "chunk_in_pool": 0.2
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -3.567,
+          "item_id": "4141",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "item_facts",
+          "score": -3.402,
+          "item_id": "4142",
+          "is_relevant": true
+        },
+        {
+          "rank": 3,
+          "source": "item_facts",
+          "score": -3.297,
+          "item_id": "4143",
+          "is_relevant": true
+        },
+        {
+          "rank": 4,
+          "source": "item_facts",
+          "score": -3.294,
+          "item_id": "4144",
+          "is_relevant": true
+        },
+        {
+          "rank": 5,
+          "source": "item_facts",
+          "score": -3.29,
+          "item_id": "4145",
+          "is_relevant": true
+        },
+        {
+          "rank": 6,
+          "source": "item_facts",
+          "score": -2.752,
+          "item_id": "4146",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "vector",
+          "score": -1.92,
+          "item_id": "4141",
+          "is_relevant": true
+        },
+        {
+          "rank": 8,
+          "source": "vector",
+          "score": -1.017,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "vector",
+          "score": -0.948,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "vector",
+          "score": -0.946,
+          "item_id": null,
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R06",
+      "query": "英伟达 EDC 培训讲了什么",
+      "relevant": [
+        "4147",
+        "4148",
+        "4149",
+        "4150",
+        "4151"
+      ],
+      "relevant_ranks": {
+        "4147": 1,
+        "4148": 2,
+        "4149": 3,
+        "4150": 4,
+        "4151": 5
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.2,
+        "chunk_recall@20": 0.2,
+        "chunk_in_pool": 0.2
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -5.702,
+          "item_id": "4147",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "item_facts",
+          "score": -5.466,
+          "item_id": "4148",
+          "is_relevant": true
+        },
+        {
+          "rank": 3,
+          "source": "item_facts",
+          "score": -2.513,
+          "item_id": "4149",
+          "is_relevant": true
+        },
+        {
+          "rank": 4,
+          "source": "item_facts",
+          "score": -2.509,
+          "item_id": "4150",
+          "is_relevant": true
+        },
+        {
+          "rank": 5,
+          "source": "item_facts",
+          "score": -2.506,
+          "item_id": "4151",
+          "is_relevant": true
+        },
+        {
+          "rank": 6,
+          "source": "item_facts",
+          "score": -2.182,
+          "item_id": "4118",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "item_facts",
+          "score": -2.137,
+          "item_id": "4123",
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "item_facts",
+          "score": -2.137,
+          "item_id": "4139",
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "vector",
+          "score": -1.892,
+          "item_id": "4148",
+          "is_relevant": true
+        },
+        {
+          "rank": 10,
+          "source": "item_entity_facts",
+          "score": -1.522,
+          "item_id": "4306",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R07",
+      "query": "OdyssLife 众筹节奏",
+      "relevant": [
+        "4649"
+      ],
+      "relevant_ranks": {
+        "4649": 1
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -4.64,
+          "item_id": "4649",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "item_facts",
+          "score": -2.323,
+          "item_id": "4787",
+          "is_relevant": false
+        },
+        {
+          "rank": 3,
+          "source": "item_facts",
+          "score": -2.312,
+          "item_id": "4718",
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "vector",
+          "score": -0.958,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "vector",
+          "score": -0.939,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "vector",
+          "score": -0.923,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "vector",
+          "score": -0.873,
+          "item_id": "4186",
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "vector",
+          "score": -0.873,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "vector",
+          "score": -0.77,
+          "item_id": "4328",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "vector",
+          "score": -0.77,
+          "item_id": "4192",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R08",
+      "query": "FREELANDER 神行者怎么定义产品",
+      "relevant": [
+        "4644",
+        "4645",
+        "4646"
+      ],
+      "relevant_ranks": {
+        "4646": 1,
+        "4644": 2,
+        "4645": 3
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -6.514,
+          "item_id": "4646",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "fts",
+          "score": -6.195,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 3,
+          "source": "item_facts",
+          "score": -2.555,
+          "item_id": "4644",
+          "is_relevant": true
+        },
+        {
+          "rank": 4,
+          "source": "item_facts",
+          "score": -2.55,
+          "item_id": "4645",
+          "is_relevant": true
+        },
+        {
+          "rank": 5,
+          "source": "item_facts",
+          "score": -2.45,
+          "item_id": "4756",
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "item_facts",
+          "score": -2.12,
+          "item_id": "4647",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "vector",
+          "score": -0.927,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "vector",
+          "score": -0.863,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "vector",
+          "score": -0.862,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "vector",
+          "score": -0.859,
+          "item_id": null,
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R09",
+      "query": "未来脑律 ZenoWell 是什么",
+      "relevant": [
+        "4648"
+      ],
+      "relevant_ranks": {
+        "4648": 1
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -5.72,
+          "item_id": "4648",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "fts",
+          "score": -5.445,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 3,
+          "source": "item_facts",
+          "score": -2.322,
+          "item_id": "4818",
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "item_facts",
+          "score": -2.302,
+          "item_id": "4647",
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "item_facts",
+          "score": -2.292,
+          "item_id": "4751",
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "item_facts",
+          "score": -2.12,
+          "item_id": "4812",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "item_facts",
+          "score": -2.07,
+          "item_id": "4833",
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "vector",
+          "score": -0.96,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "vector",
+          "score": -0.934,
+          "item_id": "4110",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "vector",
+          "score": -0.921,
+          "item_id": null,
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R10",
+      "query": "程天科技外骨骼",
+      "relevant": [
+        "4651"
+      ],
+      "relevant_ranks": {
+        "4651": 1
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -6.146,
+          "item_id": "4651",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "fts",
+          "score": -5.945,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 3,
+          "source": "fts",
+          "score": -3.945,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "fts",
+          "score": -2.645,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "fts",
+          "score": -1.945,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "fts",
+          "score": -1.94,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "item_facts",
+          "score": -1.87,
+          "item_id": "4652",
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "item_facts",
+          "score": -1.87,
+          "item_id": "4684",
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "item_facts",
+          "score": -1.82,
+          "item_id": "4757",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "item_facts",
+          "score": -1.82,
+          "item_id": "4770",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R11",
+      "query": "Agent 治理与合规 7 月 15 日",
+      "relevant": [
+        "4105",
+        "4106"
+      ],
+      "relevant_ranks": {
+        "4105": 1,
+        "4106": 23
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 0.5,
+        "recall@10": 0.5,
+        "recall@20": 0.5
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.5
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "fts",
+          "score": -6.877,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 2,
+          "source": "item_facts",
+          "score": -6.277,
+          "item_id": "4105",
+          "is_relevant": true
+        },
+        {
+          "rank": 3,
+          "source": "fts",
+          "score": -5.877,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "fts",
+          "score": -5.707,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "fts",
+          "score": -4.177,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "item_facts",
+          "score": -2.902,
+          "item_id": "4201",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "item_facts",
+          "score": -2.649,
+          "item_id": "4340",
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "item_facts",
+          "score": -2.328,
+          "item_id": "4371",
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "item_facts",
+          "score": -2.242,
+          "item_id": "4146",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "item_facts",
+          "score": -2.232,
+          "item_id": "4382",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R12",
+      "query": "端侧模型与智能座舱",
+      "relevant": [
+        "4116",
+        "4120",
+        "4125",
+        "4128"
+      ],
+      "relevant_ranks": {
+        "4116": 1,
+        "4120": 23,
+        "4128": 24,
+        "4125": 27
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 0.25,
+        "recall@10": 0.25,
+        "recall@20": 0.25
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -5.313,
+          "item_id": "4116",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "fts",
+          "score": -4.927,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 3,
+          "source": "item_facts",
+          "score": -4.305,
+          "item_id": "4130",
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "item_facts",
+          "score": -4.028,
+          "item_id": "4167",
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "item_facts",
+          "score": -4.023,
+          "item_id": "4118",
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "item_facts",
+          "score": -3.997,
+          "item_id": "4383",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "item_facts",
+          "score": -3.966,
+          "item_id": "4112",
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "fts",
+          "score": -3.927,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "item_facts",
+          "score": -3.902,
+          "item_id": "4176",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "item_facts",
+          "score": -3.852,
+          "item_id": "4114",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R13",
+      "query": "具身智能数据圆桌讨论了什么",
+      "relevant": [
+        "4154",
+        "4155",
+        "4156"
+      ],
+      "relevant_ranks": {
+        "4154": 1,
+        "4155": 2,
+        "4156": 7
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 0.6667,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.3333,
+        "chunk_in_pool": 0.3333
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -7.237,
+          "item_id": "4154",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "item_facts",
+          "score": -5.152,
+          "item_id": "4155",
+          "is_relevant": true
+        },
+        {
+          "rank": 3,
+          "source": "item_facts",
+          "score": -2.504,
+          "item_id": "4379",
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "item_facts",
+          "score": -2.322,
+          "item_id": "4380",
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "item_facts",
+          "score": -2.313,
+          "item_id": "4250",
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "item_facts",
+          "score": -2.102,
+          "item_id": "4153",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "item_facts",
+          "score": -2.052,
+          "item_id": "4156",
+          "is_relevant": true
+        },
+        {
+          "rank": 8,
+          "source": "item_facts",
+          "score": -2.052,
+          "item_id": "4158",
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "item_facts",
+          "score": -2.052,
+          "item_id": "4160",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "item_facts",
+          "score": -2.052,
+          "item_id": "4174",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R14",
+      "query": "视频号本周播放较好的片子",
+      "relevant": [
+        "4632",
+        "4633",
+        "4864"
+      ],
+      "relevant_ranks": {
+        "4632": 2,
+        "4633": 3,
+        "4864": 4
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -4.325,
+          "item_id": "4821",
+          "is_relevant": false
+        },
+        {
+          "rank": 2,
+          "source": "item_facts",
+          "score": -4.315,
+          "item_id": "4632",
+          "is_relevant": true
+        },
+        {
+          "rank": 3,
+          "source": "item_facts",
+          "score": -4.306,
+          "item_id": "4633",
+          "is_relevant": true
+        },
+        {
+          "rank": 4,
+          "source": "item_facts",
+          "score": -4.296,
+          "item_id": "4864",
+          "is_relevant": true
+        },
+        {
+          "rank": 5,
+          "source": "fts",
+          "score": -3.345,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "item_facts",
+          "score": -2.42,
+          "item_id": "4785",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "item_facts",
+          "score": -2.37,
+          "item_id": "4822",
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "vector",
+          "score": -1.378,
+          "item_id": "4292",
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "vector",
+          "score": -1.041,
+          "item_id": "4284",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "vector",
+          "score": -1.003,
+          "item_id": "4283",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R15",
+      "query": "编辑部选题里 IFA 相关",
+      "relevant": [
+        "4639",
+        "4640"
+      ],
+      "relevant_ranks": {
+        "4639": 1,
+        "4640": 2
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -6.64,
+          "item_id": "4639",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "item_facts",
+          "score": -6.64,
+          "item_id": "4640",
+          "is_relevant": true
+        },
+        {
+          "rank": 3,
+          "source": "fts",
+          "score": -4.195,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "item_facts",
+          "score": -2.456,
+          "item_id": "4631",
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "item_facts",
+          "score": -2.45,
+          "item_id": "4635",
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "item_facts",
+          "score": -2.12,
+          "item_id": "4786",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "item_facts",
+          "score": -2.07,
+          "item_id": "4787",
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "item_facts",
+          "score": -2.07,
+          "item_id": "4634",
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "item_facts",
+          "score": -2.02,
+          "item_id": "4636",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "item_facts",
+          "score": -2.02,
+          "item_id": "4637",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R16",
+      "query": "詹杨帆怎么看端侧和云端",
+      "relevant": [
+        "4125",
+        "4126",
+        "4127",
+        "4131"
+      ],
+      "relevant_ranks": {
+        "4125": 2,
+        "4131": 6,
+        "4126": 10,
+        "4127": 13
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 0.25,
+        "recall@10": 0.75,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.25
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -3.184,
+          "item_id": "4122",
+          "is_relevant": false
+        },
+        {
+          "rank": 2,
+          "source": "item_facts",
+          "score": -3.084,
+          "item_id": "4125",
+          "is_relevant": true
+        },
+        {
+          "rank": 3,
+          "source": "item_facts",
+          "score": -3.06,
+          "item_id": "4121",
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "fts",
+          "score": -1.927,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "item_facts",
+          "score": -1.902,
+          "item_id": "4118",
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "item_facts",
+          "score": -1.852,
+          "item_id": "4120",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "item_facts",
+          "score": -1.852,
+          "item_id": "4131",
+          "is_relevant": true
+        },
+        {
+          "rank": 8,
+          "source": "item_facts",
+          "score": -1.851,
+          "item_id": "4117",
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "item_facts",
+          "score": -1.802,
+          "item_id": "4302",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "item_facts",
+          "score": -1.784,
+          "item_id": "4123",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R17",
+      "query": "滴滴战投牛一鸣怎么看智能硬件",
+      "relevant": [
+        "4647"
+      ],
+      "relevant_ranks": {
+        "4647": 1
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -10.39,
+          "item_id": "4647",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "vector",
+          "score": -1.135,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 3,
+          "source": "vector",
+          "score": -1.132,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "vector",
+          "score": -1.096,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "vector",
+          "score": -1.08,
+          "item_id": "4156",
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "vector",
+          "score": -1.042,
+          "item_id": "4383",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "vector",
+          "score": -0.991,
+          "item_id": "4355",
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "vector",
+          "score": -0.982,
+          "item_id": "4328",
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "vector",
+          "score": -0.912,
+          "item_id": "4112",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "vector",
+          "score": -0.892,
+          "item_id": "4321",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R18",
+      "query": "Founder Park 下半年规划",
+      "relevant": [
+        "4271",
+        "4358"
+      ],
+      "relevant_ranks": {
+        "4358": 1,
+        "4271": 11
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 0.5,
+        "recall@10": 0.5,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.5
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -3.952,
+          "item_id": "4358",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "item_facts",
+          "score": -3.717,
+          "item_id": "4246",
+          "is_relevant": false
+        },
+        {
+          "rank": 3,
+          "source": "item_facts",
+          "score": -3.598,
+          "item_id": "4376",
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "item_facts",
+          "score": -3.594,
+          "item_id": "4377",
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "item_facts",
+          "score": -3.589,
+          "item_id": "4369",
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "item_facts",
+          "score": -3.549,
+          "item_id": "4378",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "item_facts",
+          "score": -3.499,
+          "item_id": "4247",
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "item_facts",
+          "score": -3.49,
+          "item_id": "4386",
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "item_facts",
+          "score": -3.405,
+          "item_id": "4385",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "item_facts",
+          "score": -3.396,
+          "item_id": "4387",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R19",
+      "query": "社群小红书本周计划发什么",
+      "relevant": [
+        "4368"
+      ],
+      "relevant_ranks": {
+        "4368": 1
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 1.0
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -6.119,
+          "item_id": "4368",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "item_facts",
+          "score": -4.115,
+          "item_id": "4321",
+          "is_relevant": false
+        },
+        {
+          "rank": 3,
+          "source": "item_facts",
+          "score": -2.294,
+          "item_id": "4371",
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "item_facts",
+          "score": -2.284,
+          "item_id": "4372",
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "item_facts",
+          "score": -2.208,
+          "item_id": "4373",
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "item_facts",
+          "score": -2.102,
+          "item_id": "4374",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "item_facts",
+          "score": -2.052,
+          "item_id": "4358",
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "item_facts",
+          "score": -2.052,
+          "item_id": "4359",
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "item_facts",
+          "score": -2.03,
+          "item_id": "4367",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "item_facts",
+          "score": -2.002,
+          "item_id": "4360",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R20",
+      "query": "张鹏去深圳拜访吴伟",
+      "relevant": [
+        "4356"
+      ],
+      "relevant_ranks": {
+        "4356": 1
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -4.165,
+          "item_id": "4356",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "item_facts",
+          "score": -2.284,
+          "item_id": "4349",
+          "is_relevant": false
+        },
+        {
+          "rank": 3,
+          "source": "item_facts",
+          "score": -2.274,
+          "item_id": "4241",
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "item_facts",
+          "score": -2.102,
+          "item_id": "4243",
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "item_facts",
+          "score": -2.057,
+          "item_id": "4267",
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "item_facts",
+          "score": -2.057,
+          "item_id": "4313",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "vector",
+          "score": -1.152,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "vector",
+          "score": -0.94,
+          "item_id": "4313",
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "vector",
+          "score": -0.903,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "vector",
+          "score": -0.899,
+          "item_id": null,
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R21",
+      "query": "The Verge 写了哪些手机或隐私相关",
+      "relevant": [
+        "4709",
+        "4711"
+      ],
+      "relevant_ranks": {
+        "4711": 1,
+        "4709": 3
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -2.74,
+          "item_id": "4711",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "item_facts",
+          "score": -2.725,
+          "item_id": "4708",
+          "is_relevant": false
+        },
+        {
+          "rank": 3,
+          "source": "item_facts",
+          "score": -2.715,
+          "item_id": "4709",
+          "is_relevant": true
+        },
+        {
+          "rank": 4,
+          "source": "item_facts",
+          "score": -2.704,
+          "item_id": "4710",
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "item_facts",
+          "score": -2.683,
+          "item_id": "4712",
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "item_facts",
+          "score": -2.2,
+          "item_id": "4687",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "item_facts",
+          "score": -2.15,
+          "item_id": "4690",
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "item_facts",
+          "score": -2.15,
+          "item_id": "4691",
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "item_facts",
+          "score": -2.15,
+          "item_id": "4695",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "item_facts",
+          "score": -2.15,
+          "item_id": "4699",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R22",
+      "query": "Seattle Times 起诉 OpenAI",
+      "relevant": [
+        "4695"
+      ],
+      "relevant_ranks": {
+        "4695": 2
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -6.05,
+          "item_id": "4712",
+          "is_relevant": false
+        },
+        {
+          "rank": 2,
+          "source": "item_facts",
+          "score": -5.88,
+          "item_id": "4695",
+          "is_relevant": true
+        },
+        {
+          "rank": 3,
+          "source": "item_facts",
+          "score": -2.521,
+          "item_id": "4634",
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "item_facts",
+          "score": -2.472,
+          "item_id": "4697",
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "item_facts",
+          "score": -2.467,
+          "item_id": "4700",
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "item_facts",
+          "score": -2.37,
+          "item_id": "4702",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "item_facts",
+          "score": -2.32,
+          "item_id": "4714",
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "item_facts",
+          "score": -2.32,
+          "item_id": "4864",
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "item_facts",
+          "score": -2.1,
+          "item_id": "4718",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "item_facts",
+          "score": -2.1,
+          "item_id": "4726",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R23",
+      "query": "锦涛提供的建站风格参考",
+      "relevant": [
+        "4251"
+      ],
+      "relevant_ranks": {
+        "4251": 1
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 1.0,
+        "chunk_in_pool": 1.0
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -8.115,
+          "item_id": "4251",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "item_facts",
+          "score": -2.857,
+          "item_id": "4259",
+          "is_relevant": false
+        },
+        {
+          "rank": 3,
+          "source": "item_facts",
+          "score": -2.214,
+          "item_id": "4819",
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "item_facts",
+          "score": -2.21,
+          "item_id": "4656",
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "item_facts",
+          "score": -2.206,
+          "item_id": "4677",
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "item_facts",
+          "score": -2.12,
+          "item_id": "4706",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "item_facts",
+          "score": -2.052,
+          "item_id": "4260",
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "item_facts",
+          "score": -2.052,
+          "item_id": "4280",
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "item_facts",
+          "score": -1.996,
+          "item_id": "4137",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "item_facts",
+          "score": -1.991,
+          "item_id": "4321",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R24",
+      "query": "破壳创智吴伟拜访计划",
+      "relevant": [
+        "4356"
+      ],
+      "relevant_ranks": {
+        "4356": 1
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -6.372,
+          "item_id": "4356",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "item_facts",
+          "score": -5.007,
+          "item_id": "32",
+          "is_relevant": false
+        },
+        {
+          "rank": 3,
+          "source": "fts",
+          "score": -4.927,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "fts",
+          "score": -4.893,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "item_facts",
+          "score": -2.166,
+          "item_id": "33",
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "vector",
+          "score": -1.067,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "vector",
+          "score": -1.017,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "vector",
+          "score": -1.007,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "vector",
+          "score": -0.998,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "vector",
+          "score": -0.915,
+          "item_id": "4321",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R25",
+      "query": "锦涛提供的建站风格参考",
+      "relevant": [
+        "4251"
+      ],
+      "relevant_ranks": {
+        "4251": 1
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 1.0,
+        "chunk_in_pool": 1.0
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -8.225,
+          "item_id": "4251",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "item_facts",
+          "score": -2.857,
+          "item_id": "4259",
+          "is_relevant": false
+        },
+        {
+          "rank": 3,
+          "source": "item_facts",
+          "score": -2.297,
+          "item_id": "4260",
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "item_facts",
+          "score": -2.284,
+          "item_id": "4280",
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "item_facts",
+          "score": -2.274,
+          "item_id": "4137",
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "item_facts",
+          "score": -2.052,
+          "item_id": "4321",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "item_facts",
+          "score": -2.052,
+          "item_id": "4184",
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "item_facts",
+          "score": -2.052,
+          "item_id": "4197",
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "item_facts",
+          "score": -2.002,
+          "item_id": "4219",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "item_facts",
+          "score": -2.002,
+          "item_id": "4222",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R26",
+      "query": "灵瑙科技助眠头带",
+      "relevant": [
+        "4110"
+      ],
+      "relevant_ranks": {
+        "4110": 1
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 1.0,
+        "chunk_recall@10": 1.0,
+        "chunk_recall@20": 1.0,
+        "chunk_in_pool": 1.0
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -7.372,
+          "item_id": "4110",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "vector",
+          "score": -1.794,
+          "item_id": "4110",
+          "is_relevant": true
+        },
+        {
+          "rank": 3,
+          "source": "vector",
+          "score": -0.972,
+          "item_id": "4156",
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "vector",
+          "score": -0.905,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "vector",
+          "score": -0.881,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "vector",
+          "score": -0.851,
+          "item_id": "4319",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "vector",
+          "score": -0.797,
+          "item_id": "4295",
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "vector",
+          "score": -0.777,
+          "item_id": "4238",
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "vector",
+          "score": -0.726,
+          "item_id": "4214",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "vector",
+          "score": -0.725,
+          "item_id": "4175",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R27",
+      "query": "BMC 瑞迈特呼吸机差异化",
+      "relevant": [
+        "4135",
+        "4136"
+      ],
+      "relevant_ranks": {
+        "4135": 1,
+        "4136": 2
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.5,
+        "chunk_recall@10": 0.5,
+        "chunk_recall@20": 0.5,
+        "chunk_in_pool": 0.5
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -6.622,
+          "item_id": "4135",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "item_facts",
+          "score": -2.677,
+          "item_id": "4136",
+          "is_relevant": true
+        },
+        {
+          "rank": 3,
+          "source": "vector",
+          "score": -2.124,
+          "item_id": "4135",
+          "is_relevant": true
+        },
+        {
+          "rank": 4,
+          "source": "vector",
+          "score": -0.931,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "vector",
+          "score": -0.926,
+          "item_id": "4313",
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "vector",
+          "score": -0.902,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "vector",
+          "score": -0.853,
+          "item_id": "4319",
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "vector",
+          "score": -0.845,
+          "item_id": "4192",
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "vector",
+          "score": -0.79,
+          "item_id": "4176",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "vector",
+          "score": -0.769,
+          "item_id": "4383",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R28",
+      "query": "云迹科技酒店机器人",
+      "relevant": [
+        "4140"
+      ],
+      "relevant_ranks": {
+        "4140": 1
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 1.0,
+        "chunk_recall@20": 1.0,
+        "chunk_in_pool": 1.0
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -7.372,
+          "item_id": "4140",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "item_facts",
+          "score": -4.164,
+          "item_id": "4168",
+          "is_relevant": false
+        },
+        {
+          "rank": 3,
+          "source": "item_facts",
+          "score": -4.088,
+          "item_id": "4169",
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "fts",
+          "score": -3.927,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "fts",
+          "score": -3.927,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "item_facts",
+          "score": -3.907,
+          "item_id": "4190",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "item_facts",
+          "score": -3.907,
+          "item_id": "4244",
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "item_facts",
+          "score": -3.852,
+          "item_id": "4175",
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "fts",
+          "score": -3.627,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "vector",
+          "score": -1.795,
+          "item_id": "4140",
+          "is_relevant": true
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R29",
+      "query": "腾讯 wb 生态应用接触",
+      "relevant": [
+        "4866"
+      ],
+      "relevant_ranks": {
+        "4866": 1
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -6.63,
+          "item_id": "4866",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "item_entity_facts",
+          "score": -1.93,
+          "item_id": "4866",
+          "is_relevant": true
+        },
+        {
+          "rank": 3,
+          "source": "vector",
+          "score": -1.536,
+          "item_id": "4157",
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "vector",
+          "score": -1.321,
+          "item_id": "4293",
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "vector",
+          "score": -1.088,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "vector",
+          "score": -1.063,
+          "item_id": "4232",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "vector",
+          "score": -1.059,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "vector",
+          "score": -0.931,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "vector",
+          "score": -0.9,
+          "item_id": "4322",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "vector",
+          "score": -0.895,
+          "item_id": "4321",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    },
+    {
+      "id": "R30",
+      "query": "floatboat 少卿接触记录",
+      "relevant": [
+        "4643"
+      ],
+      "relevant_ranks": {
+        "4643": 1
+      },
+      "missed": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0
+      },
+      "top10": [
+        {
+          "rank": 1,
+          "source": "item_facts",
+          "score": -5.394,
+          "item_id": "4643",
+          "is_relevant": true
+        },
+        {
+          "rank": 2,
+          "source": "fts",
+          "score": -5.195,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 3,
+          "source": "fts",
+          "score": -3.025,
+          "item_id": null,
+          "is_relevant": false
+        },
+        {
+          "rank": 4,
+          "source": "item_facts",
+          "score": -2.302,
+          "item_id": "4644",
+          "is_relevant": false
+        },
+        {
+          "rank": 5,
+          "source": "item_facts",
+          "score": -2.226,
+          "item_id": "4645",
+          "is_relevant": false
+        },
+        {
+          "rank": 6,
+          "source": "item_facts",
+          "score": -2.12,
+          "item_id": "4646",
+          "is_relevant": false
+        },
+        {
+          "rank": 7,
+          "source": "item_facts",
+          "score": -2.07,
+          "item_id": "4647",
+          "is_relevant": false
+        },
+        {
+          "rank": 8,
+          "source": "item_facts",
+          "score": -2.07,
+          "item_id": "4648",
+          "is_relevant": false
+        },
+        {
+          "rank": 9,
+          "source": "item_facts",
+          "score": -2.02,
+          "item_id": "4649",
+          "is_relevant": false
+        },
+        {
+          "rank": 10,
+          "source": "item_facts",
+          "score": -2.02,
+          "item_id": "4650",
+          "is_relevant": false
+        }
+      ],
+      "mode": "hybrid"
+    }
+  ]
+}
