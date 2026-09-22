@@ -1,6 +1,8 @@
 """跨部门交叉问答：意图分流 + 事实表 SQL（差集/交集/海外缺口/按团队聚合）。"""
 from __future__ import annotations
 import os, re, datetime
+from typing import Any
+
 from . import db, ingest
 
 DEFAULT_WINDOW_DAYS = int(
@@ -597,6 +599,107 @@ def query_intersect(con, team_a: str, team_b: str, date_from: str | None, sectio
     return ctxs, total
 
 
+def _fetch_section_rows(
+    con,
+    section: str,
+    date_from: str | None,
+    date_to: str | None,
+    *,
+    hardware: bool = False,
+    team_scope: str = "",
+) -> list[dict]:
+    """全公司（或指定队）某 section 的行；不带 team 等值过滤。"""
+    hw_sql, hw_params = ("", [])
+    if hardware:
+        hw_sql, hw_params = _hardware_sql("")
+        hw_sql = " AND " + hw_sql
+    a_date, a_params = _date_clause("", date_from, date_to)
+    where = ["1=1"]
+    params: list[Any] = []
+    if section:
+        where.append("section = ?")
+        params.append(section)
+    if team_scope:
+        where.append("team = ?")
+        params.append(team_scope)
+    sql = f"""
+    SELECT name, team, kind, issue_slug, section, group_title, snippet, source_hint, date_end
+    FROM entity_team_facts
+    WHERE {' AND '.join(where)}{a_date.replace('a.', '')}{hw_sql}
+    ORDER BY date_end DESC, name
+    """
+    params.extend(a_params)
+    params.extend(hw_params)
+    return [dict(r) for r in con.execute(sql, params)]
+
+
+def query_multi_team(
+    con,
+    date_from: str | None,
+    date_to: str | None,
+    *,
+    section: str = "",
+    hardware: bool = False,
+    min_teams: int = 2,
+    team_scope: str = "",
+    kind: str = "any",
+    limit: int = RESULT_LIMIT,
+) -> tuple[list[dict], int, dict]:
+    """同一主体出现在 ≥ min_teams 个团队：确定性集合运算，不让 LLM 从上下文里数。
+
+    「多少家公司在多个团队同时出现过」「跨团队出现的公司有哪些」这类问句，
+    数据在 entity_team_facts 里是现成的（每行一个主体×团队），只需按主体名归一
+    后统计覆盖了几个团队。此前这类问句落到 hybrid 全文检索 → 答不出确定集合。
+
+    去重口径与 query_count 一致：先按主体别名（含复合名拆分）归并，再按代表键计数，
+    避免「A / B」一格被算成两个主体。
+
+    kind=company 时只统计公司主体（问「多少家公司」时用）；any 不限。
+    """
+    rows = _fetch_section_rows(
+        con, section, date_from, date_to, hardware=hardware, team_scope=team_scope
+    )
+    if kind == "company":
+        rows = [r for r in rows if str(r.get("kind") or "") == "company"]
+    # key -> {name, teams:set, rows:[]}；一个主体可能有多个别名 key，取并集
+    groups: dict[str, dict] = {}
+    key_to_group: dict[str, str] = {}
+    for r in rows:
+        keys = _entity_keys(r["name"])
+        if not keys:
+            continue
+        # 找已有归并组（任一 key 命中）
+        gid = next((key_to_group[k] for k in keys if k in key_to_group), None)
+        if gid is None:
+            gid = _entity_norm(r["name"]) or (r["name"] or "").strip()
+            groups[gid] = {"name": r["name"], "teams": set(), "rows": []}
+        g = groups[gid]
+        g["teams"].add(r["team"])
+        g["rows"].append(r)
+        for k in keys:
+            key_to_group[k] = gid
+
+    multi = [g for g in groups.values() if len(g["teams"]) >= min_teams]
+    multi.sort(key=lambda g: (-len(g["teams"]), g["name"]))
+    total = len(multi)
+
+    ctxs: list[dict] = []
+    for g in multi[:limit]:
+        teams = sorted(g["teams"])
+        first = g["rows"][0]
+        ctxs.append({
+            "期号": first.get("issue_slug") or "",
+            "章节": first.get("section") or "",
+            "标题": g["name"],
+            "内容": " · ".join(filter(None, [
+                f"出现在 {len(teams)} 个团队：{'、'.join(teams)}",
+                (first.get("snippet") or "")[:400],
+            ])),
+            "团队": "、".join(teams),
+        })
+    return ctxs, total, {"teams_count": total, "min_teams": min_teams, "kind": kind}
+
+
 def query_overseas_gap(con, date_from: str | None, section: str = "接触",
                        hardware: bool = False, date_to: str | None = None) -> tuple[list[dict], int]:
     o_teams = overseas_teams()
@@ -760,6 +863,18 @@ def query_bridge(
 def query_by_team(con, topic: str, date_from: str | None, date_to: str | None = None,
                   team_scope: str = "") -> tuple[list[dict], int]:
     like = f"%{topic}%"
+    # 主题词分词兜底：事实表里「AI硬件」常被写成「AI 硬件」（带空格），
+    # 整串 LIKE 会漏。追加「分词后各词都命中」的 OR 分支（如「AI」+「硬件」）。
+    terms = [t for t in _topic_terms(topic) if t and t != topic]
+    term_sql = ""
+    term_params: list[str] = []
+    if terms:
+        clauses = []
+        for t in terms:
+            clauses.append("(name LIKE ? OR snippet LIKE ? OR group_title LIKE ?)")
+            pat = f"%{t}%"
+            term_params.extend([pat, pat, pat])
+        term_sql = " OR (" + " AND ".join(clauses) + ")"
     date_sql, date_params = "", []
     if date_from or date_to:
         expr = "COALESCE(NULLIF(date_end,''), NULLIF(date_start,''))"
@@ -776,11 +891,31 @@ def query_by_team(con, topic: str, date_from: str | None, date_to: str | None = 
     sql = f"""
     SELECT name, team, issue_slug, section, group_title, snippet, source_hint, date_end
     FROM entity_team_facts
-    WHERE {date_sql}{team_sql}(name LIKE ? OR snippet LIKE ? OR group_title LIKE ?)
+    WHERE {date_sql}{team_sql}((name LIKE ? OR snippet LIKE ? OR group_title LIKE ?){term_sql})
     ORDER BY team, date_end DESC, name
     """
-    rows = [dict(r) for r in con.execute(sql, (*date_params, *team_params, like, like, like))]
+    rows = [dict(r) for r in con.execute(
+        sql, (*date_params, *team_params, like, like, like, *term_params)
+    )]
     return _rows_to_contexts(rows, limit=RESULT_LIMIT)
+
+
+_TOPIC_SPLIT_RE = re.compile(
+    r"(?<=[\u4e00-\u9fff])(?=[A-Za-z])|(?<=[A-Za-z])(?=[\u4e00-\u9fff])|[\s·、/／,，]+"
+)
+
+
+def _topic_terms(topic: str) -> list[str]:
+    """把主题词切成检索用原子词（「AI硬件」→ ["AI","硬件"]；「AI 硬件」同理）。"""
+    raw = (topic or "").strip()
+    if not raw:
+        return []
+    out: list[str] = []
+    for part in _TOPIC_SPLIT_RE.split(raw):
+        p = part.strip()
+        if len(p) >= 2 and p not in out:
+            out.append(p)
+    return out
 
 
 def _filter_contexts_team(ctxs: list[dict], team_scope: str) -> list[dict]:
@@ -838,6 +973,11 @@ def build_structured_preamble(intent: dict, total: int, shown: int) -> dict:
                 f"时间范围：{win_txt}，按主体名去重后共 {total} {kind_label}。"
                 f"{caveat}"
                 f"下列 {shown} 个是明细示例，不是全部。请直接回答 {total}，不要另算。")
+    elif t == "multi_team":
+        desc = (f"查询类型：跨团队主体。时间范围：{win_txt}。"
+                f"按主体名去重后，出现在 ≥{intent.get('min_teams') or 2} 个团队的主体共 {total} 个，"
+                f"下列展示 {shown} 个。每个主体已标注其出现的全部团队。"
+                f"请直接回答 {total}，并按团队数从多到少陈述；不要另算。")
     else:
         desc = f"结构化查询结果共 {total} 条，展示 {shown} 条。"
     if intent.get("hardware"):
@@ -898,6 +1038,10 @@ def empty_result_answer(intent: dict) -> str:
         body = (f"在 {win_txt} 范围内，团队「{intent.get('team')}」"
                 f"{'（' + intent.get('section') + '）' if intent.get('section') else ''}"
                 f"没有任何记录，计数为 0 {kind_label}。")
+    elif t == "multi_team":
+        body = (
+            f"在 {win_txt} 范围内，没有主体出现在 ≥{intent.get('min_teams') or 2} 个团队。"
+        )
     else:
         body = f"在 {win_txt} 范围内，结构化检索未返回任何记录。"
     return body + "\n\n来源：结构化检索（主体×团队事实表）"
@@ -940,6 +1084,18 @@ def run_structured(con, intent: dict, team_scope: str = "") -> dict:
             kind=intent.get("kind") or "any",
         )
         intent = {**intent, **count_meta}
+    elif t == "multi_team":
+        ctxs, total, mt_meta = query_multi_team(
+            con,
+            df,
+            dt,
+            section=intent.get("section") or "",
+            hardware=intent.get("hardware", False),
+            min_teams=int(intent.get("min_teams") or 2),
+            team_scope=team_scope,
+            kind=intent.get("kind") or "any",
+        )
+        intent = {**intent, **mt_meta}
     else:
         return {"ok": False, "mode": "structured", "contexts": [], "total": 0,
                 "intent": intent, "message": "未知查询类型"}
@@ -967,6 +1123,7 @@ def run_structured(con, intent: dict, team_scope: str = "") -> dict:
             "kind": intent.get("kind"),
             "kind_label": intent.get("kind_label"),
             "expanded": intent.get("expanded"),
+            "min_teams": intent.get("min_teams"),
             "window_days": intent.get("window_days"),
             "date_from": intent.get("date_from"),
             "date_to": intent.get("date_to"),

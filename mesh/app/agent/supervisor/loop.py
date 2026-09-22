@@ -479,11 +479,27 @@ def handle_turn(
     out.trace["envelopes"] = [e.to_dict() for e in envelopes]
     out.trace["budget_hit"] = budget_hit
     out.trace["timings"] = timings
+    # 汇总各 step 的 claim 级证据（去重、保序），供 Evidence / answer_status 使用。
+    # 此前该字段从未回填 → evidence_refs 恒空、answer_status 恒 unknown。
+    ev_all: list[str] = []
+    bind_all: list[Any] = []
+    for e in envelopes:
+        for ref in e.evidence_refs or []:
+            s = str(ref)
+            if s and s not in ev_all:
+                ev_all.append(s)
+        for b in e.claim_bindings or []:
+            bind_all.append(b)
+    out.evidence_refs = ev_all
+    out.claim_bindings = bind_all
     log.info(
-        "supervisor done mode=work band=%s tools=%s chars=%s progress=%s timings=%s",
+        "supervisor done mode=work band=%s tools=%s chars=%s evidence=%s bindings=%s "
+        "progress=%s timings=%s",
         graph.band,
         out.tools_called,
         len(out.text or ""),
+        len(ev_all),
+        len(bind_all),
         out.progress,
         timings,
     )

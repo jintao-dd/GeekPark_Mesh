@@ -386,3 +386,165 @@ def test_parse_window_one_year():
     assert days == 365
     _, _, days2 = qa_structured.parse_window("过去两年接触了多少人")
     assert days2 == 730
+
+
+# ---- 跨团队主体（multi_team）----
+
+def test_rule_multi_team_count(monkeypatch):
+    """「多少家公司在多个团队同时出现过」→ multi_team 精确计数，不再落 hybrid。"""
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "0")
+    p = plan_retrieval("一共有多少家公司在多个团队同时出现过？")
+    assert p.set_op == "multi_team"
+    assert p.path == "structured"
+    assert p.intent["kind"] == "company"
+
+
+def test_rule_multi_team_list(monkeypatch):
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "0")
+    p = plan_retrieval("哪些公司在多个团队同时出现过？")
+    assert p.set_op == "multi_team"
+    assert p.intent["kind"] == "any"
+
+
+def test_multi_team_not_steal_intersect(monkeypatch):
+    """两个队的「都接触」是 intersect，不能被 multi_team 抢走。"""
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "0")
+    p = plan_retrieval("编辑部和商业化团队都接触过的公司有哪些？")
+    assert p.set_op != "multi_team"
+
+
+def test_multi_team_not_steal_diff(monkeypatch):
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "0")
+    p = plan_retrieval("商业化团队跟进了但编辑部还没接触的公司有哪些？")
+    assert p.set_op == "diff"
+
+
+def test_multi_team_not_generic_retrieval(monkeypatch):
+    """普通「团队进展」问句不得被 multi_team 抢走。"""
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "0")
+    assert plan_retrieval("编辑部最近在做什么？").set_op != "multi_team"
+
+
+def test_llm_intent_multi_team(monkeypatch):
+    """LLM 层识别改述：「被两个以上团队接触过的公司」。"""
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "1")
+    payload = {"type": "multi_team", "confidence": 0.9}
+    with mock.patch("app.llm.call", _mock_llm(payload)):
+        p = plan_retrieval("被两个以上团队接触过的公司有多少家？")
+    assert p.set_op == "multi_team"
+    assert p.path == "structured"
+
+
+def test_rule_diff_past_tense_variant(monkeypatch):
+    """「A 接触了、但 B 还没接触」——「接触了」过去式也须走 diff。"""
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "0")
+    p = plan_retrieval("硅谷 BD 团队接触了、但编辑部还没接触的公司有哪些？")
+    assert p.set_op == "diff"
+    assert p.intent["team_a"] == "硅谷 BD 团队"
+    assert p.intent["team_b"] == "编辑部"
+
+
+def test_topic_terms_split_latin_cjk():
+    """主题词切分：「AI硬件」→ AI + 硬件（事实表里常写「AI 硬件」）。"""
+    from app import qa_structured
+
+    assert qa_structured._topic_terms("AI硬件") == ["AI", "硬件"]
+    assert qa_structured._topic_terms("AI 硬件") == ["AI", "硬件"]
+    assert qa_structured._topic_terms("具身智能") == ["具身智能"]
+
+
+def test_query_multi_team_sql(tmp_path):
+    """确定性 SQL：按主体归一后统计覆盖团队数，min_teams 过滤。"""
+    from app import db, db_conn, qa_structured
+
+    old_path, old_url = db_conn.DB_PATH, db_conn.MESH_DB_URL
+    db_conn.DB_PATH = str(tmp_path / "mt.db")
+    db_conn.MESH_DB_URL = ""
+    db.DB_PATH = db_conn.DB_PATH
+    try:
+        con = db.connect()
+        db.init_db(seed=False)
+        rows = [
+            ("编辑部", "面壁智能", "接触", "2026-09-15"),
+            ("商业化团队", "面壁智能", "接触", "2026-09-15"),
+            ("视频号团队", "面壁智能", "关注", "2026-09-15"),
+            ("编辑部", "只此一家", "接触", "2026-09-15"),
+        ]
+        for team, name, section, date_end in rows:
+            con.execute(
+                """INSERT INTO entity_team_facts(
+                   issue_slug, date_start, date_end, section, name, team, kind,
+                   group_title, snippet, source_hint)
+                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    date_end, date_end, date_end, section, name, team, "company",
+                    "g", "x", "test",
+                ),
+            )
+        con.commit()
+        ctxs, total, meta = qa_structured.query_multi_team(con, None, None, min_teams=2)
+        assert total == 1
+        assert ctxs and ctxs[0]["标题"] == "面壁智能"
+        assert "3 个团队" in ctxs[0]["内容"]
+        assert meta["min_teams"] == 2
+        # min_teams=1 时两个主体都算
+        _, total1, _ = qa_structured.query_multi_team(con, None, None, min_teams=1)
+        assert total1 == 2
+        con.close()
+    finally:
+        db_conn.DB_PATH, db_conn.MESH_DB_URL = old_path, old_url
+
+
+def test_run_structured_multi_team_preamble(tmp_path):
+    """run_structured 必须给出「共 N 个」的确定结论，供成文直接回答。"""
+    from app import db, db_conn, qa_structured
+
+    old_path, old_url = db_conn.DB_PATH, db_conn.MESH_DB_URL
+    db_conn.DB_PATH = str(tmp_path / "mt2.db")
+    db_conn.MESH_DB_URL = ""
+    db.DB_PATH = db_conn.DB_PATH
+    try:
+        con = db.connect()
+        db.init_db(seed=False)
+        for team in ("编辑部", "商业化团队"):
+            con.execute(
+                """INSERT INTO entity_team_facts(
+                   issue_slug, date_start, date_end, section, name, team, kind,
+                   group_title, snippet, source_hint)
+                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                ("2026-09-15", "2026-09-15", "2026-09-15", "接触", "面壁智能", team,
+                 "company", "g", "x", "test"),
+            )
+        con.commit()
+        out = qa_structured.run_structured(
+            con,
+            {
+                "type": "multi_team",
+                "section": "",
+                "kind": "company",
+                "date_from": None,
+                "date_to": None,
+                "window_days": 90,
+            },
+        )
+        assert out["ok"] is True
+        assert out["total"] == 1
+        assert out["intent"]["type"] == "multi_team"
+        preamble = out["contexts"][0]["内容"]
+        assert "共 1 个" in preamble
+        # 零命中：固定话术，不编造
+        empty = qa_structured.run_structured(
+            con,
+            {
+                "type": "multi_team",
+                "section": "看法",
+                "kind": "any",
+                "date_from": None,
+                "date_to": None,
+                "window_days": 90,
+            },
+        )
+        assert empty["total"] == 0
+        con.close()
+    finally:
+        db_conn.DB_PATH, db_conn.MESH_DB_URL = old_path, old_url

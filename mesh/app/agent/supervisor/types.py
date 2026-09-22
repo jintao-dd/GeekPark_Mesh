@@ -67,6 +67,8 @@ class TieredEnvelope:
     need_replan: bool = False
     replan_reason: str = ""
     payload: dict[str, Any] = field(default_factory=dict)
+    claim_bindings: list[Any] = field(default_factory=list)
+    evidence_refs: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

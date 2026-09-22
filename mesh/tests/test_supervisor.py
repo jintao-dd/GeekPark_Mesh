@@ -616,6 +616,95 @@ def test_supervisor_enabled_default_on(monkeypatch):
     assert supervisor.supervisor_enabled() is False
 
 
+def test_worker_step_keeps_evidence_and_bindings():
+    """run_step 必须保留 render_tool_result 的 bindings/evidence（此前被丢弃）。"""
+    from app.agent.models import ClaimBinding
+    from app.agent.supervisor.types import PlanStep
+
+    def fake_invoke(tool, con, identity, permission, context, args):
+        return ToolResult(ok=True, tool_id=tool, payload={"answer": "答", "n_hits": 2})
+
+    def fake_render(result, intent, status):
+        b = ClaimBinding(claim="面壁智能", evidence_refs=["item:101"], status="grounded")
+        return ("- 面壁智能", [b], ["item:101"])
+
+    env = workers.run_step(
+        PlanStep(id="s1", worker="published", tool="ask.published", args={"q": "面壁"}),
+        con=None,
+        identity=IdentityResult(status="bound", primary_team="编辑部"),
+        permission=PermissionDecision(
+            agent_access=True,
+            tool_acl=["ask.published"],
+            data_visibility={"published_only": True},
+            query_scope={"mode": "all_published"},
+        ),
+        context=None,
+        invoke_tool=fake_invoke,
+        render_tool_result=fake_render,
+    )
+    assert env.evidence_refs == ["item:101"]
+    assert len(env.claim_bindings) == 1
+    assert env.claim_bindings[0].status == "grounded"
+
+
+def test_supervisor_backfills_evidence_on_result(monkeypatch):
+    """收尾必须把各 step 证据汇总回填到 SupervisorResult（否则 answer_status 恒 unknown）。"""
+    from app.agent.models import ClaimBinding
+
+    st = sstore.SessionContextState()
+    ident = IdentityResult(status="bound", feishu_open_id="ou_x", primary_team="编辑部")
+    perm = PermissionDecision(
+        agent_access=True,
+        tool_acl=["ask.published"],
+        data_visibility={"published_only": True},
+        query_scope={"mode": "all_published"},
+    )
+    ctx = AgentContext(
+        scope_key="t",
+        channel="feishu_dm",
+        issue_ref=IssueRef(mode="latest_published", slug="2026-09-08"),
+        text="",
+    )
+
+    def fake_invoke(tool, con, identity, permission, context, args):
+        return ToolResult(ok=True, tool_id=tool, payload={"answer": "答"})
+
+    def fake_render(result, intent, status):
+        b = ClaimBinding(claim="c", evidence_refs=["item:7"], status="grounded")
+        return ("- 答", [b], ["item:7"])
+
+    def fake_call(system, user, max_tokens=4000, json_mode=False, task="default"):
+        if json_mode:
+            return {
+                "mode": "work",
+                "band": "ordinary",
+                "goal": "周报",
+                "steps": [
+                    {"id": "s1", "worker": "published", "tool": "ask.published", "args": {"q": "x"}}
+                ],
+            }
+        return "整理好了。"
+
+    monkeypatch.setattr("app.llm.call", fake_call)
+    monkeypatch.setattr("app.llm.model_for_task", lambda *a, **k: "mock")
+    monkeypatch.setattr(
+        "app.agent.supervisor.mouth.synthesize_work",
+        lambda *a, **k: ("答", {"llm_used": False}, {"FACT": "x"}),
+    )
+    out = supervisor.handle_turn(
+        con=None,
+        user_text="最近周报有什么",
+        identity=ident,
+        permission=perm,
+        context=ctx,
+        session=st,
+        invoke_tool=fake_invoke,
+        render_tool_result=fake_render,
+    )
+    assert out.evidence_refs == ["item:7"]
+    assert len(out.claim_bindings) == 1
+
+
 def test_progress_callback_emits_during_work(monkeypatch):
     from app.agent.supervisor import progress as progressmod
 

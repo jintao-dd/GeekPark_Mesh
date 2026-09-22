@@ -393,6 +393,10 @@ def run_step(
             intent,
             getattr(identity, "status", "") or "",
         )
+        # 保留 claim 级证据：Supervisor 收尾时会汇总回填 SupervisorResult，
+        # 否则 answer_status/evidence 恒为空，质量采集与「每句有据」都失效。
+        bindings = list(_bindings or [])
+        evidence = list(_ev or [])
         ok = bool(getattr(result, "ok", False))
         payload = getattr(result, "payload", None)
         if not isinstance(payload, dict):
@@ -436,6 +440,8 @@ def run_step(
             error=err,
             need_replan=need_replan,
             replan_reason=replan_reason,
+            claim_bindings=bindings,
+            evidence_refs=evidence,
             payload={
                 **{
                     k: payload.get(k)
