@@ -228,7 +228,7 @@ def vector_search(
     params: list[Any] = [model]
     sql = """
         SELECT c.chunk_id, c.issue_slug, c.date_end, c.layer, c.section, c.title, c.body,
-               c.owner_team, c.stype, c.item_id, c.source_label, e.vector_json
+               c.owner_team, c.stype, c.item_id, c.source_label, c.meta_json, e.vector_json
         FROM chunk_index c
         JOIN chunk_embeddings e ON e.chunk_id = c.chunk_id AND e.model = ?
         WHERE 1=1
@@ -258,6 +258,13 @@ def vector_search(
         sc = dot / (qn * rn)
         if sc <= 0.05:
             continue
+        meta = {}
+        try:
+            raw_meta = r["meta_json"]
+            if raw_meta:
+                meta = json.loads(raw_meta)
+        except Exception:
+            meta = {}
         hit = {
             "issue_slug": r["issue_slug"],
             "section": r["section"] or "抽取条目",
@@ -270,6 +277,8 @@ def vector_search(
             "stype": r["stype"] or "",
             "source": "vector",
             "chunk_id": r["chunk_id"],
+            "layer": r["layer"] or "",
+            "meta": meta,
         }
         if len(heap) < top_k:
             heapq.heappush(heap, (-sc, hit))

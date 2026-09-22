@@ -15,6 +15,7 @@ from typing import Any
 
 
 from . import embeddings, item_facts, qa_structured, search
+from .chunk_index import expand_children_to_parents as ingest_chunk_expand
 
 from .ranking_quality import apply_ranking_v1_4
 
@@ -466,6 +467,9 @@ def _hybrid_recall(
         },
 
     )
+
+    # small-to-big：命中小子块后展开父块完整正文供生成（检索精度用子块，生成用父块）
+    ranked = ingest_chunk_expand(con, ranked)
 
     return ranked, {"date_from": date_from, "date_to": date_to, "used_vector": used_vector}
 
