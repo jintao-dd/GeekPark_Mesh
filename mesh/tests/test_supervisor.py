@@ -475,7 +475,7 @@ def test_parse_acting_team_commercial_roleplay():
 def test_normalize_crm_steps_trusts_planner_mode():
     from app.agent.supervisor.types import PlanStep
 
-    # planner 决定走 cross：旁边的 ask.published 被剥掉，cross 子字段兜底
+    # planner 决定走 cross：保留 ask.published 作周报分栏；cross 子字段兜底
     steps = [
         PlanStep(id="a", worker="published", tool="ask.published", args={"query": "关注"}),
         PlanStep(
@@ -486,11 +486,24 @@ def test_normalize_crm_steps_trusts_planner_mode():
         ),
     ]
     kept = planmod.normalize_crm_steps(steps)
-    assert [s.tool for s in kept] == ["crm.search"]
-    crm = kept[0]
+    assert [s.tool for s in kept] == ["ask.published", "crm.search"]
+    crm = kept[1]
     assert crm.args["mode"] == "cross"
     assert crm.args.get("cross_op") == "both"
     assert crm.args.get("entity_kind") == "person"
+
+    # planner 决定 stats：剥 ask.published，防脚注把计数混成周报
+    steps_stats = [
+        PlanStep(id="a", worker="published", tool="ask.published", args={"query": "多少人"}),
+        PlanStep(
+            id="b",
+            worker="crm",
+            tool="crm.search",
+            args={"query": "接触了多少人", "mode": "stats", "metric": "people_touched"},
+        ),
+    ]
+    kept_stats = planmod.normalize_crm_steps(steps_stats)
+    assert [s.tool for s in kept_stats] == ["crm.search"]
 
     # planner 决定普通检索：不剥 ask.published，保留原意图
     steps2 = [

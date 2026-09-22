@@ -3,6 +3,9 @@
 CRM 侧：people / companies（+ aliases）
 周报侧：entity_team_facts.name（复用 _entity_keys 对齐）
 匹配不上的进 pending 桶，不硬并。
+
+both / crm_only 样例会附带 CRM 明细（headline / 最近沟通 / Take），
+便于 mouth 写成「重叠名单 + 节点进展」，而不是只吐对照对。
 """
 from __future__ import annotations
 
@@ -10,6 +13,7 @@ import re
 from typing import Any
 
 from .. import qa_structured
+from .crm_search import _owner_label
 
 _CROSS_OPS = frozenset({"both", "crm_only", "weekly_only"})
 
@@ -157,6 +161,229 @@ def _match_sets(
     return both, crm_only, weekly_only, pending
 
 
+def _person_crm_detail(con, name: str) -> dict[str, Any]:
+    """对照名单上的人：补 CRM 侧进展，供成文引用（不是冒充总数）。"""
+    name = (name or "").strip()
+    if not name:
+        return {}
+    row = con.execute(
+        """
+        SELECT display_name, company_names, headline, last_touched
+        FROM crm_people
+        WHERE display_name = ? OR aliases LIKE ?
+        ORDER BY CASE WHEN display_name = ? THEN 0 ELSE 1 END
+        LIMIT 1
+        """,
+        (name, f"%{name}%", name),
+    ).fetchone()
+    detail: dict[str, Any] = {}
+    if row:
+        detail = {
+            "name": row["display_name"] or name,
+            "company": row["company_names"] or "",
+            "headline": row["headline"] or "",
+            "last_touched": row["last_touched"] or "",
+        }
+    ix = con.execute(
+        """
+        SELECT title, date_start, interact_type, our_side
+        FROM crm_interactions
+        WHERE people_names LIKE ?
+        ORDER BY date_start DESC, title DESC
+        LIMIT 1
+        """,
+        (f"%{name}%",),
+    ).fetchone()
+    if ix:
+        detail["last_interaction"] = {
+            "date": ix["date_start"] or "",
+            "type": ix["interact_type"] or "",
+            "title": ix["title"] or "",
+            "our_side": _owner_label(ix["our_side"] or ""),
+        }
+    take = con.execute(
+        """
+        SELECT verdict, scenario, owner, last_reviewed
+        FROM crm_takes
+        WHERE (person_names LIKE ? OR name LIKE ?)
+          AND verdict IS NOT NULL AND TRIM(verdict) != ''
+        ORDER BY last_reviewed DESC, name
+        LIMIT 1
+        """,
+        (f"%{name}%", f"%{name}%"),
+    ).fetchone()
+    if take:
+        detail["take"] = {
+            "verdict": (take["verdict"] or "")[:160],
+            "scenario": (take["scenario"] or "")[:80],
+            "owner": _owner_label(take["owner"] or "Lilyann"),
+            "last_reviewed": take["last_reviewed"] or "",
+        }
+    return detail
+
+
+def _company_crm_detail(con, name: str) -> dict[str, Any]:
+    name = (name or "").strip()
+    if not name:
+        return {}
+    row = con.execute(
+        """
+        SELECT name, one_liner, sector, stage
+        FROM crm_companies
+        WHERE name = ? OR aliases LIKE ?
+        ORDER BY CASE WHEN name = ? THEN 0 ELSE 1 END
+        LIMIT 1
+        """,
+        (name, f"%{name}%", name),
+    ).fetchone()
+    if not row:
+        return {}
+    return {
+        "name": row["name"] or name,
+        "one_liner": row["one_liner"] or "",
+        "sector": row["sector"] or "",
+        "stage": row["stage"] or "",
+    }
+
+
+def _weekly_detail(
+    con,
+    name: str,
+    *,
+    date_from: str | None,
+    date_to: str | None,
+    weekly_team: str = "",
+) -> dict[str, Any]:
+    name = (name or "").strip()
+    if not name:
+        return {}
+    where = ["name = ?"]
+    params: list[Any] = [name]
+    if date_from:
+        where.append("date_end IS NOT NULL AND date_end >= ?")
+        params.append(date_from)
+    if date_to:
+        where.append("date_end IS NOT NULL AND date_end <= ?")
+        params.append(date_to)
+    team = (weekly_team or "").strip()
+    if team:
+        from .. import db as mesh_db
+
+        nt = mesh_db.normalize_team(team) or team
+        where.append("team = ?")
+        params.append(nt)
+    row = con.execute(
+        f"""
+        SELECT team, section, snippet, group_title, date_end, issue_slug
+        FROM entity_team_facts
+        WHERE {' AND '.join(where)}
+        ORDER BY date_end DESC, id DESC
+        LIMIT 1
+        """,
+        params,
+    ).fetchone()
+    if not row:
+        return {}
+    return {
+        "team": row["team"] or "",
+        "section": row["section"] or "",
+        "snippet": (row["snippet"] or "")[:200],
+        "group_title": row["group_title"] or "",
+        "date_end": row["date_end"] or "",
+        "issue_slug": row["issue_slug"] or "",
+    }
+
+
+def _format_crm_detail_line(detail: dict[str, Any], *, kind: str) -> str:
+    if not detail:
+        return ""
+    bits: list[str] = []
+    if kind == "person":
+        if detail.get("company"):
+            bits.append(str(detail["company"]))
+        if detail.get("headline"):
+            bits.append(str(detail["headline"])[:120])
+        ix = detail.get("last_interaction") or {}
+        if isinstance(ix, dict) and (ix.get("date") or ix.get("title")):
+            piece = f"最近沟通 {ix.get('date') or ''} {ix.get('type') or ''}".strip()
+            if ix.get("title"):
+                piece += f"「{ix['title']}」"
+            if ix.get("our_side"):
+                piece += f"（我方：{ix['our_side']}）"
+            bits.append(piece.strip())
+        take = detail.get("take") or {}
+        if isinstance(take, dict) and take.get("verdict"):
+            bits.append(f"Take：{take['verdict']}")
+    else:
+        if detail.get("one_liner"):
+            bits.append(str(detail["one_liner"])[:120])
+        if detail.get("sector"):
+            bits.append(str(detail["sector"]))
+        if detail.get("stage"):
+            bits.append(str(detail["stage"]))
+    return "；".join(b for b in bits if b)
+
+
+def _format_weekly_detail_line(detail: dict[str, Any]) -> str:
+    if not detail:
+        return ""
+    bits: list[str] = []
+    if detail.get("team"):
+        bits.append(str(detail["team"]))
+    if detail.get("section"):
+        bits.append(str(detail["section"]))
+    if detail.get("date_end"):
+        bits.append(str(detail["date_end"]))
+    if detail.get("snippet"):
+        bits.append(str(detail["snippet"])[:120])
+    elif detail.get("group_title"):
+        bits.append(str(detail["group_title"])[:80])
+    return " · ".join(bits)
+
+
+def _enrich_rows(
+    con,
+    rows: list[dict],
+    *,
+    op: str,
+    kind: str,
+    date_from: str | None,
+    date_to: str | None,
+    weekly_team: str,
+) -> list[dict]:
+    enriched: list[dict] = []
+    for r in rows:
+        item = dict(r)
+        crm_name = str(item.get("crm") or item.get("name") or "").strip()
+        if op in ("both", "crm_only") and crm_name:
+            if kind == "company":
+                item["crm_detail"] = _company_crm_detail(con, crm_name)
+            else:
+                item["crm_detail"] = _person_crm_detail(con, crm_name)
+        if op == "both":
+            weekly_name = str(item.get("weekly") or "").strip()
+            if weekly_name:
+                item["weekly_detail"] = _weekly_detail(
+                    con,
+                    weekly_name,
+                    date_from=date_from,
+                    date_to=date_to,
+                    weekly_team=weekly_team,
+                )
+        elif op == "weekly_only":
+            weekly_name = str(item.get("name") or "").strip()
+            if weekly_name:
+                item["weekly_detail"] = _weekly_detail(
+                    con,
+                    weekly_name,
+                    date_from=date_from,
+                    date_to=date_to,
+                    weekly_team=weekly_team,
+                )
+        enriched.append(item)
+    return enriched
+
+
 def cross_crm_weekly(
     con,
     *,
@@ -201,9 +428,20 @@ def cross_crm_weekly(
         total = len(weekly_only)
         label = "仅周报有"
 
+    rows = _enrich_rows(
+        con,
+        rows,
+        op=op,
+        kind=kind,
+        date_from=date_from,
+        date_to=date_to,
+        weekly_team=weekly_team or "",
+    )
+
     lines = [
         "【硅谷 CRM × 已上线周报 · 交叉】",
         "说明：CRM 与周报口径不同（思琪侧人脉库 vs 国内各队周报事实），分栏对照，不合成一个假总数。",
+        "成文提示：下列样例含 CRM 进展明细；请按节点写重叠结论，勿只复读「CRM X ↔ 周报 Y」。",
         f"运算：{label}（{op}）",
         f"实体类型：{kind}",
         f"命中：**{total}**",
@@ -221,13 +459,21 @@ def cross_crm_weekly(
         lines.append(f"注意：{p}")
     if rows:
         lines.append("")
-        lines.append(f"## 样例（最多 {len(rows)} 条，不是总数）")
+        lines.append(f"## 样例（最多 {len(rows)} 条，不是总数；含 CRM 明细）")
         for r in rows:
             if op == "both":
                 lines.append(f"- CRM **{r.get('crm')}** ↔ 周报 **{r.get('weekly')}**")
             else:
                 side = "CRM" if op == "crm_only" else "周报"
                 lines.append(f"- [{side}] **{r.get('name')}**")
+            crm_line = _format_crm_detail_line(
+                r.get("crm_detail") or {}, kind=kind
+            )
+            if crm_line:
+                lines.append(f"  · CRM：{crm_line}")
+            weekly_line = _format_weekly_detail_line(r.get("weekly_detail") or {})
+            if weekly_line:
+                lines.append(f"  · 周报：{weekly_line}")
     else:
         lines.append("")
         lines.append("本运算下没有命中。")
@@ -235,18 +481,23 @@ def cross_crm_weekly(
     items = []
     for r in rows[:12]:
         if op == "both":
+            snip = _format_crm_detail_line(r.get("crm_detail") or {}, kind=kind)
             items.append(
                 {
                     "title": r.get("crm") or r.get("weekly"),
-                    "snippet": f"weekly={r.get('weekly')}",
+                    "snippet": snip or f"weekly={r.get('weekly')}",
                     "kind": f"cross:{op}",
                 }
             )
         else:
+            if op == "crm_only":
+                snip = _format_crm_detail_line(r.get("crm_detail") or {}, kind=kind)
+            else:
+                snip = _format_weekly_detail_line(r.get("weekly_detail") or {})
             items.append(
                 {
                     "title": r.get("name"),
-                    "snippet": op,
+                    "snippet": snip or op,
                     "kind": f"cross:{op}",
                 }
             )

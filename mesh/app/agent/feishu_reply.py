@@ -251,7 +251,15 @@ def format_display_text(
         if any(str(t) == "crm.search" for t in (tools or [])):
             crmish = True
     if crmish:
-        meta_lines.append("来源：硅谷 CRM（Notion）")
+        cross_op = ""
+        if isinstance(payload, dict):
+            cross_op = str(payload.get("cross_op") or "").strip()
+        if not cross_op:
+            cross_op = str((answer.trace or {}).get("cross_op") or "").strip()
+        if cross_op:
+            meta_lines.append("来源：硅谷 CRM × 已上线周报（分栏对照）")
+        else:
+            meta_lines.append("来源：硅谷 CRM（Notion）")
         if uniq_refs and kind not in ("no_hit", "system_error", "timeout", "permission"):
             meta_lines.append("可核对：")
             for r in uniq_refs[:6]:

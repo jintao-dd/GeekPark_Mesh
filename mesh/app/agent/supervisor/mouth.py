@@ -55,14 +55,40 @@ _SYNTH_SYSTEM = """你是 GeekPark 内部同事 Mesh（唯一对外的一张嘴�
 10) 目标长度：普通问 ≤400 字；多问清单 ≤800 字。宁可短，不要注水。
 """
 
+_CROSS_SYNTH_EXTRA = """
+11) 本轮材料含「CRM × 已上线周报 · 交叉」：按 mode=cross 成文，放宽长度与结构。
+   - 目标长度 800–1200 字（材料够时写满关键节点，仍禁开场白与空话）。
+   - 建议结构：①重叠结论与名单 → ②每个关键节点的 CRM 进展/我方接口 → ③需要对齐的点（周报侧出现但 CRM 侧口径不同处）。
+   - CRM 桶与周报桶分栏引用；禁止把 CRM 写成「周报里记过」，也禁止只报「两边都有 N 个」而不写节点。
+   - 规则 6 对本轮放宽：允许简短的「串起来看」一两段，但仍禁「建议下一步」套话（用户没问就不给）。
+"""
 
-def _mouth_max_tokens() -> int:
+
+def _envelopes_have_crm_cross(envelopes: list[TieredEnvelope]) -> bool:
+    for e in envelopes or []:
+        pl = getattr(e, "payload", None) or {}
+        if not isinstance(pl, dict):
+            continue
+        if str(pl.get("mode") or "").strip().lower() == "cross":
+            return True
+        if pl.get("cross_op") or pl.get("cross_op_obs"):
+            return True
+        text = str(getattr(e, "text", None) or "")
+        if "CRM × 已上线周报 · 交叉" in text or "硅谷 CRM × 已上线周报" in text:
+            return True
+    return False
+
+
+def _mouth_max_tokens(*, cross: bool = False) -> int:
     import os
 
     try:
-        return max(400, min(2000, int(os.environ.get("MESH_MOUTH_MAX_TOKENS") or "1200")))
+        base = max(400, min(2000, int(os.environ.get("MESH_MOUTH_MAX_TOKENS") or "1200")))
     except Exception:
-        return 1200
+        base = 1200
+    if cross:
+        return max(base, min(2400, int(os.environ.get("MESH_MOUTH_CROSS_MAX_TOKENS") or "1800")))
+    return base
 
 
 def sanitize(text: str) -> str:
@@ -276,7 +302,9 @@ def synthesize_work(
         notes.append(f"执行备注：预算触顶（{budget_hit}），材料可能不完整。")
     elif partial:
         notes.append("执行备注：部分步骤未成功，请据此如实说明缺口。")
-    system = _SYNTH_SYSTEM
+    is_cross = _envelopes_have_crm_cross(envelopes)
+    meta["crm_cross"] = is_cross
+    system = _SYNTH_SYSTEM + (_CROSS_SYNTH_EXTRA if is_cross else "")
     if company_block:
         system += "\n\n" + company_block
     hist = _history_block(session)
@@ -287,12 +315,19 @@ def synthesize_work(
     )
     if notes:
         user += "\n" + "\n".join(notes) + "\n"
-    user += "\nMesh 答复（先结论，短列表，别注水）："
+    if is_cross:
+        user += "\nMesh 答复（交叉题：重叠结论 + 关键节点进展；分栏引用，别塌成空壳名单）："
+    else:
+        user += "\nMesh 答复（先结论，短列表，别注水）："
     try:
         from ... import llm
 
         out = llm.call(
-            system, user, max_tokens=_mouth_max_tokens(), json_mode=False, task="answer"
+            system,
+            user,
+            max_tokens=_mouth_max_tokens(cross=is_cross),
+            json_mode=False,
+            task="answer",
         )
         meta["llm_used"] = True
         meta["model"] = llm.model_for_task("answer")
@@ -306,7 +341,14 @@ def synthesize_work(
             for e in envelopes
             if e.ok and (e.text or "").strip() and not (e.payload or {}).get("empty")
         ]
-        if grounded and text and len((text or "").strip()) < 48 and max(len(e.text or "") for e in grounded) > 80:
+        # cross 材料通常很长；短答更像塌缩，阈值略抬高
+        min_chars = 96 if is_cross else 48
+        if (
+            grounded
+            and text
+            and len((text or "").strip()) < min_chars
+            and max(len(e.text or "") for e in grounded) > 80
+        ):
             log.warning("supervisor mouth contradicted non-empty materials")
             text = render_work_answer(columns)
             meta["source"] = "rule_columns_contradiction"

@@ -124,20 +124,25 @@ def strip_calendar_unless_asked(steps: list[PlanStep], user_text: str) -> list[P
 def normalize_crm_steps(steps: list[PlanStep]) -> list[PlanStep]:
     """信任 planner 给的 crm.search 决策，只做安全约束，不做正则意图判定。
 
-    - stats/cross 步骤旁边的 ask.published/relations_summary 去掉，防脚注混级；
+    - stats 步骤旁边的 ask.published/relations_summary 去掉，防脚注把计数混成周报；
+    - cross 保留 ask.published（周报分栏），供成文写跨线重叠；脚注仍按 tier 分栏；
     - 缺 mode 时保底为 auto；stats/cross 缺子字段时兜底（safety，不是意图识别）。
     """
     if not steps:
         return list(steps or [])
 
-    crm_modes = {(s.args or {}).get("mode") for s in steps if (s.tool or "").strip() == "crm.search"}
-    has_structured = bool({"stats", "cross"} & {str(m or "").strip().lower() for m in crm_modes})
+    crm_modes = {
+        str((s.args or {}).get("mode") or "").strip().lower()
+        for s in steps
+        if (s.tool or "").strip() == "crm.search"
+    }
+    # 仅 stats 剥周报步骤；cross 需要周报上下文，保留分栏
+    strip_ask = "stats" in crm_modes
 
     kept: list[PlanStep] = []
     for s in steps:
         tool = (s.tool or "").strip()
-        # 结构化 CRM 在场时，剥掉会污染脚注的已上线周报步骤
-        if has_structured and tool in ("ask.published", "ask.relations_summary"):
+        if strip_ask and tool in ("ask.published", "ask.relations_summary"):
             continue
         if tool == "crm.search":
             args = dict(s.args or {})
@@ -157,7 +162,7 @@ def normalize_crm_steps(steps: list[PlanStep]) -> list[PlanStep]:
         for s in kept:
             s.depends_on = [d for d in (s.depends_on or []) if d in ids and d != s.id]
         log.info(
-            "planner normalized crm steps (dropped ask to avoid footnote mix) kept=%s dropped=%s modes=%s",
+            "planner normalized crm steps (dropped ask for stats footnotes) kept=%s dropped=%s modes=%s",
             len(kept),
             len(steps) - len(kept),
             sorted(str(m or "auto") for m in crm_modes),
@@ -252,7 +257,8 @@ _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划�
 7) 步骤 ≤8；有依赖才写 depends_on；可并行的标同一 parallel_group。
 8) 问周报相关 / 个人或团队进展 /「该关注什么」→ 主步骤用 ask.published（可并行 directory）；
    不要用 feishu.calendar.* 当主步骤，除非用户明确问日程、会议、忙不忙、空闲。
-9) CRM 的 stats/cross 步骤不要再并行 ask.published，避免脚注把 CRM 证据混成已上线周报。
+9) CRM 的 stats 步骤不要再并行 ask.published，避免脚注把 CRM 计数证据混成已上线周报。
+   mode=cross 时可以并行一条 ask.published（周报分栏），供成文写「跨线重叠」；禁止把 CRM 说成周报。
 10) 只输出 JSON。
 """
 

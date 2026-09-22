@@ -26,8 +26,8 @@ def crm_db(monkeypatch):
     db.init_db(seed=False)
     con = db.connect()
     con.execute(
-        "INSERT INTO crm_people(notion_id, display_name, aliases, company_names) VALUES(?,?,?,?)",
-        ("p1", "Alice Zhang", "Alice", "Acme"),
+        "INSERT INTO crm_people(notion_id, display_name, aliases, company_names, headline) VALUES(?,?,?,?,?)",
+        ("p1", "Alice Zhang", "Alice", "Acme", "Acme founder · AI infra"),
     )
     con.execute(
         "INSERT INTO crm_people(notion_id, display_name, aliases, company_names) VALUES(?,?,?,?)",
@@ -42,9 +42,9 @@ def crm_db(monkeypatch):
         ("c2", "Beta"),
     )
     con.execute(
-        "INSERT INTO crm_interactions(notion_id, title, date_start, interact_type, people_names) "
-        "VALUES(?,?,?,?,?)",
-        ("i1", "meet Alice", "2026-09-10", "沟通会", "Alice Zhang"),
+        "INSERT INTO crm_interactions(notion_id, title, date_start, interact_type, people_names, our_side) "
+        "VALUES(?,?,?,?,?,?)",
+        ("i1", "meet Alice", "2026-09-10", "沟通会", "Alice Zhang", "Lilyann"),
     )
     con.execute(
         "INSERT INTO crm_interactions(notion_id, title, date_start, interact_type, people_names) "
@@ -68,9 +68,9 @@ def crm_db(monkeypatch):
         ("2026-09-08", "2026-09-01", "2026-09-08", "t", "published", "{}"),
     )
     con.execute(
-        "INSERT INTO entity_team_facts(issue_slug,date_end,section,name,team,kind) "
-        "VALUES(?,?,?,?,?,?)",
-        ("2026-09-08", "2026-09-08", "接触", "Alice Zhang", "硅谷 BD 团队", "unknown"),
+        "INSERT INTO entity_team_facts(issue_slug,date_end,section,name,team,kind,snippet) "
+        "VALUES(?,?,?,?,?,?,?)",
+        ("2026-09-08", "2026-09-08", "接触", "Alice Zhang", "硅谷 BD 团队", "unknown", "国内队也在跟 Acme"),
     )
     con.execute(
         "INSERT INTO entity_team_facts(issue_slug,date_end,section,name,team,kind) "
@@ -145,6 +145,15 @@ def test_cross_both(crm_db):
     out = crm_cross.cross_crm_weekly(crm_db, op="both", entity_kind="person")
     assert out["counts"]["both"] >= 1
     assert any(r.get("crm") == "Alice Zhang" for r in out["rows"])
+    alice = next(r for r in out["rows"] if r.get("crm") == "Alice Zhang")
+    detail = alice.get("crm_detail") or {}
+    assert "Acme" in (detail.get("company") or "")
+    assert "AI infra" in (detail.get("headline") or "")
+    assert (detail.get("last_interaction") or {}).get("date") == "2026-09-10"
+    assert "值得跟进" in ((detail.get("take") or {}).get("verdict") or "")
+    assert "AI infra" in out["text"]
+    assert "值得跟进" in out["text"]
+    assert "国内队也在跟" in out["text"]
 
 
 def test_cross_crm_only(crm_db):
@@ -158,6 +167,50 @@ def test_cross_weekly_only(crm_db):
     out = crm_cross.cross_crm_weekly(crm_db, op="weekly_only", entity_kind="person")
     names = [r["name"] for r in out["rows"]]
     assert "Charlie" in names
+
+
+def test_mouth_detects_crm_cross_envelope():
+    from app.agent.supervisor import mouth as mouthmod
+    from app.agent.supervisor.types import TieredEnvelope
+
+    env = TieredEnvelope(
+        step_id="s1",
+        worker="crm",
+        tool="crm.search",
+        ok=True,
+        tier="crm_prior",
+        text="【硅谷 CRM × 已上线周报 · 交叉】\n命中：7",
+        payload={"mode": "cross", "cross_op": "both"},
+    )
+    assert mouthmod._envelopes_have_crm_cross([env]) is True
+    assert mouthmod._envelopes_have_crm_cross(
+        [
+            TieredEnvelope(
+                step_id="s2",
+                worker="crm",
+                tool="crm.search",
+                ok=True,
+                tier="crm_prior",
+                text="档案 2 人",
+                payload={"mode": "stats"},
+            )
+        ]
+    ) is False
+
+
+def test_feishu_reply_cross_footer_tiered():
+    ans = AgentAnswer(
+        text="两边都有 7 人，关键节点含…",
+        intent="crm_search",
+        evidence_refs=["crm:cross:both:7"],
+        tools_called=["crm.search", "ask.published"],
+        trace={"source_tier": "crm_prior", "cross_op": "both"},
+    )
+    display = format_display_text(
+        ans, payload={"source_tier": "crm_prior", "cross_op": "both"}
+    )
+    assert "硅谷 CRM × 已上线周报" in display
+    assert "分栏对照" in display
 
 
 def test_ask_planner_suppresses_weekly_count_for_crm():
