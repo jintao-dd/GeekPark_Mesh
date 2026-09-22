@@ -678,7 +678,10 @@ def publish_blockers(con, issue_id: int, draft_json: str) -> list[str]:
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     con = db.connect()
-    r = con.execute("SELECT slug FROM issues WHERE status='published' ORDER BY date_end DESC LIMIT 1").fetchone()
+    from .issue_period import sql_order_published_desc
+    r = con.execute(
+        f"SELECT slug FROM issues WHERE status='published' ORDER BY {sql_order_published_desc()} LIMIT 1"
+    ).fetchone()
     con.close()
     if not r: return RedirectResponse("/admin")
     return RedirectResponse(f"/{r['slug']}")
@@ -882,7 +885,11 @@ async def api_debug_role(request: Request):
 def archive(request: Request):
     auth.require(request, "viewer")
     con = db.connect()
-    rows = con.execute("SELECT slug, period_label, date_start, date_end, published_at FROM issues WHERE status='published' ORDER BY date_end DESC").fetchall()
+    from .issue_period import sql_order_published_desc
+    rows = con.execute(
+        f"SELECT slug, period_label, date_start, date_end, published_at, updated_at "
+        f"FROM issues WHERE status='published' ORDER BY {sql_order_published_desc()}"
+    ).fetchall()
     con.close()
     return templates.TemplateResponse("archive.html", ctx(request, issues=[_enrich_issue(r) for r in rows]))
 
@@ -1679,19 +1686,16 @@ def _parse_iso_date(s: str | None) -> datetime.date | None:
 
 def format_display_date(d: datetime.date) -> str:
     """读者页单日期：2026.8.27"""
-    return f"{d.year}.{d.month}.{d.day}"
+    from .issue_period import format_period_label
+
+    return format_period_label(d)
 
 
 def issue_display_date(issue: dict) -> str:
-    """已上线用 published_at；草稿用 date_end（创建默认当天）。"""
-    if issue.get("published_at"):
-        d = _parse_iso_date(str(issue["published_at"])[:10])
-        if d:
-            return format_display_date(d)
-    d = _parse_iso_date(issue.get("date_end"))
-    if d:
-        return format_display_date(d)
-    return (issue.get("period_label") or issue.get("slug") or "").strip()
+    """已上线按上线日；上线后若有更新且更晚则按最新更新日期；草稿按 date_end。"""
+    from .issue_period import issue_display_date as _period_display
+
+    return _period_display(issue)
 
 
 def _enrich_issue(row) -> dict:
@@ -1773,10 +1777,12 @@ def admin_eval_dashboard(request: Request, current: str = "", baseline: str = ""
 def admin_issue_list(request: Request, err: str = ""):
     u = auth.require(request, "editor")
     con = db.connect()
+    from .issue_period import sql_order_published_desc
     issues = [_enrich_issue(r) for r in con.execute(
-        """SELECT id, slug, period_label, status, updated_at, published_at, date_end, draft_json,
+        f"""SELECT id, slug, period_label, status, updated_at, published_at, date_end, draft_json,
                   embedding_status, embedding_total, embedding_done, embedding_model
-           FROM issues ORDER BY date_end DESC"""
+           FROM issues ORDER BY CASE WHEN status='published' THEN 0 ELSE 1 END,
+                {sql_order_published_desc()}, date_end DESC, id DESC"""
     )]
     for i in issues:
         draft = i.pop("draft_json", None)
@@ -1815,10 +1821,12 @@ def issue_new(request: Request, slug: str = Form(...), date_start: str = Form(""
     exists = con.execute("SELECT 1 FROM issues WHERE slug=?", (slug,)).fetchone()
     if exists:
         suggest = suggest_next_issue(con)
+        from .issue_period import sql_order_published_desc
         issues = [_enrich_issue(r) for r in con.execute(
-            """SELECT id, slug, period_label, status, updated_at, published_at, date_end, draft_json,
+            f"""SELECT id, slug, period_label, status, updated_at, published_at, date_end, draft_json,
                       embedding_status, embedding_total, embedding_done, embedding_model
-               FROM issues ORDER BY date_end DESC"""
+               FROM issues ORDER BY CASE WHEN status='published' THEN 0 ELSE 1 END,
+                    {sql_order_published_desc()}, date_end DESC, id DESC"""
         )]
         for i in issues:
             draft = i.pop("draft_json", None)
@@ -2631,7 +2639,12 @@ def create_revision(request: Request, slug: str):
         return _flash_redirect(f"/admin/issue/{slug}", msg)
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     ensure_draft_for_edit(con, r, sync_from_published=True, force=True)
-    con.execute("UPDATE issues SET updated_at=? WHERE id=?", (now, r["id"]))
+    from .issue_period import period_fields_for_stamp
+    period = period_fields_for_stamp(now)
+    con.execute(
+        "UPDATE issues SET updated_at=?, period_label=?, date_start=?, date_end=? WHERE id=?",
+        (now, period["period_label"], period["date_start"], period["date_end"], r["id"]),
+    )
     con.execute(
         "INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)",
         (r["id"], u["u"], "create_revision", "published", "draft reset from published (still live)"),
@@ -2965,9 +2978,8 @@ def publish(request: Request, slug: str, confirm: str = Form("")):
     data["_relations_backlog"] = backlog
     published = build_published_projection(data)
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    pub_day = datetime.date.today()
-    pub_label = format_display_date(pub_day)
-    pub_iso = pub_day.isoformat()
+    from .issue_period import period_fields_for_stamp
+    period = period_fields_for_stamp(now)
     draft_payload = json.dumps(data, ensure_ascii=False)
     pub_payload = json.dumps(published, ensure_ascii=False)
     from .publish_lane import allow_published_write, write_publish_projection
@@ -2979,9 +2991,9 @@ def publish(request: Request, slug: str, confirm: str = Form("")):
             draft_payload=draft_payload,
             published_at=now,
             updated_at=now,
-            period_label=pub_label,
-            date_end=pub_iso,
-            date_start=pub_iso,
+            period_label=period["period_label"],
+            date_end=period["date_end"],
+            date_start=period["date_start"],
         )
     db.register_entities(con, published, slug)
     db.snapshot_published_items(con, r["id"])
@@ -3083,8 +3095,11 @@ def edm_admin(request: Request, saved: int = 0, err: str = ""):
     auth.require(request, "owner")
     con = db.connect()
     issues = []
+    from .issue_period import sql_order_published_desc
     for row in con.execute(
-        "SELECT id, slug, period_label, status, published_at, updated_at, version, draft_json, published_json, date_end FROM issues ORDER BY date_end DESC"
+        f"SELECT id, slug, period_label, status, published_at, updated_at, version, draft_json, published_json, date_end "
+        f"FROM issues ORDER BY CASE WHEN status='published' THEN 0 ELSE 1 END, "
+        f"{sql_order_published_desc()}, date_end DESC, id DESC"
     ):
         row_d = dict(row)
         data = _edm_json_from_row(row_d)
@@ -3600,7 +3615,11 @@ def issue_page(request: Request, slug: str, preview: int = 0, edit: int = 0, syn
             if isinstance(r, dict)
         ]
     con = db.connect()
-    arch = [_enrich_issue(x) for x in con.execute("SELECT slug, period_label, date_end, published_at FROM issues WHERE status='published' ORDER BY date_end DESC LIMIT 12")]
+    from .issue_period import sql_order_published_desc
+    arch = [_enrich_issue(x) for x in con.execute(
+        f"SELECT slug, period_label, date_end, published_at, updated_at FROM issues "
+        f"WHERE status='published' ORDER BY {sql_order_published_desc()} LIMIT 12"
+    )]
     con.close()
     return templates.TemplateResponse(
         "issue.html",

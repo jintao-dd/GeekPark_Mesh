@@ -114,6 +114,49 @@ def test_vector_on_requires_explicit_enable(monkeypatch):
     assert embeddings.retrieval_execution_mode(structured_candidate=True) == "structured"
 
 
+def test_vector_cache_respects_slug_filter(monkeypatch):
+    """全量矩阵缓存不得让无 slug 查询污染后续 slug 过滤（e07 串期根因）。"""
+    embeddings.clear_vector_cache()
+
+    class _R(dict):
+        def __getitem__(self, k):
+            return dict.__getitem__(self, k)
+
+    rows_data = [
+        _R(
+            chunk_id="c1", issue_slug="2026-8-17", date_end="2026-08-17",
+            layer="item", section="接触", title="面壁智能", body="面壁",
+            owner_team="编辑部", stype="", item_id=1, source_label="",
+            meta_json="{}", vector_json="[1,0,0]",
+        ),
+        _R(
+            chunk_id="c2", issue_slug="2026-08-21", date_end="2026-08-21",
+            layer="item", section="接触", title="面壁智能", body="面壁他期",
+            owner_team="编辑部", stype="", item_id=2, source_label="",
+            meta_json="{}", vector_json="[0.99,0.1,0]",
+        ),
+    ]
+
+    class _Con:
+        def execute(self, sql, params=()):
+            sql_l = str(sql).lower()
+            if "count(*)" in sql_l and "chunk_embeddings" in sql_l:
+                class One:
+                    def __getitem__(self, k):
+                        return 2 if k == "c" else 20
+                return type("X", (), {"fetchone": lambda self: One()})()
+            return rows_data
+
+    hits_all = embeddings.vector_search(_Con(), [1.0, 0.0, 0.0], limit=10)
+    assert {h["issue_slug"] for h in hits_all} == {"2026-8-17", "2026-08-21"}
+    hits_scoped = embeddings.vector_search(
+        _Con(), [1.0, 0.0, 0.0], slug="2026-8-17", limit=10,
+    )
+    assert hits_scoped
+    assert {h["issue_slug"] for h in hits_scoped} == {"2026-8-17"}
+    embeddings.clear_vector_cache()
+
+
 def test_base_urls_supports_comma_fallback(monkeypatch):
     monkeypatch.setenv(
         "MESH_EMBED_BASE_URL",

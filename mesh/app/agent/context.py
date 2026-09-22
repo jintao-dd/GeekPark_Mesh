@@ -40,10 +40,12 @@ def _issue_published(con, slug: str) -> bool:
 
 
 def _latest_published_slug(con) -> str:
+    from ..issue_period import sql_order_published_desc
+
     row = con.execute(
         "SELECT slug FROM issues WHERE status='published' "
         "AND published_json IS NOT NULL AND TRIM(published_json) != '' "
-        "ORDER BY date_end DESC, id DESC LIMIT 1"
+        f"ORDER BY {sql_order_published_desc()}, id DESC LIMIT 1"
     ).fetchone()
     return (row["slug"] if row else "") or ""
 

@@ -335,11 +335,13 @@ def _chunk_hint_terms(con, chunk_ids: list[str], limit: int = 12) -> list[str]:
 
 
 def _resolve_date_window(scope: AskScope, search_q: str) -> tuple[str | None, str | None]:
-
+    # 钉死某期时不再叠默认词法时间窗，避免与 slug 过滤语义打架
+    if (scope.slug or "").strip():
+        if scope.date_from or scope.date_to:
+            return scope.date_from, scope.date_to
+        return None, None
     if scope.date_from or scope.date_to:
-
         return scope.date_from, scope.date_to
-
     return search.lexical_date_range(search_q)
 
 
@@ -470,6 +472,10 @@ def _hybrid_recall(
 
     # small-to-big：命中小子块后展开父块完整正文供生成（检索精度用子块，生成用父块）
     ranked = ingest_chunk_expand(con, ranked)
+
+    # 钉死 slug：融合/展开后硬过滤，防止任意通道泄漏他期
+    if slug:
+        ranked = [h for h in ranked if (h.get("issue_slug") or "") == slug]
 
     return ranked, {"date_from": date_from, "date_to": date_to, "used_vector": used_vector}
 

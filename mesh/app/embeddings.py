@@ -20,9 +20,17 @@ from .providers.base import env
 _HTTP = requests.Session()
 
 # 向量矩阵进程内缓存：941 条 × 4096 维 JSON 约 86MB，每次查询重新解析会白花数秒。
-# 按 (model, 语料指纹) 缓存一次解析结果，语料变更时重建。
+# 按 (model, 语料指纹) 缓存「全量」矩阵；slug/team/date 过滤在检索时做，禁止按过滤后结果缓存
+# （否则第一次无 slug 查询会污染后续限定某期的召回 → 串期）。
 _VEC_CACHE: dict[str, Any] = {"key": "", "rows": [], "norms": []}
 _VEC_CACHE_LOCK = threading.Lock()
+
+_FULL_MATRIX_SQL = """
+    SELECT c.chunk_id, c.issue_slug, c.date_end, c.layer, c.section, c.title, c.body,
+           c.owner_team, c.stype, c.item_id, c.source_label, c.meta_json, e.vector_json
+    FROM chunk_index c
+    JOIN chunk_embeddings e ON e.chunk_id = c.chunk_id AND e.model = ?
+"""
 
 
 def _corpus_key(con: Any, model: str) -> str:
@@ -37,15 +45,22 @@ def _corpus_key(con: Any, model: str) -> str:
         return ""
 
 
-def _cached_matrix(con: Any, model: str, sql: str, params: list[Any]) -> tuple[list, list]:
-    """返回 (rows, norms)；rows 为 (chunk_meta_tuple, vector)。"""
+def clear_vector_cache() -> None:
+    with _VEC_CACHE_LOCK:
+        _VEC_CACHE["key"] = ""
+        _VEC_CACHE["rows"] = []
+        _VEC_CACHE["norms"] = []
+
+
+def _load_full_matrix(con: Any, model: str) -> tuple[list, list]:
+    """返回全量 (rows, norms)；rows 为 (chunk_row, vector)。"""
     key = _corpus_key(con, model)
     with _VEC_CACHE_LOCK:
         if key and _VEC_CACHE["key"] == key:
             return _VEC_CACHE["rows"], _VEC_CACHE["norms"]
     rows: list[Any] = []
     norms: list[float] = []
-    for r in con.execute(sql, params):
+    for r in con.execute(_FULL_MATRIX_SQL, (model,)):
         try:
             vec = json.loads(r["vector_json"])
         except Exception:
@@ -60,6 +75,29 @@ def _cached_matrix(con: Any, model: str, sql: str, params: list[Any]) -> tuple[l
             _VEC_CACHE["rows"] = rows
             _VEC_CACHE["norms"] = norms
     return rows, norms
+
+
+def _row_passes_filters(
+    r: Any,
+    *,
+    slug: str,
+    team: str,
+    date_from: str | None,
+    date_to: str | None,
+) -> bool:
+    if slug and (r["issue_slug"] or "") != slug:
+        return False
+    if team and (r["owner_team"] or "") != team:
+        return False
+    de = (r["date_end"] or "")[:10]
+    if date_from or date_to:
+        if not de:
+            return False
+        if date_from and de < date_from:
+            return False
+        if date_to and de > date_to:
+            return False
+    return True
 
 RetrievalMode = Literal["structured", "lexical", "hybrid"]
 
@@ -225,33 +263,17 @@ def vector_search(
     if not query_vec:
         return []
     model = model_name()
-    params: list[Any] = [model]
-    sql = """
-        SELECT c.chunk_id, c.issue_slug, c.date_end, c.layer, c.section, c.title, c.body,
-               c.owner_team, c.stype, c.item_id, c.source_label, c.meta_json, e.vector_json
-        FROM chunk_index c
-        JOIN chunk_embeddings e ON e.chunk_id = c.chunk_id AND e.model = ?
-        WHERE 1=1
-    """
-    if slug:
-        sql += " AND c.issue_slug = ?"
-        params.append(slug)
-    if team:
-        sql += " AND c.owner_team = ?"
-        params.append(team)
-    if date_from:
-        sql += " AND c.date_end >= ?"
-        params.append(date_from)
-    if date_to:
-        sql += " AND c.date_end <= ?"
-        params.append(date_to)
+    rows, norms = _load_full_matrix(con, model)
     top_k = max(limit * 4, limit)
-    rows, norms = _cached_matrix(con, model, sql, params)
     qn = math.sqrt(sum(x * x for x in query_vec))
     if qn <= 0:
         return []
     heap: list[tuple[float, dict]] = []
     for (r, vec), rn in zip(rows, norms):
+        if not _row_passes_filters(
+            r, slug=slug, team=team, date_from=date_from, date_to=date_to,
+        ):
+            continue
         if rn <= 0 or len(vec) != len(query_vec):
             continue
         dot = sum(x * y for x, y in zip(query_vec, vec))

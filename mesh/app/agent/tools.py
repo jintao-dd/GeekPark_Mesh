@@ -168,16 +168,18 @@ def tool_list_issues(
     blocked = _guard_common("context.list_issues", identity, permission, context, args=args)
     if blocked:
         return blocked
+    from ..issue_period import issue_display_date, sql_order_published_desc
+
     rows = con.execute(
-        "SELECT slug, period_label, date_end, status FROM issues "
+        "SELECT slug, period_label, date_end, published_at, updated_at, status FROM issues "
         "WHERE status='published' AND published_json IS NOT NULL "
         "AND TRIM(published_json) != '' "
-        "ORDER BY date_end DESC, id DESC LIMIT 50"
+        f"ORDER BY {sql_order_published_desc()}, id DESC LIMIT 50"
     ).fetchall()
     issues = [
         {
             "slug": r["slug"],
-            "period_label": r["period_label"] or "",
+            "period_label": issue_display_date(dict(r)) or (r["period_label"] or ""),
             "date_end": r["date_end"] or "",
             "status": "published",
         }
