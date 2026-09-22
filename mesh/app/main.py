@@ -1455,6 +1455,80 @@ def admin_crm_notion_sync(request: Request, full: int = 0):
         raise HTTPException(status_code=500, detail=str(e)[:500]) from e
 
 
+@app.get("/admin/qa", response_class=HTMLResponse)
+def admin_qa_log(
+    request: Request,
+    q: str = "",
+    channel: str = "",
+    status: str = "",
+    only_bad: int = 0,
+    limit: int = 50,
+    offset: int = 0,
+):
+    """AI 问答质量记录（只读 + 人工标注）。不触发 Preview/Ask/Embed/Publish。"""
+    auth.require(request, "editor")
+    from . import qa_log
+
+    con = db.connect()
+    try:
+        qa_log.ensure_schema(con)
+        page = qa_log.list_turns(
+            con,
+            channel=channel,
+            answer_status=status,
+            only_bad=bool(only_bad),
+            q=q,
+            limit=max(1, min(int(limit or 50), 200)),
+            offset=max(0, int(offset or 0)),
+        )
+        stats = qa_log.stats(con, days=7)
+    finally:
+        con.close()
+    return templates.TemplateResponse(
+        "qa_log.html",
+        ctx(
+            request,
+            nav="qa",
+            turns=page["turns"],
+            total=page["total"],
+            limit=page["limit"],
+            offset=page["offset"],
+            stats=stats,
+            filters={
+                "q": q,
+                "channel": channel,
+                "status": status,
+                "only_bad": bool(only_bad),
+            },
+        ),
+    )
+
+
+@app.post("/admin/qa/{turn_id}/feedback")
+def admin_qa_feedback(
+    request: Request,
+    turn_id: int,
+    feedback: str = Form(""),
+    note: str = Form(""),
+):
+    """人工标注某轮问答好/差（用于后续归因失败分类）。"""
+    u = auth.require(request, "editor")
+    from . import qa_log
+
+    con = db.connect()
+    try:
+        qa_log.ensure_schema(con)
+        ok = qa_log.set_feedback(
+            con, turn_id, feedback=feedback, note=note, by=(u.get("u") or "")
+        )
+        con.commit()
+    finally:
+        con.close()
+    if not ok:
+        return _flash_redirect("/admin/qa", "反馈值不合法")
+    return RedirectResponse("/admin/qa", status_code=302)
+
+
 @app.post("/admin/reindex_facts")
 def admin_reindex_facts(request: Request):
     """回填/重建全部已发布期的主体×团队事实表 + 搜索/chunk 索引。"""

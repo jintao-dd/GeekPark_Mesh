@@ -844,6 +844,26 @@ def process_feishu_message_job(payload: dict[str, Any]) -> dict[str, Any]:
             answer = handle_message(con, env)
             d = answer.to_dict()
             reply = str(d.get("display_text") or d.get("text") or "").strip()
+            # 质量采集：落库每轮问答（含答案/证据/answer_status），失败不影响回复
+            try:
+                from .. import qa_log
+
+                qa_log.record_answer(
+                    con,
+                    envelope={
+                        "channel": payload.get("channel") or "",
+                        "feishu_open_id": payload.get("feishu_open_id") or "",
+                        "chat_id": payload.get("chat_id") or "",
+                        "session_id": d.get("context", {}).get("session_id") if isinstance(d.get("context"), dict) else "",
+                    },
+                    answer=d,
+                    question=query,
+                    latency_ms=int((time.time() - t_agent) * 1000),
+                    request_id=str(payload.get("inbound_message_id") or ""),
+                )
+                con.commit()
+            except Exception as _e:
+                log.debug("qa_log feishu record skip: %s", _e)
         finally:
             con.close()
             progressmod.reset_progress_callback(prog_token)

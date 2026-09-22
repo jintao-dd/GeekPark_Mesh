@@ -428,6 +428,12 @@ def migrate(con):
         except Exception:
             pass
         try:
+            from . import qa_log
+
+            qa_log.ensure_schema(con)
+        except Exception:
+            pass
+        try:
             set_setting(con, "schema_version", SCHEMA_VERSION)
         except Exception:
             pass
@@ -523,6 +529,12 @@ def migrate(con):
     con.execute("""CREATE TABLE IF NOT EXISTS feishu_chat_bindings(
       chat_id TEXT PRIMARY KEY, chat_type TEXT DEFAULT 'group', team TEXT, label TEXT,
       created_at TEXT DEFAULT (datetime('now')), updated_at TEXT)""")
+    try:
+        from . import qa_log
+
+        qa_log.ensure_schema(con)
+    except Exception:
+        pass
     for ddl in (
         """CREATE TABLE IF NOT EXISTS chunk_index(
           chunk_id TEXT PRIMARY KEY, issue_slug TEXT NOT NULL, issue_id INTEGER, date_end TEXT,
