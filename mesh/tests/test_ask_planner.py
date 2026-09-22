@@ -228,3 +228,55 @@ def test_llm_intent_exception_falls_back(monkeypatch):
         p = plan_retrieval(q)
     assert p.set_op == "diff"
     assert p.path == "structured"
+
+
+# ---- 2 跳：cooccur / bridge ----
+
+def test_llm_intent_cooccur(monkeypatch):
+    """「跟面壁聊过的人还接触过谁」→ LLM 判 cooccur，seed=面壁智能。"""
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "1")
+    q = "跟面壁智能聊过的人还接触过谁？"
+    payload = {"type": "cooccur", "seed": "面壁智能", "confidence": 0.9}
+    with mock.patch("app.llm.call", _mock_llm(payload)):
+        p = plan_retrieval(q)
+    assert p.set_op == "cooccur"
+    assert p.path == "structured"
+    assert p.intent["seed"] == "面壁智能"
+
+
+def test_llm_intent_bridge(monkeypatch):
+    """「谁把 X 和 Y 连起来」→ LLM 判 bridge，两个 seed 都要有。"""
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "1")
+    q = "谁把编辑部跟商业化团队连起来？"
+    payload = {"type": "bridge", "seed": "编辑部", "seed_b": "商业化团队", "confidence": 0.88}
+    with mock.patch("app.llm.call", _mock_llm(payload)):
+        p = plan_retrieval(q)
+    assert p.set_op == "bridge"
+    assert p.intent["seed"] == "编辑部"
+    assert p.intent["seed_b"] == "商业化团队"
+
+
+def test_llm_intent_cooccur_missing_seed_falls_back(monkeypatch):
+    """cooccur 但 seed 为空 → 不采用，回落规则（不把空种子送进 SQL）。"""
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "1")
+    q = "还接触过谁？"
+    payload = {"type": "cooccur", "seed": "", "confidence": 0.9}
+    with mock.patch("app.llm.call", _mock_llm(payload)):
+        p = plan_retrieval(q)
+    assert p.set_op != "cooccur"
+
+
+def test_rule_cooccur_fallback(monkeypatch):
+    """LLM 关时，规则兜底能识别「围绕 X 还有谁」。"""
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "0")
+    p = plan_retrieval("围绕面壁智能还有哪些相关的人和公司？")
+    assert p.set_op == "cooccur"
+    assert p.intent["seed"] == "面壁智能"
+
+
+def test_rule_bridge_fallback(monkeypatch):
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "0")
+    p = plan_retrieval("谁把「面壁智能」和「吉利银河」连起来？")
+    assert p.set_op == "bridge"
+    assert p.intent["seed"] == "面壁智能"
+    assert p.intent["seed_b"] == "吉利银河"

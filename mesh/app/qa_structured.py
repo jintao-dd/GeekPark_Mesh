@@ -486,6 +486,145 @@ def query_overseas_gap(con, date_from: str | None, section: str = "接触",
     return _rows_to_contexts(uniq)
 
 
+# ---- 2 跳图查询：基于 item_entity_facts（条目↔实体边表）做共现/桥接 ----
+
+def _like_entity_clause(alias: str, term: str, dialect: str = "") -> tuple[str, list]:
+    """种子实体匹配：复合串也要能命中（LIKE 双向包含），如「影眸科技」命中复合行。
+
+    PG(psycopg2) 会把 SQL 里的字面 `%` 当参数占位符，须写成 `%%`。
+    """
+    t = (term or "").strip()
+    pct = "%%" if dialect == "postgresql" else "%"
+    return (
+        f"({alias}.entity_name LIKE ? OR ? LIKE '{pct}' || {alias}.entity_name || '{pct}')",
+        [f"%{t}%", t],
+    )
+
+
+def _graph_rows_to_contexts(rows: list[dict], *, limit: int = 20) -> tuple[list[dict], int]:
+    """2 跳结果 → contexts。每行是一个共现/桥接主体（不是条目）。
+
+    注意：不展示 entity_kind —— 现有 infer_entity_kind 启发式噪声大
+    （公司常被误标 person），展示会给 LLM 错误信号。
+    """
+    total = len(rows)
+    ctxs = []
+    for r in rows[:limit]:
+        co = int(r.get("co") or 0)
+        ctxs.append({
+            "期号": r.get("date_end") or "",
+            "章节": "图检索",
+            "标题": r["name"],
+            "内容": " · ".join(filter(None, [
+                f"团队 {r.get('team') or '未知'}",
+                f"关联 {co} 条记录",
+                (r.get("snippet") or "")[:300],
+                f"来源 {r['source_hint']}" if r.get("source_hint") else "",
+            ])),
+            "团队": r.get("team") or "",
+        })
+    return ctxs, total
+
+
+def query_cooccur(
+    con,
+    seed: str,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    *,
+    limit: int = 20,
+) -> tuple[list[dict], int]:
+    """2 跳共现：seed 实体 → 同条目出现的其他实体（按共现次数排序）。
+
+    问法示例：「跟面壁智能聊过的人还接触过谁」「面壁智能都和谁一起出现」。
+    返回主体（不是条目），每行 = 一个共现实体。
+    """
+    seed = (seed or "").strip()
+    if not seed:
+        return [], 0
+    dialect = getattr(con, "dialect", "")
+    seed_sql, seed_params = _like_entity_clause("e1", seed, dialect)
+    e2_sql, e2_params = _like_entity_clause("e2", seed, dialect)
+    date_sql, date_params = _date_clause("e1", date_from, date_to)
+    sql = f"""
+    SELECT e2.entity_name AS name,
+           MIN(e2.owner_team) AS team,
+           MAX(e2.entity_kind) AS kind,
+           MAX(e2.date_end) AS date_end,
+           MAX(e2.text_snippet) AS snippet,
+           MAX(e2.source_label) AS source_hint,
+           COUNT(DISTINCT e1.item_id) AS co
+    FROM item_entity_facts e1
+    JOIN item_entity_facts e2 ON e1.item_id = e2.item_id
+    WHERE {seed_sql}
+      AND e2.entity_name <> e1.entity_name
+      AND NOT ({e2_sql})
+      {date_sql}
+    GROUP BY e2.entity_name
+    ORDER BY co DESC, name
+    LIMIT ?
+    """
+    params = [*seed_params, *e2_params, *date_params, int(limit)]
+    rows = [dict(r) for r in con.execute(sql, params)]
+    return _graph_rows_to_contexts(rows, limit=limit)
+
+
+def query_bridge(
+    con,
+    a: str,
+    b: str,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    *,
+    limit: int = 20,
+) -> tuple[list[dict], int]:
+    """2 跳桥接：同时与 a、b 共现过的中间实体（「谁把 X 和 Y 连起来」）。
+
+    a 与 b 不必出现在同一条目：中间实体只要分别与二者共现过即可（这正是「桥梁」）。
+    """
+    a, b = (a or "").strip(), (b or "").strip()
+    if not a or not b:
+        return [], 0
+    dialect = getattr(con, "dialect", "")
+    a_x_sql, a_x_p = _like_entity_clause("x", a, dialect)
+    a_e_sql, a_e_p = _like_entity_clause("e", a, dialect)
+    b_y_sql, b_y_p = _like_entity_clause("y", b, dialect)
+    b_e_sql, b_e_p = _like_entity_clause("e", b, dialect)
+    date_sql, date_params = _date_clause("e", date_from, date_to)
+    sql = f"""
+    WITH ca AS (
+        SELECT DISTINCT e.entity_name AS name, e.item_id
+        FROM item_entity_facts e
+        JOIN item_entity_facts x ON x.item_id = e.item_id AND {a_x_sql}
+        WHERE NOT ({a_e_sql}) {date_sql}
+    ),
+    cb AS (
+        SELECT DISTINCT e.entity_name AS name, e.item_id
+        FROM item_entity_facts e
+        JOIN item_entity_facts y ON y.item_id = e.item_id AND {b_y_sql}
+        WHERE NOT ({b_e_sql}) {date_sql}
+    ),
+    hits AS (
+        SELECT ca.name AS name, COUNT(*) AS co
+        FROM ca JOIN cb ON ca.name = cb.name
+        GROUP BY ca.name
+    )
+    SELECT h.name AS name, h.co AS co,
+           MIN(e.owner_team) AS team,
+           MAX(e.entity_kind) AS kind,
+           MAX(e.date_end) AS date_end,
+           MAX(e.text_snippet) AS snippet,
+           MAX(e.source_label) AS source_hint
+    FROM hits h JOIN item_entity_facts e ON e.entity_name = h.name
+    GROUP BY h.name, h.co
+    ORDER BY h.co DESC, h.name
+    LIMIT ?
+    """
+    params = [*a_x_p, *a_e_p, *date_params, *b_y_p, *b_e_p, *date_params, int(limit)]
+    rows = [dict(r) for r in con.execute(sql, params)]
+    return _graph_rows_to_contexts(rows, limit=limit)
+
+
 def query_by_team(con, topic: str, date_from: str | None, date_to: str | None = None,
                   team_scope: str = "") -> tuple[list[dict], int]:
     like = f"%{topic}%"
@@ -551,6 +690,14 @@ def build_structured_preamble(intent: dict, total: int, shown: int) -> dict:
     elif t == "by_team":
         desc = (f"查询类型：按团队聚合。主题「{intent.get('topic')}」。"
                 f"时间范围：{win_txt}。共 {total} 条，展示 {shown} 条。请按团队分别陈述。")
+    elif t == "cooccur":
+        desc = (f"查询类型：二跳共现。种子主体「{intent.get('seed')}」。时间范围：{win_txt}。"
+                f"下列主体与种子主体出现在同一条目里（按关联记录条数排序，多者在前）。"
+                f"共 {total} 个，展示 {shown} 个。")
+    elif t == "bridge":
+        desc = (f"查询类型：二跳桥接。下列主体分别与「{intent.get('seed')}」和"
+                f"「{intent.get('seed_b')}」都有关联（是二者的中间连接点）。"
+                f"时间范围：{win_txt}。共 {total} 个，展示 {shown} 个。")
     else:
         desc = f"结构化查询结果共 {total} 条，展示 {shown} 条。"
     if intent.get("hardware"):
@@ -598,6 +745,12 @@ def empty_result_answer(intent: dict) -> str:
     elif t == "by_team":
         topic = intent.get("topic") or "该主题"
         body = f"在 {win_txt} 范围内，未找到与「{topic}」相关的团队记录。"
+    elif t == "cooccur":
+        body = (f"在 {win_txt} 范围内，未找到与「{intent.get('seed')}」"
+                f"出现在同一条目里的其他主体。")
+    elif t == "bridge":
+        body = (f"在 {win_txt} 范围内，未找到同时与「{intent.get('seed')}」和"
+                f"「{intent.get('seed_b')}」共现过的中间主体。")
     else:
         body = f"在 {win_txt} 范围内，结构化检索未返回任何记录。"
     return body + "\n\n来源：结构化检索（主体×团队事实表）"
@@ -626,6 +779,10 @@ def run_structured(con, intent: dict, team_scope: str = "") -> dict:
         )
     elif t == "by_team":
         ctxs, total = query_by_team(con, intent["topic"], df, dt, team_scope=team_scope)
+    elif t == "cooccur":
+        ctxs, total = query_cooccur(con, intent.get("seed") or "", df, dt)
+    elif t == "bridge":
+        ctxs, total = query_bridge(con, intent.get("seed") or "", intent.get("seed_b") or "", df, dt)
     else:
         return {"ok": False, "mode": "structured", "contexts": [], "total": 0,
                 "intent": intent, "message": "未知查询类型"}
@@ -646,6 +803,8 @@ def run_structured(con, intent: dict, team_scope: str = "") -> dict:
             "team_b": intent.get("team_b"),
             "teams": [intent.get("team_a"), intent.get("team_b")],
             "topic": intent.get("topic"),
+            "seed": intent.get("seed"),
+            "seed_b": intent.get("seed_b"),
             "section": intent.get("section"),
             "window_days": intent.get("window_days"),
             "date_from": intent.get("date_from"),
