@@ -383,7 +383,7 @@ def query_count(
     section: str = "",
     kind: str = "any",
     limit: int = RESULT_LIMIT,
-) -> tuple[list[dict], int]:
+) -> tuple[list[dict], int, dict]:
     """团队在时间窗内的主体计数：直接 SQL 精确计数，不让 LLM 从上下文里数。
 
     section 为空 = 不按 section 过滤（「接触了多少人」没明说时，避免漏算）。
@@ -399,7 +399,7 @@ def query_count(
     再让每个主体认领一个代表键，按代表键去重。
     """
     if not team:
-        return [], 0
+        return [], 0, {}
     a_date, a_params = _date_clause("", date_from, date_to)
     where = ["team = ?"]
     params: list = [team]
@@ -454,18 +454,9 @@ def query_count(
         caveat = ""
     multi = ""
     if expanded > total:
-        multi = f"（其中部分条目一格列出多个主体，拆开计为 {expanded} 个。）"
-    ctxs = [{
-        "期号": "查询说明",
-        "章节": "结构化计数",
-        "标题": "本答案由主体×团队事实表精确计数，非全文模糊检索",
-        "内容": (
-            f"团队「{team}」在 {_window_label({'date_from': date_from, 'date_to': date_to, 'window_days': 0})} "
-            f"范围内{'（' + section + '）' if section else ''}共涉及 {total} {kind_label}"
-            f"（按记录中的主体名去重）。{multi}{caveat}"
-            "请直接给出这个数字，并说明统计口径；不要用下列示例去反推或编造其他数字。"
-        ),
-    }]
+        multi = f"其中部分条目一格列出多个主体，拆开计为 {expanded} 个。"
+    # 口径与 preamble 一并回传（避免 query_count 自造 preamble 与 run_structured 重复）
+    ctxs: list[dict] = []
     for g in ranked[:limit]:
         ctxs.append({
             "期号": "",
@@ -474,7 +465,7 @@ def query_count(
             "内容": f"团队 {team} · 记录 {g['n']} 条 · 类型 {g['kind'] or 'unknown'}",
             "团队": team,
         })
-    return ctxs, total
+    return ctxs, total, {"kind_label": kind_label, "expanded": expanded, "caveat": caveat + multi}
 
 
 def _date_clause(alias: str, date_from: str | None, date_to: str | None = None) -> tuple[str, list]:
@@ -840,12 +831,12 @@ def build_structured_preamble(intent: dict, total: int, shown: int) -> dict:
                 f"「{intent.get('seed_b')}」都有关联（是二者的中间连接点）。"
                 f"时间范围：{win_txt}。共 {total} 个，展示 {shown} 个。")
     elif t == "count":
-        kind_label = {"person": "个主体（事实表未区分个人）", "company": "家公司", "any": "个主体"}.get(
-            intent.get("kind") or "any", "个主体"
-        )
+        kind_label = intent.get("kind_label") or "个主体"
+        caveat = intent.get("caveat") or ""
         desc = (f"查询类型：精确计数。团队「{intent.get('team')}」"
                 f"{'· ' + intent.get('section') if intent.get('section') else ''}，"
                 f"时间范围：{win_txt}，按主体名去重后共 {total} {kind_label}。"
+                f"{caveat}"
                 f"下列 {shown} 个是明细示例，不是全部。请直接回答 {total}，不要另算。")
     else:
         desc = f"结构化查询结果共 {total} 条，展示 {shown} 条。"
@@ -940,7 +931,7 @@ def run_structured(con, intent: dict, team_scope: str = "") -> dict:
     elif t == "bridge":
         ctxs, total = query_bridge(con, intent.get("seed") or "", intent.get("seed_b") or "", df, dt)
     elif t == "count":
-        ctxs, total = query_count(
+        ctxs, total, count_meta = query_count(
             con,
             intent.get("team") or "",
             df,
@@ -948,6 +939,7 @@ def run_structured(con, intent: dict, team_scope: str = "") -> dict:
             section=intent.get("section") or "",
             kind=intent.get("kind") or "any",
         )
+        intent = {**intent, **count_meta}
     else:
         return {"ok": False, "mode": "structured", "contexts": [], "total": 0,
                 "intent": intent, "message": "未知查询类型"}
@@ -973,6 +965,8 @@ def run_structured(con, intent: dict, team_scope: str = "") -> dict:
             "seed_b": intent.get("seed_b"),
             "section": intent.get("section"),
             "kind": intent.get("kind"),
+            "kind_label": intent.get("kind_label"),
+            "expanded": intent.get("expanded"),
             "window_days": intent.get("window_days"),
             "date_from": intent.get("date_from"),
             "date_to": intent.get("date_to"),

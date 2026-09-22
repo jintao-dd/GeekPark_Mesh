@@ -183,19 +183,19 @@ def test_query_count_people(count_db):
     """「接触了多少人」：事实表未区分个人，按主体计数。
     接触段 distinct 主体名 = 张三 + 李四 + ACME = 3（张三两条记录去重）；
     不含关注段的王五、也不含编辑部的赵六。"""
-    ctxs, total = qa_structured.query_count(
+    ctxs, total, _meta = qa_structured.query_count(
         count_db, "硅谷 BD 团队", None, None, section="接触", kind="person"
     )
     assert total == 3
-    assert "3" in ctxs[0]["内容"]
-    assert "未区分个人" in ctxs[0]["内容"]
-    names = [c["标题"] for c in ctxs[1:]]
+    assert "未区分个人" in _meta["caveat"]
+    assert _meta["kind_label"] == "个主体"
+    names = [c["标题"] for c in ctxs]
     assert set(names) == {"张三", "李四", "ACME"}
 
 
 def test_query_count_any_includes_company(count_db):
     """不限 kind 时同样是 3（person 不再过滤掉公司）。"""
-    _, total = qa_structured.query_count(
+    _, total, _meta = qa_structured.query_count(
         count_db, "硅谷 BD 团队", None, None, section="接触", kind="any"
     )
     assert total == 3
@@ -203,14 +203,14 @@ def test_query_count_any_includes_company(count_db):
 
 def test_query_count_no_section_counts_all(count_db):
     """section 为空时不按 section 过滤（避免「接触了多少人」漏算）。"""
-    _, total = qa_structured.query_count(
+    _, total, _meta = qa_structured.query_count(
         count_db, "硅谷 BD 团队", None, None, section="", kind="person"
     )
     assert total == 4  # 张三 + 李四 + ACME + 关注段王五
 
 
 def test_query_count_company_only(count_db):
-    _, total = qa_structured.query_count(
+    _, total, _meta = qa_structured.query_count(
         count_db, "硅谷 BD 团队", None, None, section="接触", kind="company"
     )
     assert total == 1
@@ -218,14 +218,14 @@ def test_query_count_company_only(count_db):
 
 def test_query_count_date_window_excludes_old(count_db):
     """窗口从 2026-08-01 起：张三 07-01 那条被排除，但 08-17 那条仍在 → 仍算 1 人。"""
-    _, total = qa_structured.query_count(
+    _, total, _meta = qa_structured.query_count(
         count_db, "硅谷 BD 团队", "2026-08-01", None, section="接触", kind="person"
     )
     assert total == 3
 
 
 def test_query_count_no_team_returns_empty(count_db):
-    assert qa_structured.query_count(count_db, "", None, None) == ([], 0)
+    assert qa_structured.query_count(count_db, "", None, None)[:2] == ([], 0)
 
 
 def test_query_count_composite_name_not_inflated(count_db):
@@ -238,11 +238,11 @@ def test_query_count_composite_name_not_inflated(count_db):
          "company", "", "", "T1"),
     )
     count_db.commit()
-    ctxs, total = qa_structured.query_count(
+    ctxs, total, _meta = qa_structured.query_count(
         count_db, "硅谷 BD 团队", None, None, section="接触", kind="company"
     )
     assert total == 2  # ACME + 「阿尔法 / 贝塔」这一格
-    assert "拆开计为" in ctxs[0]["内容"]
+    assert "拆开计为" in _meta["caveat"]
 
 
 def test_run_structured_count(count_db):
