@@ -128,4 +128,6 @@ def test_needs_cross():
     assert ask_context.needs_cross("编辑部本周接触了谁", one) is False
     assert ask_context.needs_cross("两边同时跟进了谁", two) is True
     assert ask_context.needs_cross("随便问问", two) is False
-    assert ask_context.needs_cross("交集", two, mode="structured") is True
+    # 结构化：SQL 已聚合，禁止再交叉抽干
+    assert ask_context.needs_cross("交集", two, mode="structured") is False
+    assert ask_context.needs_cross("各团队分别知道什么", two, mode="structured") is False

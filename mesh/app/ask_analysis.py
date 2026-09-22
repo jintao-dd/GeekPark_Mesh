@@ -200,36 +200,68 @@ def _analyze_one_source(q: str, group: dict) -> dict:
     }
 
 
-def _reports_from_structured_contexts(contexts: list[dict]) -> list[dict]:
+def _structured_fact_text(title: str, body: str) -> str:
+    """结构化物化：保留正文，禁止只留标题导致成文空心。"""
+    title = (title or "").strip()
+    body = (body or "").strip()
+    if title and body:
+        if body.startswith(title) or title in body[: max(40, len(title) + 8)]:
+            return body
+        return f"{title}：{body}"
+    return title or body
+
+
+def _reports_from_structured_contexts(
+    contexts: list[dict],
+    *,
+    intent: dict | None = None,
+) -> list[dict]:
+    """把结构化 contexts 收成 source_reports。
+
+    by_team：按团队聚合（多期合并到同一团队桶），避免同队两期被当成「多源交叉」。
+    其它类型：仍按 (团队, 期号) 分桶，便于出处；交叉由上层跳过。
+    """
+    intent = intent if isinstance(intent, dict) else {}
+    intent_type = str(intent.get("type") or "").strip()
+    by_team = intent_type == "by_team"
+
     buckets: dict[tuple[str, str], list[dict]] = defaultdict(list)
     for ctx in contexts or []:
         if not isinstance(ctx, dict) or _is_meta_ctx(ctx):
             continue
         team = (ctx.get("归属团队") or ctx.get("团队") or "未标注来源").strip()
         issue = (ctx.get("期号") or "未知期").strip()
-        buckets[(team, issue)].append(ctx)
+        key = (team, "" if by_team else issue)
+        buckets[key].append(ctx)
+
     reports = []
-    for i, ((team, issue), items) in enumerate(list(buckets.items())[:_MAX_GROUPS]):
+    for i, ((team, issue_key), items) in enumerate(list(buckets.items())[:_MAX_GROUPS]):
         gid = f"g{i+1}"
         facts, entities, evidence = [], [], []
+        issues_seen: list[str] = []
         for j, it in enumerate(items[:_MAX_PER_GROUP], 1):
             title = (it.get("标题") or "").strip()
             body = (it.get("内容") or "").strip()
-            text = title or body[:80]
+            iss = (it.get("期号") or "").strip()
+            if iss and iss not in issues_seen:
+                issues_seen.append(iss)
+            text = _structured_fact_text(title, body)
             if text:
                 facts.append({"text": text, "evidence_refs": [f"e{j}"]})
             if title:
                 entities.append(title.split("·")[0].strip() or title)
-            if body:
+            if body or title:
                 evidence.append({
-                    "ref": f"e{j}", "quote": body[:160],
+                    "ref": f"e{j}",
+                    "quote": (body or title)[:240],
                     "item_id": it.get("条目ID") or it.get("item_id"),
                     "chunk_id": it.get("chunk_id") or it.get("chunkId"),
                 })
+        issue_label = "、".join(issues_seen[:4]) if by_team and issues_seen else (issue_key or "未知期")
         reports.append({
             "group_id": gid,
             "source": team,
-            "issue": issue,
+            "issue": issue_label,
             "n_evidence": len(items),
             "facts": facts,
             "entities": entities[:20],
@@ -237,8 +269,58 @@ def _reports_from_structured_contexts(contexts: list[dict]) -> list[dict]:
             "evidence": evidence,
             "items": items[:_MAX_PER_GROUP],
             "_from_structured": True,
+            "_intent_type": intent_type,
         })
     return reports
+
+
+def _structured_passthrough_cross(source_reports: list[dict], intent: dict | None = None) -> dict:
+    """结构化：不做印证叙事，逐条事实直通成文。"""
+    intent = intent if isinstance(intent, dict) else {}
+    intent_type = str(intent.get("type") or "").strip()
+    claims = []
+    entities: list[str] = []
+    for r in source_reports or []:
+        if not isinstance(r, dict):
+            continue
+        gid = r.get("group_id")
+        for f in r.get("facts") or []:
+            if not isinstance(f, dict):
+                continue
+            text = (f.get("text") or "").strip()
+            if not text:
+                continue
+            claims.append({
+                "text": text,
+                "support": [gid] if gid else [],
+                "kind": "single",
+                "evidence_refs": list(f.get("evidence_refs") or []),
+            })
+        for e in r.get("entities") or []:
+            s = str(e).strip()
+            if s and s not in entities:
+                entities.append(s)
+    teams = [str(r.get("source") or "").strip() for r in (source_reports or []) if isinstance(r, dict)]
+    teams = [t for t in teams if t]
+    summary_bits = []
+    if intent_type == "by_team":
+        summary_bits.append(
+            f"按团队投影：已有记录的团队={('、'.join(teams) if teams else '无')}。"
+            "成文须按团队分块写清要点；未出现的团队写「已上线周报无记录」，禁止因只有一队有料就宣称整题无法回答。"
+        )
+    elif intent_type in ("diff", "intersect", "overseas_gap", "cooccur", "bridge", "count"):
+        summary_bits.append(f"结构化类型={intent_type}：按查询结果列表如实陈述，禁止改写成「多源印证/提及实体」。")
+    else:
+        summary_bits.append("结构化结果直通：逐条陈述事实要点，禁止空心「提及/印证」话术。")
+    return {
+        "summary": " ".join(summary_bits),
+        "same_entities": entities[:30],
+        "claims": claims,
+        "conflicts": [],
+        "corroborations": [],
+        "changes": [],
+        "_structured_passthrough": True,
+    }
 
 
 def _heuristic_cross(q: str, source_reports: list[dict]) -> dict:
@@ -490,11 +572,53 @@ def _scrub_user_answer(text: str) -> str:
     return t.strip()
 
 
+def _structured_compose_contract(intent: dict | None) -> str:
+    """由 planner 的 intent.type 驱动成文契约（禁止对用户问句做正则特判）。"""
+    intent = intent if isinstance(intent, dict) else {}
+    t = str(intent.get("type") or "").strip()
+    topic = str(intent.get("topic") or intent.get("seed") or "").strip()
+    lines = [
+        "【结构化投影模式】下列要点已由事实表算出，你的任务是按用户问题如实写成通顺中文，禁止编造。",
+        "禁止空心话术：不要只写「提及了某实体」「多源印证」「互相印证」「有记录」而不写具体要点。",
+        "须写入要点中的具体信息（人/公司/动作/产品/判断）；没有的团队或集合侧明确说「已上线周报无记录」。",
+    ]
+    if t == "by_team":
+        lines.append(
+            f"查询类型=按团队聚合"
+            + (f"（主题「{topic}」）" if topic else "")
+            + "：必须按团队分块；有记录的团队写清知道什么；未出现的团队写无记录。"
+            "禁止因为只有一个团队有材料就说「无法回答各团队分别知道什么」。"
+        )
+    elif t == "diff":
+        lines.append(
+            f"查询类型=差集：只陈述 A「{intent.get('team_a') or ''}」有、B「{intent.get('team_b') or ''}」无的主体及要点；点明时间窗口径。"
+        )
+    elif t == "intersect":
+        lines.append(
+            f"查询类型=交集：只陈述同时出现在「{intent.get('team_a') or ''}」与「{intent.get('team_b') or ''}」的主体及要点。"
+        )
+    elif t == "overseas_gap":
+        lines.append("查询类型=海外缺口：列出海外有接触、国内团队窗口内无跟进的主体及要点。")
+    elif t == "count":
+        lines.append("查询类型=计数：回答以数字与口径说明为主，可附代表主体，勿改写成无关叙事。")
+    elif t == "cooccur":
+        lines.append(
+            f"查询类型=共现：列出与种子「{intent.get('seed') or topic}」同条共现的主体，按关联强弱陈述。"
+        )
+    elif t == "bridge":
+        lines.append("查询类型=桥接：陈述两主体之间的中间连接与要点。")
+    elif t:
+        lines.append(f"查询类型={t}：按结果列表忠实陈述。")
+    return "\n".join(lines)
+
+
 def _verify_and_compose(
     q: str,
     cross: dict,
     source_reports: list[dict],
     contexts: list[dict],
+    *,
+    structured_intent: dict | None = None,
 ) -> tuple[str, dict]:
     claims_in = cross.get("claims") if isinstance(cross.get("claims"), list) else []
     if not claims_in:
@@ -505,6 +629,7 @@ def _verify_and_compose(
                         "text": f["text"],
                         "support": [r.get("group_id")],
                         "kind": "single",
+                        "evidence_refs": list(f.get("evidence_refs") or []),
                     })
 
     verified_claims, downgraded, rejected = [], [], []
@@ -553,16 +678,43 @@ def _verify_and_compose(
         "时间锚定：禁止把要点里的「本周/明天/昨天」写成相对今天；须改写为期号或绝对日期。"
         "用户问「最近」时，若材料来自较早期号，开头点明依据哪一期，勿写成仿佛正在发生。"
     )
+    if structured_intent:
+        system = system + "\n" + _structured_compose_contract(structured_intent)
+
     points = []
-    for c in verified_claims + downgraded[:3]:
+    for c in verified_claims + downgraded[:8]:
         if isinstance(c, dict) and c.get("text"):
             points.append({"text": c["text"]})
+    # 结构化：额外带上证据摘录，防止成文只剩短标题
+    if structured_intent:
+        for r in source_reports or []:
+            if not isinstance(r, dict):
+                continue
+            team = r.get("source") or ""
+            issue = r.get("issue") or ""
+            for ev in (r.get("evidence") or [])[:8]:
+                if not isinstance(ev, dict):
+                    continue
+                quote = (ev.get("quote") or "").strip()
+                if quote and len(quote) > 12:
+                    points.append({"text": f"[{team}·{issue}] {quote}"})
+    # 去重保序
+    seen_pt: set[str] = set()
+    uniq_points = []
+    for p in points:
+        t = str(p.get("text") or "").strip()
+        if not t or t in seen_pt:
+            continue
+        seen_pt.add(t)
+        uniq_points.append({"text": t})
+    points = uniq_points[:40]
+
     today = datetime.date.today().isoformat()
     user = (
         f"问题：{q}\n"
         f"今天：{today}\n\n"
-        f"可用要点：\n{json.dumps(points, ensure_ascii=False)[:3500]}\n\n"
-        f"补充说明：{(cross.get('summary') or '')[:400]}\n"
+        f"可用要点：\n{json.dumps(points, ensure_ascii=False)[:5500]}\n\n"
+        f"补充说明：{(cross.get('summary') or '')[:500]}\n"
         f"来源行：{src_line}\n"
     )
 
@@ -681,10 +833,13 @@ def run_analysis(
         n_context=len(contexts),
     )
 
-    # 结构化查询：跳过 LLM 分源，直接物化
+    # 结构化查询：跳过 LLM 分源，直接物化；禁止再跑 hybrid 交叉抽干
     structured = (prepared.get("mode") or "") == "structured"
+    structured_intent = prepared.get("query") if isinstance(prepared.get("query"), dict) else None
     if structured:
-        source_reports = _reports_from_structured_contexts(contexts)
+        source_reports = _reports_from_structured_contexts(
+            contexts, intent=structured_intent,
+        )
         groups = [
             {
                 "group_id": r["group_id"],
@@ -846,6 +1001,15 @@ def run_analysis(
             changes=cross.get("changes") or [],
             claims_n=len(cross.get("claims") or []),
         )
+    elif structured:
+        cross = _structured_passthrough_cross(source_reports, structured_intent)
+        usage["cross"] = False
+        yield ask_protocol.step_event(
+            "cross", "skipped",
+            analysis_id=analysis_id,
+            message="结构化直通（跳过交叉）",
+            claims_n=len(cross.get("claims") or []),
+        )
     else:
         cross = _heuristic_cross(q, source_reports)
         yield ask_protocol.step_event(
@@ -858,7 +1022,10 @@ def run_analysis(
     yield ask_protocol.step_event(
         "verify", "running", analysis_id=analysis_id, message="校验中",
     )
-    ans, vstats = _verify_and_compose(q, cross, source_reports, contexts)
+    ans, vstats = _verify_and_compose(
+        q, cross, source_reports, contexts,
+        structured_intent=structured_intent if structured else None,
+    )
     usage["llm_calls"] += 1
     yield ask_protocol.step_event(
         "verify", "completed",

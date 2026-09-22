@@ -55,3 +55,45 @@ def test_structured_reports_no_llm():
     assert len(reports) == 2
     names = {r["source"] for r in reports}
     assert "编辑部" in names and "商业化团队" in names
+
+
+def test_structured_fact_keeps_body():
+    ctxs = [
+        {
+            "期号": "2026-8-17", "团队": "编辑部", "标题": "飞声助听器",
+            "内容": "团队 编辑部 · 彭守昆 · 把10MB模型压到300KB · 日本ODM已交付一万多套",
+        },
+    ]
+    reports = ask_analysis._reports_from_structured_contexts(
+        ctxs, intent={"type": "by_team", "topic": "AI 助听器"},
+    )
+    assert len(reports) == 1
+    fact = reports[0]["facts"][0]["text"]
+    assert "300KB" in fact or "一万" in fact
+    assert "飞声" in fact
+
+
+def test_structured_by_team_merges_issues():
+    ctxs = [
+        {"期号": "2026-8-17", "团队": "编辑部", "标题": "飞声助听器", "内容": "一期沟通要点很多字"},
+        {"期号": "2026-08-21", "团队": "编辑部", "标题": "AI 助听器", "内容": "二期端侧模型很多字"},
+    ]
+    reports = ask_analysis._reports_from_structured_contexts(
+        ctxs, intent={"type": "by_team", "topic": "AI 助听器"},
+    )
+    assert len(reports) == 1
+    assert reports[0]["source"] == "编辑部"
+    assert len(reports[0]["facts"]) == 2
+    cross = ask_analysis._structured_passthrough_cross(
+        reports, {"type": "by_team", "topic": "AI 助听器"},
+    )
+    assert cross.get("_structured_passthrough")
+    texts = " ".join(c["text"] for c in cross["claims"])
+    assert "一期沟通" in texts and "端侧模型" in texts
+    assert "在多个来源中均有记录" not in texts
+
+
+def test_structured_compose_contract_by_team():
+    block = ask_analysis._structured_compose_contract({"type": "by_team", "topic": "AI 助听器"})
+    assert "按团队" in block
+    assert "无法回答" in block or "无记录" in block

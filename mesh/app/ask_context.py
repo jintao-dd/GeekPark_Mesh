@@ -240,11 +240,16 @@ def route(
 
 
 def needs_cross(q: str, source_reports: list[dict] | None, *, mode: str = "") -> bool:
+    """是否跑多源交叉。
+
+    结构化路径：SQL 已完成差集/交集/按团队聚合，禁止再交叉成「多源印证」空话。
+    Hybrid：多源且问句需要对照时才交叉。
+    """
     reports = [r for r in (source_reports or []) if isinstance(r, dict)]
     if len(reports) <= 1:
         return False
     if (mode or "").startswith("structured"):
-        return True
+        return False
     cues = (
         "同时", "交叉", "对比", "交集", "差集", "共同", "两边", "两队", "两方",
         "冲突", "印证", "也都", "也是", "分别", "各自", "多源", "都在",

@@ -1,0 +1,15 @@
+---
+description: Ask/Agent 意图与成文禁止用正则特判用户话术；契约走 LLM planner / intent.type
+alwaysApply: true
+---
+
+# 禁止正则特判用户问句
+
+改 Ask / Agent / 结构化成文时：
+
+1. **不要**为某个热门问法（助听器、具身、面壁…）加 `re.search` / 关键词表特判分支。
+2. 意图分流以 **LLM planner → `intent.type`**（或已有 structured intent 字段）为准；成文契约按 `intent.type` 投影。
+3. 允许的正则仅限：通用清洗（去 Markdown/内部术语）、日期格式解析、与业务实体无关的结构分割。
+4. 若现有 hybrid `needs_cross` 等仍有提示词 cue 表，**只允许收紧或删除，禁止继续加词**；新场景用 intent/结构化路径解决。
+
+违反此条的 PR/改动应拒绝合并。
