@@ -241,7 +241,21 @@ def _startup():
                     n_chunk = con.execute("SELECT COUNT(*) c FROM chunk_index").fetchone()["c"]
                 except Exception:
                     n_chunk = 0
-                if n_pub and n_if and (not n_chunk or n_chunk < n_if):
+                # 切分方案升级：显式版本触发全量重建（数量判断察觉不到新增子块）
+                scheme_rebuilt = False
+                try:
+                    scheme_rebuilt = chunk_index.maybe_rebuild_for_scheme(con)
+                    if scheme_rebuilt:
+                        db.commit_retry(con)
+                        # 结构变了，旧向量对不上，全部置 pending 重跑
+                        for _r in con.execute("SELECT id FROM issues WHERE status='published'"):
+                            db.refresh_issue_embedding_status(con, _r["id"], status="pending")
+                        db.commit_retry(con)
+                        n_chunk = con.execute("SELECT COUNT(*) c FROM chunk_index").fetchone()["c"]
+                        _cache_bust()
+                except Exception as _e:
+                    print(f"[mesh] chunk scheme rebuild failed: {_e}", flush=True)
+                if not scheme_rebuilt and n_pub and n_if and (not n_chunk or n_chunk < n_if):
                     print("[mesh] backfilling chunk_index…", flush=True)
                     chunk_index.rebuild_all(con)
                     db.commit_retry(con)
@@ -2278,7 +2292,6 @@ def api_item_owner(request: Request, payload: dict):
     con.commit()
     con.close()
     return {"ok": True, "owner_team": owner}
-
 
 @app.get("/admin/source/{sid}", response_class=HTMLResponse)
 def source_view(request: Request, sid: int, err: str = ""):

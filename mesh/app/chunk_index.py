@@ -106,6 +106,12 @@ def _window_children(body: str, *, target: int, overlap: int) -> list[str]:
     return [c for c in children if c]
 
 
+# chunk 物化方案版本：切分策略变更后 +1，启动时若 DB 记录落后则强制 rebuild_all
+# （父块 chunk_id 不变，靠数量判断无法察觉「新增子块」，必须显式版本触发）
+CHUNK_SCHEME_VERSION = "2-small-to-big"
+_SCHEME_KEY = "chunk_scheme_version"
+
+
 def _cid(*parts: str) -> str:
     raw = "|".join(str(p) for p in parts)
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:20]
@@ -206,6 +212,21 @@ def rebuild_issue(con, issue_id: int, *, items: bool = True) -> int:
     )
     if row["status"] != "published":
         return 0
+    n_written = _materialize_issue_chunks(con, row, items=items)
+    # 清掉长父块的旧向量（small-to-big 下长父块不再 embed，靠子块覆盖；
+    # 残留旧向量会被 vector_search JOIN 出来，正是截断问题的复发点）
+    con.execute(
+        f"""DELETE FROM chunk_embeddings WHERE chunk_id IN (
+              SELECT chunk_id FROM chunk_index
+              WHERE issue_slug=? AND layer IN ('section','item') AND LENGTH(body) > ?
+            )""",
+        (slug, _child_target()),
+    )
+    return n_written
+
+
+def _materialize_issue_chunks(con, row, *, items: bool) -> int:
+    slug = row["slug"]
     n = 0
     for r in con.execute(
         "SELECT section, title, body, date_end FROM search_fts WHERE issue_slug=?", (slug,),
@@ -454,6 +475,29 @@ def expand_children_to_parents(con, hits: list[dict]) -> list[dict]:
         else:
             out.append(h)
     return out
+
+
+def maybe_rebuild_for_scheme(con) -> bool:
+    """切分方案升级后一次性重建全部已发布期的 chunk_index。
+
+    返回 True 表示本次触发了重建（调用方据此把相关期 embedding 置 pending 重跑）。
+    父块 chunk_id 不随方案变化，纯靠数量判断察觉不到「该切子块了」，故用显式版本。
+    """
+    from . import db as _db
+
+    try:
+        cur = _db.get_setting(con, _SCHEME_KEY, "")
+    except Exception:
+        cur = ""
+    if str(cur or "") == CHUNK_SCHEME_VERSION:
+        return False
+    n = rebuild_all(con)
+    try:
+        _db.set_setting(con, _SCHEME_KEY, CHUNK_SCHEME_VERSION)
+    except Exception:
+        pass
+    print(f"[mesh] chunk scheme upgraded → {CHUNK_SCHEME_VERSION}, rebuilt {n} chunks", flush=True)
+    return True
 
 
 def rebuild_all(con) -> int:

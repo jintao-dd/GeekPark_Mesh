@@ -129,6 +129,63 @@ def test_embed_missing_for_slug_only_target():
         con.close()
 
 
+def test_small_to_big_split_and_expand():
+    """长正文切子块检索、展开父块生成；长父块不计入 embed 总数。"""
+    con = db.connect()
+    db.migrate(con)
+    iid, slug = 88890, "test-s2b"
+    long_body = "一、背景\n" + ("这是一段足够长的正文内容。" * 40)
+    try:
+        con.execute(
+            "INSERT OR IGNORE INTO issues(id,slug,date_start,date_end,period_label,status,published_json) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (iid, slug, "2026-01-01", "2026-01-07", "测试", "published", "{}"),
+        )
+        con.execute("DELETE FROM chunk_index WHERE issue_slug=?", (slug,))
+        con.execute(
+            "INSERT INTO search_fts(issue_slug, section, title, body, date_end) VALUES (?,?,?,?,?)",
+            (slug, "可同步的关系", "长条目", long_body, "2026-01-07"),
+        )
+        con.commit()
+
+        chunk_index.rebuild_issue(con, iid, items=False)
+        con.commit()
+
+        rows = con.execute(
+            "SELECT chunk_id, layer, body, meta_json FROM chunk_index WHERE issue_slug=?",
+            (slug,),
+        ).fetchall()
+        layers = [r["layer"] for r in rows]
+        assert "section" in layers  # 父块
+        assert layers.count("child") >= 2  # 至少切出 2 个子块
+
+        # 长父块不计入 embed 总数（由子块覆盖）
+        with mock.patch("app.embeddings.model_name", return_value="test-model"):
+            total, done = chunk_index.embedding_counts_for_slug(con, slug)
+        n_children = layers.count("child")
+        assert total == n_children  # 只数子块，不数长父块
+
+        # 命中子块 → 展开父块完整正文
+        child = next(r for r in rows if r["layer"] == "child")
+        import json as _json
+        meta = _json.loads(child["meta_json"] or "{}")
+        hit = {
+            "chunk_id": child["chunk_id"], "layer": "child",
+            "body": child["body"], "meta": meta, "source": "vector", "score": -0.9,
+        }
+        expanded = chunk_index.expand_children_to_parents(con, [hit])
+        assert len(expanded) == 1
+        assert len(expanded[0]["body"]) > len(child["body"])  # 父块比子块长
+        assert expanded[0]["body"] == long_body
+    finally:
+        con.execute("DELETE FROM chunk_embeddings")
+        con.execute("DELETE FROM chunk_index WHERE issue_slug=?", (slug,))
+        con.execute("DELETE FROM search_fts WHERE issue_slug=?", (slug,))
+        con.execute("DELETE FROM issues WHERE id=?", (iid,))
+        con.commit()
+        con.close()
+
+
 def test_ensure_for_slug_idempotent():
     con = db.connect()
     db.migrate(con)
