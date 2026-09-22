@@ -21,10 +21,26 @@
 |----|------|
 | 事实层 | `answer_status` · `evidence_count` / `evidence_refs` · `claim_bindings` · `tools_called` · `error` |
 | 对话层 | `question` · `answer_text`（display_text）· `intent` · `route` · `latency_ms` |
-| 定位 | `request_id` · `channel` · `feishu_open_id` · `session_id` · `chat_id` · `trace_json`（精简） |
+| 定位 | `request_id` · `source` · `channel` · `feishu_open_id` · `session_id` · `chat_id` · `trace_json`（精简） |
 | 人工 | `feedback`（good/bad）· `feedback_note` · `feedback_by` · `feedback_at` |
 
 落表 `agent_qa_log`。写入失败**绝不影响回复**（全 try/except，仅记日志）。
+
+## 来源隔离（防自污染）★
+
+**评测脚本一律走 `app.agent.harness.run_harness`**（`run_djt_full_smoke` / `run_temporal_baseline` /
+`run_agent_llm_e2e` / `/api/agent/v1/message` 压测…）。若不隔离，在 tmesh/prod 容器里跑评测
+会把**测试问句当成真实流量**写进质量表，样本库立刻失去可信度。
+
+| source | 何时落库 |
+|--------|----------|
+| `feishu` | **默认落库**（`feishu_dm` / `feishu_group` 真实流量） |
+| `eval` | **默认不落**；`MESH_QA_LOG_EVAL=1` 才落（`channel=harness`） |
+| `http` | **默认不落**；`MESH_QA_LOG_EVAL=1` 才落（`channel=web` 等） |
+
+- 全局关：`MESH_QA_LOG=0`。
+- `/admin/qa` 默认 `source=feishu`，评测样本需显式切来源才看得到。
+- 概览里的「全表来源分布」不受筛选影响，便于一眼确认有没有评测混入。
 
 ## 自动 flag（只排优先级，不替代人判断）
 
@@ -56,4 +72,5 @@
 
 - 只读 + 人工标注；**不触发** Preview / Ask / Embed / Publish。
 - 不存原始 payload，只存精简 trace。
+- **评测/HTTP 默认不落真实样本库**（见上「来源隔离」）；生产评测仍遵守 `PROD_DATA_POLICY.md` 只读约束。
 - 多实例 Session 仍是放量门槛（见 `PROJECT_STATUS.md`）；本页不受其影响。

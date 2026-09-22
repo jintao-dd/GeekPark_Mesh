@@ -8,9 +8,15 @@
 这是排查「答错 / 无证据乱答」的可复现样本库；只读记录，不改答案。
 </p>
 
-<h2>近 {{ stats.days }} 天概览</h2>
+<h2>近 {{ stats.days }} 天概览{% if stats.source %}（来源：{{ stats.source }}）{% endif %}</h2>
 <div class="box">
   <div style="font-size:15px;margin-bottom:8px">共 <b>{{ stats.total }}</b> 轮</div>
+  {% if stats.by_source %}
+  <div class="muted" style="margin-bottom:8px;font-size:12.5px">
+    全表来源分布（不受筛选影响）：
+    {% for k, v in stats.by_source.items() %}<code>{{ k }}</code> {{ v }}{% if not loop.last %} · {% endif %}{% endfor %}
+  </div>
+  {% endif %}
   <table style="max-width:720px">
     <tr><th>answer_status</th><th>轮数</th><th>渠道</th><th>轮数</th></tr>
     {% set statuses = stats.by_status.items()|list %}
@@ -29,6 +35,12 @@
 <h2>问答记录</h2>
 <form method="get" action="/admin/qa" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0 16px">
   <input type="text" name="q" value="{{ filters.q }}" placeholder="搜问题或答案" style="max-width:260px">
+  <select name="source" style="max-width:150px">
+    <option value="feishu"{% if filters.source == 'feishu' %} selected{% endif %}>真实飞书</option>
+    <option value=""{% if filters.source == '' %} selected{% endif %}>全部来源</option>
+    <option value="eval"{% if filters.source == 'eval' %} selected{% endif %}>评测</option>
+    <option value="http"{% if filters.source == 'http' %} selected{% endif %}>HTTP</option>
+  </select>
   <select name="channel" style="max-width:150px">
     <option value="">全部渠道</option>
     {% for c in ['feishu_dm','feishu_group','harness','web'] %}
@@ -52,7 +64,7 @@
 <div class="box" id="turn-{{ t.id }}">
   <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline">
     <div style="font-size:13px" class="muted">
-      #{{ t.id }} · {{ t.created_at }} · <code>{{ t.channel or '—' }}</code>
+      #{{ t.id }} · {{ t.created_at }} · <code>{{ t.source or '—' }}</code> / <code>{{ t.channel or '—' }}</code>
       {% if t.feishu_open_id %} · {{ t.feishu_open_id[:18] }}{% endif %}
       {% if t.latency_ms %} · {{ t.latency_ms }}ms{% endif %}
     </div>
@@ -103,8 +115,8 @@
 
 {% if total > limit %}
 <div style="display:flex;gap:8px;margin-top:16px">
-  {% if offset > 0 %}<a class="btn" href="/admin/qa?offset={{ [offset - limit, 0]|max }}&limit={{ limit }}&q={{ filters.q }}&channel={{ filters.channel }}&status={{ filters.status }}{% if filters.only_bad %}&only_bad=1{% endif %}">上一页</a>{% endif %}
-  {% if offset + turns|length < total %}<a class="btn" href="/admin/qa?offset={{ offset + limit }}&limit={{ limit }}&q={{ filters.q }}&channel={{ filters.channel }}&status={{ filters.status }}{% if filters.only_bad %}&only_bad=1{% endif %}">下一页</a>{% endif %}
+  {% if offset > 0 %}<a class="btn" href="/admin/qa?offset={{ [offset - limit, 0]|max }}&limit={{ limit }}&q={{ filters.q }}&source={{ filters.source }}&channel={{ filters.channel }}&status={{ filters.status }}{% if filters.only_bad %}&only_bad=1{% endif %}">上一页</a>{% endif %}
+  {% if offset + turns|length < total %}<a class="btn" href="/admin/qa?offset={{ offset + limit }}&limit={{ limit }}&q={{ filters.q }}&source={{ filters.source }}&channel={{ filters.channel }}&status={{ filters.status }}{% if filters.only_bad %}&only_bad=1{% endif %}">下一页</a>{% endif %}
 </div>
 {% endif %}
 </div>

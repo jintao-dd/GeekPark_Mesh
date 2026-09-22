@@ -1,6 +1,7 @@
-"""飞书/Agent 回答质量采集：落库、flag 派生、筛选、人工标注。
+"""飞书/Agent 回答质量采集：落库、flag 派生、筛选、人工标注、来源隔离。
 
-覆盖：证据与 answer_status 落库、无证据标记、状态筛选、人工标差。
+覆盖：证据与 answer_status 落库、无证据标记、状态筛选、人工标差、
+以及**来源隔离**（真实飞书默认落库；评测/HTTP 默认不落，防自污染）。
 """
 from __future__ import annotations
 
@@ -8,9 +9,19 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app import db, qa_log
+
+
+@pytest.fixture(autouse=True)
+def _isolate_env(monkeypatch):
+    """默认清掉采集开关，避免外部环境串味。"""
+    monkeypatch.delenv("MESH_QA_LOG", raising=False)
+    monkeypatch.delenv("MESH_QA_LOG_EVAL", raising=False)
+    yield
 
 
 def _reset(con):
@@ -54,6 +65,7 @@ def test_record_and_read_back():
         assert t["evidence_refs"] == ["item:101"]
         assert t["claim_bindings"][0]["status"] == "grounded"
         assert t["channel"] == "feishu_dm"
+        assert t["source"] == "feishu"
         assert t["route"] == "ask"
         assert t["trace_json"]["n_hits"] == 3
         assert t["flag"] == ""
@@ -87,12 +99,12 @@ def test_unsupported_and_weak_flags():
         qa_log.ensure_schema(con)
         _reset(con)
         r1 = qa_log.record_answer(
-            con, envelope={"channel": "harness"},
+            con, envelope={"channel": "feishu_dm"},
             answer=_answer(claim_bindings=[{"claim": "x", "status": "unsupported"}]),
             question="q1",
         )
         r2 = qa_log.record_answer(
-            con, envelope={"channel": "harness"},
+            con, envelope={"channel": "feishu_dm"},
             answer=_answer(claim_bindings=[{"claim": "x", "status": "weak"}]),
             question="q2",
         )
@@ -142,8 +154,8 @@ def test_record_never_raises_on_bad_input():
     con = db.connect()
     try:
         qa_log.ensure_schema(con)
-        # answer 为怪类型也不应抛
-        assert qa_log.record_answer(con, envelope=None, answer={}, question="") is not None
+        # answer 为怪类型也不应抛（用真实飞书渠道，确保走到 INSERT）
+        assert qa_log.record_answer(con, envelope={"channel": "feishu_dm"}, answer={}, question="") is not None
         con.commit()
     finally:
         con.close()
@@ -160,5 +172,71 @@ def test_stats_shape():
         assert s["total"] >= 1
         assert "grounded" in s["by_status"]
         assert s["by_channel"].get("feishu_dm", 0) >= 1
+        assert s["by_source"].get("feishu", 0) >= 1
+    finally:
+        con.close()
+
+
+# ---------- 来源隔离（防自污染）----------
+
+
+def test_should_record_matrix(monkeypatch):
+    # 默认：真实飞书落库，评测/HTTP 不落
+    assert qa_log.should_record("feishu_dm") is True
+    assert qa_log.should_record("feishu_group") is True
+    assert qa_log.should_record("harness") is False
+    assert qa_log.should_record("web") is False
+    assert qa_log.should_record("") is False
+    # 显式开评测采集
+    monkeypatch.setenv("MESH_QA_LOG_EVAL", "1")
+    assert qa_log.should_record("harness") is True
+    assert qa_log.should_record("web") is True
+    # 全局关
+    monkeypatch.setenv("MESH_QA_LOG", "0")
+    assert qa_log.should_record("feishu_dm") is False
+    assert qa_log.should_record("harness") is False
+
+
+def test_eval_channel_not_recorded_by_default():
+    """核心：评测/HTTP 调用不得写进真实样本库。"""
+    con = db.connect()
+    try:
+        qa_log.ensure_schema(con)
+        _reset(con)
+        assert qa_log.record_answer(con, envelope={"channel": "harness"}, answer=_answer(), question="评测题") is None
+        assert qa_log.record_answer(con, envelope={"channel": "web"}, answer=_answer(), question="http 题") is None
+        con.commit()
+        assert qa_log.list_turns(con)["total"] == 0
+    finally:
+        con.close()
+
+
+def test_eval_recorded_when_enabled_and_tagged(monkeypatch):
+    monkeypatch.setenv("MESH_QA_LOG_EVAL", "1")
+    con = db.connect()
+    try:
+        qa_log.ensure_schema(con)
+        _reset(con)
+        rid = qa_log.record_answer(con, envelope={"channel": "harness"}, answer=_answer(), question="评测题")
+        con.commit()
+        t = qa_log.get_turn(con, rid)
+        assert t["source"] == "eval"
+        # 默认只看飞书时，评测样本不出现
+        assert qa_log.list_turns(con, source="feishu")["total"] == 0
+        assert qa_log.list_turns(con, source="eval")["total"] == 1
+    finally:
+        con.close()
+
+
+def test_feishu_tagged_as_feishu_source():
+    con = db.connect()
+    try:
+        qa_log.ensure_schema(con)
+        _reset(con)
+        rid = qa_log.record_answer(con, envelope={"channel": "feishu_group"}, answer=_answer(), question="真实题")
+        con.commit()
+        t = qa_log.get_turn(con, rid)
+        assert t["source"] == "feishu"
+        assert qa_log.list_turns(con, source="feishu")["total"] == 1
     finally:
         con.close()

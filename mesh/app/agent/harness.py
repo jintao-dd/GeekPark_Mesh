@@ -36,19 +36,20 @@ def run_harness(con, payload: dict[str, Any]) -> dict[str, Any]:
     env = envelope_from_payload(p)
     answer, latency_ms = timed_run(handle_message, con, env)
     d = answer.to_dict()
-    # 质量采集：HTTP harness 与飞书同一张表，便于统一回看
+    # 质量采集：只记真实飞书流量；harness/评测默认不落（防污染），需 MESH_QA_LOG_EVAL=1
     try:
         from .. import qa_log
 
-        qa_log.record_answer(
-            con,
-            envelope=p,
-            answer=d,
-            question=env.text,
-            latency_ms=latency_ms,
-            request_id=request_id,
-        )
-        con.commit()
+        if qa_log.should_record(env.channel):
+            qa_log.record_answer(
+                con,
+                envelope=p,
+                answer=d,
+                question=env.text,
+                latency_ms=latency_ms,
+                request_id=request_id,
+            )
+            con.commit()
     except Exception:
         pass
     # 透传检索命中到 observability（若 adapter 写入 trace）

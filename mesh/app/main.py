@@ -1460,12 +1460,16 @@ def admin_qa_log(
     request: Request,
     q: str = "",
     channel: str = "",
+    source: str = "feishu",
     status: str = "",
     only_bad: int = 0,
     limit: int = 50,
     offset: int = 0,
 ):
-    """AI 问答质量记录（只读 + 人工标注）。不触发 Preview/Ask/Embed/Publish。"""
+    """AI 问答质量记录（只读 + 人工标注）。不触发 Preview/Ask/Embed/Publish。
+
+    默认只看真实飞书样本（source=feishu）；评测/HTTP 需显式选 source 才能看到。
+    """
     auth.require(request, "editor")
     from . import qa_log
 
@@ -1475,13 +1479,14 @@ def admin_qa_log(
         page = qa_log.list_turns(
             con,
             channel=channel,
+            source=source,
             answer_status=status,
             only_bad=bool(only_bad),
             q=q,
             limit=max(1, min(int(limit or 50), 200)),
             offset=max(0, int(offset or 0)),
         )
-        stats = qa_log.stats(con, days=7)
+        stats = qa_log.stats(con, days=7, source=source)
     finally:
         con.close()
     return templates.TemplateResponse(
@@ -1497,6 +1502,7 @@ def admin_qa_log(
             filters={
                 "q": q,
                 "channel": channel,
+                "source": source,
                 "status": status,
                 "only_bad": bool(only_bad),
             },

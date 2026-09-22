@@ -9,12 +9,17 @@
 - 事实层：answer_status / evidence_count / evidence_refs / claim_bindings / tools
 - 对话层：question / answer_text / route / intent / latency（供人工判断「像不像同事」）
 
+**来源隔离（防自污染）：** 真实飞书流量默认落库；评测 / HTTP harness 默认**不落**，
+否则在 tmesh/prod 容器里跑评测会把测试问句当成真实样本写进质量表。
+开关：`MESH_QA_LOG=0` 全局关；`MESH_QA_LOG_EVAL=1` 允许评测/HTTP 也落库（打 `source=eval`）。
+
 不改大脑判定，只做记录。写入失败绝不影响回复。
 """
 from __future__ import annotations
 
 import json
 import logging
+import os
 from typing import Any
 
 _log = logging.getLogger("mesh.qa_log")
@@ -22,6 +27,55 @@ _log = logging.getLogger("mesh.qa_log")
 # 人工反馈取值
 FEEDBACK_OK = "good"
 FEEDBACK_BAD = "bad"
+
+# 采集来源（落库时打标，回看可筛）
+SOURCE_FEISHU = "feishu"  # 真实飞书私聊 / 群聊
+SOURCE_EVAL = "eval"  # 评测脚本 / 压测 / 本地 harness
+SOURCE_HTTP = "http"  # 外部 HTTP 调用
+
+# 真实飞书渠道：只有这些默认落库
+_FEISHU_CHANNELS = ("feishu_dm", "feishu_group")
+
+
+def _truthy(v: Any) -> bool:
+    return str(v or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _collect_enabled() -> bool:
+    """全局开关。默认开；显式设 0/false/no/off 才关。"""
+    return str(os.environ.get("MESH_QA_LOG") or "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+
+
+def _eval_collect_enabled() -> bool:
+    """评测/HTTP 是否也落库。默认关，避免污染真实样本。"""
+    return _truthy(os.environ.get("MESH_QA_LOG_EVAL"))
+
+
+def should_record(channel: str) -> bool:
+    """判定该渠道是否应落库。真实飞书默认落；其余需显式开。"""
+    if not _collect_enabled():
+        return False
+    ch = (channel or "").strip()
+    if ch in _FEISHU_CHANNELS:
+        return True
+    return _eval_collect_enabled()
+
+
+def source_of(channel: str) -> str:
+    ch = (channel or "").strip()
+    if ch in _FEISHU_CHANNELS:
+        return SOURCE_FEISHU
+    if ch == "harness":
+        return SOURCE_EVAL
+    if ch == "web":
+        return SOURCE_HTTP
+    return SOURCE_HTTP
+
 
 
 def ensure_schema(con) -> None:
@@ -32,6 +86,7 @@ def ensure_schema(con) -> None:
         f"""CREATE TABLE IF NOT EXISTS agent_qa_log(
           id {pk},
           request_id TEXT,
+          source TEXT,
           channel TEXT,
           feishu_open_id TEXT,
           mesh_user_id INTEGER,
@@ -58,6 +113,7 @@ def ensure_schema(con) -> None:
         )""",
         "CREATE INDEX IF NOT EXISTS idx_qa_log_created ON agent_qa_log(created_at)",
         "CREATE INDEX IF NOT EXISTS idx_qa_log_channel ON agent_qa_log(channel, created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_qa_log_source ON agent_qa_log(source, created_at)",
         "CREATE INDEX IF NOT EXISTS idx_qa_log_status ON agent_qa_log(answer_status, created_at)",
         "CREATE INDEX IF NOT EXISTS idx_qa_log_session ON agent_qa_log(session_id)",
         "CREATE INDEX IF NOT EXISTS idx_qa_log_open_id ON agent_qa_log(feishu_open_id)",
@@ -67,6 +123,18 @@ def ensure_schema(con) -> None:
             con.execute(ddl)
         except Exception as e:
             _log.warning("qa_log ddl failed: %s", e)
+    # 旧库补列：source
+    try:
+        cols = {r["name"] if hasattr(r, "keys") else r[1] for r in con.execute("PRAGMA table_info(agent_qa_log)")}
+        if "source" not in cols and not pg:
+            con.execute("ALTER TABLE agent_qa_log ADD COLUMN source TEXT")
+    except Exception:
+        pass
+    if pg:
+        try:
+            con.execute("ALTER TABLE agent_qa_log ADD COLUMN IF NOT EXISTS source TEXT")
+        except Exception:
+            pass
 
 
 def _json_dump(v: Any) -> str:
@@ -130,6 +198,10 @@ def record_answer(
     try:
         env = envelope or {}
         ans = answer or {}
+        channel = str(env.get("channel") or "")[:32]
+        # 来源隔离：评测/HTTP 默认不落库，避免污染真实样本
+        if not should_record(channel):
+            return None
         trace = ans.get("trace") if isinstance(ans.get("trace"), dict) else {}
         evidence_refs = list(ans.get("evidence_refs") or [])
         bindings = [
@@ -153,14 +225,15 @@ def record_answer(
         return insert_id(
             con,
             """INSERT INTO agent_qa_log(
-                 request_id, channel, feishu_open_id, mesh_user_id, session_id, chat_id,
+                 request_id, source, channel, feishu_open_id, mesh_user_id, session_id, chat_id,
                  question, answer_text, intent, route, tools_called,
                  answer_status, evidence_count, evidence_refs, claim_bindings,
                  latency_ms, refused, error, trace_json)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 (request_id or "")[:64],
-                str(env.get("channel") or "")[:32],
+                source_of(channel),
+                channel,
                 str(env.get("feishu_open_id") or env.get("open_id") or "")[:128],
                 env.get("mesh_user_id"),
                 str(env.get("session_id") or "")[:64],
@@ -232,6 +305,7 @@ def list_turns(
     con,
     *,
     channel: str = "",
+    source: str = "",
     answer_status: str = "",
     flag: str = "",
     only_bad: bool = False,
@@ -245,6 +319,9 @@ def list_turns(
     if channel:
         where.append("channel = ?")
         params.append(channel)
+    if source:
+        where.append("source = ?")
+        params.append(source)
     if answer_status:
         where.append("answer_status = ?")
         params.append(answer_status)
@@ -274,32 +351,43 @@ def get_turn(con, turn_id: int) -> dict[str, Any] | None:
     return _row_to_turn(row) if row else None
 
 
-def stats(con, *, days: int = 7) -> dict[str, Any]:
-    """近 N 天质量概览：状态分布 / 渠道分布 / 反馈。"""
+def stats(con, *, days: int = 7, source: str = SOURCE_FEISHU) -> dict[str, Any]:
+    """近 N 天质量概览：状态分布 / 渠道分布 / 反馈。默认只看真实飞书样本。"""
     window = f"-{int(days)} days"
     by_status: dict[str, int] = {}
     by_channel: dict[str, int] = {}
+    by_source: dict[str, int] = {}
+    src_clause = " AND source = ?" if source else ""
+    src_params: list[Any] = [source] if source else []
     try:
         for r in con.execute(
             "SELECT answer_status, COUNT(*) c FROM agent_qa_log "
-            "WHERE created_at >= datetime('now', ?) GROUP BY answer_status",
-            (window,),
+            "WHERE created_at >= datetime('now', ?)" + src_clause + " GROUP BY answer_status",
+            (window, *src_params),
         ):
             by_status[str(r["answer_status"] or "unknown")] = int(r["c"] or 0)
         for r in con.execute(
             "SELECT channel, COUNT(*) c FROM agent_qa_log "
-            "WHERE created_at >= datetime('now', ?) GROUP BY channel",
-            (window,),
+            "WHERE created_at >= datetime('now', ?)" + src_clause + " GROUP BY channel",
+            (window, *src_params),
         ):
             by_channel[str(r["channel"] or "unknown")] = int(r["c"] or 0)
+        for r in con.execute(
+            "SELECT source, COUNT(*) c FROM agent_qa_log "
+            "WHERE created_at >= datetime('now', ?) GROUP BY source",
+            (window,),
+        ):
+            by_source[str(r["source"] or "unknown")] = int(r["c"] or 0)
     except Exception as e:
         _log.warning("qa_log stats failed: %s", e)
     total = sum(by_status.values())
     return {
         "days": days,
+        "source": source,
         "total": total,
         "by_status": by_status,
         "by_channel": by_channel,
+        "by_source": by_source,
     }
 
 
