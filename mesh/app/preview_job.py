@@ -14,6 +14,7 @@ Cards：默认串行；MESH_PREVIEW_CARD_CONCURRENCY>1 时受控并行生成，
 from __future__ import annotations
 import datetime
 import json
+import logging
 import os
 import time
 import traceback
@@ -22,6 +23,8 @@ from typing import Any
 
 from . import ask_concurrency, db, llm, merge, job_store
 from . import preview_progressive as prog
+
+_log = logging.getLogger("mesh.preview_job")
 
 KIND = "preview"
 
@@ -41,6 +44,48 @@ def _force_card_rebuild() -> bool:
         "true",
         "yes",
     )
+
+
+def _crm_ingest_ready(slug: str) -> bool:
+    """本期是否已具备进预览的条件（有 items、无未挖掘来源、无待确认拆段）。
+
+    与 _run 里的闸门同一口径；不满足时跳过 CRM 接入，避免给过不了闸门的期写脏数据。
+    """
+    con = db.connect()
+    try:
+        r = con.execute("SELECT id FROM issues WHERE slug=?", (slug,)).fetchone()
+        if not r:
+            return False
+        issue_id = r["id"]
+        if not con.execute(
+            "SELECT COUNT(*) c FROM items WHERE issue_id=?", (issue_id,)
+        ).fetchone()["c"]:
+            return False
+        if con.execute(
+            "SELECT COUNT(*) c FROM sources WHERE issue_id=? AND length(COALESCE(text,''))>0 AND extracted=0",
+            (issue_id,),
+        ).fetchone()["c"]:
+            return False
+        from .ingest import is_aggregation_source
+
+        for row in con.execute(
+            "SELECT stype, team, channel, meta FROM sources WHERE issue_id=?", (issue_id,)
+        ):
+            if not is_aggregation_source(
+                stype=row["stype"] or "", team=row["team"] or "", channel=row["channel"] or "",
+            ):
+                continue
+            try:
+                m = json.loads(row["meta"] or "{}")
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if (m.get("split") or {}).get("needs_review"):
+                return False
+        return True
+    except Exception:
+        return False
+    finally:
+        con.close()
 
 
 def _defaults(slug: str) -> dict:
@@ -154,6 +199,28 @@ def _run(slug: str, username: str, token: int = 0) -> None:
     try:
         if not _is_current(slug, token):
             return
+
+        # 生成预览前：拉 Notion CRM 增量，作为 T3「硅谷 BD 团队创业者数据库」接入。
+        # 在写锁外执行（含 Notion/LLM 网络）；失败只记日志，不阻断预览。
+        # 仅在「本期已可进预览」时才接入，避免给过不了闸门的期写脏数据。
+        if _crm_ingest_ready(slug):
+            try:
+                from . import crm_ingest
+
+                crm_out = crm_ingest.maybe_ingest_for_issue(slug)
+                if crm_out.get("ingested"):
+                    _set(
+                        slug,
+                        message=(
+                            f"已接入 CRM 增量（{crm_out.get('items') or 0} 条 · "
+                            f"人 {((crm_out.get('counts') or {}).get('people') or 0)}/"
+                            f"公司 {((crm_out.get('counts') or {}).get('companies') or 0)}/"
+                            f"接触 {((crm_out.get('counts') or {}).get('interactions') or 0)}/"
+                            f"判断 {((crm_out.get('counts') or {}).get('takes') or 0)}）"
+                        ),
+                    )
+            except Exception as e:  # 兜底：任何异常都不应阻断预览
+                _log.warning("crm ingest skipped slug=%s: %s", slug, e)
 
         with db.write_lock():
             con = db.connect()
