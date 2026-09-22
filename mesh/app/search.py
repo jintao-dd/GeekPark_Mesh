@@ -10,6 +10,7 @@ from . import qa_structured
 _DEDUP_WS = re.compile(r"\s+")
 
 _SECTION_WEIGHT = {
+    "本期概览": 5,
     "接触过的人和公司": 3,
     "关注了什么": 3,
     "抽取条目": 2,

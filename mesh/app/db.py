@@ -1008,6 +1008,32 @@ def reindex_all_entity_facts(con) -> int:
     return len(ids)
 
 
+def _add_issue_digest(add, data: dict) -> None:
+    """把「导语 + KPI + 期次引导问句」写成一条「本期概览」事实。
+
+    这样「最新一期讲了什么 / 本期概览 / 这期周报主要内容」能直接命中一条完整摘要，
+    而不是只捞到零散条目标题。空导语且无 KPI 时不写，避免制造空壳。
+    """
+    lead = str(data.get("lead") or "").strip()
+    kpis = data.get("kpis") or []
+    kpi_txt = "；".join(
+        f"{k.get('n')} {k.get('label')}" for k in kpis
+        if isinstance(k, dict) and (k.get("label") or k.get("n"))
+    )
+    if not lead and not kpi_txt:
+        return
+    slug = str(data.get("slug") or "").strip()
+    label = str(data.get("period_label") or slug).strip()
+    guide = f"本期周报讲了什么？{label} 一期的主要内容与概览。"
+    body = " ".join(filter(None, [
+        f"【{label}】" if label else "",
+        guide,
+        lead,
+        f"本期规模：{kpi_txt}。" if kpi_txt else "",
+    ]))
+    add("本期概览", f"{label} 本期概览" if label else "本期概览", body[:2000])
+
+
 def reindex_issue(con, issue_id: int, *, items: bool = True, rebuild_chunks: bool = True):
     """仅已上线期进入搜索语料；草稿/未上线先清索引，避免问答/搜索泄露。
     items=False 时只重建 published_json 层（FTS/entity），不写 live items 到 item_facts。
@@ -1056,6 +1082,9 @@ def reindex_issue(con, issue_id: int, *, items: bool = True, rebuild_chunks: boo
                 add(sec_name, it.get("name"), " ".join([it.get("sub",""), it.get("cert",""), g.get("title","")] + [f"{x.get('k')} {x.get('v')}" for x in it.get("rows", [])]))
     for v in data.get("views", []): add("沟通中提到的看法", v.get("topic"), (v.get("text","") + " " + v.get("source","")))
     for g in data.get("gaps", []): add("本期未汇入", g.get("topic"), g.get("text"))
+    # 本期概览：导语 + KPI + 期次引导问句。此前只存在于 published_json，
+    # 从不入索引 → 「最新一期讲了什么」类问法只能取到零散条目标题，答不出内容。
+    _add_issue_digest(add, data)
     for ds in data.get("data_sources") or []:
         add("Data Source", ds.get("team"), ds.get("text") or "")
     from . import item_facts, chunk_index
