@@ -489,10 +489,7 @@ def _infer_mode(q: str, mode: str) -> str:
     m = (mode or "").strip().lower()
     if m in ("person", "company", "recent", "take", "stats", "cross"):
         return m
-    if is_crm_count_question(q) or (is_crm_context(q) and _COUNT_RE.search(q or "")):
-        return "stats"
-    if is_crm_cross_question(q):
-        return "cross"
+    # 意图由 planner（LLM）决定；这里不再用正则猜 stats/cross，缺就走 auto
     return "auto"
 
 

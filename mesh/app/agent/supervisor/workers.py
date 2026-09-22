@@ -155,23 +155,17 @@ def enrich_args(
     scope_team = acting_team or team
 
     if step.tool == "crm.search":
-        from .. import crm_search as cs
-
         q_plan = str(args.get("query") or "").strip()
         if not q_plan and resolved:
             q_plan = resolved[0]
         elif not q_plan:
             q_plan = q_user[:160]
-        # 计数问句：整句留给 stats 解析时间窗，不要截成短关键词
-        if cs.is_crm_count_question(q_user) or cs.is_crm_cross_question(q_user):
+        mode = str(args.get("mode") or "auto").strip().lower()
+        # 计数/交叉留整句给下游解析时间窗，不截成短关键词；意图由 planner 决定
+        if mode in ("stats", "cross"):
             q_plan = q_user[:160]
-            if cs.is_crm_cross_question(q_user):
-                args["mode"] = "cross"
-            else:
-                args["mode"] = "stats"
-                args.setdefault("metric", cs.infer_crm_metric(q_user))
         args["query"] = q_plan[:160]
-        args.setdefault("mode", str(args.get("mode") or "auto"))
+        args.setdefault("mode", "auto")
         return args
 
     if step.tool.startswith("ask."):

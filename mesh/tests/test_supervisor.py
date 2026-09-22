@@ -472,18 +472,33 @@ def test_parse_acting_team_commercial_roleplay():
     assert planmod.parse_acting_team("硅谷团队最近在做什么？") == ""
 
 
-def test_strip_crm_unless_asked_commercial_focus():
+def test_normalize_crm_steps_trusts_planner_mode():
     from app.agent.supervisor.types import PlanStep
 
+    # planner 决定走 cross：旁边的 ask.published 被剥掉，cross 子字段兜底
     steps = [
         PlanStep(id="a", worker="published", tool="ask.published", args={"query": "关注"}),
-        PlanStep(id="b", worker="crm", tool="crm.search", args={"query": "赵思琪"}),
+        PlanStep(
+            id="b",
+            worker="crm",
+            tool="crm.search",
+            args={"query": "其它团队是否同时接触", "mode": "cross"},
+        ),
     ]
-    q = "作为商业化团队的你，过去这段时间极客公园有哪些可能要关注的人或事？"
-    kept = planmod.strip_crm_unless_asked(steps, q)
-    assert [s.tool for s in kept] == ["ask.published"]
-    kept2 = planmod.strip_crm_unless_asked(steps, "硅谷团队最近在做什么？")
-    assert len(kept2) == 2
+    kept = planmod.normalize_crm_steps(steps)
+    assert [s.tool for s in kept] == ["crm.search"]
+    crm = kept[0]
+    assert crm.args["mode"] == "cross"
+    assert crm.args.get("cross_op") == "both"
+    assert crm.args.get("entity_kind") == "person"
+
+    # planner 决定普通检索：不剥 ask.published，保留原意图
+    steps2 = [
+        PlanStep(id="a", worker="published", tool="ask.published", args={"query": "关注"}),
+        PlanStep(id="b", worker="crm", tool="crm.search", args={"query": "赵思琪", "mode": "auto"}),
+    ]
+    kept2 = planmod.normalize_crm_steps(steps2)
+    assert [s.tool for s in kept2] == ["ask.published", "crm.search"]
 
 
 def test_strip_directory_unless_roster_asked_focus_question():

@@ -122,11 +122,23 @@ def test_stats_companies(crm_db):
     assert out["total"] == 2
 
 
-def test_search_crm_auto_count_routes_to_stats(crm_db):
-    out = cs.search_crm(crm_db, query="硅谷团队近一年接触了多少人", mode="auto")
+def test_search_crm_explicit_stats_mode(crm_db):
+    # 意图由 planner 决定并显式传 mode=stats+metric；search_crm 只忠实执行
+    out = cs.search_crm(
+        crm_db,
+        query="硅谷团队近一年接触了多少人",
+        mode="stats",
+        metric="people_touched",
+    )
     assert out["mode"] == "stats"
     assert out["metric"] == "people_touched"
     assert out["total"] == 1  # Alice only in window ~1 year from today (2026)
+
+
+def test_search_crm_auto_stays_auto(crm_db):
+    # mode=auto 时不再用正则猜 stats；保持 auto，交给 planner 决意图
+    out = cs.search_crm(crm_db, query="硅谷团队近一年接触了多少人", mode="auto")
+    assert out["mode"] != "stats"
 
 
 def test_cross_both(crm_db):
