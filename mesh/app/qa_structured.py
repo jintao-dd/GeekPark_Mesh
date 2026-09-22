@@ -387,8 +387,16 @@ def query_count(
     """团队在时间窗内的主体计数：直接 SQL 精确计数，不让 LLM 从上下文里数。
 
     section 为空 = 不按 section 过滤（「接触了多少人」没明说时，避免漏算）。
-    kind: person | company | any。
-    返回 (contexts, total)；contexts[0] 是固定话术，total 为精确去重数。
+
+    kind 与数据现实（重要）：
+      entity_team_facts.kind 只有 company / topic / team / unknown，**从不产生 person**
+      （见 db._infer_kind：接触段恒为 company/unknown）。所以「接触了多少人」不能按
+      kind='person' 过滤——那必然返回 0，比近似回答更糟。这里把「人」问法按主体计数，
+      并在口径里明说事实表未区分个人。
+
+    去重口径：同一主体可能以「A / B」「X（Y）」复合名出现，也可能单独出现。
+    若按拆分别名各自计数会把一个主体算成多个（虚高），故先取全量原子别名做并集，
+    再让每个主体认领一个代表键，按代表键去重。
     """
     if not team:
         return [], 0
@@ -401,33 +409,60 @@ def query_count(
     if section:
         where.append("section = ?")
         params.append(section)
-    if kind == "person":
-        where.append("kind = 'person'")
-    elif kind == "company":
+    # 只在明确要「公司」时过滤 kind；person 不可信（表里没有），故不过滤
+    if kind == "company":
         where.append("kind = 'company'")
     sql = (
         "SELECT name, kind, section, date_end, issue_slug FROM entity_team_facts "
         f"WHERE {' AND '.join(where)}"
     )
 
+    rows = [dict(r) for r in con.execute(sql, params)]
+
+    # 去重口径（真数据实测得出）：
+    #  - 同一主体可能以复合名出现，如「灵瑙科技 / 飞声助听器 / 亲宝宝」「擎羽科技（晴雨科技）」
+    #  - 若按拆分别名各自计数 → 虚高（硅谷 13 行会算成 17 个）
+    #  - 若只按原始名计数 → 偏低（「A / B」一格确实列了 2 家）
+    # 故 headline 用「原始主体名去重」这个最可辩护的口径，并同时报出拆分后的数量。
     groups: dict[str, dict] = {}
-    for r in con.execute(sql, params):
-        for k in _entity_keys(r["name"]):
-            g = groups.get(k)
-            if g is None:
-                groups[k] = {"name": r["name"], "kind": r["kind"], "n": 1}
-            else:
-                g["n"] += 1
+    for r in rows:
+        key = _entity_norm(r["name"]) or (r["name"] or "").strip()
+        if not key:
+            continue
+        g = groups.get(key)
+        if g is None:
+            groups[key] = {"name": r["name"], "kind": r["kind"], "n": 1}
+        else:
+            g["n"] += 1
+
     total = len(groups)
+    expanded_keys: set[str] = set()
+    for r in rows:
+        expanded_keys |= _entity_keys(r["name"])
+    expanded = len(expanded_keys)
+
     ranked = sorted(groups.values(), key=lambda g: (-g["n"], g["name"]))
-    kind_label = {"person": "人", "company": "家公司", "any": "个主体"}[kind]
+    if kind == "person":
+        kind_label = "个主体"
+        caveat = ("注意：事实表「接触」段记录的是公司/机构主体，未区分个人；"
+                  "因此这是主体数，不是精确人数。")
+    elif kind == "company":
+        kind_label = "家公司"
+        caveat = ""
+    else:
+        kind_label = "个主体"
+        caveat = ""
+    multi = ""
+    if expanded > total:
+        multi = f"（其中部分条目一格列出多个主体，拆开计为 {expanded} 个。）"
     ctxs = [{
         "期号": "查询说明",
         "章节": "结构化计数",
         "标题": "本答案由主体×团队事实表精确计数，非全文模糊检索",
         "内容": (
             f"团队「{team}」在 {_window_label({'date_from': date_from, 'date_to': date_to, 'window_days': 0})} "
-            f"范围内{'（' + section + '）' if section else ''}共涉及 {total} {kind_label}（按主体名去重）。"
+            f"范围内{'（' + section + '）' if section else ''}共涉及 {total} {kind_label}"
+            f"（按记录中的主体名去重）。{multi}{caveat}"
             "请直接给出这个数字，并说明统计口径；不要用下列示例去反推或编造其他数字。"
         ),
     }]
@@ -805,9 +840,12 @@ def build_structured_preamble(intent: dict, total: int, shown: int) -> dict:
                 f"「{intent.get('seed_b')}」都有关联（是二者的中间连接点）。"
                 f"时间范围：{win_txt}。共 {total} 个，展示 {shown} 个。")
     elif t == "count":
+        kind_label = {"person": "个主体（事实表未区分个人）", "company": "家公司", "any": "个主体"}.get(
+            intent.get("kind") or "any", "个主体"
+        )
         desc = (f"查询类型：精确计数。团队「{intent.get('team')}」"
                 f"{'· ' + intent.get('section') if intent.get('section') else ''}，"
-                f"时间范围：{win_txt}，按主体名去重后共 {total} 个。"
+                f"时间范围：{win_txt}，按主体名去重后共 {total} {kind_label}。"
                 f"下列 {shown} 个是明细示例，不是全部。请直接回答 {total}，不要另算。")
     else:
         desc = f"结构化查询结果共 {total} 条，展示 {shown} 条。"
@@ -863,9 +901,12 @@ def empty_result_answer(intent: dict) -> str:
         body = (f"在 {win_txt} 范围内，未找到同时与「{intent.get('seed')}」和"
                 f"「{intent.get('seed_b')}」共现过的中间主体。")
     elif t == "count":
+        kind_label = {"person": "个主体（事实表未区分个人）", "company": "家公司", "any": "个主体"}.get(
+            intent.get("kind") or "any", "个主体"
+        )
         body = (f"在 {win_txt} 范围内，团队「{intent.get('team')}」"
                 f"{'（' + intent.get('section') + '）' if intent.get('section') else ''}"
-                f"没有任何记录，计数为 0。")
+                f"没有任何记录，计数为 0 {kind_label}。")
     else:
         body = f"在 {win_txt} 范围内，结构化检索未返回任何记录。"
     return body + "\n\n来源：结构化检索（主体×团队事实表）"
