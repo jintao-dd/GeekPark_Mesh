@@ -139,6 +139,13 @@ def _humanize_ref(ref: str) -> str:
     r = (ref or "").strip()
     if not r:
         return ""
+    if r.startswith("crm:stats:"):
+        parts = r.split(":")
+        return f"CRM统计 {parts[2] if len(parts) > 2 else ''}={parts[3] if len(parts) > 3 else ''}".strip()
+    if r.startswith("crm:cross:"):
+        return "CRM×周报交叉"
+    if r.startswith("crm:"):
+        return r.replace("crm:", "CRM·", 1)[:48]
     m = re.search(r"item[:/]?(\d+)", r, re.I)
     if m:
         return f"条目 {m.group(1)}"
@@ -231,6 +238,29 @@ def format_display_text(
             blocks.extend(meta_lines)
             return "\n".join(blocks).strip()
         return body
+
+    # CRM 回答禁止刷「已上线周报」归因
+    crmish = tier == "crm_prior" or any(str(r).startswith("crm:") for r in uniq_refs)
+    if not crmish and str(getattr(answer, "intent", "") or "") in (
+        "crm_search",
+        "crm_stats",
+    ):
+        crmish = True
+    if not crmish and isinstance(payload, dict):
+        tools = payload.get("tools_called") or (answer.tools_called if hasattr(answer, "tools_called") else [])
+        if any(str(t) == "crm.search" for t in (tools or [])):
+            crmish = True
+    if crmish:
+        meta_lines.append("来源：硅谷 CRM（Notion）")
+        if uniq_refs and kind not in ("no_hit", "system_error", "timeout", "permission"):
+            meta_lines.append("可核对：")
+            for r in uniq_refs[:6]:
+                meta_lines.append(f"· {_humanize_ref(r)}")
+        if meta_lines:
+            blocks.append("")
+            blocks.append("——")
+            blocks.extend(meta_lines)
+        return "\n".join(blocks).strip()
 
     if issue and kind in ("ok", "supported", ""):
         meta_lines.append(f"来源：{issue} 已上线周报")

@@ -433,24 +433,48 @@ def handle_turn(
     out.intent = (
         "feishu_search"
         if any(str(t).startswith("feishu.") for t in out.tools_called)
-        else "ask_published"
+        else (
+            "crm_search"
+            if any(str(t) == "crm.search" for t in out.tools_called)
+            and not any(str(t).startswith("ask.") for t in out.tools_called)
+            else "ask_published"
+        )
     )
     out.text = mouth.sanitize(text)
+    # 来源分层：纯 CRM → crm_prior；有飞书 → feishu_live；否则 published
+    tools = [str(t) for t in out.tools_called]
+    if any(t.startswith("feishu.") for t in tools):
+        source_tier = "feishu_live"
+    elif any(t == "crm.search" for t in tools) and not any(
+        t.startswith("ask.") for t in tools
+    ):
+        source_tier = "crm_prior"
+    elif any(t == "crm.search" for t in tools):
+        source_tier = "crm_prior"  # 混源时脚注仍以 CRM 优先，避免写成「已上线周报」
+    else:
+        source_tier = "published"
+    crm_metric = ""
+    cross_op = ""
+    for e in envelopes:
+        pl = getattr(e, "payload", None) or {}
+        if isinstance(pl, dict):
+            crm_metric = crm_metric or str(pl.get("crm_metric") or "")
+            cross_op = cross_op or str(pl.get("cross_op") or pl.get("cross_op_obs") or "")
     out.payload = {
         "columns": columns,
         "partial": partial,
         "complexity": graph.band,
-        "source_tier": (
-            "feishu_live"
-            if any(str(t).startswith("feishu.") for t in out.tools_called)
-            else "published"
-        ),
+        "source_tier": source_tier,
         "orchestrated": True,
         "supervised": True,
         "progress": list(out.progress),
         "mouth_source": mouth_meta.get("source") or "",
+        "crm_metric": crm_metric,
+        "cross_op": cross_op,
     }
     out.trace["source_tier"] = out.payload["source_tier"]
+    out.trace["crm_metric"] = crm_metric
+    out.trace["cross_op"] = cross_op
     out.trace["progress"] = list(out.progress)
     out.trace["envelopes"] = [e.to_dict() for e in envelopes]
     out.trace["budget_hit"] = budget_hit

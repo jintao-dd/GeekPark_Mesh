@@ -155,12 +155,22 @@ def enrich_args(
     scope_team = acting_team or team
 
     if step.tool == "crm.search":
+        from .. import crm_search as cs
+
         q_plan = str(args.get("query") or "").strip()
         if not q_plan and resolved:
             q_plan = resolved[0]
         elif not q_plan:
-            q_plan = q_user[:80]
-        args["query"] = q_plan[:80]
+            q_plan = q_user[:160]
+        # 计数问句：整句留给 stats 解析时间窗，不要截成短关键词
+        if cs.is_crm_count_question(q_user) or cs.is_crm_cross_question(q_user):
+            q_plan = q_user[:160]
+            if cs.is_crm_cross_question(q_user):
+                args["mode"] = "cross"
+            else:
+                args["mode"] = "stats"
+                args.setdefault("metric", cs.infer_crm_metric(q_user))
+        args["query"] = q_plan[:160]
         args.setdefault("mode", str(args.get("mode") or "auto"))
         return args
 
@@ -394,6 +404,8 @@ def run_step(
         if not isinstance(payload, dict):
             payload = {}
         tier = "feishu_live" if str(step.tool).startswith("feishu.") else "published"
+        if str(step.tool) == "crm.search":
+            tier = "crm_prior"
         if payload.get("source_tier"):
             tier = str(payload.get("source_tier"))
         err = str(getattr(result, "error", "") or "")
@@ -413,8 +425,13 @@ def run_step(
             need_replan = True
             replan_reason = err
         elif payload.get("empty") or (ok and not text):
-            need_replan = True
-            replan_reason = "empty_result"
+            # stats/cross 的 empty=总数为0 仍是有效答案，不要重规划去灌周报
+            if str(payload.get("mode") or "") in ("stats", "cross"):
+                need_replan = False
+                replan_reason = ""
+            else:
+                need_replan = True
+                replan_reason = "empty_result"
         return TieredEnvelope(
             step_id=step.id,
             worker=worker,

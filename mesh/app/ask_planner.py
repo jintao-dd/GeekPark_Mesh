@@ -217,7 +217,15 @@ def _plan_count(q: str, win: dict) -> tuple[dict, float] | None:
     """计数问句：单团队 + 计数词 + 明确对象（人/公司）。
 
     只在「有且仅有一个团队」且出现计数词时才走，避免把「各团队分别多少」误路由。
+    CRM/硅谷语境的计数走 crm.stats，不走周报 entity_team_facts。
     """
+    try:
+        from .agent import crm_search as cs
+
+        if cs.is_crm_count_question(q):
+            return None
+    except Exception:
+        pass
     kind = qa_structured._parse_count_kind(q)
     if not kind:
         return None
@@ -381,6 +389,7 @@ _LLM_INTENT_SYSTEM = """你是检索意图分类器。判断用户问句需要�
 4) topic 仅 by_team 用，填被比较的话题词（如「AI 助听器」「硬件」）。
 5) cooccur 用 seed 填那个起点主体；bridge 用 seed / seed_b 填两个主体（用问句里的原词）。
 6) count 用 team 填那个团队原词；计数对象是「人」时 team 之外不用填（系统自己按人/公司判断）。
+   若问句是硅谷/CRM/人脉库计数（如「硅谷近一年接触了多少人」「CRM一共多少人」），给 none——那走 CRM 统计，不是周报 count。
 7) 拿不准就给 none，宁可漏判也不要误判。
 
 输出：{"type": "...", "team_a": "", "team_b": "", "team": "", "topic": "", "seed": "", "seed_b": "", "confidence": 0.0-1.0}"""
@@ -463,6 +472,14 @@ def _llm_intent_plan(q: str, win: dict) -> RetrievalPlan | None:
         return _validate_and_plan(intent, max(conf, 0.85), q)
 
     if t == "count":
+        try:
+            from .agent import crm_search as cs
+
+            if cs.is_crm_count_question(q):
+                log.info("ask llm-intent count dropped: CRM stats context q=%r", q[:60])
+                return None
+        except Exception:
+            pass
         team = qa_structured._normalize_team(str(data.get("team") or ""))
         if not team:
             log.info("ask llm-intent count dropped: team=%r not resolvable", data.get("team"))

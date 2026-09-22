@@ -171,6 +171,68 @@ def strip_directory_unless_roster_asked(
     return kept
 
 
+def force_crm_structured_steps(steps: list[PlanStep], user_text: str) -> list[PlanStep]:
+    """CRM 计数/交叉：强制 crm.search stats|cross，并去掉 ask.published 防混级。"""
+    from .. import crm_search as cs
+
+    q = user_text or ""
+    want_cross = cs.is_crm_cross_question(q)
+    want_stats = cs.is_crm_count_question(q)
+    if not want_cross and not want_stats:
+        return list(steps or [])
+
+    mode = "cross" if want_cross else "stats"
+    metric = cs.infer_crm_metric(q) if mode == "stats" else ""
+    kept: list[PlanStep] = []
+    has_crm = False
+    for s in steps or []:
+        tool = (s.tool or "").strip()
+        if tool in ("ask.published", "ask.relations_summary"):
+            continue
+        if tool == "crm.search":
+            has_crm = True
+            args = dict(s.args or {})
+            args["mode"] = mode
+            args["query"] = str(args.get("query") or q)[:160]
+            if metric:
+                args["metric"] = metric
+            if mode == "cross":
+                from .. import crm_cross
+
+                args["cross_op"] = crm_cross.infer_cross_op(q)
+                args["entity_kind"] = crm_cross.infer_entity_kind(q)
+            s.args = args
+            kept.append(s)
+            continue
+        kept.append(s)
+    if not has_crm:
+        args: dict[str, Any] = {"query": q[:160], "mode": mode}
+        if metric:
+            args["metric"] = metric
+        if mode == "cross":
+            from .. import crm_cross
+
+            args["cross_op"] = crm_cross.infer_cross_op(q)
+            args["entity_kind"] = crm_cross.infer_entity_kind(q)
+        kept.insert(
+            0,
+            PlanStep(
+                id="crm1",
+                worker=resolve_worker("crm.search"),
+                tool="crm.search",
+                args=args,
+                optional=False,
+            ),
+        )
+    log.info(
+        "planner forced crm structured mode=%s metric=%s steps=%s",
+        mode,
+        metric or "-",
+        [s.tool for s in kept],
+    )
+    return kept
+
+
 _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划与派工，不对用户说话，不做公司事实断言。
 
 根据用户目标、工作记忆、公司先验，输出一个 JSON：
@@ -196,7 +258,10 @@ _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划�
 }
 
 可用源（按意图选用，不要混成一个假事实源）：
-- crm.search：硅谷对外人脉/BD 底库（People 枢纽、Interactions 事件、Takes 判断）。内部同事通讯录不是这个源。query 用解析后的全名；mode=auto|person|company|recent|take。
+- crm.search：硅谷对外人脉/BD 底库（People 枢纽、Interactions 事件、Takes 判断）。内部同事通讯录不是这个源。
+  query 用解析后的全名或原问句；mode=auto|person|company|recent|take|stats|cross。
+  计数/规模（多少人、多少家公司、一共）→ mode=stats；与周报交叉对照 → mode=cross。
+  禁止用 LIKE 搜到的几条名单冒充「总数」。
 - ask.published：已上线周报事实。
 - feishu.search：飞书现场。必须带 resource_type（group|member|user|directory|doc|message|calendar|wiki|folder）。
   directory 的 keyword 用队名/部门名/姓名，或提问者团队（工作记忆里有）；系统按飞书树展开子部门。列组织不要改去空转周报。
@@ -215,7 +280,8 @@ _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划�
 7) 步骤 ≤8；有依赖才写 depends_on；可并行的标同一 parallel_group。
 8) 问周报相关 / 个人或团队进展 /「该关注什么」→ 主步骤用 ask.published（可并行 directory）；
    不要用 feishu.calendar.* 当主步骤，除非用户明确问日程、会议、忙不忙、空闲。
-9) 只输出 JSON。
+9) 硅谷/CRM「多少人/多少家」计数 → 只用 crm.search（mode=stats），不要并行 ask.published 以免脚注混成周报。
+10) 只输出 JSON。
 """
 
 
@@ -475,6 +541,7 @@ def plan_turn(
     steps = strip_calendar_unless_asked(steps, q)
     steps = strip_crm_unless_asked(steps, q)
     steps = strip_directory_unless_roster_asked(steps, q)
+    steps = force_crm_structured_steps(steps, q)
     if not steps and mode == "work":
         steps = _normalize_steps(
             [{"id": "s1", "tool": "ask.published", "args": {"query": q[:160]}}],

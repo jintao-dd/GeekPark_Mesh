@@ -367,8 +367,18 @@ CRM_SEARCH = ToolContract(
             "query": {"type": "string"},
             "mode": {
                 "type": "string",
-                "enum": ["auto", "person", "company", "recent", "take"],
+                "enum": ["auto", "person", "company", "recent", "take", "stats", "cross"],
             },
+            "metric": {
+                "type": "string",
+                "enum": ["people_archive", "people_touched", "companies", "takes"],
+            },
+            "cross_op": {
+                "type": "string",
+                "enum": ["both", "crm_only", "weekly_only"],
+            },
+            "date_from": {"type": "string"},
+            "date_to": {"type": "string"},
         },
         "required": ["query"],
     },

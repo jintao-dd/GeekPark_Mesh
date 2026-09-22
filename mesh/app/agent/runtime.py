@@ -5,6 +5,7 @@ Session Context 只消解指代；事实必须重新 Retrieval / Evidence。
 from __future__ import annotations
 
 import os
+import re
 import threading
 from typing import Any
 
@@ -242,6 +243,57 @@ def _handle_message_locked(
             ),
             route=route,
         )
+
+    # 「新对话」：清空会话粘滞（实体/议题/近期轮次），避免串题
+    _RESET_RE = re.compile(
+        r"^\s*(新对话|清空对话|清空会话|清除上下文|忘掉刚才|重新开始|reset(?:\s*chat)?)\s*[。.!！]?\s*$",
+        re.I,
+    )
+    if _RESET_RE.match(str(envelope.text or "").strip()):
+        session.active_entities = []
+        session.active_team = ""
+        session.active_issue = ""
+        session.active_period = ""
+        session.active_topic = ""
+        session.last_intent = ""
+        session.last_route = ""
+        session.last_query = ""
+        session.last_query_refs = []
+        session.last_evidence_refs = []
+        session.last_topic_frame = ""
+        session.unresolved_references = []
+        session.recent_turns = []
+        session.topic_stack = []
+        session.pending_write = None
+        session.active_goal = None
+        session.last_block = None
+        session.last_mentions = []
+        session.turn_id = 0
+        session.session_key = sk
+        sstore.save(session)
+        ans = AgentAnswer(
+            text="好，已开启新对话。之前的话题和人名粘滞已清掉，直接问下一题就行。",
+            intent="casual",
+            tools_called=[],
+            fingerprint=fp.build_fingerprint(
+                context=context, permission=permission, tool_result=None
+            ),
+            trace={
+                "session_reset": True,
+                "crm_metric": "",
+                "cross_op": "",
+                "conversation_route": "meta",
+                "session_key": sk,
+                **fp.build_trace(
+                    intent="casual",
+                    tool_id=None,
+                    context=context,
+                    identity_status=identity.status,
+                ),
+            },
+            **base_kwargs,
+        )
+        return enrich_answer_for_display(ans, payload=None)
 
     # —— Wave 1：Safety → Colleague v3（默认开；MESH_COLLEAGUE_V3=0 回退旧路径）——
     if colleague_v3_enabled():

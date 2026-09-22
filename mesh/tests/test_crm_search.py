@@ -4,6 +4,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app import db
@@ -13,6 +15,8 @@ from app.agent.models import IdentityResult, PermissionDecision, AgentContext, I
 
 def test_crm_search_gavin_take():
     con = db.connect()
+    if not cs._table_ready(con):
+        pytest.skip("local CRM empty")
     out = cs.search_crm(con, query="Gavin Ni", mode="take")
     assert out["ok"]
     assert out["takes"]
@@ -22,6 +26,8 @@ def test_crm_search_gavin_take():
 
 def test_crm_search_auto_hits_without_phrase_routing():
     con = db.connect()
+    if not cs._table_ready(con):
+        pytest.skip("local CRM empty")
     out = cs.search_crm(con, query="Gavin Ni", mode="auto")
     assert out["ok"]
     assert out["takes"] or out["people"] or out["interactions"]
@@ -33,6 +39,8 @@ def test_crm_search_auto_hits_without_phrase_routing():
 
 def test_crm_search_recent_interactions():
     con = db.connect()
+    if not cs._table_ready(con):
+        pytest.skip("local CRM empty")
     out = cs.search_crm(con, query="最近沟通", mode="recent")
     assert out["ok"]
     assert out["interactions"]
@@ -41,6 +49,8 @@ def test_crm_search_recent_interactions():
 
 def test_crm_tool_no_email_leak():
     con = db.connect()
+    if not cs._table_ready(con):
+        pytest.skip("local CRM empty")
     ident = IdentityResult(status="bound", feishu_open_id="ou_x", primary_team="品牌创意团队")
     perm = PermissionDecision(
         agent_access=True,

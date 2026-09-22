@@ -285,20 +285,29 @@ def test_rule_bridge_fallback(monkeypatch):
 # ---- 计数意图（生产真实问法）----
 
 def test_rule_count_people(monkeypatch):
-    """「硅谷团队近一年接触了多少人」→ count，且时间窗是 365 天不是默认 90 天。"""
+    """「编辑部近一年接触了多少人」→ 周报 count；时间窗 365 天。"""
     monkeypatch.setenv("MESH_ASK_LLM_INTENT", "0")
-    p = plan_retrieval("硅谷团队近一年接触了多少人")
+    p = plan_retrieval("编辑部近一年接触了多少人")
     assert p.set_op == "count"
     assert p.path == "structured"
-    assert p.intent["team"] == "硅谷 BD 团队"
+    assert p.intent["team"] == "编辑部"
     assert p.intent["kind"] == "person"
     assert p.intent["section"] == "接触"
     assert p.intent["window_days"] == 365
 
 
+def test_crm_count_does_not_route_weekly(monkeypatch):
+    """「硅谷/CRM 接触了多少人」走 CRM stats，不进周报 count。"""
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "0")
+    p = plan_retrieval("硅谷团队近一年接触了多少人")
+    assert p.set_op != "count"
+    p2 = plan_retrieval("CRM一共有多少人")
+    assert p2.set_op != "count"
+
+
 def test_rule_count_total_people(monkeypatch):
     monkeypatch.setenv("MESH_ASK_LLM_INTENT", "0")
-    p = plan_retrieval("硅谷团队一共接触了多少人")
+    p = plan_retrieval("编辑部一共接触了多少人")
     assert p.set_op == "count"
     assert p.intent["kind"] == "person"
 
@@ -336,7 +345,7 @@ def test_count_unspecified_object_requires_action(monkeypatch):
 
 def test_count_explicit_section(monkeypatch):
     monkeypatch.setenv("MESH_ASK_LLM_INTENT", "0")
-    p = plan_retrieval("硅谷团队关注了多少人？")
+    p = plan_retrieval("编辑部关注了多少人？")
     assert p.set_op == "count"
     assert p.intent["section"] == "关注"
 
@@ -344,12 +353,21 @@ def test_count_explicit_section(monkeypatch):
 def test_llm_intent_count(monkeypatch):
     """LLM 层也能识别计数问法（改述：「跟多少人打过交道」）。"""
     monkeypatch.setenv("MESH_ASK_LLM_INTENT", "1")
+    payload = {"type": "count", "team": "编辑部", "confidence": 0.92}
+    with mock.patch("app.llm.call", _mock_llm(payload)):
+        p = plan_retrieval("编辑部近一年跟多少人打过交道？")
+    assert p.set_op == "count"
+    assert p.path == "structured"
+    assert p.intent["team"] == "编辑部"
+
+
+def test_llm_intent_crm_count_suppressed(monkeypatch):
+    """硅谷计数即使 LLM 返回 count 也要丢掉，交给 CRM stats。"""
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "1")
     payload = {"type": "count", "team": "硅谷团队", "confidence": 0.92}
     with mock.patch("app.llm.call", _mock_llm(payload)):
         p = plan_retrieval("硅谷团队近一年跟多少人打过交道？")
-    assert p.set_op == "count"
-    assert p.path == "structured"
-    assert p.intent["team"] == "硅谷 BD 团队"
+    assert p.set_op != "count"
 
 
 def test_llm_intent_count_unresolvable_team_falls_back(monkeypatch):
