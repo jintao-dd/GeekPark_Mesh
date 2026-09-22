@@ -23,6 +23,9 @@ mesh/data/
 *.sqlite
 *.sqlite3
 
+# --- eval runtime artifacts (local self-check output; not release baselines) ---
+mesh/eval/reports/REPRO_STATUS.json
+
 # --- logs / temp ---
 *.log
 .tmp/
