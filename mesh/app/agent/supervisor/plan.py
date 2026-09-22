@@ -238,6 +238,8 @@ _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划�
     mode=stats 时给 args.metric：people_archive|people_touched|companies|takes。
     mode=cross 时给 args.cross_op：both|crm_only|weekly_only，并给 args.entity_kind：person|company。
       （cross 的对照面是「已上线周报」；「其它团队是否同时接触」在数据上只能用周报近似，both=两边都有=可能被其它团队碰到。）
+      cross 只用于「硅谷 CRM × 已上线周报」的对照；**不要**把「多个团队/跨团队/跨部门同时出现」这类
+      周报内部跨队统计判成 cross——那走 ask.published，系统会做确定性的跨队集合运算。
   禁止用 LIKE 搜到的几条名单冒充「总数」。
 - ask.published：已上线周报事实。
 - feishu.search：飞书现场。必须带 resource_type（group|member|user|directory|doc|message|calendar|wiki|folder）。
@@ -259,6 +261,7 @@ _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划�
    不要用 feishu.calendar.* 当主步骤，除非用户明确问日程、会议、忙不忙、空闲。
 9) CRM 的 stats 步骤不要再并行 ask.published，避免脚注把 CRM 计数证据混成已上线周报。
    mode=cross 时可以并行一条 ask.published（周报分栏），供成文写「跨线重叠」；禁止把 CRM 说成周报。
+   周报内部的跨团队统计（多少/哪些主体出现在多个团队、跨部门同时出现）→ 只用 ask.published，不要加 crm.search。
 10) 只输出 JSON。
 """
 
