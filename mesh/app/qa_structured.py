@@ -8,6 +8,9 @@ DEFAULT_WINDOW_DAYS = int(
     or os.environ.get("MESH_QA_LEXICAL_WINDOW_DAYS")
     or "90"
 )
+
+_CN_NUM = {"一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5,
+           "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
 RESULT_LIMIT = int(os.environ.get("MESH_QA_RESULT_LIMIT", "30") or "30")
 
 OVERSEAS_TEAMS_DEFAULT = ["硅谷 BD 团队", "Global Partnership 团队", "英文站"]
@@ -62,9 +65,18 @@ def parse_window(q: str) -> tuple[str | None, str | None, int]:
     if m:
         days = int(m.group(1)) * 30
         return (today - datetime.timedelta(days=days)).isoformat(), None, days
-    m = re.search(r"近\s*(\d+)\s*个?月", q)
+    m = re.search(r"(?:近|过去|最近)\s*(\d+)\s*个?月", q)
     if m:
         days = int(m.group(1)) * 30
+        return (today - datetime.timedelta(days=days)).isoformat(), None, days
+    m = re.search(r"(?:近|过去|最近)\s*(\d+)\s*(?:个)?年", q)
+    if m:
+        days = int(m.group(1)) * 365
+        return (today - datetime.timedelta(days=days)).isoformat(), None, days
+    m = re.search(r"(?:近|过去|最近)\s*([一二三四五六七八九十两])\s*年|([一二三四五六七八九十两])年内", q)
+    if m:
+        n = _CN_NUM.get(m.group(1) or m.group(2), 1)
+        days = n * 365
         return (today - datetime.timedelta(days=days)).isoformat(), None, days
     m = re.search(r"(?:近|过去)\s*(\d+)\s*天", q)
     if m:
@@ -196,7 +208,33 @@ def _infer_section(q: str) -> str:
         return "看法"
     if re.search(r"关系|可同步|同步|重合|重叠|交集", q):
         return "关系"
-    return "接触"
+    if re.search(r"接触|触达|聊过|见过|对接|拜访|联络|联系|认识", q):
+        return "接触"
+    return ""
+
+
+def _parse_section_explicit(q: str) -> str:
+    """计数问句里的 section：有明确词就用，没有则空（= 不按 section 过滤）。"""
+    if re.search(r"关注|话题|选题", q):
+        return "关注"
+    if re.search(r"看法|观点", q):
+        return "看法"
+    if re.search(r"关系|合作|可同步", q):
+        return "关系"
+    if re.search(r"接触|触达|聊过|见过|对接|拜访|联络|联系|认识", q):
+        return "接触"
+    return ""
+
+
+def _parse_count_kind(q: str) -> str | None:
+    """计数对象：人 / 公司 / 主体(不限)。"""
+    if re.search(r"多少人|几个人|多少位|几位|多少个人|人数", q):
+        return "person"
+    if re.search(r"多少家公司|几家|多少个公司|多少公司|多少家", q):
+        return "company"
+    if re.search(r"多少|几个|数量|总共多少", q):
+        return "any"
+    return None
 
 
 def _diff_team_order(q: str, teams: list[str]) -> tuple[str, str] | None:
@@ -332,6 +370,74 @@ def _rows_to_contexts(rows: list, limit: int = RESULT_LIMIT) -> tuple[list[dict]
                 f"来源提示 {r['source_hint']}" if r.get("source_hint") else "",
             ])),
             "团队": r["team"],
+        })
+    return ctxs, total
+
+
+def query_count(
+    con,
+    team: str,
+    date_from: str | None,
+    date_to: str | None,
+    *,
+    section: str = "",
+    kind: str = "any",
+    limit: int = RESULT_LIMIT,
+) -> tuple[list[dict], int]:
+    """团队在时间窗内的主体计数：直接 SQL 精确计数，不让 LLM 从上下文里数。
+
+    section 为空 = 不按 section 过滤（「接触了多少人」没明说时，避免漏算）。
+    kind: person | company | any。
+    返回 (contexts, total)；contexts[0] 是固定话术，total 为精确去重数。
+    """
+    if not team:
+        return [], 0
+    a_date, a_params = _date_clause("", date_from, date_to)
+    where = ["team = ?"]
+    params: list = [team]
+    if a_date:
+        where.append(a_date.lstrip(" AND"))
+        params.extend(a_params)
+    if section:
+        where.append("section = ?")
+        params.append(section)
+    if kind == "person":
+        where.append("kind = 'person'")
+    elif kind == "company":
+        where.append("kind = 'company'")
+    sql = (
+        "SELECT name, kind, section, date_end, issue_slug FROM entity_team_facts "
+        f"WHERE {' AND '.join(where)}"
+    )
+
+    groups: dict[str, dict] = {}
+    for r in con.execute(sql, params):
+        for k in _entity_keys(r["name"]):
+            g = groups.get(k)
+            if g is None:
+                groups[k] = {"name": r["name"], "kind": r["kind"], "n": 1}
+            else:
+                g["n"] += 1
+    total = len(groups)
+    ranked = sorted(groups.values(), key=lambda g: (-g["n"], g["name"]))
+    kind_label = {"person": "人", "company": "家公司", "any": "个主体"}[kind]
+    ctxs = [{
+        "期号": "查询说明",
+        "章节": "结构化计数",
+        "标题": "本答案由主体×团队事实表精确计数，非全文模糊检索",
+        "内容": (
+            f"团队「{team}」在 {_window_label({'date_from': date_from, 'date_to': date_to, 'window_days': 0})} "
+            f"范围内{'（' + section + '）' if section else ''}共涉及 {total} {kind_label}（按主体名去重）。"
+            "请直接给出这个数字，并说明统计口径；不要用下列示例去反推或编造其他数字。"
+        ),
+    }]
+    for g in ranked[:limit]:
+        ctxs.append({
+            "期号": "",
+            "章节": "计数明细",
+            "标题": g["name"],
+            "内容": f"团队 {team} · 记录 {g['n']} 条 · 类型 {g['kind'] or 'unknown'}",
+            "团队": team,
         })
     return ctxs, total
 
@@ -698,6 +804,11 @@ def build_structured_preamble(intent: dict, total: int, shown: int) -> dict:
         desc = (f"查询类型：二跳桥接。下列主体分别与「{intent.get('seed')}」和"
                 f"「{intent.get('seed_b')}」都有关联（是二者的中间连接点）。"
                 f"时间范围：{win_txt}。共 {total} 个，展示 {shown} 个。")
+    elif t == "count":
+        desc = (f"查询类型：精确计数。团队「{intent.get('team')}」"
+                f"{'· ' + intent.get('section') if intent.get('section') else ''}，"
+                f"时间范围：{win_txt}，按主体名去重后共 {total} 个。"
+                f"下列 {shown} 个是明细示例，不是全部。请直接回答 {total}，不要另算。")
     else:
         desc = f"结构化查询结果共 {total} 条，展示 {shown} 条。"
     if intent.get("hardware"):
@@ -751,6 +862,10 @@ def empty_result_answer(intent: dict) -> str:
     elif t == "bridge":
         body = (f"在 {win_txt} 范围内，未找到同时与「{intent.get('seed')}」和"
                 f"「{intent.get('seed_b')}」共现过的中间主体。")
+    elif t == "count":
+        body = (f"在 {win_txt} 范围内，团队「{intent.get('team')}」"
+                f"{'（' + intent.get('section') + '）' if intent.get('section') else ''}"
+                f"没有任何记录，计数为 0。")
     else:
         body = f"在 {win_txt} 范围内，结构化检索未返回任何记录。"
     return body + "\n\n来源：结构化检索（主体×团队事实表）"
@@ -783,6 +898,15 @@ def run_structured(con, intent: dict, team_scope: str = "") -> dict:
         ctxs, total = query_cooccur(con, intent.get("seed") or "", df, dt)
     elif t == "bridge":
         ctxs, total = query_bridge(con, intent.get("seed") or "", intent.get("seed_b") or "", df, dt)
+    elif t == "count":
+        ctxs, total = query_count(
+            con,
+            intent.get("team") or "",
+            df,
+            dt,
+            section=intent.get("section") or "",
+            kind=intent.get("kind") or "any",
+        )
     else:
         return {"ok": False, "mode": "structured", "contexts": [], "total": 0,
                 "intent": intent, "message": "未知查询类型"}
@@ -802,10 +926,12 @@ def run_structured(con, intent: dict, team_scope: str = "") -> dict:
             "team_a": intent.get("team_a"),
             "team_b": intent.get("team_b"),
             "teams": [intent.get("team_a"), intent.get("team_b")],
+            "team": intent.get("team"),
             "topic": intent.get("topic"),
             "seed": intent.get("seed"),
             "seed_b": intent.get("seed_b"),
             "section": intent.get("section"),
+            "kind": intent.get("kind"),
             "window_days": intent.get("window_days"),
             "date_from": intent.get("date_from"),
             "date_to": intent.get("date_to"),

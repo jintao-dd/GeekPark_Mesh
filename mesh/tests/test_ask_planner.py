@@ -280,3 +280,91 @@ def test_rule_bridge_fallback(monkeypatch):
     assert p.set_op == "bridge"
     assert p.intent["seed"] == "面壁智能"
     assert p.intent["seed_b"] == "吉利银河"
+
+
+# ---- 计数意图（生产真实问法）----
+
+def test_rule_count_people(monkeypatch):
+    """「硅谷团队近一年接触了多少人」→ count，且时间窗是 365 天不是默认 90 天。"""
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "0")
+    p = plan_retrieval("硅谷团队近一年接触了多少人")
+    assert p.set_op == "count"
+    assert p.path == "structured"
+    assert p.intent["team"] == "硅谷 BD 团队"
+    assert p.intent["kind"] == "person"
+    assert p.intent["section"] == "接触"
+    assert p.intent["window_days"] == 365
+
+
+def test_rule_count_total_people(monkeypatch):
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "0")
+    p = plan_retrieval("硅谷团队一共接触了多少人")
+    assert p.set_op == "count"
+    assert p.intent["kind"] == "person"
+
+
+def test_rule_count_companies(monkeypatch):
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "0")
+    p = plan_retrieval("编辑部接触过多少家公司？")
+    assert p.set_op == "count"
+    assert p.intent["kind"] == "company"
+    assert p.intent["team"] == "编辑部"
+
+
+def test_count_needs_single_team(monkeypatch):
+    """「各团队分别多少人」不归 count（该走 by_team / 泛检索）。"""
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "0")
+    p = plan_retrieval("各团队分别接触了多少人？")
+    assert p.set_op != "count"
+
+
+def test_count_no_team_no_route(monkeypatch):
+    """没有团队名时不归 count，避免「一共有多少人」这类泛问被误路由。"""
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "0")
+    p = plan_retrieval("公司一共有多少人？")
+    assert p.set_op != "count"
+
+
+def test_count_unspecified_object_requires_action(monkeypatch):
+    """「编辑部多少」缺对象词 → 不路由；「编辑部接触了多少」有动作词 → 路由为 any。"""
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "0")
+    assert plan_retrieval("编辑部有多少").set_op != "count"
+    p = plan_retrieval("编辑部一共接触了多少个主体")
+    assert p.set_op == "count"
+    assert p.intent["kind"] == "any"
+
+
+def test_count_explicit_section(monkeypatch):
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "0")
+    p = plan_retrieval("硅谷团队关注了多少人？")
+    assert p.set_op == "count"
+    assert p.intent["section"] == "关注"
+
+
+def test_llm_intent_count(monkeypatch):
+    """LLM 层也能识别计数问法（改述：「跟多少人打过交道」）。"""
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "1")
+    payload = {"type": "count", "team": "硅谷团队", "confidence": 0.92}
+    with mock.patch("app.llm.call", _mock_llm(payload)):
+        p = plan_retrieval("硅谷团队近一年跟多少人打过交道？")
+    assert p.set_op == "count"
+    assert p.path == "structured"
+    assert p.intent["team"] == "硅谷 BD 团队"
+
+
+def test_llm_intent_count_unresolvable_team_falls_back(monkeypatch):
+    monkeypatch.setenv("MESH_ASK_LLM_INTENT", "1")
+    payload = {"type": "count", "team": "不存在的部门", "confidence": 0.9}
+    with mock.patch("app.llm.call", _mock_llm(payload)):
+        p = plan_retrieval("不存在的部门接触了多少人？")
+    assert p.set_op != "count"
+
+
+def test_parse_window_one_year():
+    """「近一年」必须解析成 365 天（此前落到默认 90 天，是真 bug）。"""
+    from app import qa_structured
+
+    _, _, days = qa_structured.parse_window("硅谷团队近一年接触了多少人")
+    assert days == 365
+    _, _, days2 = qa_structured.parse_window("过去两年接触了多少人")
+    assert days2 == 730
