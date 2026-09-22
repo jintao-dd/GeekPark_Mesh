@@ -1,9 +1,9 @@
 """期号日期规则。
 
 规则：
-  - 已上线：期号按上线日（published_at）
-  - 上线后若有更新且更新日期更晚：期号按最新更新日期（updated_at）
-  - 草稿：按 date_end（创建默认当天）
+  - 已上线：期号按上线日（published_at）；上线后若更新日更晚，按最新更新日期
+  - 草稿：按 date_end（创建默认当天）；若有更新且更新日期更晚，按最新更新日期
+    （重新生成预览会抬 updated_at，大日期应跟到当天）
 
 slug 仍是 URL/库内主键，不随期号展示日改写。
 """
@@ -36,13 +36,17 @@ def issue_period_date(issue: dict[str, Any] | None) -> datetime.date | None:
         return None
     status = str(issue.get("status") or "").strip()
     published = bool(issue.get("published_at")) or status == "published"
+    upd = parse_stamp_date(issue.get("updated_at"))
     if published:
         pub = parse_stamp_date(issue.get("published_at"))
-        upd = parse_stamp_date(issue.get("updated_at"))
         if pub and upd and upd > pub:
             return upd
         return pub or upd or parse_stamp_date(issue.get("date_end"))
-    return parse_stamp_date(issue.get("date_end"))
+    # 草稿：创建日为 date_end；改稿/重新预览后跟最新更新日期
+    end = parse_stamp_date(issue.get("date_end"))
+    if end and upd and upd > end:
+        return upd
+    return end or upd
 
 
 def issue_display_date(issue: dict[str, Any] | None) -> str:

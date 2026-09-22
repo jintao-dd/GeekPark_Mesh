@@ -55,6 +55,16 @@ def test_draft_uses_date_end():
     }) == "2026.9.15"
 
 
+def test_draft_update_uses_newer_update_day():
+    """草稿重新生成预览后：大日期跟最新更新日期。"""
+    assert issue_display_date({
+        "status": "draft",
+        "date_end": "2026-09-15",
+        "updated_at": "2026-09-22 16:50",
+        "period_label": "2026.9.15",
+    }) == "2026.9.22"
+
+
 def test_period_fields_for_stamp():
     f = period_fields_for_stamp("2026-09-22 16:08")
     assert f["period_label"] == "2026.9.22"

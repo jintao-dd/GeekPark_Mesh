@@ -60,29 +60,22 @@ def guard_sql_against_published_write(sql: str) -> None:
 def write_draft_json(con, issue_id: int, payload: str, stamp: str) -> None:
     """编辑/预览唯一写草稿入口（不碰 published_json）。
 
-    已上线期改稿会抬 updated_at：按期号规则同步 period_label/date_* 为最新更新日期。
+    抬 updated_at 时按期号规则同步 period_label/date_* 为最新更新日期
+    （草稿与已上线改稿一致：大日期跟更新日）。
     """
-    row = con.execute("SELECT status FROM issues WHERE id=?", (issue_id,)).fetchone()
-    status = (row["status"] if row else "") or ""
-    if status == "published":
-        from .issue_period import period_fields_for_stamp
+    from .issue_period import period_fields_for_stamp
 
-        period = period_fields_for_stamp(stamp)
-        con.execute(
-            "UPDATE issues SET draft_json=?, updated_at=?, period_label=?, date_start=?, date_end=? WHERE id=?",
-            (
-                payload,
-                stamp,
-                period["period_label"],
-                period["date_start"],
-                period["date_end"],
-                issue_id,
-            ),
-        )
-        return
+    period = period_fields_for_stamp(stamp)
     con.execute(
-        "UPDATE issues SET draft_json=?, updated_at=? WHERE id=?",
-        (payload, stamp, issue_id),
+        "UPDATE issues SET draft_json=?, updated_at=?, period_label=?, date_start=?, date_end=? WHERE id=?",
+        (
+            payload,
+            stamp,
+            period["period_label"],
+            period["date_start"],
+            period["date_end"],
+            issue_id,
+        ),
     )
 
 

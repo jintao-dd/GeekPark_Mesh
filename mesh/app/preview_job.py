@@ -117,11 +117,14 @@ def _preview_url(slug: str) -> str:
 
 def _write_partial_draft(con, issue_id: int, data: dict, stamp: str) -> None:
     """预览只写 draft_json，绝不改 published_json（已上线读者/Ask 不受影响）。"""
-    payload = json.dumps(data, ensure_ascii=False)
-    con.execute(
-        "UPDATE issues SET draft_json=?, updated_at=? WHERE id=?",
-        (payload, stamp, issue_id),
-    )
+    from .issue_period import period_fields_for_stamp
+    from .publish_lane import write_draft_json
+
+    period = period_fields_for_stamp(stamp)
+    data = dict(data)
+    data["period_label"] = period["period_label"]
+    write_draft_json(con, issue_id, json.dumps(data, ensure_ascii=False), stamp)
+
 
 
 def start(slug: str, username: str, *, force: bool = False) -> dict:
@@ -678,8 +681,11 @@ def _run(slug: str, username: str, token: int = 0) -> None:
             bundle["item_rows"],
             team_cards=bundle["team_cards"],
         )
+        stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        from .issue_period import period_fields_for_stamp
+        period_now = period_fields_for_stamp(stamp)
         data["slug"] = slug
-        data["period_label"] = period_label
+        data["period_label"] = period_now["period_label"]
         data["version"] = issue_row.get("version")
         data.pop("_stale", None)
         data = prog.mark_phase(data, prog.PHASE_RELATIONS, cards_done=cards_done_teams)
@@ -693,19 +699,15 @@ def _run(slug: str, username: str, token: int = 0) -> None:
         )
         _sync_relation_kpi(data, n_reader)
 
-        stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-
         if not _is_current(slug, token):
             return
 
         with db.write_lock():
             con = db.connect()
             try:
+                from .publish_lane import write_draft_json
                 payload = json.dumps(data, ensure_ascii=False)
-                con.execute(
-                    "UPDATE issues SET draft_json=?, updated_at=? WHERE id=?",
-                    (payload, stamp, issue_id),
-                )
+                write_draft_json(con, issue_id, payload, stamp)
                 con.commit()
                 from .main import publish_blockers as _pub_blockers
                 blockers = _pub_blockers(con, issue_id, payload)
@@ -745,17 +747,16 @@ def _run(slug: str, username: str, token: int = 0) -> None:
         if resilience.skipped:
             data["_preview_degraded"] = True
         data.pop("_relations_dropped_ungrounded", None)
+        data["period_label"] = period_fields_for_stamp(stamp)["period_label"]
         if not _is_current(slug, token):
             return
         with db.write_lock():
             con = db.connect()
             try:
+                from .publish_lane import write_draft_json
                 payload = json.dumps(data, ensure_ascii=False)
                 # 只写草稿；published_json / Ask 索引仅由「确认上线」更新
-                con.execute(
-                    "UPDATE issues SET draft_json=?, updated_at=? WHERE id=?",
-                    (payload, stamp, issue_id),
-                )
+                write_draft_json(con, issue_id, payload, stamp)
                 db.register_entities(con, data, slug)
                 note = "渐进预览完成：要点卡与草稿已通过进预览检查"
                 if resilience.skipped:
