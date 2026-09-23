@@ -493,6 +493,35 @@ def test_anchor_covers_blocks_kind():
         con.close()
 
 
+def test_pipeline_skips_crm_sources_even_on_reextract():
+    """回归：pipeline 不能整份重抽 CRM source。
+
+    一条 CRM source 可能承载整个窗口的几百条 items，而 pipeline 是
+    「DELETE FROM items WHERE source_id 后重插」，整份重抽会把分块成果抹掉。
+    故无论 extracted 标记与 reextract 参数如何，都必须跳过。
+    """
+    import inspect
+
+    from app import pipeline
+
+    src = inspect.getsource(pipeline)
+    assert '"crm"' in src and "CRM 交叉已分块接入" in src, "pipeline 缺少 CRM source 跳过逻辑"
+    # 跳过判断必须在 DELETE FROM items 之前
+    i_skip = src.find('== "crm"')
+    i_del = src.find("DELETE FROM items WHERE source_id=?")
+    assert 0 < i_skip < i_del, (i_skip, i_del)
+
+
+def test_delete_issue_clears_crm_anchor():
+    """删除一期时锚点也要清掉，避免 issue_id 复用后窗口错乱。"""
+    import inspect
+
+    from app import db as db_mod
+
+    src = inspect.getsource(db_mod.delete_issue)
+    assert "crm_cross_anchor" in src, "delete_issue 未清理 crm_cross_anchor"
+
+
 def test_status_reported_for_no_changes(monkeypatch):
     """无变更时 status 必须是显式的 no_changes（以前是静默的）。"""
     con = db.connect()

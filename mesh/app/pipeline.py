@@ -167,11 +167,24 @@ def _run(slug: str, token: int = 0) -> None:
         total = len(srcs)
 
         pending: list[tuple[int, dict, bool, str]] = []
+        crm_skipped = 0
         for i, s in enumerate(srcs, 1):
             if not _is_current(slug, token):
                 return
             title = (s["title"] or f"来源 {s['id']}")[:36]
             unit = f"#{s['id']} {title}"
+            # CRM 来源由 crm_ingest 按消费窗口分块抽取后接入，且可能一条 source 对应
+            # 整个窗口的几百条 items。这里若整份重抽，会经下面的
+            # DELETE FROM items WHERE source_id 把分块成果一并抹掉，故一律跳过。
+            if (s.get("channel") or "") == "crm":
+                n_exist = con.execute(
+                    "SELECT COUNT(*) AS c FROM items WHERE source_id=?", (s["id"],)
+                ).fetchone()["c"]
+                got += int(n_exist or 0)
+                ok_sources += 1
+                crm_skipped += 1
+                _mark(slug, "extract", f"CRM 交叉已分块接入 {i}/{total} · {title}（{n_exist} 条）")
+                continue
             if int(s.get("extracted") or 0) == 1 and not reextract:
                 n_exist = con.execute(
                     "SELECT COUNT(*) AS c FROM items WHERE source_id=?", (s["id"],)

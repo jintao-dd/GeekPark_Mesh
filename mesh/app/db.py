@@ -1265,6 +1265,7 @@ def delete_issue(con, slug: str) -> bool:
     con.execute("DELETE FROM edits WHERE issue_id=?", (iid,))
     con.execute("DELETE FROM mail_log WHERE issue_id=?", (iid,))
     con.execute("DELETE FROM versions WHERE issue_id=?", (iid,))
+    con.execute("DELETE FROM crm_cross_anchor WHERE issue_id=?", (iid,))
     con.execute("DELETE FROM issues WHERE id=?", (iid,))
     return True
 
