@@ -17,6 +17,7 @@
 """
 from __future__ import annotations
 
+import datetime
 import json
 import logging
 import os
@@ -424,8 +425,16 @@ def get_turn(con, turn_id: int) -> dict[str, Any] | None:
 
 
 def stats(con, *, days: int = 7, source: str = SOURCE_FEISHU) -> dict[str, Any]:
-    """近 N 天质量概览：状态分布 / 渠道分布 / 反馈。默认只看真实飞书样本。"""
-    window = f"-{int(days)} days"
+    """近 N 天质量概览：状态分布 / 渠道分布 / 反馈。默认只看真实飞书样本。
+
+    时间窗用 Python 算好的 cutoff 字符串比较，不用 `datetime('now', ?)`：
+    后者是 SQLite 专有写法，adapt_sql 只重写无参的 `datetime('now')`，
+    在 PG 上会报「function datetime(unknown, unknown) does not exist」并被
+    except 吞掉 → 概览恒为 0，看不出任何问题。
+    """
+    cutoff = (datetime.datetime.now() - datetime.timedelta(days=max(0, int(days)))).strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
     by_status: dict[str, int] = {}
     by_channel: dict[str, int] = {}
     by_source: dict[str, int] = {}
@@ -434,20 +443,20 @@ def stats(con, *, days: int = 7, source: str = SOURCE_FEISHU) -> dict[str, Any]:
     try:
         for r in con.execute(
             "SELECT answer_status, COUNT(*) c FROM agent_qa_log "
-            "WHERE created_at >= datetime('now', ?)" + src_clause + " GROUP BY answer_status",
-            (window, *src_params),
+            "WHERE created_at >= ?" + src_clause + " GROUP BY answer_status",
+            (cutoff, *src_params),
         ):
             by_status[str(r["answer_status"] or "unknown")] = int(r["c"] or 0)
         for r in con.execute(
             "SELECT channel, COUNT(*) c FROM agent_qa_log "
-            "WHERE created_at >= datetime('now', ?)" + src_clause + " GROUP BY channel",
-            (window, *src_params),
+            "WHERE created_at >= ?" + src_clause + " GROUP BY channel",
+            (cutoff, *src_params),
         ):
             by_channel[str(r["channel"] or "unknown")] = int(r["c"] or 0)
         for r in con.execute(
             "SELECT source, COUNT(*) c FROM agent_qa_log "
-            "WHERE created_at >= datetime('now', ?) GROUP BY source",
-            (window,),
+            "WHERE created_at >= ? GROUP BY source",
+            (cutoff,),
         ):
             by_source[str(r["source"] or "unknown")] = int(r["c"] or 0)
     except Exception as e:

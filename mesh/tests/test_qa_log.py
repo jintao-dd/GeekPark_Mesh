@@ -304,6 +304,52 @@ def test_ensure_schema_is_idempotent():
         con.close()
 
 
+def test_stats_uses_no_sqlite_only_datetime_sql():
+    """stats() 不得依赖 SQLite 专有 `datetime('now', ?)`。
+
+    adapt_sql 只重写无参的 `datetime('now')`；带参形式在 PG 上会直接报函数不存在，
+    且被 stats 的 except 吞掉 → 概览恒为 0。这里用假连接断言下发的 SQL 不含该写法。
+    """
+    seen: list[str] = []
+
+    class _Con:
+        dialect = "postgresql"
+
+        def execute(self, sql, params=()):
+            seen.append(" ".join(str(sql).split()))
+
+            class R:
+                def fetchone(self):
+                    return {"c": 0}
+
+                def __iter__(self):
+                    return iter([])
+
+            return R()
+
+    qa_log.stats(_Con(), days=7, source="feishu")
+    assert seen, "stats 应至少下发一条查询"
+    for sql in seen:
+        assert "datetime(" not in sql.lower(), f"stats SQL 含 SQLite 专有函数: {sql}"
+
+
+def test_stats_windows_by_cutoff_and_counts_rows():
+    con = db.connect()
+    try:
+        qa_log.ensure_schema(con)
+        _reset(con)
+        qa_log.record_answer(con, envelope={"channel": "feishu_dm"}, answer=_answer(), question="近题")
+        con.commit()
+        s = qa_log.stats(con, days=7, source="feishu")
+        assert s["total"] == 1
+        assert s["by_status"].get("grounded") == 1
+        # 0 天窗口：cutoff 是「现在」，历史行不计入（证明不是恒 0 也不是恒全量）
+        assert qa_log.stats(con, days=0, source="feishu")["total"] == 0
+    finally:
+        con.close()
+
+
+
 class _AbortedTxError(Exception):
     """模拟 psycopg2 的 InFailedSqlTransaction。"""
 
