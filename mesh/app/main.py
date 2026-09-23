@@ -1475,7 +1475,12 @@ def admin_qa_log(
 
     con = db.connect()
     try:
-        qa_log.ensure_schema(con)
+        # DDL 失败不得让页面 500（历史上 source 补列失败就是这样挂的）；
+        # 单条 DDL 已在 qa_log 内用 SAVEPOINT 隔离，这里再兜一层。
+        try:
+            qa_log.ensure_schema(con)
+        except Exception:
+            con.rollback()
         page = qa_log.list_turns(
             con,
             channel=channel,
@@ -1487,6 +1492,15 @@ def admin_qa_log(
             offset=max(0, int(offset or 0)),
         )
         stats = qa_log.stats(con, days=7, source=source)
+    except Exception as e:
+        # 兜底：任何查询异常也渲染空页 + 错误提示，不抛 500。
+        try:
+            con.rollback()
+        except Exception:
+            pass
+        page = {"turns": [], "total": 0, "limit": 50, "offset": 0}
+        stats = {"days": 7, "source": source, "total": 0, "by_status": {},
+                 "by_channel": {}, "by_source": {}, "error": str(e)[:300]}
     finally:
         con.close()
     return templates.TemplateResponse(

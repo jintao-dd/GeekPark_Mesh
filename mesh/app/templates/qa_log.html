@@ -9,6 +9,13 @@
 </p>
 
 <h2>近 {{ stats.days }} 天概览{% if stats.source %}（来源：{{ stats.source }}）{% endif %}</h2>
+{% if stats.error %}
+<div class="box" style="border-color:#B42318">
+  <b style="color:#B42318">概览查询失败</b>
+  <div class="muted" style="margin-top:6px;font-size:12.5px"><code>{{ stats.error }}</code></div>
+  <div class="muted" style="margin-top:6px;font-size:12.5px">页面仍可用；若持续报错请查容器日志 <code>qa_log</code>。</div>
+</div>
+{% endif %}
 <div class="box">
   <div style="font-size:15px;margin-bottom:8px">共 <b>{{ stats.total }}</b> 轮</div>
   {% if stats.by_source %}

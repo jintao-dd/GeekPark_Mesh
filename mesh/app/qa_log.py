@@ -78,11 +78,91 @@ def source_of(channel: str) -> str:
 
 
 
+def _safe_ddl(con, sql: str, *, pg: bool) -> None:
+    """执行 DDL；单条失败不得毒化外层事务。
+
+    Postgres 里任意语句报错会把整个事务置为 aborted，之后所有语句都返回
+    InFailedSqlTransaction。这里用 SAVEPOINT 把失败限制在本语句内，
+    否则一条索引建不起来就会连累后面的补列，且被 except 吞掉后无从察觉。
+    """
+    if pg:
+        try:
+            con.execute("SAVEPOINT qa_log_ddl")
+        except Exception:
+            pass
+    try:
+        con.execute(sql)
+        if pg:
+            con.execute("RELEASE SAVEPOINT qa_log_ddl")
+    except Exception as e:
+        _log.warning("qa_log ddl failed: %s | sql=%s", e, sql[:90])
+        if pg:
+            try:
+                con.execute("ROLLBACK TO SAVEPOINT qa_log_ddl")
+            except Exception:
+                pass
+
+
+def _add_column_if_missing(con, table: str, col: str, decl: str, *, pg: bool) -> bool:
+    """补列；返回是否本次新建（用于决定要不要回填历史数据）。"""
+    if pg:
+        try:
+            exists = bool(
+                con.execute(
+                    "SELECT 1 FROM information_schema.columns "
+                    "WHERE table_schema='public' AND table_name=%s AND column_name=%s",
+                    (table, col),
+                ).fetchone()
+            )
+        except Exception:
+            exists = False
+        if exists:
+            return False
+        _safe_ddl(con, f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {decl}", pg=pg)
+        return True
+    try:
+        cols = {
+            (r["name"] if hasattr(r, "keys") else r[1])
+            for r in con.execute(f"PRAGMA table_info({table})")
+        }
+    except Exception:
+        return False
+    if col in cols:
+        return False
+    _safe_ddl(con, f"ALTER TABLE {table} ADD COLUMN {col} {decl}", pg=pg)
+    return True
+
+
+def _backfill_source(con, *, pg: bool) -> None:
+    """老库补出 source 后，按 channel 回填历史行。
+
+    否则这些真实飞书样本 source 为 NULL，会被回看台默认的 source=feishu 过滤掉，
+    看起来「一条记录都没有」。
+    """
+    cases = " ".join(
+        f"WHEN channel = ? THEN ?" for _ in _FEISHU_CHANNELS
+    )
+    params: list[Any] = []
+    for ch in _FEISHU_CHANNELS:
+        params.extend([ch, SOURCE_FEISHU])
+    params.extend(["harness", SOURCE_EVAL])
+    sql = (
+        f"UPDATE agent_qa_log SET source = CASE {cases} "
+        f"WHEN channel = ? THEN ? ELSE ? END WHERE source IS NULL"
+    )
+    params.append(SOURCE_HTTP)
+    try:
+        con.execute(sql, params)
+    except Exception as e:
+        _log.warning("qa_log source backfill failed: %s", e)
+
+
 def ensure_schema(con) -> None:
     """SQLite / Postgres 均可反复调用。"""
     pg = getattr(con, "dialect", "sqlite") == "postgresql"
     pk = "SERIAL PRIMARY KEY" if pg else "INTEGER PRIMARY KEY"
-    ddls = [
+    _safe_ddl(
+        con,
         f"""CREATE TABLE IF NOT EXISTS agent_qa_log(
           id {pk},
           request_id TEXT,
@@ -111,30 +191,22 @@ def ensure_schema(con) -> None:
           feedback_at TEXT,
           created_at TEXT DEFAULT (datetime('now'))
         )""",
+        pg=pg,
+    )
+    # 旧库补列必须在建索引之前：先建 source 索引会因缺列报错，
+    # 进而 abort 整个 PG 事务，把后面的补列一起带没。
+    added = _add_column_if_missing(con, "agent_qa_log", "source", "TEXT", pg=pg)
+    if added:
+        _backfill_source(con, pg=pg)
+    for idx in (
         "CREATE INDEX IF NOT EXISTS idx_qa_log_created ON agent_qa_log(created_at)",
         "CREATE INDEX IF NOT EXISTS idx_qa_log_channel ON agent_qa_log(channel, created_at)",
         "CREATE INDEX IF NOT EXISTS idx_qa_log_source ON agent_qa_log(source, created_at)",
         "CREATE INDEX IF NOT EXISTS idx_qa_log_status ON agent_qa_log(answer_status, created_at)",
         "CREATE INDEX IF NOT EXISTS idx_qa_log_session ON agent_qa_log(session_id)",
         "CREATE INDEX IF NOT EXISTS idx_qa_log_open_id ON agent_qa_log(feishu_open_id)",
-    ]
-    for ddl in ddls:
-        try:
-            con.execute(ddl)
-        except Exception as e:
-            _log.warning("qa_log ddl failed: %s", e)
-    # 旧库补列：source
-    try:
-        cols = {r["name"] if hasattr(r, "keys") else r[1] for r in con.execute("PRAGMA table_info(agent_qa_log)")}
-        if "source" not in cols and not pg:
-            con.execute("ALTER TABLE agent_qa_log ADD COLUMN source TEXT")
-    except Exception:
-        pass
-    if pg:
-        try:
-            con.execute("ALTER TABLE agent_qa_log ADD COLUMN IF NOT EXISTS source TEXT")
-        except Exception:
-            pass
+    ):
+        _safe_ddl(con, idx, pg=pg)
 
 
 def _json_dump(v: Any) -> str:

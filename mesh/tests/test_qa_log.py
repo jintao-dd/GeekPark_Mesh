@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -240,3 +241,161 @@ def test_feishu_tagged_as_feishu_source():
         assert qa_log.list_turns(con, source="feishu")["total"] == 1
     finally:
         con.close()
+
+
+def test_legacy_table_without_source_column_is_migrated_and_backfilled():
+    """老库没有 source 列：ensure_schema 必须补上并回填，且不得毒化事务。
+
+    线上 500 的根因：建 source 索引发生在补列之前，PG 报「column does not exist」
+    后事务被 abort，随后的 ALTER TABLE ADD COLUMN 又被 except 吞掉，
+    于是 source 永远补不上，/admin/qa 每次查询都撞 InFailedSqlTransaction。
+    """
+    con = db.connect()
+    try:
+        con.execute("DROP TABLE IF EXISTS agent_qa_log")
+        # 造一个缺 source 的旧表（与 bfde11a 的 schema 一致）
+        con.execute(
+            """CREATE TABLE agent_qa_log(
+              id INTEGER PRIMARY KEY, request_id TEXT, channel TEXT,
+              feishu_open_id TEXT, mesh_user_id INTEGER, session_id TEXT, chat_id TEXT,
+              question TEXT NOT NULL, answer_text TEXT, intent TEXT, route TEXT,
+              tools_called TEXT, answer_status TEXT, evidence_count INTEGER DEFAULT 0,
+              evidence_refs TEXT, claim_bindings TEXT, latency_ms INTEGER,
+              refused INTEGER DEFAULT 0, error TEXT, trace_json TEXT,
+              feedback TEXT, feedback_note TEXT, feedback_by TEXT, feedback_at TEXT,
+              created_at TEXT DEFAULT (datetime('now')))"""
+        )
+        con.execute(
+            "INSERT INTO agent_qa_log(channel, question, answer_status, evidence_count) "
+            "VALUES(?,?,?,?)",
+            ("feishu_dm", "历史真实题", "grounded", 2),
+        )
+        con.commit()
+
+        qa_log.ensure_schema(con)
+        con.commit()
+
+        cols = {r["name"] for r in con.execute("PRAGMA table_info(agent_qa_log)")}
+        assert "source" in cols
+        # 历史行必须被回填，否则默认 source=feishu 过滤下「一条都没有」
+        assert qa_log.list_turns(con, source="feishu")["total"] == 1
+        assert qa_log.get_turn(con, 1)["source"] == "feishu"
+        # 且事务未被毒化：还能继续查询
+        assert qa_log.stats(con, days=3650, source="feishu")["total"] == 1
+    finally:
+        try:
+            con.execute("DROP TABLE IF EXISTS agent_qa_log")
+            con.commit()
+        except Exception:
+            pass
+        con.close()
+
+
+def test_ensure_schema_is_idempotent():
+    con = db.connect()
+    try:
+        qa_log.ensure_schema(con)
+        con.commit()
+        qa_log.ensure_schema(con)
+        con.commit()
+        cols = {r["name"] for r in con.execute("PRAGMA table_info(agent_qa_log)")}
+        assert "source" in cols
+    finally:
+        con.close()
+
+
+class _AbortedTxError(Exception):
+    """模拟 psycopg2 的 InFailedSqlTransaction。"""
+
+
+class _FakePgCon:
+    """模拟 Postgres：任一语句报错后，事务进入 aborted，后续语句全部报错。
+
+    只有 ROLLBACK TO SAVEPOINT 才能解除 aborted。SQLite 不会这样，
+    所以线上这个 bug 在本地 SQLite 测试里测不出来——必须显式模拟。
+    """
+
+    dialect = "postgresql"
+
+    def __init__(self, cols):
+        self.cols = set(cols)
+        self.aborted = False
+        self.savepoints: list[str] = []
+        self.executed: list[str] = []
+
+    def execute(self, sql, params=()):
+        s = " ".join(str(sql).split())
+        self.executed.append(s)
+        up = s.upper()
+        if up.startswith("SAVEPOINT"):
+            self.savepoints.append(s.split()[-1])
+            return self
+        if up.startswith("RELEASE SAVEPOINT"):
+            if self.savepoints:
+                self.savepoints.pop()
+            return self
+        if up.startswith("ROLLBACK TO SAVEPOINT"):
+            self.aborted = False
+            return self
+        if self.aborted:
+            raise _AbortedTxError("current transaction is aborted")
+
+        # information_schema 查询：返回列是否存在
+        if "INFORMATION_SCHEMA.COLUMNS" in up:
+            name = (params or ("", ""))[-1]
+            self._rows = [{"1": 1}] if name in self.cols else []
+            return self
+        if up.startswith("ALTER TABLE") and "ADD COLUMN" in up:
+            rest = s.split("ADD COLUMN", 1)[1].strip()
+            rest = re.sub(r"^IF\s+NOT\s+EXISTS\s+", "", rest, flags=re.IGNORECASE)
+            col = rest.split()[0]
+            if col not in self.cols:
+                self.cols.add(col)
+            return self
+        if up.startswith("CREATE INDEX") and " ON AGENT_QA_LOG(" in up:
+            # 索引列必须在表里，否则 PG 报错
+            body = s.split("(", 1)[1]
+            for c in body.split(")")[0].split(","):
+                if c.strip() and c.strip() not in self.cols:
+                    self.aborted = True  # 关键：毒化事务
+                    raise _AbortedTxError(f"column {c.strip()} does not exist")
+            return self
+        if up.startswith("UPDATE AGENT_QA_LOG SET SOURCE"):
+            return self
+        return self
+
+    def fetchone(self):
+        return (getattr(self, "_rows", None) or [None])[0]
+
+    def fetchall(self):
+        return getattr(self, "_rows", [])
+
+    def commit(self):
+        self.aborted = False
+
+    def rollback(self):
+        self.aborted = False
+
+    def close(self):
+        pass
+
+
+def test_pg_migration_adds_source_before_index_and_survives_abort():
+    """PG 回归：老表缺 source 时，补列必须先于建索引，否则事务被毒化、列永远补不上。"""
+    con = _FakePgCon(cols={"id", "request_id", "channel", "question", "answer_status",
+                           "evidence_count", "created_at"})
+    qa_log.ensure_schema(con)
+    # 补列成功
+    assert "source" in con.cols
+    # 事务未被毒化：最后没有残留 aborted
+    assert con.aborted is False
+    # 顺序断言：ADD COLUMN source 出现在 source 索引之前
+    add_i = next(
+        i for i, s in enumerate(con.executed)
+        if s.upper().startswith("ALTER TABLE") and "ADD COLUMN" in s.upper() and "SOURCE" in s.upper()
+    )
+    idx_i = next(
+        i for i, s in enumerate(con.executed)
+        if s.upper().startswith("CREATE INDEX") and "IDX_QA_LOG_SOURCE" in s.upper()
+    )
+    assert add_i < idx_i, "source 补列必须早于 source 索引，否则 PG 事务会被 abort"
