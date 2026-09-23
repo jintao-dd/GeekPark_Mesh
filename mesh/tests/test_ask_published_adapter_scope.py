@@ -167,3 +167,39 @@ def test_expand_person_contexts_batches_names():
     # 人名扩召回不得重复走向量（避免每批一次全量 cosine）
     assert all(c["use_vector"] is False for c in calls)
     assert len(ctxs) >= 2
+
+
+def test_structured_summary_keeps_deterministic_count():
+    """结构化结果成文必须保留「查询说明」里的确定性总数，不能只列标题。"""
+    from app.agent.adapters import _structured_summary
+
+    ctxs = [
+        {
+            "期号": "查询说明",
+            "章节": "结构化检索",
+            "标题": "本答案由主体×团队事实表算出，非全文模糊检索",
+            "内容": "查询类型：跨团队主体。按主体名去重后，出现在 ≥2 个团队的主体共 21 个，"
+                    "下列展示 21 个。请直接回答 21，不要另算。",
+        },
+        {
+            "期号": "2026-09-15",
+            "章节": "接触",
+            "标题": "机器鸭",
+            "内容": "出现在 3 个团队：编辑部、英文站、视频号团队",
+        },
+    ]
+    out = _structured_summary(ctxs, "多少家公司在多个团队同时出现过？")
+    assert "21" in out
+    assert "机器鸭" in out
+    # 只列标题、丢掉总数 的旧行为不得回归
+    assert "共 21 个" in out
+
+
+def test_structured_summary_without_preamble_falls_back_to_rows():
+    from app.agent.adapters import _structured_summary
+
+    out = _structured_summary(
+        [{"期号": "2026-09-15", "章节": "接触", "标题": "xAI", "内容": "出现在 3 个团队"}],
+        "q",
+    )
+    assert "xAI" in out

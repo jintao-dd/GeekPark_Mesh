@@ -215,6 +215,39 @@ def _summary_from_contexts(contexts: list[dict], q: str, *, max_items: int = 5) 
     return head + "\n" + "\n".join(lines)
 
 
+def _structured_summary(contexts: list[dict], q: str, *, max_items: int = 12) -> str:
+    """结构化结果成文兜底：先给「查询说明」里的确定性口径（总数/条件），再列主体。
+
+    此前统一走 _summary_from_contexts：它把「查询说明」整条跳过、且只取标题，
+    于是「共 N 个」这类唯一确定的结论被丢掉，成文退回「材料不足」。
+    结构化检索的总数来自 SQL，本身即结论，必须优先保留。
+    """
+    head = ""
+    lines: list[str] = []
+    for ctx in contexts or []:
+        if not isinstance(ctx, dict):
+            continue
+        sec = str(ctx.get("章节") or "")
+        issue = str(ctx.get("期号") or "")
+        title = str(ctx.get("标题") or "").strip()
+        body = str(ctx.get("内容") or "").strip()
+        if issue == "查询说明" or sec in ("结构化检索", "查询说明"):
+            if not head and body:
+                head = body
+            continue
+        if not (title or body):
+            continue
+        lines.append(f"- {title}：{body[:200]}" if body else f"- {title}")
+        if len(lines) >= max_items:
+            break
+    if not head and not lines:
+        return "未在已上线周报中找到与问题直接相关的记录。"
+    out = head
+    if lines:
+        out = (out + "\n\n" if out else "") + "\n".join(lines)
+    return out.strip()
+
+
 def _maybe_llm_answer(
     q: str, contexts: list[dict], *, temporal_block: str = ""
 ) -> str | None:
@@ -371,12 +404,17 @@ def ask_published(
     tblock = temporal_mod.prompt_block(sem)
     answer = (prepared.get("direct_answer") or "").strip()
     if not answer and contexts:
-        llm_ans = _maybe_llm_answer(q, contexts, temporal_block=tblock)
-        if llm_ans:
-            answer = llm_ans
-            llm_used = True
+        # 结构化结果的总数由 SQL 确定性算出，是唯一可靠结论：
+        # 若交给 LLM 从标题里二次归纳，会把「共 N 个」丢掉甚至答「材料不足」。
+        if (prepared.get("mode") or "") == "structured":
+            answer = _structured_summary(contexts, q)
         else:
-            answer = _summary_from_contexts(contexts, q)
+            llm_ans = _maybe_llm_answer(q, contexts, temporal_block=tblock)
+            if llm_ans:
+                answer = llm_ans
+                llm_used = True
+            else:
+                answer = _summary_from_contexts(contexts, q)
     if not answer:
         answer = "未在已上线周报中找到与问题直接相关的记录。"
 
