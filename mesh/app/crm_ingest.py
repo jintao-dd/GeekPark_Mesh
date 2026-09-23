@@ -37,6 +37,9 @@ SOURCE_STYPE = "T3"
 CHANNEL = "crm"
 
 _SYNC_KINDS = ("people", "companies", "interactions", "takes")
+# 消费锚点覆盖的类别：四库属性 + 页面正文。
+# blocks 必须在内，否则正文锚点永不推进、每期都会重抽全部页面。
+_CONSUME_KINDS = _SYNC_KINDS + ("blocks",)
 
 # 首次接入时的兜底回看天数（锚点表缺失且本期无 date_start 时用）
 _FALLBACK_DAYS = 14
@@ -127,10 +130,10 @@ def resolve_window(con, issue: dict) -> dict[str, str]:
     """
     anchors = _load_anchors(con, int(issue["id"]))
     floor = _issue_window_floor(issue)
-    return {k: (anchors.get(k) or floor) for k in _SYNC_KINDS}
+    return {k: (anchors.get(k) or floor) for k in _CONSUME_KINDS}
 
 
-def commit_anchors(con, issue_id: int, until: str, kinds=_SYNC_KINDS) -> None:
+def commit_anchors(con, issue_id: int, until: str, kinds=_CONSUME_KINDS) -> None:
     """消费成功后推进锚点。仅在真正写入 items 之后调用。"""
     now = _now_iso()
     for kind in kinds:
@@ -539,38 +542,45 @@ def _write_items(con, issue, *, source_id: int, items: list[dict]) -> int:
     return len(items)
 
 
-def _existing_source(con, issue_id: int) -> dict | None:
-    row = con.execute(
-        "SELECT id, meta FROM sources WHERE issue_id=? AND channel=? ORDER BY id LIMIT 1",
+def _window_key(digest: dict) -> str:
+    """本消费窗口的稳定指纹：同窗口重跑 = 同一条 source，不会重复叠加。"""
+    parts = [(k, (digest.get("since") or {}).get(k) or "") for k in _CONSUME_KINDS]
+    parts.append(("until", digest.get("until") or ""))
+    return "|".join(f"{k}={v}" for k, v in parts)
+
+
+def _source_for_window(con, issue_id: int, key: str) -> dict | None:
+    rows = con.execute(
+        "SELECT id, meta FROM sources WHERE issue_id=? AND channel=? ORDER BY id",
         (issue_id, CHANNEL),
-    ).fetchone()
-    return dict(row) if row else None
-
-
-def _prev_since(meta_json: str) -> dict[str, str]:
-    try:
-        meta = json.loads(meta_json or "{}")
-    except (json.JSONDecodeError, TypeError):
-        return {}
-    since = (meta or {}).get("since") or {}
-    return {k: str(v) for k, v in since.items() if v} if isinstance(since, dict) else {}
+    ).fetchall()
+    for r in rows:
+        try:
+            if (json.loads(r["meta"] or "{}") or {}).get("window_key") == key:
+                return dict(r)
+        except (json.JSONDecodeError, TypeError):
+            continue
+    return None
 
 
 def ingest_for_issue(con, issue, *, digest: dict, items: list[dict] | None = None) -> dict:
-    """把增量摘要作为一条 sources(channel='crm') 接入该期，并抽取成 items。
+    """把**本次消费窗口**作为一条 sources(channel='crm') 接入该期，并抽取成 items。
 
-    复用同一期已有的 CRM 来源行（重复生成预览不叠加）。
+    每期可以有**多条** CRM source：一个消费窗口一条。
+    这样「新数据到达后再次生成预览」只会在本窗口内删后插（幂等），
+    而不会像旧实现那样复用唯一 source、把上一批已入库的条目整体删掉。
     items 由调用方在写锁外抽好传入；为 None 时在本函数内同步抽取（调用方需自行持锁）。
     """
     text = (digest or {}).get("text") or ""
     if not text.strip():
         return {"ingested": False, "reason": "no_changes", "items": 0}
-
     ensure_anchor_schema(con)
+    key = _window_key(digest)
     meta = json.dumps(
         {
             "crm_ingest": 1,
             "source_label": SOURCE_LABEL,
+            "window_key": key,
             "since": digest.get("since") or {},
             "until": digest.get("until") or "",
             "counts": digest.get("counts") or {},
@@ -580,8 +590,7 @@ def ingest_for_issue(con, issue, *, digest: dict, items: list[dict] | None = Non
         },
         ensure_ascii=False,
     )
-
-    ex = _existing_source(con, issue["id"])
+    ex = _source_for_window(con, issue["id"], key)
     if ex:
         sid = ex["id"]
         con.execute(
@@ -597,13 +606,13 @@ def ingest_for_issue(con, issue, *, digest: dict, items: list[dict] | None = Non
             "VALUES(?,?,?,?,?,?,?,?,?)",
             (issue["id"], SOURCE_STYPE, SOURCE_TEAM, SOURCE_TITLE, SOURCE_FILENAME, "", text, meta, CHANNEL),
         )
-
     if items is None:
         items, n_chunks = extract_all_chunks(issue, text=text, source_id=sid)
         digest["chunks"] = n_chunks
+    # 仅删除**本窗口**的条目后重插：其他窗口的历史批次不受影响
     n_items = _write_items(con, issue, source_id=sid, items=items)
     con.execute("UPDATE sources SET extracted=1 WHERE id=?", (sid,))
-    # 只消费成功才推进锚点：窗口收敛，重跑不会重抽同一段
+    # 消费成功才推进锚点：窗口收敛，重跑不会重抽同一段
     commit_anchors(con, issue["id"], digest.get("until") or _now_iso())
     return {
         "ingested": True,

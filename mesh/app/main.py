@@ -1523,7 +1523,7 @@ def admin_crm_anchor_reset(request: Request, slug: str, since: str = ""):
             raise HTTPException(status_code=404, detail="没有这一期")
         issue_id = int(row["id"])
         if (since or "").strip():
-            for kind in crm_ingest._SYNC_KINDS:
+            for kind in crm_ingest._CONSUME_KINDS:
                 con.execute(
                     "INSERT INTO crm_cross_anchor(issue_id,kind,anchor_edited,updated_at) "
                     "VALUES(?,?,?,?) ON CONFLICT(issue_id,kind) DO UPDATE SET "

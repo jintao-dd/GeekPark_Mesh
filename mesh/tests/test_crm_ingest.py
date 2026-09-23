@@ -101,13 +101,74 @@ def test_ingest_writes_t3_source_with_fixed_label(monkeypatch):
         assert it["owner_team"] == "硅谷 BD 团队"
         assert it["channel"] == "crm"
 
-        # 重复接入不新增来源行
+        # 同一窗口重复接入：复用同一条 source，不叠加
         out2 = crm_ingest.ingest_for_issue(con, issue, digest=digest)
         con.commit()
         n = con.execute(
             "SELECT COUNT(*) c FROM sources WHERE issue_id=99001 AND channel='crm'"
         ).fetchone()["c"]
         assert n == 1 and out2["source_id"] == out["source_id"]
+        assert con.execute(
+            "SELECT COUNT(*) c FROM items WHERE issue_id=99001 AND channel='crm'"
+        ).fetchone()["c"] == 1
+    finally:
+        con.close()
+
+
+def test_new_window_accumulates_and_keeps_previous_items(monkeypatch):
+    """回归：新数据到达后再生成预览，上一批 CRM 条目不能被删掉。
+
+    旧实现复用唯一 source 且 _write_items 先删后插，
+    窗口收敛后重跑会把 728 条削成 21 条。
+    """
+    con = db.connect()
+    try:
+        issue = _seed_issue(con)
+        monkeypatch.setattr(
+            crm_ingest, "_extract_items",
+            lambda issue_, *, source_id, text: [
+                {"zone": 3, "level": "L1", "kind": "fact", "text": "x",
+                 "entities": [], "roles": [], "signals": [],
+                 "source_label": crm_ingest.SOURCE_LABEL, "pointer": "", "blocked": 0}
+            ],
+        )
+        # 窗口 1：4 条
+        d1 = {"text": "w1", "counts": {}, "since": {"people": "2026-09-16T00:00:00.000Z"},
+              "until": "2026-09-20T00:00:00.000Z", "chunks": 4}
+        d1["text"] = "【Notion CRM 增量】\n" + "\n".join(f"- 行{i}" for i in range(4))
+        crm_ingest.ingest_for_issue(con, issue, digest=d1, items=[
+            {"zone": 3, "level": "L1", "kind": "fact", "text": "x",
+             "entities": [], "roles": [], "signals": [],
+             "source_label": crm_ingest.SOURCE_LABEL, "pointer": "", "blocked": 0} for _ in range(4)
+        ])
+        con.commit()
+        # 窗口 2：3 条（模拟新增数据）
+        d2 = {"text": "w2", "counts": {}, "since": {"people": "2026-09-20T00:00:00.000Z"},
+              "until": "2026-09-23T00:00:00.000Z", "chunks": 3}
+        d2["text"] = "【Notion CRM 增量】\n" + "\n".join(f"- 新{i}" for i in range(3))
+        crm_ingest.ingest_for_issue(con, issue, digest=d2, items=[
+            {"zone": 3, "level": "L1", "kind": "fact", "text": "x",
+             "entities": [], "roles": [], "signals": [],
+             "source_label": crm_ingest.SOURCE_LABEL, "pointer": "", "blocked": 0} for _ in range(3)
+        ])
+        con.commit()
+        assert con.execute(
+            "SELECT COUNT(*) c FROM sources WHERE issue_id=99001 AND channel='crm'"
+        ).fetchone()["c"] == 2, "两个窗口应有两条 source"
+        assert con.execute(
+            "SELECT COUNT(*) c FROM items WHERE issue_id=99001 AND channel='crm'"
+        ).fetchone()["c"] == 7, "两批条目应累积"
+
+        # 窗口 2 重跑：只替换窗口 2，窗口 1 的 4 条不动
+        crm_ingest.ingest_for_issue(con, issue, digest=d2, items=[
+            {"zone": 3, "level": "L1", "kind": "fact", "text": "x",
+             "entities": [], "roles": [], "signals": [],
+             "source_label": crm_ingest.SOURCE_LABEL, "pointer": "", "blocked": 0} for _ in range(3)
+        ])
+        con.commit()
+        assert con.execute(
+            "SELECT COUNT(*) c FROM items WHERE issue_id=99001 AND channel='crm'"
+        ).fetchone()["c"] == 7, "重跑窗口不应波及上一批"
     finally:
         con.close()
 
@@ -213,6 +274,7 @@ def test_anchor_advances_only_after_consume_and_rerun_is_idempotent(monkeypatch)
         assert w1["takes"] == d["until"], "消费成功应推进锚点"
         # 重跑：锚点不再回到 date_start（旧 min() 行为会永久钉在最早那天）
         assert w1["takes"] > w0["takes"]
+        assert w1["blocks"] > w0["blocks"], "正文锚点也要推进"
         d2 = crm_ingest.build_digest(con, since_map=w1)
         assert d2["counts"]["takes"] == 0, "同一窗口不应被重复消费"
     finally:
@@ -412,6 +474,21 @@ def test_timeline_respects_page_window():
         d = crm_ingest.build_digest(con, since_map={"blocks": "2026-09-16T00:00:00.000Z"})
         assert d["counts"]["blocks"] == 0
         assert "旧内容" not in d["text"]
+    finally:
+        con.close()
+
+
+def test_anchor_covers_blocks_kind():
+    """回归：blocks 必须在消费锚点里，否则每期都会重抽全部页面正文。"""
+    con = db.connect()
+    try:
+        issue = _seed_issue(con)
+        assert "blocks" in crm_ingest._CONSUME_KINDS
+        w = crm_ingest.resolve_window(con, issue)
+        assert "blocks" in w, w
+        crm_ingest.commit_anchors(con, issue["id"], "2026-09-23T00:00:00.000Z")
+        con.commit()
+        assert crm_ingest._load_anchors(con, issue["id"]).get("blocks") == "2026-09-23T00:00:00.000Z"
     finally:
         con.close()
 
