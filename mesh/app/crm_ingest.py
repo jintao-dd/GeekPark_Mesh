@@ -47,6 +47,8 @@ _SAFETY_MAX_ROWS = 4000
 # 改为按行数/字符数切块，每块独立抽取，彻底消除「80 行之外被截断」。
 _CHUNK_LINES = 40
 _CHUNK_CHARS = 6000
+# 单次接入的分块上限（防止异常超大窗口把 LLM 打爆）；超出的行会被计入 truncated
+_MAX_CHUNKS = 60
 # 页面正文（Take 时间线）单页与总量的软上限，超出时显式记录在 truncated
 _BLOCK_PAGE_LIMIT = 60
 _BLOCK_CHARS_PER_PAGE = 1200
@@ -441,24 +443,63 @@ def _extract_items(issue, *, source_id: int, text: str) -> list[dict]:
 
 
 def extract_all_chunks(issue, *, text: str, source_id: int = -1) -> tuple[list[dict], int]:
-    """按行分块逐块抽取，合并结果。
+    """按行分块并行抽取，合并结果。
 
     取代原来的「整份文本一次抽取 + 80 行硬截断」：
     块内是合法抽取单元，且不会触发 aggregator 的短行过滤。
-    单块失败只跳过该块（记日志），不拖垮整次接入。
+    并行走 llm 既有的段级信号量（MESH_SEGMENT_EXTRACT_MAX_CONCURRENT）限流，
+    单块失败/超时只跳过该块（记日志），不拖垮整次接入。
     """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from . import llm
+
     chunks = split_digest_chunks(text)
     if not chunks:
         return [], 0
-    items: list[dict] = []
-    ok_chunks = 0
-    for i, ch in enumerate(chunks):
+    if len(chunks) > _MAX_CHUNKS:
+        _log.warning("crm chunks capped %s -> %s", len(chunks), _MAX_CHUNKS)
+        chunks = chunks[:_MAX_CHUNKS]
+
+    workers = max(1, min(len(chunks), int(os.environ.get("MESH_CRM_CHUNK_WORKERS") or 4)))
+    sem = getattr(llm, "_SEG_EXTRACT_SEMAPHORE", None)
+    budget = getattr(llm, "_SEG_EXTRACT_TIMEOUT_S", 120)
+
+    def _one(i_ch: tuple[int, str]) -> list[dict]:
+        i, ch = i_ch
+        if sem is not None and not sem.acquire(timeout=budget):
+            _log.warning("crm chunk %s/%s semaphore timeout", i + 1, len(chunks))
+            return []
         try:
-            items.extend(_extract_items(issue, source_id=source_id, text=ch))
-            ok_chunks += 1
+            return _extract_items(issue, source_id=source_id, text=ch)
         except Exception as e:
             _log.warning("crm chunk extract failed %s/%s: %s", i + 1, len(chunks), e)
-    if chunks and ok_chunks == 0:
+            return []
+        finally:
+            if sem is not None:
+                sem.release()
+
+    items: list[dict] = []
+    ok_chunks = 0
+    if len(chunks) == 1 or workers == 1:
+        for i, ch in enumerate(chunks):
+            got = _one((i, ch))
+            if got:
+                ok_chunks += 1
+            items.extend(got)
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futs = {pool.submit(_one, (i, ch)): i for i, ch in enumerate(chunks)}
+            for fut in as_completed(futs):
+                try:
+                    got = fut.result(timeout=budget)
+                except Exception as e:
+                    _log.warning("crm chunk future failed %s/%s: %s", futs[fut] + 1, len(chunks), e)
+                    continue
+                if got:
+                    ok_chunks += 1
+                items.extend(got)
+
+    if ok_chunks == 0:
         raise RuntimeError(f"全部 {len(chunks)} 个分块抽取失败")
     return items, len(chunks)
 

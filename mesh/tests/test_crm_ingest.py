@@ -295,6 +295,51 @@ def test_extract_all_chunks_survives_one_bad_chunk(monkeypatch):
     assert len(items) == n_chunks - 1, "只有坏的那块被跳过"
 
 
+def test_extract_all_chunks_parallel_runs_all_chunks(monkeypatch):
+    """并行路径：所有分块都要被跑到（结果顺序不保证，但条数要对）。"""
+    seen: list[str] = []
+    import threading
+
+    lock = threading.Lock()
+
+    def _fake(issue_, *, source_id, text):
+        with lock:
+            seen.append(text)
+        return [
+            {"zone": 3, "level": "L1", "kind": "fact", "text": "t",
+             "entities": [], "roles": [], "signals": [],
+             "source_label": crm_ingest.SOURCE_LABEL, "pointer": "", "blocked": 0}
+        ]
+
+    monkeypatch.setattr(crm_ingest, "_extract_items", _fake)
+    monkeypatch.setenv("MESH_CRM_CHUNK_WORKERS", "4")
+    items, n_chunks = crm_ingest.extract_all_chunks(
+        {"date_start": "2026-09-16", "date_end": "2026-09-22", "period_label": "x"},
+        text=_digest_with_kinds(300),
+    )
+    assert n_chunks == len(seen) and n_chunks > 4
+    assert len(items) == n_chunks
+
+
+def test_chunks_are_capped(monkeypatch):
+    """异常超大窗口：分块数被 _MAX_CHUNKS 兜住，不把 LLM 打爆。"""
+    monkeypatch.setattr(crm_ingest, "_MAX_CHUNKS", 3)
+    monkeypatch.setattr(
+        crm_ingest, "_extract_items",
+        lambda issue_, *, source_id, text: [
+            {"zone": 3, "level": "L1", "kind": "fact", "text": "t",
+             "entities": [], "roles": [], "signals": [],
+             "source_label": crm_ingest.SOURCE_LABEL, "pointer": "", "blocked": 0}
+        ],
+    )
+    items, n_chunks = crm_ingest.extract_all_chunks(
+        {"date_start": "2026-09-16", "date_end": "2026-09-22", "period_label": "x"},
+        text=_digest_with_kinds(300),
+    )
+    assert n_chunks == 3
+    assert len(items) == 3
+
+
 def test_no_hard_row_cap_for_short_rows():
     """回归：旧的 _CAP_PER_KIND=80 会静默丢掉 747 行；现在不再截断。"""
     con = db.connect()
