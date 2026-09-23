@@ -324,6 +324,20 @@ CREATE TABLE IF NOT EXISTS crm_takes(
   props_json TEXT, last_edited_time TEXT, synced_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_crm_takes_reviewed ON crm_takes(last_reviewed);
+CREATE TABLE IF NOT EXISTS crm_page_blocks(
+  id INTEGER PRIMARY KEY,
+  notion_id TEXT NOT NULL,
+  owner_kind TEXT DEFAULT 'takes',
+  block_id TEXT UNIQUE NOT NULL,
+  parent_block_id TEXT,
+  ord INTEGER,
+  block_type TEXT,
+  text TEXT,
+  page_last_edited TEXT,
+  synced_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_crm_blocks_page ON crm_page_blocks(notion_id, ord);
+CREATE INDEX IF NOT EXISTS idx_crm_blocks_kind ON crm_page_blocks(owner_kind);
 """
 
 @contextmanager

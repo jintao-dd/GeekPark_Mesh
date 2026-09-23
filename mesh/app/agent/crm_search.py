@@ -452,7 +452,7 @@ def _search_takes(con, q: str = "", *, limit: int = 10) -> list[dict[str, Any]]:
     if not (q or "").strip() or (q or "").strip().lower() in _SIQI_ALIASES:
         rows = con.execute(
             """
-            SELECT name, person_names, verdict, scenario, owner, last_reviewed, is_prospect
+            SELECT notion_id, name, person_names, verdict, scenario, owner, last_reviewed, is_prospect
             FROM crm_takes
             WHERE verdict IS NOT NULL AND TRIM(verdict) != ''
             ORDER BY last_reviewed DESC, name
@@ -463,7 +463,7 @@ def _search_takes(con, q: str = "", *, limit: int = 10) -> list[dict[str, Any]]:
     else:
         rows = con.execute(
             """
-            SELECT name, person_names, verdict, scenario, owner, last_reviewed, is_prospect
+            SELECT notion_id, name, person_names, verdict, scenario, owner, last_reviewed, is_prospect
             FROM crm_takes
             WHERE person_names LIKE ? OR name LIKE ? OR verdict LIKE ? OR scenario LIKE ?
             ORDER BY last_reviewed DESC, name
@@ -473,6 +473,7 @@ def _search_takes(con, q: str = "", *, limit: int = 10) -> list[dict[str, Any]]:
         ).fetchall()
     return [
         {
+            "notion_id": r["notion_id"] or "",
             "person": r["person_names"] or "",
             "name": r["name"] or "",
             "verdict": r["verdict"] or "",
@@ -521,6 +522,14 @@ def _format_text(
             if t["scenario"]:
                 bit += f"｜场景：{t['scenario']}"
             lines.append(bit)
+            # Take 页面正文 = 逐次沟通/判断变更的完整时间线，单条 verdict 装不下。
+            tl = (t.get("timeline") or "").strip()
+            if tl:
+                lines.append("  <跟进记录>")
+                for ln in tl.splitlines():
+                    if ln.strip():
+                        lines.append(f"  {ln}")
+                lines.append("  </跟进记录>")
 
     if interactions:
         lines.append("")
@@ -679,6 +688,15 @@ def search_crm(
         if not (people or takes or interactions or companies):
             interactions = _search_interactions(con, "", recent=True, limit=limit)
 
+    # 命中 Take 时挂上页面正文（详细沟通记录）。只取前几条，避免上下文爆掉。
+    if takes:
+        from .. import notion_crm
+
+        for t in takes[:3]:
+            nid = t.get("notion_id") or ""
+            if nid:
+                t["timeline"] = notion_crm.page_timeline_text(con, nid)
+
     text = _format_text(
         mode=m,
         query=q,
@@ -696,6 +714,14 @@ def search_crm(
                 "kind": "take",
             }
         )
+        if (t.get("timeline") or "").strip():
+            items.append(
+                {
+                    "title": f"{t.get('person') or t.get('name')} · 跟进记录",
+                    "snippet": t["timeline"],
+                    "kind": "take_timeline",
+                }
+            )
     for ix in interactions:
         items.append(
             {

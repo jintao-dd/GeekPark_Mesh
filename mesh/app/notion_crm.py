@@ -119,6 +119,20 @@ def ensure_crm_schema(con) -> None:
           last_edited_time TEXT,
           synced_at TEXT
         )""",
+        f"""CREATE TABLE IF NOT EXISTS crm_page_blocks(
+          id {pk},
+          notion_id TEXT NOT NULL,
+          owner_kind TEXT DEFAULT 'takes',
+          block_id TEXT UNIQUE NOT NULL,
+          parent_block_id TEXT,
+          ord INTEGER,
+          block_type TEXT,
+          text TEXT,
+          page_last_edited TEXT,
+          synced_at TEXT
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_crm_blocks_page ON crm_page_blocks(notion_id, ord)",
+        "CREATE INDEX IF NOT EXISTS idx_crm_blocks_kind ON crm_page_blocks(owner_kind)",
         "CREATE INDEX IF NOT EXISTS idx_crm_people_name ON crm_people(display_name)",
         "CREATE INDEX IF NOT EXISTS idx_crm_people_touched ON crm_people(last_touched)",
         "CREATE INDEX IF NOT EXISTS idx_crm_companies_name ON crm_companies(name)",
@@ -444,6 +458,185 @@ def query_database(database_id: str, *, since: str | None = None) -> list[dict]:
     return results
 
 
+# 有正文/子块的 block 类型 → 取 rich_text 的字段名
+_TEXT_KEYS = (
+    "paragraph", "heading_1", "heading_2", "heading_3", "bulleted_list_item",
+    "numbered_list_item", "to_do", "quote", "callout", "code", "toggle",
+    "template", "child_page",
+)
+_MAX_BLOCK_DEPTH = 4
+_MAX_PAGE_BLOCKS = 400
+
+
+def _block_text(block: dict) -> str:
+    """把一个 block 压成单行文本。table_row 取 cells，其余取 rich_text。"""
+    t = (block or {}).get("type") or ""
+    payload = block.get(t) or {}
+    if t == "table_row":
+        cells = payload.get("cells") or []
+        return " | ".join(_rich_text(c) for c in cells).strip()
+    if t in _TEXT_KEYS:
+        return _rich_text(payload.get("rich_text") or payload.get("title"))
+    if t in ("image", "video", "file", "pdf"):
+        cap = _rich_text(payload.get("caption"))
+        url = payload.get("external", {}).get("url") or payload.get("file", {}).get("url") or ""
+        return (cap or url).strip()
+    if t == "bookmark":
+        return str(payload.get("url") or "").strip()
+    return ""
+
+
+def fetch_page_blocks(page_id: str, *, max_depth: int = _MAX_BLOCK_DEPTH) -> list[dict]:
+    """递归拉取页面正文 → 扁平 block 列表（保序，带 depth/ord）。
+
+    只读 API，现有 Notion 集成权限即可（comments 端点才是 403）。
+    """
+    out: list[dict] = []
+
+    def walk(parent_id: str, depth: int) -> None:
+        if depth > max_depth or len(out) >= _MAX_PAGE_BLOCKS:
+            return
+        try:
+            children = list_block_children(parent_id)
+        except Exception as e:
+            _log.warning("crm blocks fetch %s depth=%s failed: %s", parent_id, depth, e)
+            return
+        for b in children:
+            if len(out) >= _MAX_PAGE_BLOCKS:
+                return
+            bid = b.get("id") or ""
+            if not bid:
+                continue
+            out.append(
+                {
+                    "block_id": bid,
+                    "parent_block_id": "" if depth == 0 else parent_id,
+                    "ord": len(out),
+                    "block_type": b.get("type") or "",
+                    "text": _block_text(b),
+                    "depth": depth,
+                    "has_children": bool(b.get("has_children")),
+                }
+            )
+            if b.get("has_children"):
+                walk(bid, depth + 1)
+
+    walk(page_id, 0)
+    return out
+
+
+def _block_to_line(row: dict, indent: int = 0) -> str:
+    """block 行 → 供 LLM 读的文本行（表格行渲染成 markdown 表）。"""
+    t = row.get("block_type") or ""
+    txt = (row.get("text") or "").strip()
+    if t == "table_row":
+        return ("  " * indent) + "| " + txt + " |"
+    if t in ("heading_1", "heading_2", "heading_3"):
+        lvl = {"heading_1": "#", "heading_2": "##", "heading_3": "###"}[t]
+        return ("  " * indent) + f"{lvl} {txt}".strip()
+    if t == "divider":
+        return ("  " * indent) + "---"
+    if not txt:
+        return ""
+    return ("  " * indent) + txt
+
+
+def page_timeline_text(con, notion_id: str, *, max_chars: int = 6000) -> str:
+    """取某页正文，拼成时间线文本。无记录返回空串。"""
+    try:
+        rows = con.execute(
+            "SELECT block_type, text FROM crm_page_blocks WHERE notion_id=? ORDER BY ord",
+            (notion_id,),
+        ).fetchall()
+    except Exception as e:
+        _log.debug("page_timeline_text failed: %s", e)
+        return ""
+    lines: list[str] = []
+    in_table = False
+    for r in rows:
+        t = r["block_type"] or ""
+        txt = (r["text"] or "").strip()
+        if t == "table" or t == "table_row":
+            if not in_table:
+                lines.append("")
+                in_table = True
+        elif in_table:
+            lines.append("")
+            in_table = False
+        line = _block_to_line({"block_type": t, "text": txt})
+        if line:
+            lines.append(line)
+    text = "\n".join(lines).strip()
+    return text[:max_chars]
+
+
+def sync_page_blocks(
+    con,
+    kind: str = "takes",
+    *,
+    full: bool = False,
+    page_limit: int = 0,
+) -> dict[str, int]:
+    """抓 Take（或 People）页面正文进 crm_page_blocks。
+
+    依赖已同步的 crm_takes.notion_id / last_edited_time；增量只抓
+    page_last_edited 有变的页，全量重抓全部。不抓评论（Notion 集成无权限）。
+    """
+    ensure_crm_schema(con)
+    if kind not in ("takes", "people", "companies"):
+        raise ValueError(f"unsupported kind: {kind}")
+    table = _CONVERTERS[kind][0]
+    rows = con.execute(
+        f"SELECT notion_id, last_edited_time FROM {table} ORDER BY last_edited_time DESC"
+    ).fetchall()
+    if page_limit > 0:
+        rows = rows[:page_limit]
+
+    seen = 0
+    fetched = 0
+    for r in rows:
+        nid = r["notion_id"]
+        if not nid:
+            continue
+        seen += 1
+        page_edited = r["last_edited_time"] or ""
+        if not full:
+            have = con.execute(
+                "SELECT page_last_edited FROM crm_page_blocks WHERE notion_id=? LIMIT 1",
+                (nid,),
+            ).fetchone()
+            if have and (have["page_last_edited"] or "") == page_edited:
+                continue
+        try:
+            blocks = fetch_page_blocks(nid)
+        except Exception as e:
+            _log.warning("crm page blocks %s failed: %s", nid, e)
+            continue
+        fetched += 1
+        con.execute("DELETE FROM crm_page_blocks WHERE notion_id=?", (nid,))
+        for b in blocks:
+            con.execute(
+                "INSERT INTO crm_page_blocks"
+                "(notion_id, owner_kind, block_id, parent_block_id, ord, block_type, text,"
+                " page_last_edited, synced_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?)",
+                (
+                    nid,
+                    kind,
+                    b["block_id"],
+                    b["parent_block_id"],
+                    b["ord"],
+                    b["block_type"],
+                    b["text"],
+                    page_edited,
+                    _now(),
+                ),
+            )
+        db.commit_retry(con)
+    total = con.execute("SELECT COUNT(*) c FROM crm_page_blocks").fetchone()["c"]
+    return {"pages_seen": seen, "pages_fetched": fetched, "blocks_total": int(total or 0)}
+
+
 def _props_snapshot(props: dict) -> dict:
     out = {}
     for name, prop in (props or {}).items():
@@ -659,8 +852,18 @@ def resolve_relation_names(con) -> dict[str, int]:
     return updated
 
 
-def sync_all(*, full: bool = False, con=None) -> dict:
-    """同步四库。full=True 忽略游标全量 upsert。"""
+def sync_all(
+    *,
+    full: bool = False,
+    con=None,
+    with_blocks: bool = True,
+    blocks_full: bool = False,
+) -> dict:
+    """同步四库。full=True 忽略游标全量 upsert。
+
+    with_blocks=True 时同时抓 Take 页面正文（详细沟通记录）进 crm_page_blocks；
+    正文增量靠页面 last_edited_time 比对，blocks_full=True 强制重抓。
+    """
     own = con is None
     if own:
         con = db.connect()
@@ -692,9 +895,24 @@ def sync_all(*, full: bool = False, con=None) -> dict:
         "interactions": con.execute("SELECT COUNT(*) c FROM crm_interactions").fetchone()["c"],
         "takes": con.execute("SELECT COUNT(*) c FROM crm_takes").fetchone()["c"],
     }
+    # 页面正文（Take 详细沟通记录）默认一起抓；失败只记日志，不拖垮四库同步。
+    blocks: dict[str, int] = {}
+    if with_blocks:
+        try:
+            blocks = sync_page_blocks(con, "takes", full=full or blocks_full)
+        except Exception as e:
+            _log.warning("crm page blocks sync failed: %s", e)
+            blocks = {"error": str(e)[:300]}
     if own:
         con.close()
-    return {"ok": True, "full": full, "results": results, "resolved": rel, "counts": counts}
+    return {
+        "ok": True,
+        "full": full,
+        "results": results,
+        "resolved": rel,
+        "counts": counts,
+        "blocks": blocks,
+    }
 
 
 def sync_status(con=None) -> dict:
@@ -714,6 +932,12 @@ def sync_status(con=None) -> dict:
             counts[kind] = con.execute(f"SELECT COUNT(*) c FROM {table}").fetchone()["c"]
         except Exception:
             counts[kind] = 0
+    try:
+        counts["page_blocks"] = con.execute(
+            "SELECT COUNT(*) c FROM crm_page_blocks"
+        ).fetchone()["c"]
+    except Exception:
+        counts["page_blocks"] = 0
     if own:
         con.close()
     return {"states": rows, "counts": counts}

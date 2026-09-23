@@ -131,3 +131,124 @@ def test_page_to_person_fields():
     assert json.loads(cols["company_ids_json"]) == ["c1"]
     assert cols["email"] == "a@b.com"
     assert cols["last_touched"] == "2026-08-01"
+
+
+# ---- Take 页面正文（详细沟通记录）----
+
+
+def _block(bid, btype, payload, *, children=False):
+    return {"id": bid, "type": btype, btype: payload, "has_children": children}
+
+
+def test_block_text_table_row_and_paragraph():
+    row = _block("r1", "table_row", {"cells": [[{"plain_text": "08-24"}], [{"plain_text": "约专访"}]]})
+    assert notion_crm._block_text(row) == "08-24 | 约专访"
+    para = _block("p1", "paragraph", {"rich_text": [{"plain_text": "首次见面"}]})
+    assert notion_crm._block_text(para) == "首次见面"
+
+
+def test_fetch_page_blocks_walks_children(monkeypatch):
+    tree = {
+        "page": [
+            _block("h", "heading_2", {"rich_text": [{"plain_text": "跟进记录 Log"}]}),
+            _block("t", "table", {}, children=True),
+            _block("d", "divider", {}),
+        ],
+        "t": [
+            _block("r1", "table_row", {"cells": [[{"plain_text": "09-08"}], [{"plain_text": "稿件梳理"}]]}),
+        ],
+    }
+    monkeypatch.setattr(notion_crm, "list_block_children", lambda bid: tree.get(bid, []))
+    blocks = notion_crm.fetch_page_blocks("page")
+    types = [b["block_type"] for b in blocks]
+    assert types == ["heading_2", "table", "table_row", "divider"]
+    # 保序 ord 连续，子块记录了 parent
+    assert [b["ord"] for b in blocks] == [0, 1, 2, 3]
+    assert blocks[2]["parent_block_id"] == "t"
+
+
+def test_page_timeline_text_renders_markdown(crm_db):
+    con = crm_db
+    pid = "take-page-1"
+    for i, (btype, text) in enumerate(
+        [
+            ("paragraph", "2026-08-23 · Take created ahead of first meeting"),
+            ("heading_2", "跟进记录 Log"),
+            ("table_row", "09-08 | 稿件梳理中"),
+            ("table_row", "09-22（当前） | 文章均已发布"),
+        ]
+    ):
+        con.execute(
+            "INSERT INTO crm_page_blocks"
+            "(notion_id, owner_kind, block_id, parent_block_id, ord, block_type, text,"
+            " page_last_edited, synced_at) VALUES (?,?,?,?,?,?,?,?,?)",
+            (pid, "takes", f"b{i}", "", i, btype, text, "2026-09-22T00:00:00Z", ""),
+        )
+    db.commit_retry(con)
+    tl = notion_crm.page_timeline_text(con, pid)
+    assert "2026-08-23 · Take created" in tl
+    assert "## 跟进记录 Log" in tl
+    assert "| 09-22（当前） | 文章均已发布 |" in tl
+
+
+def test_sync_page_blocks_incremental_skips_unchanged(crm_db, monkeypatch):
+    con = crm_db
+    notion_crm._upsert(
+        con,
+        "crm_takes",
+        "take-1",
+        {
+            "name": "Bodi",
+            "person_ids_json": "[]",
+            "person_names": "",
+            "verdict": "v",
+            "scenario": "",
+            "owner": "",
+            "last_reviewed": "2026-09-22",
+            "is_prospect": "",
+            "props_json": "{}",
+            "last_edited_time": "2026-09-22T00:00:00Z",
+        },
+    )
+    db.commit_retry(con)
+    calls: list[str] = []
+
+    def fake_children(bid):
+        calls.append(bid)
+        return [_block("b1", "paragraph", {"rich_text": [{"plain_text": "hello"}]})]
+
+    monkeypatch.setattr(notion_crm, "list_block_children", fake_children)
+    first = notion_crm.sync_page_blocks(con, "takes")
+    assert first["pages_fetched"] == 1
+    assert first["blocks_total"] == 1
+    # 页面 last_edited 未变 → 第二次不再打 API
+    second = notion_crm.sync_page_blocks(con, "takes")
+    assert second["pages_fetched"] == 0
+    assert calls == ["take-1"]
+
+
+def test_crm_format_text_includes_timeline():
+    from app.agent import crm_search as cs
+
+    text = cs._format_text(
+        mode="take",
+        query="Bodi 进展",
+        people=[],
+        companies=[],
+        interactions=[],
+        takes=[
+            {
+                "person": "Brad (Bodi) Yuan",
+                "name": "Brad (Bodi) Yuan",
+                "verdict": "专访完成，等待发布",
+                "scenario": "专访",
+                "owner": "思琪（Lilyann）",
+                "last_reviewed": "2026-09-08",
+                "is_prospect": "",
+                "timeline": "2026-08-24 · 首次见面\n| 09-22（当前） | 文章均已发布 |",
+            }
+        ],
+    )
+    assert "<跟进记录>" in text
+    assert "2026-08-24 · 首次见面" in text
+    assert "文章均已发布" in text

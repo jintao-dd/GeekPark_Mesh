@@ -1444,13 +1444,19 @@ def admin_crm_notion_status(request: Request):
 
 
 @app.post("/admin/crm/notion/sync")
-def admin_crm_notion_sync(request: Request, full: int = 0):
-    """Notion CRM 全量/增量同步进底库。full=1 忽略游标。不进本期周报。"""
+def admin_crm_notion_sync(request: Request, full: int = 0, blocks: int = 1, blocks_full: int = 0):
+    """Notion CRM 全量/增量同步进底库。full=1 忽略游标。
+
+    blocks=1（默认）同时抓 Take 页面正文（详细沟通记录）进 crm_page_blocks；
+    blocks_full=1 强制重抓所有页面正文。不进本期周报。
+    """
     auth.require(request, "admin")
     from . import notion_crm
 
     try:
-        return notion_crm.sync_all(full=bool(full))
+        return notion_crm.sync_all(
+            full=bool(full), with_blocks=bool(blocks), blocks_full=bool(blocks_full)
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)[:500]) from e
 
