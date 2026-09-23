@@ -1449,6 +1449,9 @@ def admin_crm_notion_sync(request: Request, full: int = 0, blocks: int = 1, bloc
 
     blocks=1（默认）同时抓 Take 页面正文（详细沟通记录）进 crm_page_blocks；
     blocks_full=1 强制重抓所有页面正文。不进本期周报。
+
+    注意：这里只动 crm_sync_state 同步游标，**不会**影响各期 CRM 交叉的消费锚点
+    （crm_cross_anchor），所以随便同步都不会吃掉某一期的增量。
     """
     auth.require(request, "admin")
     from . import notion_crm
@@ -1459,6 +1462,88 @@ def admin_crm_notion_sync(request: Request, full: int = 0, blocks: int = 1, bloc
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)[:500]) from e
+
+
+@app.get("/admin/crm/notion/anchors")
+def admin_crm_anchors(request: Request, slug: str = ""):
+    """各期 CRM 交叉消费锚点 + 本期窗口预算。只读。"""
+    auth.require(request, "admin")
+    from . import crm_ingest
+
+    con = db.connect()
+    try:
+        crm_ingest.ensure_anchor_schema(con)
+        out: dict = {"anchors": []}
+        try:
+            out["anchors"] = [
+                dict(r)
+                for r in con.execute(
+                    "SELECT a.issue_id, i.slug, a.kind, a.anchor_edited, a.updated_at "
+                    "FROM crm_cross_anchor a LEFT JOIN issues i ON i.id=a.issue_id "
+                    "ORDER BY a.issue_id DESC, a.kind"
+                )
+            ]
+        except Exception as e:
+            out["anchors_error"] = str(e)[:200]
+        if slug:
+            row = con.execute(
+                "SELECT id, slug, date_start, date_end, period_label, status FROM issues WHERE slug=?",
+                (slug,),
+            ).fetchone()
+            if row:
+                issue = dict(row)
+                out["issue"] = issue
+                out["window"] = crm_ingest.resolve_window(con, issue)
+                d = crm_ingest.build_digest(con, since_map=out["window"])
+                out["would_ingest"] = bool((d.get("text") or "").strip())
+                out["counts"] = d.get("counts") or {}
+                out["truncated"] = d.get("truncated") or {}
+                out["chunks"] = len(crm_ingest.split_digest_chunks(d.get("text") or ""))
+            else:
+                out["issue"] = None
+        return out
+    finally:
+        con.close()
+
+
+@app.post("/admin/crm/notion/anchor/reset")
+def admin_crm_anchor_reset(request: Request, slug: str, since: str = ""):
+    """把某期 CRM 交叉锚点重置到指定时间（不传则删除锚点，回落到 date_start）。
+
+    用来让某一期重新消费一段窗口。只影响该期，不碰同步游标。
+    """
+    auth.require(request, "admin")
+    from . import crm_ingest
+
+    con = db.connect()
+    try:
+        crm_ingest.ensure_anchor_schema(con)
+        row = con.execute("SELECT id, date_start FROM issues WHERE slug=?", (slug,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="没有这一期")
+        issue_id = int(row["id"])
+        if (since or "").strip():
+            for kind in crm_ingest._SYNC_KINDS:
+                con.execute(
+                    "INSERT INTO crm_cross_anchor(issue_id,kind,anchor_edited,updated_at) "
+                    "VALUES(?,?,?,?) ON CONFLICT(issue_id,kind) DO UPDATE SET "
+                    "anchor_edited=excluded.anchor_edited, updated_at=excluded.updated_at",
+                    (issue_id, kind, since.strip(), crm_ingest._now_iso()),
+                )
+            action = f"set:{since.strip()}"
+        else:
+            con.execute("DELETE FROM crm_cross_anchor WHERE issue_id=?", (issue_id,))
+            action = "cleared->date_start"
+        db.commit_retry(con)
+        issue = {"id": issue_id, "date_start": row["date_start"] or ""}
+        return {
+            "ok": True,
+            "slug": slug,
+            "action": action,
+            "window": crm_ingest.resolve_window(con, issue),
+        }
+    finally:
+        con.close()
 
 
 @app.get("/admin/qa", response_class=HTMLResponse)

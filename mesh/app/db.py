@@ -338,6 +338,14 @@ CREATE TABLE IF NOT EXISTS crm_page_blocks(
 );
 CREATE INDEX IF NOT EXISTS idx_crm_blocks_page ON crm_page_blocks(notion_id, ord);
 CREATE INDEX IF NOT EXISTS idx_crm_blocks_kind ON crm_page_blocks(owner_kind);
+CREATE TABLE IF NOT EXISTS crm_cross_anchor(
+  id INTEGER PRIMARY KEY,
+  issue_id INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  anchor_edited TEXT,
+  updated_at TEXT,
+  UNIQUE(issue_id, kind)
+);
 """
 
 @contextmanager

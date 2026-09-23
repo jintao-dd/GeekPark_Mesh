@@ -109,6 +109,8 @@ def _defaults(slug: str) -> dict:
         "cards_total": 0,
         "card_profile": None,
         "card_concurrency": 1,
+        # 本期 CRM 交叉接入结果（ok/truncated/no_changes/failed），供预览页显式展示
+        "crm_cross": None,
     }
 
 
@@ -208,19 +210,38 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                 from . import crm_ingest
 
                 crm_out = crm_ingest.maybe_ingest_for_issue(slug)
-                if crm_out.get("ingested"):
-                    _set(
-                        slug,
-                        message=(
-                            f"已接入 CRM 增量（{crm_out.get('items') or 0} 条 · "
-                            f"人 {((crm_out.get('counts') or {}).get('people') or 0)}/"
-                            f"公司 {((crm_out.get('counts') or {}).get('companies') or 0)}/"
-                            f"接触 {((crm_out.get('counts') or {}).get('interactions') or 0)}/"
-                            f"判断 {((crm_out.get('counts') or {}).get('takes') or 0)}）"
-                        ),
+                status = crm_out.get("status") or ("ok" if crm_out.get("ingested") else "no_changes")
+                counts = crm_out.get("counts") or {}
+                payload = {
+                    "status": status,
+                    "items": crm_out.get("items") or 0,
+                    "counts": counts,
+                    "truncated": crm_out.get("truncated") or {},
+                    "chunks": crm_out.get("chunks") or 0,
+                    "window": crm_out.get("window") or {},
+                    "reason": crm_out.get("reason") or "",
+                }
+                # 显式回报状态：以前 no_changes / 失败都是静默的，界面看不出 CRM 有没有进来。
+                if status == "ok":
+                    msg = (
+                        f"已接入 CRM 交叉（{payload['items']} 条 · {payload['chunks']} 块 · "
+                        f"人 {counts.get('people') or 0}/公司 {counts.get('companies') or 0}/"
+                        f"接触 {counts.get('interactions') or 0}/判断 {counts.get('takes') or 0}/"
+                        f"正文 {counts.get('blocks') or 0} 页）"
                     )
+                elif status == "truncated":
+                    trunc = "、".join(f"{k} 省略 {v} 条" for k, v in (payload["truncated"] or {}).items())
+                    msg = f"CRM 交叉已接入（{payload['items']} 条），但存在截断：{trunc}"
+                elif status == "no_changes":
+                    win = (payload["window"] or {}).get("takes") or ""
+                    msg = f"本期 CRM 无增量（窗口起点 {win or '—'}），未新增交叉条目"
+                else:
+                    msg = f"CRM 交叉接入未完成：{payload['reason'] or status}"
+                _set(slug, message=msg, crm_cross=payload)
+                _log.info("crm preview cross slug=%s %s", slug, payload)
             except Exception as e:  # 兜底：任何异常都不应阻断预览
                 _log.warning("crm ingest skipped slug=%s: %s", slug, e)
+                _set(slug, crm_cross={"status": "failed", "reason": str(e)[:200]})
 
         with db.write_lock():
             con = db.connect()
