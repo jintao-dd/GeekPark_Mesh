@@ -213,6 +213,32 @@ def test_feishu_reply_cross_footer_tiered():
     assert "分栏对照" in display
 
 
+def test_feishu_reply_hides_internal_item_ids():
+    ans = AgentAnswer(
+        text="有相关记录。",
+        intent="ask_published",
+        evidence_refs=[
+            "条目 1991",
+            "ev:ctx:2026-09-15:4",
+            "ev:2026-09-15:item:1899",
+        ],
+        context={"issue_ref": {"slug": "2026-09-15"}},
+        trace={},
+    )
+    display = format_display_text(
+        ans,
+        payload={
+            "issue": "2026-09-15",
+            "claim_support": {"support": "supported", "reason": "direct"},
+        },
+    )
+    assert "来源：2026-09-15" in display
+    assert "1991" not in display
+    assert "1899" not in display
+    assert "ev:ctx" not in display
+    assert "条目" not in display
+
+
 def test_ask_planner_suppresses_weekly_count_for_crm():
     from app import ask_planner
 

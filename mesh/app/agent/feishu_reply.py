@@ -136,6 +136,7 @@ def _failure_kind(
 
 
 def _humanize_ref(ref: str) -> str:
+    """对外可见的核对标签。内部条目号 / ev:ctx 返回空串（不展示）。"""
     r = (ref or "").strip()
     if not r:
         return ""
@@ -145,11 +146,39 @@ def _humanize_ref(ref: str) -> str:
     if r.startswith("crm:cross:"):
         return "CRM×周报交叉"
     if r.startswith("crm:"):
-        return r.replace("crm:", "CRM·", 1)[:48]
-    m = re.search(r"item[:/]?(\d+)", r, re.I)
+        # crm:take:Alice / crm:person:… → 保留短标签，去掉协议前缀
+        rest = r.replace("crm:", "", 1)
+        return ("CRM·" + rest)[:48]
+    # ev:2026-8-17:item:4251 / ev:ctx:2026-09-15:4 → 只留期次，不晒内部 id
+    m = re.match(r"^ev:(?:ctx:)?([^:]+)", r, re.I)
     if m:
-        return f"条目 {m.group(1)}"
-    return r
+        slug = (m.group(1) or "").strip()
+        if slug and slug.lower() != "ctx":
+            return f"{slug} 周报"
+        return ""
+    # 裸 item:123 / 条目号 → 不对外
+    if re.search(r"(?:^|[:/])item[:/]?\d+", r, re.I):
+        return ""
+    if re.fullmatch(r"\d{3,6}", r):
+        return ""
+    if re.match(r"^条目\s*\d+", r):
+        return ""
+    return r[:48]
+
+
+def _user_facing_check_lines(refs: list[str], *, limit: int = 4) -> list[str]:
+    """去重后的人话核对行；全是内部 id 时返回空（只保留「来源」行）。"""
+    seen: set[str] = set()
+    out: list[str] = []
+    for r in refs:
+        label = _humanize_ref(r)
+        if not label or label in seen:
+            continue
+        seen.add(label)
+        out.append(f"· {label}")
+        if len(out) >= limit:
+            break
+    return out
 
 
 def _rewrite_body_for_failure(body: str, kind: str) -> str:
@@ -228,10 +257,10 @@ def format_display_text(
     ):
         tier = "feishu_live"
     if tier == "feishu_live":
-        if uniq_refs and kind not in ("no_hit", "system_error", "timeout", "permission"):
+        check = _user_facing_check_lines(uniq_refs)
+        if check and kind not in ("no_hit", "system_error", "timeout", "permission"):
             meta_lines.append("可核对：")
-            for r in uniq_refs[:6]:
-                meta_lines.append(f"· {_humanize_ref(r)}")
+            meta_lines.extend(check)
         if meta_lines:
             blocks.append("")
             blocks.append("——")
@@ -260,10 +289,10 @@ def format_display_text(
             meta_lines.append("来源：硅谷 CRM × 已上线周报（分栏对照）")
         else:
             meta_lines.append("来源：硅谷 CRM（Notion）")
-        if uniq_refs and kind not in ("no_hit", "system_error", "timeout", "permission"):
+        check = _user_facing_check_lines(uniq_refs)
+        if check and kind not in ("no_hit", "system_error", "timeout", "permission"):
             meta_lines.append("可核对：")
-            for r in uniq_refs[:6]:
-                meta_lines.append(f"· {_humanize_ref(r)}")
+            meta_lines.extend(check)
         if meta_lines:
             blocks.append("")
             blocks.append("——")
@@ -280,10 +309,17 @@ def format_display_text(
     elif kind == "contradicted":
         meta_lines.append("说明：周报里有不一致记录")
 
-    if uniq_refs and kind not in ("no_hit", "system_error", "timeout", "permission"):
-        meta_lines.append("可核对：")
-        for r in uniq_refs[:6]:
-            meta_lines.append(f"· {_humanize_ref(r)}")
+    check = _user_facing_check_lines(uniq_refs)
+    # 已有「来源：{issue}」时，同质期次标签不必再刷一遍可核对
+    if check and kind not in ("no_hit", "system_error", "timeout", "permission"):
+        filtered = [
+            line
+            for line in check
+            if not (issue and line.strip("· ").startswith(f"{issue} "))
+        ]
+        if filtered:
+            meta_lines.append("可核对：")
+            meta_lines.extend(filtered)
 
     if meta_lines:
         blocks.append("")

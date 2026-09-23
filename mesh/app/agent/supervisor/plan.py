@@ -41,8 +41,24 @@ _CALENDAR_ASK_RE = re.compile(
 
 # 用户明确要硅谷/对外人脉才放行 crm.search；否则硬剥离
 # （会话里残留人名时 Planner 爱顺手加 CRM，把「商业化该关注」答成 CRM 名单）
+# 注：此正则仅作遗留 helper；选源以 planner prompt + crm_evidence_hint 软提示为准，不再硬剥离。
 _CRM_ASK_RE = re.compile(
     r"(硅谷|CRM|人脉库|对外人脉|创业者库|Notion\s*CRM|思琪侧|海外\s*BD|\bBD\b|湾区)",
+    re.I,
+)
+
+# 证据提示（软信号，只写入工作记忆，不硬改 steps）：本问像对外库检索
+_CRM_EVIDENCE_HINT_RE = re.compile(
+    r"(创业者|创始人|初创|融资|[A-C]轮|种子轮|Series\s*[A-C]|"
+    r"出海|人脉库|人脉|CRM|硅谷|湾区|Notion|"
+    r"找(?:出|到)?\s*\d*\s*个?.{0,16}(?:公司|创业|创始)|"
+    r"(?:公司|初创).{0,24}(?:新加坡|旧金山|湾区|硅谷))",
+    re.I,
+)
+# 纯周报队内集合：有此且无对外库强信号时，不注入 CRM 提示
+_WEEKLY_SET_HINT_RE = re.compile(
+    r"(共同关注|都关注|都接触|同时出现|跨团队|跨部门|交集|差集|"
+    r"接触了但.+还没|还没接触)",
     re.I,
 )
 
@@ -67,6 +83,18 @@ def user_asks_calendar(user_text: str) -> bool:
 
 def user_asks_crm(user_text: str) -> bool:
     return bool(_CRM_ASK_RE.search(user_text or ""))
+
+
+def crm_evidence_hint(user_text: str) -> bool:
+    """软提示：问句像需要对外人脉/创业者库证据（不是硬路由、不改 steps）。"""
+    q = user_text or ""
+    if not _CRM_EVIDENCE_HINT_RE.search(q):
+        return False
+    if _WEEKLY_SET_HINT_RE.search(q) and not re.search(
+        r"(创业者|初创|融资|CRM|人脉库|硅谷|出海)", q, re.I
+    ):
+        return False
+    return True
 
 
 def user_asks_org_roster(user_text: str) -> bool:
@@ -228,7 +256,13 @@ _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划�
 
 可用源（按意图选用，不要混成一个假事实源）：
 - crm.search：硅谷对外人脉/BD 底库（People 枢纽、Interactions 事件、Takes 判断）。内部同事通讯录不是这个源。
-  只在用户确实问硅谷/对外人脉/BD/思琪侧/湾区这类对外接触时才用；内部同事进展别灌 CRM。
+  **按证据需要选用，不要等用户点名「硅谷/CRM」才查。**
+  下列语义 → 主源用 crm.search（可并行一条 ask.published 作周报分栏补充）：
+    · 找创业者/创始人/人脉、列 N 个对外联系人；
+    · 找初创公司/融资轮次/赛道/地点（如新加坡、湾区）等库内档案属性；
+    · 硅谷/海外 BD/思琪侧对外沟通、Takes 判断。
+  下列语义 → 不要灌 CRM：
+    · 内部同事进展、周报两队/多队的关注交集差集、组织花名册、「该关注什么」按队视角。
   你（planner）自己判断意图，在 args 里给结构化字段，不要指望下游再猜：
     args.query：解析后的全名或原问句。
     args.mode：auto|person|company|recent|take|stats|cross —— 你按语义选：
@@ -244,7 +278,7 @@ _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划�
       也是周报内部集合运算 → 只用 ask.published（系统按队名做 diff/intersect），不要走 crm.search。
       「硅谷 BD 团队」是周报团队名，问句里出现它**不等于**要查硅谷 CRM 底库。
   禁止用 LIKE 搜到的几条名单冒充「总数」。
-- ask.published：已上线周报事实。
+- ask.published：已上线周报事实（当期交过并过闸的切片，不是对外人脉全集）。
 - feishu.search：飞书现场。必须带 resource_type（group|member|user|directory|doc|message|calendar|wiki|folder）。
   directory 的 keyword 用队名/部门名/姓名，或提问者团队（工作记忆里有）；系统按飞书树展开子部门。列组织不要改去空转周报。
   member 必须 depends_on 列群步骤；user 仅在已知 open_id 时使用。
@@ -253,7 +287,7 @@ _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划�
 规划原则：
 1) 需要查数、多源、关联、组织、对外人脉 → mode=work。按意图选源，禁止假设固定问法。
 2) 工作记忆里已有具体同事（全名）时：即使问看法/建议，也必须 mode=work，先用这些全名走 ask.published（必要时 directory）；
-   只有用户确实问硅谷/BD/对外人脉/CRM 时才加 crm.search。不要因为会话里残留人名就默认灌 CRM。
+   不要因为会话残留人名就默认灌 CRM。但若本问本身是找创业者/公司/轮次/出海人脉，主源仍用 crm.search。
 3) 组织归属（某组算不算某队、我们团队有谁）→ feishu.search directory；默认「我们团队」按提问者 Mesh 业务队；
    若用户说「作为/做为某队的你」则本轮按该视角队理解，不要用提问者主队同事名单顶替。周报桶名不是飞书上级。
 4) 要写入飞书 → prepare_write（系统会再请用户确认）。
@@ -263,7 +297,7 @@ _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划�
 8) 问周报相关 / 个人或团队进展 /「该关注什么」→ 主步骤用 ask.published（可并行 directory）；
    不要用 feishu.calendar.* 当主步骤，除非用户明确问日程、会议、忙不忙、空闲。
 9) CRM 的 stats 步骤不要再并行 ask.published，避免脚注把 CRM 计数证据混成已上线周报。
-   mode=cross 时可以并行一条 ask.published（周报分栏），供成文写「跨线重叠」；禁止把 CRM 说成周报。
+   mode=cross 或「找人脉/创业者且想对照国内队是否也提过」时可并行一条 ask.published（周报分栏）；禁止把 CRM 说成周报。
    周报内部的跨团队统计（多少/哪些主体出现在多个团队、跨部门同时出现）→ 只用 ask.published，不要加 crm.search。
 10) 只输出 JSON。
 """
@@ -297,6 +331,7 @@ def work_memory_block(
     identity: Any = None,
     session: Any = None,
     resolved_people: list[Any] | None = None,
+    user_text: str = "",
 ) -> str:
     """Planner 的一等输入：人、身份、上一轮，不是句式表。"""
     lines = ["## 工作记忆（规划用，不是事实）"]
@@ -333,11 +368,17 @@ def work_memory_block(
             lines.append(
                 "周报团队（已上线期次里出现的业务队）："
                 + "、".join(teams[:40])
-                + "。问句里出现这些队名时，按周报内部集合运算处理（ask.published）；"
-                "只有明确问硅谷 CRM / 对外人脉底库时才用 crm.search。"
+                + "。问句里出现这些队名且只做队内关注/交集/差集时，用 ask.published；"
+                "若同时在找创业者/公司/轮次/出海人脉，主源仍用 crm.search，周报可作分栏。"
             )
     except Exception:
         pass
+
+    if crm_evidence_hint(user_text):
+        lines.append(
+            "证据提示：本问像对外人脉/创业者/公司库检索 → 优先 crm.search；"
+            "若只是周报两队集合运算则仍用 ask.published。"
+        )
 
     if session is None:
         return "\n".join(lines)
@@ -370,9 +411,9 @@ def _acting_team_memory_line(user_text: str, identity: Any = None) -> str:
         return (
             f"本轮用户指定回答视角：{acting}"
             f"（提问者主队是 {asker}，不要用主队同事/「我们团队」顶替此视角；"
-            "除非用户明确问硅谷/人脉，不要加 crm.search）。"
+            "找创业者/公司/人脉时仍可用 crm.search，队内关注/集合运算用 ask.published）。"
         )
-    return f"本轮用户指定回答视角：{acting}（按该队周报材料答；勿默认灌 CRM）。"
+    return f"本轮用户指定回答视角：{acting}（按该队周报材料答；勿把 CRM 名单当成默认「该关注」）。"
 
 
 def _parse_json(raw: Any) -> dict[str, Any]:
@@ -478,6 +519,7 @@ def plan_turn(
         identity=identity,
         session=session,
         resolved_people=resolved_people,
+        user_text=q,
     )
     acting_line = _acting_team_memory_line(q, identity)
     if acting_line:

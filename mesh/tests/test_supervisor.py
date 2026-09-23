@@ -514,6 +514,28 @@ def test_normalize_crm_steps_trusts_planner_mode():
     assert [s.tool for s in kept2] == ["ask.published", "crm.search"]
 
 
+def test_crm_evidence_hint_soft_signal():
+    # 找创业者 / 新加坡初创 → 应提示 CRM 证据
+    assert planmod.crm_evidence_hint("我想找出来10个关于AI硬件相关的创业者")
+    assert planmod.crm_evidence_hint(
+        "有没有接触融资B轮以上的与AI硬件相关的base在新加坡的初创公司？"
+    )
+    # 纯队内集合 → 不提示
+    assert not planmod.crm_evidence_hint("投资团队和商业化共同关注")
+    # 点名 CRM → 提示
+    assert planmod.crm_evidence_hint("你查查硅谷 CRM")
+
+
+def test_work_memory_injects_crm_evidence_hint():
+    block = planmod.work_memory_block(
+        user_text="找10个AI硬件相关的创业者",
+    )
+    assert "证据提示" in block
+    assert "crm.search" in block
+    block2 = planmod.work_memory_block(user_text="投资团队和商业化共同关注")
+    assert "证据提示" not in block2
+
+
 def test_strip_directory_unless_roster_asked_focus_question():
     from app.agent.supervisor.types import PlanStep
 
