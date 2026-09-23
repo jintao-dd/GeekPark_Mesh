@@ -240,6 +240,9 @@ _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划�
       （cross 的对照面是「已上线周报」；「其它团队是否同时接触」在数据上只能用周报近似，both=两边都有=可能被其它团队碰到。）
       cross 只用于「硅谷 CRM × 已上线周报」的对照；**不要**把「多个团队/跨团队/跨部门同时出现」这类
       周报内部跨队统计判成 cross——那走 ask.published，系统会做确定性的跨队集合运算。
+      **同理**：两个周报团队之间的差集/交集（如「A 团队接触了、但 B 团队还没接触」「A 和 B 都接触过的公司」）
+      也是周报内部集合运算 → 只用 ask.published（系统按队名做 diff/intersect），不要走 crm.search。
+      「硅谷 BD 团队」是周报团队名，问句里出现它**不等于**要查硅谷 CRM 底库。
   禁止用 LIKE 搜到的几条名单冒充「总数」。
 - ask.published：已上线周报事实。
 - feishu.search：飞书现场。必须带 resource_type（group|member|user|directory|doc|message|calendar|wiki|folder）。
@@ -319,6 +322,22 @@ def work_memory_block(
     if hits:
         lines.append("已解析人名：" + "；".join(hits[:12]))
         lines.append("检索时用全名，不要只用称呼。")
+
+    # 周报团队花名册：让 planner 能区分「问句里的队名」与「要查 CRM 底库」。
+    # 队名是数据（ingest.TEAMS），不是句式表；出现队名 ≠ 要查硅谷 CRM。
+    try:
+        from ... import ingest as _ingest
+
+        teams = [t for t in list(getattr(_ingest, "TEAMS", []) or []) if t]
+        if teams:
+            lines.append(
+                "周报团队（已上线期次里出现的业务队）："
+                + "、".join(teams[:40])
+                + "。问句里出现这些队名时，按周报内部集合运算处理（ask.published）；"
+                "只有明确问硅谷 CRM / 对外人脉底库时才用 crm.search。"
+            )
+    except Exception:
+        pass
 
     if session is None:
         return "\n".join(lines)
