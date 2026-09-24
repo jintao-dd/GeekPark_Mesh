@@ -294,8 +294,12 @@ _PLANNER_SYSTEM = """你是 MeshSupervisor（全局掌控 Agent）。只规划�
 5) steps 只用只读工具；写入绝不进 steps。
 6) 检索用工作记忆里的全名/团队，不要要求用户再报一遍。
 7) 步骤 ≤8；有依赖才写 depends_on；可并行的标同一 parallel_group。
-8) 问周报相关 / 个人或团队进展 /「该关注什么」→ 主步骤用 ask.published（可并行 directory）；
+8) 问周报相关 / 内部个人或团队进展 /「该关注什么」→ 主步骤用 ask.published（可并行 directory）；
    不要用 feishu.calendar.* 当主步骤，除非用户明确问日程、会议、忙不忙、空闲。
+   **区分：若用户问的是「思琪侧 / 硅谷 BD / 对外人脉 / 海外拓展」相关人的最近进展**
+   （如「思琪老师最近在干啥」「思琪最近跟进了谁」「Sean 最近有什么动作」），
+   这些人的「进展」就是 CRM 里的跟进记录，主步骤走 crm.search（mode=recent/take），
+   可并行 ask.published 作周报对照；不要只走 ask.published 然后说 CRM 没内容。
 9) CRM 的 stats 步骤不要再并行 ask.published，避免脚注把 CRM 计数证据混成已上线周报。
    mode=cross 或「找人脉/创业者且想对照国内队是否也提过」时可并行一条 ask.published（周报分栏）；禁止把 CRM 说成周报。
    周报内部的跨团队统计（多少/哪些主体出现在多个团队、跨部门同时出现）→ 只用 ask.published，不要加 crm.search。

@@ -18,6 +18,17 @@ _TAG_RE = re.compile(
     r"\[(?:published|feishu_live|crm_prior|wiki_prior|analysis|system)/[^\]]+\]\s*"
 )
 
+# 用户问「最新 / 最近 / 新动态 / 最新消息」
+_LATEST_QUERY_RE = re.compile(r"最新|最近|新动态|最新消息|最近进展|最近情况|最近动作", re.I)
+# 成文里把证据里的有效事实否认掉的常见表达
+_NEGATIVE_ANSWER_RE = re.compile(
+    r"没有[最新|新|相关]|没有最新动态|没有消息|没有进展|没有.*动态|"
+    r"无[最新|新|相关]|无最新动态|无消息|无进展|"
+    r"未[有|见]|未有最新|未见.*动态|"
+    r"(?:拿不出|给不出|凑不满|找不到).{0,8}(?:公司|人|创业者|条目|匹配)",
+    re.I,
+)
+
 # 成文材料上限：够用即可；飞书卡片另有展示上限
 _MATERIAL_CAP = 9000
 _SNIPPET_CAP = 3500
@@ -53,6 +64,8 @@ _SYNTH_SYSTEM = """你是 GeekPark 内部同事 Mesh（唯一对外的一张嘴�
    若名单里有海外拓展的赵思琪/Sean Shen/胡清远，且用户在问硅谷/海外相关，即使条目挂在「硅谷 BD」下也要纳入。
 9) 问「相关 / 周报 / 进展」时以周报与人名进展为主；日历只作一句补充（除非用户明确问会议/忙不忙）。
 10) 目标长度：普通问 ≤400 字；多问清单 ≤800 字。宁可短，不要注水。
+11) **禁止谎称已查询某源**。若材料分桶里没有「硅谷 CRM（思琪侧）」，你绝不可写「CRM 没查出」「CRM 没带出内容」等句子；只说你实际查到的源即可。
+12) 用户问「最新 / 最近 / 新动态 / 最新消息」时，必须按时间倒序列出近 1–2 期里的相关条目；禁止把「拟 / 待 / 将 / 观察 / 考虑 / 计划」等动作词过滤掉说成「没有最新动态」。只要证据里有带时间戳的相关事实，就要答出来。
 """
 
 _CROSS_SYNTH_EXTRA = """
@@ -91,6 +104,21 @@ def _mouth_max_tokens(*, cross: bool = False) -> int:
     return base
 
 
+def _looks_like_latest_question(user_text: str) -> bool:
+    return bool(_LATEST_QUERY_RE.search(user_text or ""))
+
+
+def _looks_like_negative_answer(text: str) -> bool:
+    return bool(_NEGATIVE_ANSWER_RE.search(text or ""))
+
+
+def _has_grounded_evidence(envelopes: list[TieredEnvelope]) -> bool:
+    for e in envelopes or []:
+        if e.ok and (e.text or "").strip() and not (e.payload or {}).get("empty"):
+            return True
+    return False
+
+
 def sanitize(text: str) -> str:
     t = (text or "").strip()
     if not t:
@@ -127,11 +155,17 @@ def _clean_snippet(text: str) -> str:
     return t.strip()
 
 
-def materials_block(envelopes: list[TieredEnvelope]) -> str:
-    """拼完整材料给 LLM；只做展示清洗，不做语义弱化。"""
+def materials_block(envelopes: list[TieredEnvelope], *, planned_tools: list[str] | None = None) -> str:
+    """拼完整材料给 LLM；只做展示清洗，不做语义弱化。
+
+    同时显式标注本轮没有调用的源，防止成文编造「某源没查出」。
+    """
     parts: list[str] = []
     blockers: list[str] = []
+    seen_tiers: set[str] = set()
     for r in envelopes:
+        if r.ok and (r.text or "").strip():
+            seen_tiers.add(r.tier)
         if not r.ok:
             blockers.append(_human_error(r.error, r.tool))
             continue
@@ -147,6 +181,22 @@ def materials_block(envelopes: list[TieredEnvelope]) -> str:
         }.get(r.tier, r.tier or "其他")
         worker = r.worker or ""
         parts.append(f"### {bucket}" + (f" · {worker}" if worker else "") + f"\n{snippet}")
+
+    # 标注未查询的源
+    planned = [t.strip() for t in (planned_tools or []) if t.strip()]
+    has_crm_step = any(t == "crm.search" for t in planned)
+    has_ask_step = any(t in ("ask.published", "ask.relations_summary") for t in planned)
+    has_feishu_step = any(t == "feishu.search" or t.startswith("feishu.") for t in planned)
+    missing: list[str] = []
+    if has_crm_step and "crm_prior" not in seen_tiers:
+        missing.append("硅谷 CRM（思琪侧）：步骤计划了但无返回或返回为空")
+    if has_ask_step and "published" not in seen_tiers:
+        missing.append("已上线周报：步骤计划了但无返回或返回为空")
+    if has_feishu_step and "feishu_live" not in seen_tiers:
+        missing.append("飞书侧：步骤计划了但无返回或返回为空")
+    if missing:
+        parts.append("### 本轮未返回材料的源\n" + "\n".join(f"- {m}" for m in missing))
+
     if blockers:
         seen: set[str] = set()
         uniq = []
@@ -292,11 +342,12 @@ def synthesize_work(
 ) -> tuple[str, dict[str, Any], dict[str, str]]:
     """默认：LLM 按用户完整原话 + 完整材料成文；失败才回落规则分栏。"""
     graph = graph or TaskGraph(goal=(user_text or "")[:200], mode="work")
+    planned_tools = [s.tool for s in (graph.steps or []) if s.tool]
     columns = format_columns(
         envelopes, graph=graph, partial=partial, budget_hit=budget_hit
     )
     meta: dict[str, Any] = {"llm_used": False, "model": None, "source": "rule_columns"}
-    material = materials_block(envelopes)
+    material = materials_block(envelopes, planned_tools=planned_tools)
     notes = []
     if budget_hit:
         notes.append(f"执行备注：预算触顶（{budget_hit}），材料可能不完整。")
@@ -352,6 +403,43 @@ def synthesize_work(
             log.warning("supervisor mouth contradicted non-empty materials")
             text = render_work_answer(columns)
             meta["source"] = "rule_columns_contradiction"
+
+        # Guard：用户问「最新/最近」且答案写「没有」，但 evidence 非空 → 很可能是成文把有效事实降档了。
+        # 用更严的系统 prompt 重抽一次；仍失败则回落规则分栏（规则分栏会把证据列出来）。
+        if (
+            _looks_like_latest_question(user_text)
+            and _looks_like_negative_answer(text)
+            and _has_grounded_evidence(envelopes)
+            and not is_cross
+        ):
+            log.warning("supervisor mouth negative-latest guard triggered, retrying")
+            retry_system = (
+                system
+                + "\n\n【硬性纠偏】用户明确问「最新/最近/新动态」。\n"
+                "只要材料里存在带时间戳的相关事实，就必须列出，绝不能说「没有」。\n"
+                "若确实只有旧材料，也按时间倒序列出最近 1–2 条，并说明时间。"
+            )
+            try:
+                out2 = llm.call(
+                    retry_system,
+                    user,
+                    max_tokens=_mouth_max_tokens(cross=is_cross),
+                    json_mode=False,
+                    task="answer",
+                )
+                text2 = sanitize(str(out2 or "").strip())
+                if text2 and not _looks_like_negative_answer(text2):
+                    text = text2
+                    meta["source"] = "llm_mouth_retry_latest"
+                else:
+                    log.warning("retry still negative, falling back to rule columns")
+                    text = render_work_answer(columns)
+                    meta["source"] = "rule_columns_latest_guard"
+            except Exception as e2:
+                log.warning("latest guard retry failed: %s", e2)
+                text = render_work_answer(columns)
+                meta["source"] = "rule_columns_latest_guard_err"
+
         return text, meta, columns
     except Exception as e:
         log.warning("supervisor mouth synthesize failed: %s", e)

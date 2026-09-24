@@ -10,9 +10,13 @@
       "gold_claim_invalid": false,
       "current_line_grounded": true,
       "current_gate_result": {
-        "fails_grounding": [],
-        "gate_kept": true,
-        "dropped_titles": []
+        "fails_grounding": [
+          "关系「Founder Park 账号运营：传播涨粉与下半年规划两侧各知一半」证据仅为点名/身份介绍，无真实沟通或对接动作"
+        ],
+        "gate_kept": false,
+        "dropped_titles": [
+          "Founder Park 账号运营：传播涨粉与下半年规划两侧各知一半"
+        ]
       },
       "current_claim_check": {
         "claim_verdict": "valid",
@@ -205,9 +209,13 @@
       "gold_claim_invalid": false,
       "current_line_grounded": true,
       "current_gate_result": {
-        "fails_grounding": [],
-        "gate_kept": true,
-        "dropped_titles": []
+        "fails_grounding": [
+          "关系「豆包：商业化、编辑部、视频号各自碰到的三个触点」证据仅为点名/身份介绍，无真实沟通或对接动作"
+        ],
+        "gate_kept": false,
+        "dropped_titles": [
+          "豆包：商业化、编辑部、视频号各自碰到的三个触点"
+        ]
       },
       "current_claim_check": {
         "claim_verdict": "valid",
