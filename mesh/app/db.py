@@ -460,6 +460,7 @@ def migrate(con):
         except Exception:
             pass
         ensure_search_fts_schema(con)
+        _maybe_normalize_issue_slugs(con)
         return
     add = [
         ("sources", "channel", "TEXT DEFAULT 'manual'"),
@@ -478,6 +479,12 @@ def migrate(con):
                 con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
         except Exception:
             pass
+    # raw_snippet 字段：新 SCHEMA 已包含；旧库补加
+    try:
+        if "raw_snippet" not in _cols(con, "items"):
+            con.execute("ALTER TABLE items ADD COLUMN raw_snippet TEXT")
+    except Exception:
+        pass
     # 旧数据回填：owner_team 缺失时先沿用 team，管理员可在审校台改
     try:
         con.execute("UPDATE items SET owner_team=team WHERE owner_team IS NULL OR owner_team=''")
@@ -643,6 +650,40 @@ def migrate(con):
     except Exception:
         pass
     ensure_search_fts_schema(con)
+    _maybe_normalize_issue_slugs(con)
+
+
+def _maybe_normalize_issue_slugs(con) -> None:
+    """把 issues.slug 及所有依赖表的 issue_slug 规范为 YYYY-MM-DD。
+    幂等、轻量，每次启动跑一遍无妨。"""
+    from .issue_period import normalize_issue_slug
+
+    try:
+        rows = con.execute("SELECT id, slug FROM issues").fetchall()
+    except Exception:
+        return
+    for r in rows:
+        old = (r["slug"] or "").strip()
+        new = normalize_issue_slug(old) or old
+        if not new or new == old:
+            continue
+        # 级联更新依赖表（不删 issue 本身，保留 id）
+        for table, col in [
+            ("sources", "issue_slug"),
+            ("items", "issue_slug"),
+            ("search_fts", "issue_slug"),
+            ("entity_team_facts", "issue_slug"),
+            ("item_facts", "issue_slug"),
+            ("item_entity_facts", "issue_slug"),
+            ("chunk_index", "issue_slug"),
+            ("crm_cross_anchor", "issue_slug"),
+            ("preview_job_state", "issue_slug"),
+        ]:
+            try:
+                con.execute(f"UPDATE {table} SET {col}=? WHERE {col}=?", (new, old))
+            except Exception:
+                pass
+        con.execute("UPDATE issues SET slug=? WHERE id=?", (new, r["id"]))
 
 
 def _fts_columns(con) -> set[str]:
@@ -948,13 +989,14 @@ def _collect_item_teams(it: dict, parent_label: str = "", group_title: str = "")
 
 def reindex_entity_facts(con, issue_id: int):
     """从已发布 JSON 物化 主体×团队×期号；仅 published 写入，草稿不进交叉语料。"""
+    from .issue_period import normalize_issue_slug
     row = con.execute(
         "SELECT slug, status, date_start, date_end, published_json FROM issues WHERE id=?",
         (issue_id,),
     ).fetchone()
     if not row:
         return
-    slug = row["slug"]
+    slug = normalize_issue_slug(row["slug"])
     con.execute("DELETE FROM entity_team_facts WHERE issue_slug=?", (slug,))
     if row["status"] != "published" or not (row["published_json"] or "").strip():
         return
@@ -1074,13 +1116,14 @@ def reindex_issue(con, issue_id: int, *, items: bool = True, rebuild_chunks: boo
     rebuild_chunks=False 时跳过 chunk_index（Publish 可异步补建）。
     """
     from . import tokenize as tok
+    from .issue_period import normalize_issue_slug
     row = con.execute(
         "SELECT slug, status, date_end, published_json FROM issues WHERE id=?",
         (issue_id,),
     ).fetchone()
     if not row:
         return
-    slug = row["slug"]
+    slug = normalize_issue_slug(row["slug"])
     con.execute("DELETE FROM search_fts WHERE issue_slug=?", (slug,))
     if row["status"] != "published" or not (row["published_json"] or "").strip():
         from . import item_facts, chunk_index
@@ -1125,7 +1168,6 @@ def reindex_issue(con, issue_id: int, *, items: bool = True, rebuild_chunks: boo
     if items:
         item_facts.reindex_item_facts(con, issue_id)
     else:
-        slug = row["slug"]
         con.execute("DELETE FROM item_facts WHERE issue_slug=?", (slug,))
         con.execute("DELETE FROM item_entity_facts WHERE issue_slug=?", (slug,))
         item_facts.sync_fts(con)
@@ -1151,7 +1193,8 @@ def refresh_issue_embedding_status(
     ).fetchone()
     if not row:
         return {}
-    slug = row["slug"]
+    from .issue_period import normalize_issue_slug
+    slug = normalize_issue_slug(row["slug"])
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     model = embeddings.model_name() if embeddings.is_configured() else ""
     if row["status"] != "published":
@@ -1327,7 +1370,7 @@ def snapshot_published_items(con, issue_id: int) -> int:
     rows = [
         dict(x)
         for x in con.execute(
-            """SELECT id, source_id, team, stype, zone, level, kind, text, entities, roles, signals,
+            """SELECT id, source_id, team, stype, zone, level, kind, text, raw_snippet, entities, roles, signals,
                source_label, pointer, blocked, owner_team, channel, merged_into, source_labels
                FROM items WHERE issue_id=? AND blocked=0 AND merged_into IS NULL""",
             (issue_id,),
@@ -1353,7 +1396,7 @@ def iter_index_items(con, issue_id: int):
         except Exception:
             _log.warning("published_items_snapshot corrupt for issue_id=%s", issue_id)
     for it in con.execute(
-        """SELECT id, source_id, team, stype, zone, level, kind, text, entities, roles, signals,
+        """SELECT id, source_id, team, stype, zone, level, kind, text, raw_snippet, entities, roles, signals,
            source_label, pointer, blocked, owner_team, channel, merged_into, source_labels
            FROM items WHERE issue_id=? AND blocked=0 AND merged_into IS NULL""",
         (issue_id,),

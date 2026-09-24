@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS items(
   channel TEXT DEFAULT 'manual',
   merged_into INTEGER,
   source_labels TEXT,
+  raw_snippet TEXT,                              -- 原文较长去敏摘要，供问答深度成文
   created_at TEXT DEFAULT to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')
 );
 

@@ -167,6 +167,7 @@ def _expand_person_contexts(
 
 
 def _evidence_from_contexts(contexts: list[dict], slug: str) -> list[str]:
+    from ..issue_period import normalize_issue_slug
     refs: list[str] = []
     for i, ctx in enumerate(contexts or []):
         if not isinstance(ctx, dict):
@@ -181,7 +182,7 @@ def _evidence_from_contexts(contexts: list[dict], slug: str) -> list[str]:
         elif iid is not None and str(iid).strip():
             refs.append(f"ev:item:{iid}")
         else:
-            issue = str(ctx.get("期号") or ctx.get("issue") or slug or "")
+            issue = normalize_issue_slug(ctx.get("期号") or ctx.get("issue") or slug or "")
             refs.append(f"ev:ctx:{issue or 'na'}:{i}")
     # 去重保序
     seen: set[str] = set()
@@ -464,6 +465,8 @@ def ask_published(
 
 
 def _relation_evidence_refs(rel: dict, slug: str, idx: int) -> list[str]:
+    from ..issue_period import normalize_issue_slug
+    norm_slug = normalize_issue_slug(slug) or slug
     refs: list[str] = []
     for j, ev in enumerate(rel.get("evidence") or []):
         if isinstance(ev, dict):
@@ -475,9 +478,9 @@ def _relation_evidence_refs(rel: dict, slug: str, idx: int) -> list[str]:
             if cid:
                 refs.append(f"ev:chunk:{cid}")
                 continue
-        refs.append(f"ev:rel:{slug}:{idx}:{j}")
+        refs.append(f"ev:rel:{norm_slug}:{idx}:{j}")
     if not refs:
-        refs.append(f"ev:rel:{slug}:{idx}")
+        refs.append(f"ev:rel:{norm_slug}:{idx}")
     return refs
 
 

@@ -86,15 +86,16 @@ def row_from_item(
     roles = _parse_json_list(item.get("roles"))
     signals = _parse_json_list(item.get("signals"))
     text = (item.get("text") or "").strip()
+    raw_snippet = (item.get("raw_snippet") or text or "").strip()
     name = primary_name(entities, text)
     owner = (item.get("owner_team") or item.get("team") or "").strip()
     stype = (item.get("stype") or "").strip()
-    snippet = text[:_SNIP]
+    snippet = raw_snippet[:_SNIP]
     title = " · ".join(x for x in (name, owner, stype) if x)[:200]
     body = " ".join(
         x
         for x in (
-            text,
+            raw_snippet,  # 优先用完整摘要做检索/问答 body
             owner,
             stype,
             " ".join(entities),
@@ -134,13 +135,14 @@ def row_from_item(
 
 def reindex_item_facts(con, issue_id: int) -> int:
     """仅从已发布期写入 item_facts；草稿/下线清空。返回写入条数。"""
+    from .issue_period import normalize_issue_slug
     row = con.execute(
         "SELECT id, slug, status, date_start, date_end FROM issues WHERE id=?",
         (issue_id,),
     ).fetchone()
     if not row:
         return 0
-    slug = row["slug"]
+    slug = normalize_issue_slug(row["slug"])
     con.execute("DELETE FROM item_facts WHERE issue_slug=?", (slug,))
     con.execute("DELETE FROM item_entity_facts WHERE issue_slug=?", (slug,))
     if row["status"] != "published":

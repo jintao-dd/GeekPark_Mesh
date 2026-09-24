@@ -37,6 +37,8 @@ def fts_search(
     q = (q or "").strip()
     if not q:
         return []
+    from .issue_period import normalize_issue_slug
+    slug = normalize_issue_slug(slug) or slug
     match_q = tok.build_match_query(q)
     hits: list[dict] = []
 
@@ -59,7 +61,7 @@ def fts_search(
                 for r in fts_pg.search_fts(con, q, slug=slug, date_from=date_from, date_to=date_to, limit=limit):
                     body = r.get("body") or ""
                     hits.append({
-                        "issue_slug": r["issue_slug"],
+                        "issue_slug": normalize_issue_slug(r["issue_slug"]) or r["issue_slug"],
                         "section": r["section"],
                         "title": r["title"],
                         "sn": _highlight(body, q),
@@ -87,7 +89,7 @@ def fts_search(
                 for r in con.execute(sql, params):
                     body = r["body"] or ""
                     hits.append({
-                        "issue_slug": r["issue_slug"],
+                        "issue_slug": normalize_issue_slug(r["issue_slug"]) or r["issue_slug"],
                         "section": r["section"],
                         "title": r["title"],
                         "sn": _highlight(body, q),
@@ -115,12 +117,13 @@ def fts_search(
             seen = {(h["issue_slug"], h["section"], h["title"]) for h in hits}
             try:
                 for r in con.execute(sql, params):
-                    key = (r["issue_slug"], r["section"], r["title"])
+                    norm_slug = normalize_issue_slug(r["issue_slug"]) or r["issue_slug"]
+                    key = (norm_slug, r["section"], r["title"])
                     if key in seen:
                         continue
                     body = r["body"] or ""
                     hits.append({
-                        "issue_slug": r["issue_slug"],
+                        "issue_slug": norm_slug,
                         "section": r["section"],
                         "title": r["title"],
                         "sn": _highlight(body, terms[0]),
@@ -192,7 +195,7 @@ def ask_contexts_from_hits(hits: list[dict], limit: int = 40) -> list[dict]:
     ctxs = []
     for h in hits[:limit]:
         ctx: dict = {
-            "期号": h["issue_slug"],
+            "期号": h.get("issue_slug") or "",
             "章节": h.get("section") or "",
             "标题": h.get("title") or "",
             "内容": (h.get("body") or "")[:600],

@@ -547,7 +547,12 @@ def extract_items(
         zone = int(it.get("zone", 4) or 4); level = str(it.get("level", "L1")).upper()
         blocked = 1 if (zone == 5 or level == "L3") else 0
         llm_hint = sanitize_owner_team(it.get("owner_team"))
-        out.append({"zone": zone, "level": level, "kind": it.get("kind", "fact"), "text": it.get("text", ""),
+        raw = (it.get("raw_snippet") or it.get("text") or "").strip()
+        text = (it.get("text") or "").strip()
+        if not raw and text:
+            raw = text
+        out.append({"zone": zone, "level": level, "kind": it.get("kind", "fact"), "text": text,
+                    "raw_snippet": raw,
                     "entities": it.get("entities", []), "roles": it.get("roles", []), "signals": it.get("signals", []),
                     "llm_owner_team_hint": llm_hint,
                     "source_label": it.get("source_label", ""), "pointer": it.get("pointer", ""), "blocked": blocked, "team": it.get("team") or team})

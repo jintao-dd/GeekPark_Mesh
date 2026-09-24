@@ -97,6 +97,8 @@ def maybe_split_stage_list_item(it: dict[str, Any]) -> list[dict[str, Any]]:
     for name, note in subjects:
         child = dict(it)
         child["text"] = _child_text(name, stage, note)
+        # 拆出子条时 raw_snippet 也对应收短，避免把整段名单当单条摘要
+        child["raw_snippet"] = child["text"]
         child["entities"] = _filter_entities(it.get("entities"), name)
         child["signals"] = _signals_with_split(it.get("signals"))
         # 不继承父级「已拦」以外的假安全：子条默认未拦，交给 zone_hard

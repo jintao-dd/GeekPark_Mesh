@@ -29,13 +29,14 @@ _PERMISSION_UX = "这部分信息不在你当前可查看的范围内。"
 
 
 def _issue_slug(answer: AgentAnswer, payload: dict[str, Any] | None = None) -> str:
+    from ..issue_period import normalize_issue_slug
     p = payload or {}
     if p.get("issue"):
-        return str(p["issue"]).strip()
+        return normalize_issue_slug(p["issue"])
     ctx = answer.context or {}
     iref = ctx.get("issue_ref") or {}
     if isinstance(iref, dict) and iref.get("slug"):
-        return str(iref["slug"]).strip()
+        return normalize_issue_slug(iref["slug"])
     return ""
 
 
@@ -149,10 +150,11 @@ def _humanize_ref(ref: str) -> str:
         # crm:take:Alice / crm:person:… → 保留短标签，去掉协议前缀
         rest = r.replace("crm:", "", 1)
         return ("CRM·" + rest)[:48]
-    # ev:2026-8-17:item:4251 / ev:ctx:2026-09-15:4 → 只留期次，不晒内部 id
+    # ev:2026-8-17:item:4251 / ev:ctx:2026-09-15:4 → 只留期次，不晒内部 id，并规范格式
     m = re.match(r"^ev:(?:ctx:)?([^:]+)", r, re.I)
     if m:
-        slug = (m.group(1) or "").strip()
+        from ..issue_period import normalize_issue_slug
+        slug = normalize_issue_slug(m.group(1))
         if slug and slug.lower() != "ctx":
             return f"{slug} 周报"
         return ""

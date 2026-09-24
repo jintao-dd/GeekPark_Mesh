@@ -73,7 +73,7 @@ def _item_row(it: dict) -> dict:
         "source_id": it.get("source_id"),
         "owner_team": sanitize_owner_team(it.get("owner_team")) or "",
         "pointer": normalize_pointer(it.get("pointer")),
-        "text": (it.get("text") or "")[:_SNIP_LEN],
+        "text": ((it.get("raw_snippet") or it.get("text")) or "")[:_SNIP_LEN],
         "source_label": (it.get("source_label") or "").strip(),
         "entities": _parse_entities(it.get("entities")),
     }
@@ -1084,7 +1084,7 @@ def prepare_draft_bundle(con, issue_id: int, slug: str) -> dict:
     item_rows = [
         dict(x)
         for x in con.execute(
-            """SELECT id, source_id, owner_team, pointer, entities, roles, text, source_label, blocked
+            """SELECT id, source_id, owner_team, pointer, entities, roles, text, raw_snippet, source_label, blocked
                FROM items WHERE issue_id=? AND blocked=0 AND merged_into IS NULL""",
             (issue_id,),
         )

@@ -28,10 +28,16 @@ def _scope_key(envelope: AgentEnvelope, identity: IdentityResult, issue_slug: st
 
 
 def _issue_published(con, slug: str) -> bool:
-    row = con.execute(
-        "SELECT status, published_json FROM issues WHERE slug=?",
-        (slug,),
-    ).fetchone()
+    from ..issue_period import normalize_issue_slug
+    norm = normalize_issue_slug(slug) or slug
+    # 兼容历史库：先按规范化 slug 查，查不到再按原样查
+    for candidate in (norm, slug):
+        row = con.execute(
+            "SELECT status, published_json FROM issues WHERE slug=?",
+            (candidate,),
+        ).fetchone()
+        if row:
+            break
     if not row:
         return False
     if (row["status"] or "") != "published":
@@ -40,19 +46,20 @@ def _issue_published(con, slug: str) -> bool:
 
 
 def _latest_published_slug(con) -> str:
-    from ..issue_period import sql_order_published_desc
+    from ..issue_period import sql_order_published_desc, normalize_issue_slug
 
     row = con.execute(
         "SELECT slug FROM issues WHERE status='published' "
         "AND published_json IS NOT NULL AND TRIM(published_json) != '' "
         f"ORDER BY {sql_order_published_desc()}, id DESC LIMIT 1"
     ).fetchone()
-    return (row["slug"] if row else "") or ""
+    return normalize_issue_slug(row["slug"]) if row else ""
 
 
 def resolve_issue_ref(con, envelope: AgentEnvelope) -> IssueRef:
     """explicit → pinned → latest_published → none。draft/unpublished 不可作 IssueRef。"""
-    explicit = (envelope.explicit_issue or "").strip()
+    from ..issue_period import normalize_issue_slug
+    explicit = normalize_issue_slug(envelope.explicit_issue)
     if explicit:
         if _issue_published(con, explicit):
             return IssueRef(
@@ -70,7 +77,7 @@ def resolve_issue_ref(con, envelope: AgentEnvelope) -> IssueRef:
             reason="explicit_not_published",
         )
 
-    pinned = (envelope.pinned_issue or "").strip()
+    pinned = normalize_issue_slug(envelope.pinned_issue)
     if pinned:
         if _issue_published(con, pinned):
             return IssueRef(

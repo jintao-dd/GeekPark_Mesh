@@ -521,12 +521,13 @@ def _write_items(con, issue, *, source_id: int, items: list[dict]) -> int:
         owner = attr.owner_team
         blocked = int(it.get("blocked") or 0)
         con.execute(
-            """INSERT INTO items(issue_id,source_id,team,stype,zone,level,kind,text,entities,roles,signals,
+            """INSERT INTO items(issue_id,source_id,team,stype,zone,level,kind,text,raw_snippet,entities,roles,signals,
                source_label,pointer,blocked,owner_team,channel,source_labels,owner_provenance,llm_owner_team_hint)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 issue["id"], source_id, owner or it.get("team"), item_stype, it["zone"], it["level"],
-                it["kind"], it["text"], json.dumps(it["entities"], ensure_ascii=False),
+                it["kind"], it["text"], it.get("raw_snippet") or it["text"],
+                json.dumps(it["entities"], ensure_ascii=False),
                 json.dumps(it["roles"], ensure_ascii=False), json.dumps(it["signals"], ensure_ascii=False),
                 it["source_label"], it["pointer"], blocked, owner, CHANNEL,
                 json.dumps([it["source_label"]] if it.get("source_label") else [], ensure_ascii=False),

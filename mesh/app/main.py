@@ -1920,6 +1920,7 @@ def _period_label(start: datetime.date, end: datetime.date) -> str:
 
 def suggest_next_issue(con) -> dict:
     """新建下一期：默认发布日期为今天，无需手填区间。"""
+    from .issue_period import normalize_issue_slug
     row = con.execute(
         "SELECT version FROM issues ORDER BY date_end DESC, id DESC LIMIT 1"
     ).fetchone()
@@ -1927,9 +1928,9 @@ def suggest_next_issue(con) -> dict:
     today = datetime.date.today()
     ds = today.isoformat()
     return {
-        "slug": ds,
-        "date_start": ds,
-        "date_end": ds,
+        "slug": normalize_issue_slug(ds),
+        "date_start": normalize_issue_slug(ds),
+        "date_end": normalize_issue_slug(ds),
         "period_label": format_display_date(today),
         "version": version,
     }
@@ -1989,13 +1990,17 @@ def admin_issue_list(request: Request, err: str = ""):
 @app.post("/admin/issue/new")
 def issue_new(request: Request, slug: str = Form(...), date_start: str = Form(""), date_end: str = Form(""), period_label: str = Form(""), version: str = Form("v1.4")):
     auth.require(request, "editor")
-    slug = (slug or "").strip()
+    from .issue_period import normalize_issue_slug
+    slug = normalize_issue_slug(slug or "").strip()
     version = (version or "v1.4").strip() or "v1.4"
     today = datetime.date.today()
     if not date_end:
         date_end = today.isoformat()
     if not date_start:
         date_start = date_end
+    # 同时规范化 date_start / date_end
+    date_start = normalize_issue_slug(date_start) or date_start
+    date_end = normalize_issue_slug(date_end) or date_end
     if not period_label:
         period_label = format_display_date(_parse_iso_date(date_end) or today)
     if not slug:
@@ -2579,9 +2584,10 @@ def source_extract(request: Request, sid: int):
         )
         owner = attr.owner_team
         blocked = int(it.get("blocked") or 0)
-        con.execute("""INSERT INTO items(issue_id,source_id,team,stype,zone,level,kind,text,entities,roles,signals,source_label,pointer,blocked,owner_team,channel,source_labels,owner_provenance,llm_owner_team_hint)
-                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (s["issue_id"], sid, owner or it.get("team"), item_stype, it["zone"], it["level"], it["kind"], it["text"], json.dumps(it["entities"], ensure_ascii=False),
+        con.execute("""INSERT INTO items(issue_id,source_id,team,stype,zone,level,kind,text,raw_snippet,entities,roles,signals,source_label,pointer,blocked,owner_team,channel,source_labels,owner_provenance,llm_owner_team_hint)
+                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (s["issue_id"], sid, owner or it.get("team"), item_stype, it["zone"], it["level"], it["kind"], it["text"], it.get("raw_snippet") or it["text"],
+                     json.dumps(it["entities"], ensure_ascii=False),
                      json.dumps(it["roles"], ensure_ascii=False), json.dumps(it["signals"], ensure_ascii=False), it["source_label"], it["pointer"], blocked,
                      owner, s["channel"] or "manual",
                      json.dumps([it["source_label"]] if it.get("source_label") else [], ensure_ascii=False),
@@ -2680,7 +2686,7 @@ def _build_cards_for_issue(con, r) -> None:
     for team in teams:
         if team in ("外部媒体",):
             continue
-        items = [dict(x) for x in con.execute("SELECT zone, level, kind, text, entities, roles, signals, source_label, source_labels, channel FROM items WHERE issue_id=? AND owner_team=? AND blocked=0 AND merged_into IS NULL", (r["id"], team))]
+        items = [dict(x) for x in con.execute("SELECT zone, level, kind, text, raw_snippet, entities, roles, signals, source_label, source_labels, channel FROM items WHERE issue_id=? AND owner_team=? AND blocked=0 AND merged_into IS NULL", (r["id"], team))]
         card = llm.build_team_card(team, items, r["period_label"])
         _upsert_team_card(con, r["id"], team, card)
     db.mark_draft_stale(con, r["id"])

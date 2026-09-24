@@ -176,13 +176,14 @@ def _handle_message_locked(
         user_for_state: str = "",
         controller: ctrl.ControllerDecision | None = None,
     ) -> AgentAnswer:
+        from ..issue_period import normalize_issue_slug
         issue = ""
         if payload and payload.get("issue"):
-            issue = str(payload.get("issue") or "")
+            issue = normalize_issue_slug(payload.get("issue"))
         if not issue:
             iref = (answer.context or {}).get("issue_ref") or {}
             if isinstance(iref, dict):
-                issue = str(iref.get("slug") or "")
+                issue = normalize_issue_slug(iref.get("slug"))
         team = str(getattr(identity, "primary_team", None) or "") or ""
         sstore.save(
             conv.update_state_after_turn(

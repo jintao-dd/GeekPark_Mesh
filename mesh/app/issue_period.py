@@ -25,6 +25,24 @@ def parse_stamp_date(value: Any) -> datetime.date | None:
         return None
 
 
+def normalize_issue_slug(value: Any) -> str:
+    """把任意日期字符串规范为 YYYY-MM-DD（补零）。空/非法则返回原样。"""
+    if not value:
+        return ""
+    s = str(value).strip()
+    if not s:
+        return ""
+    # 兼容 2026-8-17、2026/8/17、2026.8.17 等历史缺零写法
+    import re
+    m = re.match(r"^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$", s)
+    if m:
+        try:
+            return datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3))).isoformat()
+        except ValueError:
+            pass
+    return s
+
+
 def format_period_label(d: datetime.date) -> str:
     """读者可见期号：2026.8.27（月日不补零）。"""
     return f"{d.year}.{d.month}.{d.day}"

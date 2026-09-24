@@ -200,12 +200,13 @@ def _insert_parent_and_children(con, parent: dict) -> int:
 
 
 def rebuild_issue(con, issue_id: int, *, items: bool = True) -> int:
+    from .issue_period import normalize_issue_slug
     row = con.execute(
         "SELECT id, slug, status, date_end FROM issues WHERE id=?", (issue_id,),
     ).fetchone()
     if not row:
         return 0
-    slug = row["slug"]
+    slug = normalize_issue_slug(row["slug"])
     con.execute("DELETE FROM chunk_index WHERE issue_slug=?", (slug,))
     con.execute(
         "DELETE FROM chunk_embeddings WHERE chunk_id NOT IN (SELECT chunk_id FROM chunk_index)"
@@ -226,7 +227,8 @@ def rebuild_issue(con, issue_id: int, *, items: bool = True) -> int:
 
 
 def _materialize_issue_chunks(con, row, *, items: bool) -> int:
-    slug = row["slug"]
+    from .issue_period import normalize_issue_slug
+    slug = normalize_issue_slug(row["slug"])
     n = 0
     for r in con.execute(
         "SELECT section, title, body, date_end FROM search_fts WHERE issue_slug=?", (slug,),

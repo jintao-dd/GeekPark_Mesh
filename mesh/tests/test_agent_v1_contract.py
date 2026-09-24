@@ -157,7 +157,7 @@ def test_list_issues_published_only(db_ready):
     r = _run("有哪些期次", feishu_open_id="ou_bound")
     assert r["intent"] == "list_issues"
     assert r["data_tools_called"] == ["context.list_issues"]
-    assert "2026-8-17" in r["text"]
+    assert "2026-08-17" in r["text"]
     assert "2026-9-01" not in r["text"]
     assert "DRAFT" not in r["text"]
     assert r["fingerprint"] and r["trace"]["tool"] == "context.list_issues"
@@ -168,7 +168,7 @@ def test_ask_published_one_tool(db_ready):
     assert r["intent"] == "ask_published"
     assert r["data_tools_called"] == ["ask.published"]
     assert len(r["data_tools_called"]) == 1
-    assert r["trace"]["issue"] == "2026-8-17"
+    assert r["trace"]["issue"] == "2026-08-17"
     assert r["fingerprint"]
     assert r["evidence_refs"]
 
@@ -270,13 +270,13 @@ def test_explicit_team_and_issue(db_ready):
     assert r["permission"]["query_scope"]["team_focus"] == "投资团队"
     assert r["context"]["issue_ref"]["mode"] == "explicit"
     assert r["context"]["issue_ref"]["locked"] is True
-    assert r["trace"]["issue"] == "2026-8-17"
+    assert r["trace"]["issue"] == "2026-08-17"
 
 
 def test_latest_published_fallback(db_ready):
     r = _run("随便问问进展", feishu_open_id="ou_bound")
     assert r["context"]["issue_ref"]["mode"] == "latest_published"
-    assert r["context"]["issue_ref"]["slug"] == "2026-8-17"
+    assert r["context"]["issue_ref"]["slug"] == "2026-08-17"
     assert r["context"]["issue_ref"]["locked"] is False
 
 

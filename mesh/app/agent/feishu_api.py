@@ -46,7 +46,6 @@ def bot_reply_enabled() -> bool:
     app_id, app_secret = feishu_app_credentials()
     return bool(app_id and app_secret)
 
-
 def get_tenant_access_token(*, force: bool = False) -> str:
     app_id, app_secret = feishu_app_credentials()
     if not app_id or not app_secret:

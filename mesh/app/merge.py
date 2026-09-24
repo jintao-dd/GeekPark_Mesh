@@ -59,7 +59,7 @@ def same_event(a: dict, b: dict) -> bool:
         return False
     if _ent_overlap(_loads(a.get("entities")), _loads(b.get("entities"))) < ENT_THRESHOLD:
         return False
-    return SequenceMatcher(None, _norm(a.get("text")), _norm(b.get("text"))).ratio() >= SIM_THRESHOLD
+    return SequenceMatcher(None, _norm(a.get("raw_snippet") or a.get("text")), _norm(b.get("raw_snippet") or b.get("text"))).ratio() >= SIM_THRESHOLD
 
 
 def plan_merge(items: list[dict]) -> list[dict]:
@@ -83,7 +83,7 @@ def plan_merge(items: list[dict]) -> list[dict]:
         if len(g) < 2:
             continue
         g_sorted = sorted(g, key=lambda x: (0 if (x.get("channel") == "manual") else 1,
-                                            -len(x.get("text") or "")))
+                                            -len((x.get("raw_snippet") or x.get("text")) or "")))
         keep, drop = g_sorted[0], g_sorted[1:]
         labels, seen = [], set()
         for x in g_sorted:
@@ -99,7 +99,7 @@ def plan_merge(items: list[dict]) -> list[dict]:
 def apply_merge(con, issue_id: int) -> dict:
     """执行合并，返回统计供后台显示。"""
     rows = [dict(r) for r in con.execute(
-        "SELECT id, owner_team, team, channel, kind, text, entities, source_label, source_labels, blocked "
+        "SELECT id, owner_team, team, channel, kind, text, raw_snippet, entities, source_label, source_labels, blocked "
         "FROM items WHERE issue_id=? AND merged_into IS NULL", (issue_id,))]
     for r in rows:
         if not r.get("owner_team"):

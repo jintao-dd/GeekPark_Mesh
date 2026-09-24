@@ -397,7 +397,7 @@ def _run(slug: str, username: str, token: int = 0) -> None:
                     items = [
                         dict(x)
                         for x in con.execute(
-                            "SELECT zone, level, kind, text, entities, roles, signals, source_label, "
+                            "SELECT zone, level, kind, text, raw_snippet, entities, roles, signals, source_label, "
                             "source_labels, channel FROM items WHERE issue_id=? AND owner_team=? "
                             "AND blocked=0 AND merged_into IS NULL",
                             (issue_id, team),

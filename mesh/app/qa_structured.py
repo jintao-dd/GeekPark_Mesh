@@ -358,11 +358,12 @@ def _hardware_sql(alias: str = "") -> tuple[str, list]:
 
 
 def _rows_to_contexts(rows: list, limit: int = RESULT_LIMIT) -> tuple[list[dict], int]:
+    from .issue_period import normalize_issue_slug
     total = len(rows)
     ctxs = []
     for r in rows[:limit]:
         ctxs.append({
-            "期号": r["issue_slug"],
+            "期号": normalize_issue_slug(r["issue_slug"]) or r["issue_slug"],
             "章节": r.get("section") or "",
             "标题": r["name"],
             "内容": " · ".join(filter(None, [
@@ -683,12 +684,13 @@ def query_multi_team(
     multi.sort(key=lambda g: (-len(g["teams"]), g["name"]))
     total = len(multi)
 
+    from .issue_period import normalize_issue_slug
     ctxs: list[dict] = []
     for g in multi[:limit]:
         teams = sorted(g["teams"])
         first = g["rows"][0]
         ctxs.append({
-            "期号": first.get("issue_slug") or "",
+            "期号": normalize_issue_slug(first.get("issue_slug")) or first.get("issue_slug") or "",
             "章节": first.get("section") or "",
             "标题": g["name"],
             "内容": " · ".join(filter(None, [
@@ -742,12 +744,13 @@ def _graph_rows_to_contexts(rows: list[dict], *, limit: int = 20) -> tuple[list[
     注意：不展示 entity_kind —— 现有 infer_entity_kind 启发式噪声大
     （公司常被误标 person），展示会给 LLM 错误信号。
     """
+    from .issue_period import normalize_issue_slug
     total = len(rows)
     ctxs = []
     for r in rows[:limit]:
         co = int(r.get("co") or 0)
         ctxs.append({
-            "期号": r.get("date_end") or "",
+            "期号": normalize_issue_slug(r.get("issue_slug")) or r.get("date_end") or "",
             "章节": "图检索",
             "标题": r["name"],
             "内容": " · ".join(filter(None, [
