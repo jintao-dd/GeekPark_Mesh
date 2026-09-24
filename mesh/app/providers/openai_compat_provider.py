@@ -42,6 +42,26 @@ def _transient(status: int, body: str) -> bool:
     ))
 
 
+def _thinking_disabled(model: str) -> bool:
+    """这些模型是「思考型」：推理 token 会先吃掉 completion 预算。
+
+    在 Mesh 这种「短 JSON / 短成文」调用里，小 max_tokens（semantic 160、
+    controller 400、intent 200 等）会被推理烧光，content 变空。
+    实测网关支持 `thinking:{"type":"disabled"}` 关闭推理；默认对下列模型关闭，
+    可用 MESH_LLM_DISABLE_THINKING 覆盖（逗号分隔的子串；置空字符串表示全部不关）。
+    """
+    m = (model or "").lower()
+    if not m:
+        return False
+    raw = env("MESH_LLM_DISABLE_THINKING")
+    pats = [p.strip().lower() for p in raw.split(",") if p.strip()] if raw else [
+        "deepseek-v4.1-flash",
+        "deepseek-v4-flash",
+        "deepseek/deepseek-v4",
+    ]
+    return any(p in m for p in pats)
+
+
 class OpenAICompatProvider(Provider):
     name = "openai_compat"
 
@@ -74,7 +94,7 @@ class OpenAICompatProvider(Provider):
         return bool(self.key and self.model and self.base)
 
     def _request_payload(self, system: str, user: str, max_tokens: int, *, stream: bool = True) -> dict:
-        return {
+        payload = {
             "model": self.model,
             "max_tokens": max_tokens,
             "stream": stream,
@@ -83,6 +103,9 @@ class OpenAICompatProvider(Provider):
                 {"role": "user", "content": user},
             ],
         }
+        if _thinking_disabled(self.model):
+            payload["thinking"] = {"type": "disabled"}
+        return payload
 
     def complete_detail(self, system: str, user: str, max_tokens: int = 4000, *, task: str = "default") -> dict:
         """完整 API 响应（诊断用）：content / finish_reason / usage / raw_response。
@@ -298,10 +321,7 @@ class OpenAICompatProvider(Provider):
     def stream(self, system: str, user: str, max_tokens: int = 4000, *, task: str = "default"):
         if not self.is_configured():
             raise LLMError("未配置 MESH_LLM_API_KEY / MESH_LLM_MODEL / MESH_LLM_BASE_URL（见 .env）")
-        payload = json.dumps({
-            "model": self.model, "max_tokens": max_tokens, "stream": True,
-            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-        }, ensure_ascii=False).encode("utf-8")
+        payload = json.dumps(self._request_payload(system, user, max_tokens, stream=True), ensure_ascii=False).encode("utf-8")
         timeout = self._timeout_for(task)
         try:
             r = _llm_session().post(
