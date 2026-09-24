@@ -109,9 +109,40 @@ def _accum_usage(usage: dict | None, *, attempts: int = 1) -> None:
                 usage.get("prompt_tokens") or 0
             ) + int(usage.get("completion_tokens") or 0)
 
+# 任务→模型解析结果的进程内缓存（DB 选择可能随时被后台改，TTL 要短）。
+# 后台改完会调 model_settings_cache_bust() 让本进程立即失效；其它 worker 靠 TTL 收敛。
+_MODEL_CACHE: dict[str, tuple[float, str | None]] = {}
+_MODEL_CACHE_LOCK = threading.Lock()
+_MODEL_CACHE_TTL_S = max(1.0, float(__import__("os").environ.get("MESH_MODEL_CACHE_TTL_S") or 3))
+
+
+def model_settings_cache_bust() -> None:
+    with _MODEL_CACHE_LOCK:
+        _MODEL_CACHE.clear()
+
+
+def _resolve_model_for_task(task: str) -> str | None:
+    """DB 里的任务选择优先（后台「模型」页可切换）；未设置则回落 .env。"""
+    from . import model_settings
+
+    t = (task or "default").strip().lower()
+    try:
+        from . import db
+
+        con = db.connect()
+        try:
+            return model_settings.effective_model(con, t) or None
+        finally:
+            con.close()
+    except Exception:
+        # DB 不可用：绝不因此让业务断掉，直接走 env 兜底
+        return model_settings.env_default_model(t) or None
+
+
 def model_for_task(task: str = "default") -> str | None:
     """任务级固定模型配置（非动态 router）。
 
+    解析顺序：**DB 任务选择（后台「模型」页）** → 环境变量兜底。
     环境变量（可选）：
       MESH_LLM_MODEL_SEMANTIC    — Claim semantic judge
       MESH_LLM_MODEL_ANSWER      — Answer 成文
@@ -119,27 +150,16 @@ def model_for_task(task: str = "default") -> str | None:
       MESH_LLM_MODEL_CONTROLLER  — Colleague Controller（未设则回落 SEMANTIC / MODEL）
       MESH_LLM_MODEL             — 默认回落
     """
-    import os
-
     t = (task or "default").strip().lower()
-    keys = {
-        "semantic": ("MESH_LLM_MODEL_SEMANTIC",),
-        "answer": ("MESH_LLM_MODEL_ANSWER",),
-        # ask.published 中间成文：与 answer 同模型，但不走飞书真流式（task!=answer）
-        "ask": ("MESH_LLM_MODEL_ANSWER", "MESH_LLM_MODEL"),
-        "sensitive": ("MESH_LLM_MODEL_SENSITIVE", "MESH_LLM_MODEL_ANSWER"),
-        "controller": (
-            "MESH_LLM_MODEL_CONTROLLER",
-            "MESH_LLM_MODEL_SEMANTIC",
-            "MESH_LLM_MODEL",
-        ),
-        "default": ("MESH_LLM_MODEL",),
-    }.get(t, ("MESH_LLM_MODEL",))
-    for k in keys:
-        v = (os.environ.get(k) or "").strip()
-        if v:
-            return v
-    return (os.environ.get("MESH_LLM_MODEL") or "").strip() or None
+    now = time.monotonic()
+    with _MODEL_CACHE_LOCK:
+        hit = _MODEL_CACHE.get(t)
+        if hit and now - hit[0] <= _MODEL_CACHE_TTL_S:
+            return hit[1]
+    model = _resolve_model_for_task(t)
+    with _MODEL_CACHE_LOCK:
+        _MODEL_CACHE[t] = (now, model)
+    return model
 
 
 def provider_info() -> dict:

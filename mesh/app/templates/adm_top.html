@@ -15,6 +15,7 @@
       {% if perms.sysadmin %}
       <a href="/admin/users"{% if nav == 'users' %} class="on"{% endif %}>账号</a>
       <a href="/admin/prompts"{% if nav == 'prompts' %} class="on"{% endif %}>提示词</a>
+      <a href="/admin/models"{% if nav == 'models' %} class="on"{% endif %}>模型</a>
       {% endif %}
       <a href="/logout" class="quiet">退出</a>
     </nav>

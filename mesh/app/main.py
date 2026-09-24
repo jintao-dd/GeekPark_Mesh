@@ -3572,6 +3572,88 @@ def users_delete(request: Request, uid: int):
     con.commit(); con.close()
     return RedirectResponse("/admin/users", status_code=302)
 
+def _models_page(request: Request, *, ok: str = "", err: str = ""):
+    from . import model_settings
+
+    auth.require(request, "owner")
+    con = db.connect()
+    try:
+        model_settings.ensure_catalog(con)
+        db.commit_retry(con)
+        rows = model_settings.task_rows(con)
+        models = model_settings.list_models(con)
+    finally:
+        con.close()
+    return templates.TemplateResponse(
+        "models.html",
+        ctx(request, models=models, rows=rows, flash_ok=ok or None, flash_err=err or None),
+    )
+
+
+def _models_redirect(ok: str = "", err: str = ""):
+    from urllib.parse import quote
+
+    if err:
+        return RedirectResponse("/admin/models?err=" + quote(err[:400]), status_code=302)
+    return RedirectResponse("/admin/models?ok=" + quote(ok[:200]), status_code=302)
+
+
+@app.get("/admin/models", response_class=HTMLResponse)
+def models_page(request: Request, ok: str = "", err: str = ""):
+    return _models_page(request, ok=ok, err=err)
+
+
+@app.post("/admin/models/add")
+def models_add(request: Request, model: str = Form(...)):
+    from . import model_settings
+
+    auth.require(request, "owner")
+    con = db.connect()
+    try:
+        ok, msg = model_settings.add_model(con, model)
+        if ok:
+            db.commit_retry(con)
+            llm.model_settings_cache_bust()
+    finally:
+        con.close()
+    return _models_redirect(ok=f"已添加 {model.strip()}" if ok else "", err="" if ok else msg)
+
+
+@app.post("/admin/models/delete")
+def models_delete(request: Request, model: str = Form(...)):
+    from . import model_settings
+
+    auth.require(request, "owner")
+    con = db.connect()
+    try:
+        ok, msg = model_settings.delete_model(con, model)
+        if ok:
+            db.commit_retry(con)
+            llm.model_settings_cache_bust()
+    finally:
+        con.close()
+    return _models_redirect(ok=f"已移除 {model.strip()}" if ok else "", err="" if ok else msg)
+
+
+@app.post("/admin/models/task")
+def models_set_task(request: Request, task: str = Form(...), model: str = Form("")):
+    from . import model_settings
+
+    auth.require(request, "owner")
+    con = db.connect()
+    try:
+        ok, msg = model_settings.set_task_choice(con, task, model)
+        if ok:
+            db.commit_retry(con)
+            llm.model_settings_cache_bust()
+    finally:
+        con.close()
+    label = dict(model_settings.TASK_LABELS).get((task or "").strip().lower(), task)
+    if not ok:
+        return _models_redirect(err=msg)
+    return _models_redirect(ok=f"{label} → {model.strip() or '跟随 .env 兜底'}")
+
+
 def _prompt_path(name: str) -> Path:
     """仅允许 prompts 目录下的 *.md，防路径穿越。"""
     raw = (name or "").strip()
