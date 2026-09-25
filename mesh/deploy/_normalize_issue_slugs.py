@@ -43,10 +43,10 @@ def _tables_exist(con) -> list[tuple[str, str]]:
 
 def _pg_tables_exist(con) -> list[tuple[str, str]]:
     rows = con.execute(
-        "SELECT tablename FROM pg_tables WHERE schemaname='public'"
+        "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema='public'"
     ).fetchall()
-    existing = {r["tablename"] for r in rows}
-    return [(t, c) for t, c in ISSUE_SLUG_TABLES if t in existing]
+    existing = {(r["table_name"], r["column_name"]) for r in rows}
+    return [(t, c) for t, c in ISSUE_SLUG_TABLES if (t, c) in existing]
 
 
 def migrate() -> dict:
