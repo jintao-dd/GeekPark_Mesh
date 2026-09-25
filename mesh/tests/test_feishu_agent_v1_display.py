@@ -36,11 +36,11 @@ def test_display_includes_issue_and_evidence_for_supported():
         },
     )
     assert "XX 尚不能证明已经量产。" in text
-    assert "期次：2026-8-17" in text or "来源" in text
+    assert "期次：2026-08-17" in text or "来源" in text
     # 对外不晒内部条目号；期次来源即可核对
     assert "4251" not in text
     assert "条目" not in text
-    assert "来源：2026-8-17" in text or "期次" in text
+    assert "来源：2026-08-17" in text or "期次" in text
 
 
 def test_display_insufficient_without_related_only():
