@@ -399,7 +399,7 @@ CREATE TABLE IF NOT EXISTS crm_companies(
   id SERIAL PRIMARY KEY,
   notion_id TEXT UNIQUE NOT NULL,
   name TEXT, aliases TEXT, one_liner TEXT, sector TEXT, stage TEXT, website TEXT,
-  people_ids_json TEXT, props_json TEXT, last_edited_time TEXT, synced_at TEXT
+  people_ids_json TEXT, people_names TEXT, props_json TEXT, last_edited_time TEXT, synced_at TEXT
 );
 CREATE TABLE IF NOT EXISTS crm_people(
   id SERIAL PRIMARY KEY,

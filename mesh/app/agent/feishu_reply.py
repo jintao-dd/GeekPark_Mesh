@@ -138,7 +138,8 @@ def _failure_kind(
 
 def _humanize_ref(ref: str) -> str:
     """对外可见的核对标签。内部条目号 / ev:ctx 返回空串（不展示）。"""
-    r = (ref or "").strip()
+    from ..issue_period import normalize_issue_ref
+    r = normalize_issue_ref(ref or "").strip()
     if not r:
         return ""
     if r.startswith("crm:stats:"):

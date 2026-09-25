@@ -367,7 +367,7 @@ def ask_published(
     contexts = claim_support_mod.enrich_contexts_for_denial_counter_evidence(
         con, scope, q, contexts
     )
-    evidence = _evidence_from_contexts(contexts, slug)
+    evidence = _normalize_evidence_refs(_evidence_from_contexts(contexts, slug))
     n_hits = max(
         int(prepared.get("n_hits") or prepared.get("n_context") or 0),
         len([c for c in contexts if isinstance(c, dict) and str(c.get("章节") or "") not in ("检索范围", "查询说明", "检索说明")]),
@@ -484,6 +484,17 @@ def _relation_evidence_refs(rel: dict, slug: str, idx: int) -> list[str]:
     return refs
 
 
+def _normalize_evidence_refs(refs: list[str]) -> list[str]:
+    """对所有含 issue slug 的 evidence_ref 做防御性格式化。"""
+    from ..issue_period import normalize_issue_ref
+    out: list[str] = []
+    for r in refs or []:
+        nr = normalize_issue_ref(r)
+        if nr and nr not in out:
+            out.append(nr)
+    return out
+
+
 def ask_relations_summary(
     con,
     identity: IdentityResult,
@@ -585,7 +596,7 @@ def ask_relations_summary(
 
     binding = ClaimBinding(
         claim=answer[:500],
-        evidence_refs=ev_out[:8],
+        evidence_refs=_normalize_evidence_refs(ev_out[:8]),
         status=status,
         reason="published_relations_reader_visible",
     )
@@ -603,6 +614,6 @@ def ask_relations_summary(
                 "reason": binding.reason,
             },
         },
-        evidence_refs=ev_out,
+        evidence_refs=_normalize_evidence_refs(evidence),
         claim_bindings=[binding],
     )

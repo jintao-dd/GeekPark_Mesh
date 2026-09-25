@@ -64,6 +64,7 @@ def ensure_crm_schema(con) -> None:
           stage TEXT,
           website TEXT,
           people_ids_json TEXT,
+          people_names TEXT,
           props_json TEXT,
           last_edited_time TEXT,
           synced_at TEXT

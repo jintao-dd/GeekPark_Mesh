@@ -380,6 +380,34 @@ def _search_people(con, q: str, *, limit: int = 8) -> list[dict[str, Any]]:
                 "last_touched": r["last_touched"] or "",
             }
         )
+
+    # 如果按公司名（如 Notta）搜不到人，但该公司名在 people 的 company_names 里，
+    # 则把对应的人也列出来
+    if not out and q:
+        rows2 = con.execute(
+            """
+            SELECT display_name, company_names, headline, sector, location,
+                   last_touched, interaction_count
+            FROM crm_people
+            WHERE company_names LIKE ?
+            ORDER BY
+              CASE WHEN last_touched IS NOT NULL AND TRIM(last_touched) != '' THEN 0 ELSE 1 END,
+              display_name
+            LIMIT ?
+            """,
+            (_like(q), int(limit)),
+        ).fetchall()
+        for r in rows2:
+            out.append(
+                {
+                    "name": r["display_name"] or "",
+                    "company": r["company_names"] or "",
+                    "headline": r["headline"] or "",
+                    "sector": r["sector"] or "",
+                    "location": r["location"] or "",
+                    "last_touched": r["last_touched"] or "",
+                }
+            )
     return out
 
 
@@ -394,7 +422,7 @@ def _search_companies(con, q: str, *, limit: int = 8) -> list[dict[str, Any]]:
         """,
         (_like(q), _like(q), _like(q), _like(q), _like(q), int(limit)),
     ).fetchall()
-    return [
+    out = [
         {
             "name": r["name"] or "",
             "one_liner": r["one_liner"] or "",
@@ -404,6 +432,29 @@ def _search_companies(con, q: str, *, limit: int = 8) -> list[dict[str, Any]]:
         }
         for r in rows
     ]
+    # 如果按人名搜公司没结果，但 company 的 people 字段含该人名，也返回该公司
+    if not out and q:
+        rows2 = con.execute(
+            """
+            SELECT name, one_liner, sector, stage, website
+            FROM crm_companies
+            WHERE people_names LIKE ?
+            ORDER BY name
+            LIMIT ?
+            """,
+            (_like(q), int(limit)),
+        ).fetchall()
+        out = [
+            {
+                "name": r["name"] or "",
+                "one_liner": r["one_liner"] or "",
+                "sector": r["sector"] or "",
+                "stage": r["stage"] or "",
+                "website": r["website"] or "",
+            }
+            for r in rows2
+        ]
+    return out
 
 
 def _search_interactions(

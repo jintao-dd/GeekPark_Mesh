@@ -1115,6 +1115,8 @@ def _qa_prompt(
         f"可用记录（每条含 期号/章节/标题/内容）：\n"
         f"{json.dumps(packed, ensure_ascii=False)[:ans_budget]}\n\n"
         "请用中文简明回答：结论优先；每一句都能指回上面的记录；末尾列出「来源」。"
+        "如果记录内容是已发布文章或外部媒体且带有 URL，把标题写成 Markdown 超链接 [《标题》](URL)；"
+        "无 URL 时仍用《标题》格式。不要把裸 URL 直接贴在答案里。"
         "无法回答的部分说明缺哪类来源。不要展开无关分析。"
     )
     return system, user

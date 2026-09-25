@@ -293,7 +293,7 @@ CREATE TABLE IF NOT EXISTS crm_companies(
   id INTEGER PRIMARY KEY,
   notion_id TEXT UNIQUE NOT NULL,
   name TEXT, aliases TEXT, one_liner TEXT, sector TEXT, stage TEXT, website TEXT,
-  people_ids_json TEXT, props_json TEXT, last_edited_time TEXT, synced_at TEXT
+  people_ids_json TEXT, people_names TEXT, props_json TEXT, last_edited_time TEXT, synced_at TEXT
 );
 CREATE TABLE IF NOT EXISTS crm_people(
   id INTEGER PRIMARY KEY,
@@ -941,8 +941,12 @@ def teams_from_blob(*parts: str) -> list[str]:
                 found.append(n)
     return found
 
-def _item_snippet(it: dict, limit: int = 240) -> str:
+def _item_snippet(it: dict, limit: int = 500) -> str:
     bits = []
+    # 优先用 LLM 生成的完整摘要（若有）
+    summary = str(it.get("summary") or it.get("raw_summary") or "").strip()
+    if summary:
+        bits.append(summary)
     if it.get("sub"):
         bits.append(str(it["sub"]))
     for row in it.get("rows") or []:

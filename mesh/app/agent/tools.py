@@ -187,7 +187,8 @@ def tool_list_issues(
     ]
     # 防御：绝不返回 draft
     issues = [i for i in issues if i["status"] == "published"]
-    refs = [f"issue:{i['slug']}" for i in issues[:20]]
+    from ..issue_period import normalize_issue_ref
+    refs = [normalize_issue_ref(f"issue:{i['slug']}") for i in issues[:20]]
     claim = ClaimBinding(
         claim=f"共 {len(issues)} 个已上线期次",
         evidence_refs=refs[:5],

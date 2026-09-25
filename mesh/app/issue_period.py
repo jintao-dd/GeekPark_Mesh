@@ -10,6 +10,7 @@ slug 仍是 URL/库内主键，不随期号展示日改写。
 from __future__ import annotations
 
 import datetime
+import re
 from typing import Any
 
 
@@ -33,7 +34,6 @@ def normalize_issue_slug(value: Any) -> str:
     if not s:
         return ""
     # 兼容 2026-8-17、2026/8/17、2026.8.17 等历史缺零写法
-    import re
     m = re.match(r"^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$", s)
     if m:
         try:
@@ -41,6 +41,28 @@ def normalize_issue_slug(value: Any) -> str:
         except ValueError:
             pass
     return s
+
+
+def normalize_issue_ref(ref: str) -> str:
+    """规范 evidence ref 里的期号段：ev:ctx:2026-8-17:4 → ev:ctx:2026-08-17:4。"""
+    r = (ref or "").strip()
+    if not r:
+        return r
+    if r.startswith("issue:"):
+        slug = r.split(":", 1)[1]
+        return f"issue:{normalize_issue_slug(slug) or slug}"
+    m = re.match(r"^(ev:(?:ctx|rel):)([^:]+)(.*)$", r, re.I)
+    if m:
+        prefix, slug, rest = m.group(1), m.group(2), m.group(3)
+        norm = normalize_issue_slug(slug) or slug
+        return f"{prefix}{norm}{rest}"
+    # 兼容旧式 ev:2026-8-17:item:4251
+    m = re.match(r"^(ev:)(\d{4}-\d{1,2}-\d{1,2})(:.*)$", r, re.I)
+    if m:
+        prefix, slug, rest = m.group(1), m.group(2), m.group(3)
+        norm = normalize_issue_slug(slug) or slug
+        return f"{prefix}{norm}{rest}"
+    return r
 
 
 def format_period_label(d: datetime.date) -> str:

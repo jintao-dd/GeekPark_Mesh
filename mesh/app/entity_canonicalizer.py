@@ -44,6 +44,7 @@ _HARDCODED_ALIAS_RULES: dict[str, set[str]] = {
     "nota": {"notta"},
     "armaro": {"armaro"},
     "poko": {"破壳", "破壳创智"},
+    "notta": {"notta.ai", "张岩"},
 }
 
 # 排序规则：优先命中长 key，避免 "oppo" 先被 "op" 误匹配。
