@@ -1,0 +1,732 @@
+[
+  {
+    "model": "anthropic/claude-4.8-opus",
+    "passed": 4,
+    "total": 5,
+    "total_rejected": 0,
+    "results": [
+      {
+        "id": "e02",
+        "pass": false,
+        "failures": [
+          [
+            "answer_has_面壁",
+            "len=108"
+          ]
+        ],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e03",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e06",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e11",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 1,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e23",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      }
+    ]
+  },
+  {
+    "model": "anthropic/claude-4.7-opus",
+    "passed": 4,
+    "total": 5,
+    "total_rejected": 0,
+    "results": [
+      {
+        "id": "e02",
+        "pass": false,
+        "failures": [
+          [
+            "answer_has_面壁",
+            "len=108"
+          ]
+        ],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e03",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e06",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e11",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 1,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e23",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      }
+    ]
+  },
+  {
+    "model": "anthropic/claude-opus-5",
+    "passed": 4,
+    "total": 5,
+    "total_rejected": 0,
+    "results": [
+      {
+        "id": "e02",
+        "pass": false,
+        "failures": [
+          [
+            "answer_has_面壁",
+            "len=108"
+          ]
+        ],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e03",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e06",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e11",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 1,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e23",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      }
+    ]
+  },
+  {
+    "model": "deepseek/deepseek-v4-pro",
+    "passed": 4,
+    "total": 5,
+    "total_rejected": 0,
+    "results": [
+      {
+        "id": "e02",
+        "pass": false,
+        "failures": [
+          [
+            "answer_has_面壁",
+            "len=108"
+          ]
+        ],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e03",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e06",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e11",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 1,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e23",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      }
+    ]
+  },
+  {
+    "model": "deepseek/deepseek-v3.1-terminus",
+    "passed": 4,
+    "total": 5,
+    "total_rejected": 0,
+    "results": [
+      {
+        "id": "e02",
+        "pass": false,
+        "failures": [
+          [
+            "answer_has_面壁",
+            "len=108"
+          ]
+        ],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e03",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e06",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e11",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 1,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e23",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      }
+    ]
+  },
+  {
+    "model": "openai/gpt-5.4-pro",
+    "passed": 4,
+    "total": 5,
+    "total_rejected": 0,
+    "results": [
+      {
+        "id": "e02",
+        "pass": false,
+        "failures": [
+          [
+            "answer_has_面壁",
+            "len=108"
+          ]
+        ],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e03",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e06",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e11",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 1,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e23",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      }
+    ]
+  },
+  {
+    "model": "openai/gpt-5-pro",
+    "passed": 4,
+    "total": 5,
+    "total_rejected": 0,
+    "results": [
+      {
+        "id": "e02",
+        "pass": false,
+        "failures": [
+          [
+            "answer_has_面壁",
+            "len=108"
+          ]
+        ],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e03",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e06",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e11",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 1,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e23",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      }
+    ]
+  },
+  {
+    "model": "qwen3-235b-a22b",
+    "passed": 4,
+    "total": 5,
+    "total_rejected": 0,
+    "results": [
+      {
+        "id": "e02",
+        "pass": false,
+        "failures": [
+          [
+            "answer_has_面壁",
+            "len=108"
+          ]
+        ],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e03",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e06",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e11",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 1,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e23",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      }
+    ]
+  },
+  {
+    "model": "z-ai/glm-5.1",
+    "passed": 4,
+    "total": 5,
+    "total_rejected": 0,
+    "results": [
+      {
+        "id": "e02",
+        "pass": false,
+        "failures": [
+          [
+            "answer_has_面壁",
+            "len=108"
+          ]
+        ],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e03",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e06",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e11",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 1,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e23",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      }
+    ]
+  },
+  {
+    "model": "minimax/minimax-m3",
+    "passed": 4,
+    "total": 5,
+    "total_rejected": 0,
+    "results": [
+      {
+        "id": "e02",
+        "pass": false,
+        "failures": [
+          [
+            "answer_has_面壁",
+            "len=108"
+          ]
+        ],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e03",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e06",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e11",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 1,
+          "flags": [],
+          "rejected_texts": []
+        }
+      },
+      {
+        "id": "e23",
+        "pass": true,
+        "failures": [],
+        "verify": {
+          "verified": 0,
+          "rejected": 0,
+          "downgraded": 0,
+          "flags": [],
+          "rejected_texts": []
+        }
+      }
+    ]
+  }
+]

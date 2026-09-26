@@ -1,0 +1,5103 @@
+{
+  "generated_at": "2026-09-25T16:40:31",
+  "corpus_env": "golden_sqlite(_issue_2026-8-17.json)",
+  "db_stats": {
+    "issues_published": 2,
+    "issue_slugs": [
+      "2026-8-17",
+      "2026-08-14"
+    ],
+    "items": 266,
+    "fts": 246,
+    "facts": 271,
+    "chunks": 533
+  },
+  "questions": [
+    {
+      "id": "e01",
+      "q": "商业化团队在跟进的客户里，哪些同时也是编辑部的采访对象？",
+      "tags": [
+        "structured",
+        "intersect"
+      ],
+      "pass": true,
+      "failure_layer": null,
+      "routing": {
+        "kind": "independent",
+        "reason": "no_history",
+        "search_q": "商业化团队在跟进的客户里，哪些同时也是编辑部的采访对象？",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "structured",
+        "n_hits": 0,
+        "n_context": 0,
+        "total": 0,
+        "date_from": "2026-06-27",
+        "date_to": null,
+        "latency_ms": 29268,
+        "titles": [],
+        "issues": [],
+        "direct_answer": true
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=no_history"
+        },
+        {
+          "check": "mode",
+          "ok": true,
+          "detail": "mode=structured"
+        },
+        {
+          "check": "min_total",
+          "ok": true,
+          "detail": "total=0"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": true,
+          "detail": "rejected=0"
+        }
+      ],
+      "evidence": {
+        "analysis_id": null,
+        "sources": [],
+        "context_refs": {},
+        "steps_n": 0
+      },
+      "answer": {
+        "text": "在 2026-06-27 起至今（约 90 天） 范围内，未找到同时出现在「商业化团队」与「编辑部」的主体。\n\n来源：结构化检索（主体×团队事实表）",
+        "len": 74,
+        "correctness": "pass"
+      },
+      "verify": {},
+      "latency": {
+        "retrieve_ms": 29268,
+        "analysis_ms": 0,
+        "total_ms": 29268
+      },
+      "usage": {
+        "path": "direct",
+        "retrieve_ms": 29268,
+        "analysis_ms": 0,
+        "total_ms": 29268
+      },
+      "n_retries": null,
+      "n_llm_calls": null
+    },
+    {
+      "id": "e02",
+      "q": "编辑部接触了面壁智能吗",
+      "tags": [
+        "entity",
+        "hybrid"
+      ],
+      "pass": false,
+      "failure_layer": "evidence",
+      "routing": {
+        "kind": "independent",
+        "reason": "no_history",
+        "search_q": "编辑部接触了面壁智能吗",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "hybrid",
+        "n_hits": 40,
+        "n_context": 40,
+        "total": null,
+        "date_from": "2026-06-27",
+        "date_to": null,
+        "latency_ms": 4809,
+        "titles": [
+          "面壁智能",
+          "面壁智能",
+          "面壁智能",
+          "面壁智能",
+          "面壁智能",
+          "面壁智能"
+        ],
+        "issues": [
+          "2026-08-14",
+          "2026-08-17"
+        ],
+        "direct_answer": false
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=no_history"
+        },
+        {
+          "check": "mode",
+          "ok": true,
+          "detail": "mode=hybrid"
+        },
+        {
+          "check": "context_has_面壁",
+          "ok": true,
+          "detail": "found=True"
+        },
+        {
+          "check": "answer_has_面壁",
+          "ok": true,
+          "detail": "len=245"
+        },
+        {
+          "check": "answer_has_编辑部",
+          "ok": true,
+          "detail": "len=245"
+        },
+        {
+          "check": "answer_forbid_已校验断言",
+          "ok": true,
+          "detail": "hit=False"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": false,
+          "detail": "rejected=11"
+        }
+      ],
+      "evidence": {
+        "analysis_id": "2923dfc5be94f950",
+        "sources": [
+          {
+            "group_id": "g1",
+            "source": "编辑部",
+            "issue": "2026-08-17",
+            "n_facts": 6,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "面壁智能（沟通对象为高通侧芯片调优负责人）：端侧模型在旗舰手机应用的限制与发展方向（已接触）。"
+              }
+            ]
+          },
+          {
+            "group_id": "g2",
+            "source": "未标注来源",
+            "issue": "2026-08-17",
+            "n_facts": 4,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "詹杨帆 车与端侧 身份 端侧模型上车、智能座舱 要点 与吉利银河、长安车企合作，做舱内视频流分析、事故处理 Agent；端云协同与路由模型判断 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话（有原始记录）"
+              },
+              {
+                "ref": "e2",
+                "quote": "关注的公司与人 编辑部 端侧上车、事故处理 Agent、路由模型一手对话 硅谷 BD 团队 终端是 AI 进入物理世界的路径判断"
+              },
+              {
+                "ref": "e3",
+                "quote": "关注的领域 编辑部 与面壁智能、安谋科技谈端侧模型与端云协同；整理端侧芯片框架能力 硅谷 BD 团队 英伟达技术分享、PPIO Token 演进分享"
+              },
+              {
+                "ref": "e4",
+                "quote": "一方接触，另一方用得上 端侧模型上车与智能座舱方向，编辑部与硅谷 BD 团队各有一手对话记录。 编辑部记录：与詹杨帆谈端云协同、路由模型、事故处理 Agent，及与吉利银河、长安车企的智能座舱合作。 硅谷 BD 团队记录：与詹杨帆谈终端是 AI 进入物理世界的路径、汽车算力强于手机、端侧模型芯片适配情况。 编辑部沟通记"
+              },
+              {
+                "ref": "e5",
+                "quote": "关注的技术 编辑部 多智能体协作、路由模型与国内智能体合规 硅谷 BD 团队 PPIO 分享智能体阶段 Token 百万级演进 商业化团队 Agent 壁垒在上下文积累的判断 视频号团队 支付宝 Agent、Genspark 等入口话题脚本"
+              },
+              {
+                "ref": "e6",
+                "quote": "已联动 编辑部在建具身智能硬件方向新账号，并与品牌创意团队协同确定栏目与呈现形式。 编辑部记录：李源负责新的具身智能硬件方向账号，X 账号已建立，名字未定。 品牌创意团队记录：新账号内容在网站单独开 tag，UI 与现有网站一致，锦涛提供 Web Coding Blog 风格参考。 品牌创意团队周会复盘 编辑部 品牌创"
+              }
+            ]
+          },
+          {
+            "group_id": "g3",
+            "source": "未标注来源",
+            "issue": "2026-08-14",
+            "n_facts": 0,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "CMO 智能硬件 身份 CMO · 智能硬件 时间 8 月 4 日 要点 IFA 规划 来源 编辑部沟通记录"
+              },
+              {
+                "ref": "e2",
+                "quote": "刘李正 · CEO 智能硬件 身份 CEO 刘李正 · 智能桌游硬件 时间 8 月 5 日 要点 智能棋子 + DM copilot；核心桌游玩家抗拒电子化；纯 AI-DM 收不到钱 来源 编辑部沟通记录"
+              },
+              {
+                "ref": "e3",
+                "quote": "孙旭 · PR 智能硬件 身份 PR 孙旭 · AR 眼镜 时间 8 月 6 日 要点 下半年新品；Project Aura 来源 编辑部沟通记录"
+              },
+              {
+                "ref": "e4",
+                "quote": "李天羽 · CEO 具身智能 身份 CEO 李天羽 · 具身智能数据 时间 8 月 5 日 要点 物理交互数据拼广度不拼时长；业内称 GPT-3 时刻至少 5 年；不优先砸全身遥操作（含转述业内两位人士观点） 来源 编辑部沟通记录"
+              },
+              {
+                "ref": "e5",
+                "quote": "关注的领域 编辑部 文章 <a href=\"https://www.geekpark.net/news/368846\" target=\"_blank\">《阿里云，接得住中国智驾吗？》</a> 8/14 李苏；选题 8/10 提报 → 8/14 发布"
+              }
+            ]
+          },
+          {
+            "group_id": "g4",
+            "source": "硅谷 BD 团队",
+            "issue": "2026-08-17",
+            "n_facts": 2,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "Calvin Z.（Calvin Zhou，RoboForce 联合创始人，硅谷湾区）：RoboForce（具身智能/机器人）做 Physical AI 驱动的机器人劳动力，面向工业现场作业（数据库人物，尚未接触，投资团队/编辑部用得上）"
+              }
+            ]
+          }
+        ],
+        "context_refs": {
+          "analysis_id": "2923dfc5be94f950",
+          "parent_analysis_id": null,
+          "last_user_q": "编辑部接触了面壁智能吗",
+          "entities": [
+            "面壁智能",
+            "AI智能体安全",
+            "阿里",
+            "詹杨帆",
+            "面壁智能 · 詹杨帆",
+            "李源",
+            "威诚资本",
+            "端侧 AI 与芯片",
+            "几硕",
+            "网信办",
+            "以色列",
+            "Agent 与模型商品化",
+            "奥术造物",
+            "氧刻",
+            "亲宝宝",
+            "XREAL",
+            "具身智能",
+            "李源 · 具身智能账号矩阵",
+            "安谋科技",
+            "源策",
+            "李天羽",
+            "智能驾驶",
+            "乙烯众筹",
+            "Calvin Zhou"
+          ],
+          "teams": [
+            "编辑部",
+            "视频号团队",
+            "硅谷 BD 团队",
+            "未标注来源"
+          ],
+          "issues": [
+            "2026-08-17",
+            "2026-08-14"
+          ],
+          "chunk_ids": [],
+          "item_ids": [
+            "668",
+            "673",
+            "675",
+            "677",
+            "674",
+            "722",
+            "676",
+            "678",
+            "660",
+            "669",
+            "721",
+            "807",
+            "685",
+            "684",
+            "744",
+            "659",
+            "661",
+            "682",
+            "748",
+            "683",
+            "747",
+            "735",
+            "657",
+            "672"
+          ]
+        },
+        "steps_n": 14
+      },
+      "answer": {
+        "text": "根据现有材料（2026-08-17 期记录），我没有查到关于面壁智能的接触信息。RoboForce 是一家具身智能/机器人公司，从事 Physical AI 驱动的机器人劳动力，面向工业现场作业。由于材料中并未涉及面壁智能，我无法确认编辑部是否接触过这家公司。如你需要，可进一步核实相关记录。\n\n来源：2026-08-17·编辑部；2026-08-17·未标注来源；2026-08-14·未标注来源；2026-08-17·硅谷 BD 团队\n（注：部分表述因可用记录中缺少对应依据，已省略。）",
+        "len": 245,
+        "correctness": "fail"
+      },
+      "verify": {
+        "verified": 2,
+        "rejected": 11,
+        "downgraded": 0,
+        "flags": [
+          "Calvin×投资团队",
+          "Calvin×编辑部",
+          "Zhou×投资团队",
+          "Zhou×编辑部",
+          "Calvin Zhou×投资团队",
+          "Calvin Zhou×编辑部"
+        ]
+      },
+      "latency": {
+        "retrieve_ms": 4809,
+        "analysis_ms": 33237,
+        "total_ms": 38046
+      },
+      "usage": {
+        "llm_calls": 5,
+        "source_groups": 4,
+        "elapsed_ms": 33230,
+        "path": "analysis",
+        "cross": false,
+        "prompt_tokens": 4450,
+        "completion_tokens": 2454,
+        "total_tokens": 6904,
+        "n_calls": 5,
+        "n_retries": 0,
+        "analysis_ms": 33237,
+        "retrieve_ms": 4809,
+        "total_ms": 38046
+      },
+      "n_retries": 0,
+      "n_llm_calls": 5
+    },
+    {
+      "id": "e03",
+      "q": "具身智能有哪些公司",
+      "tags": [
+        "topic",
+        "hybrid"
+      ],
+      "pass": false,
+      "failure_layer": "evidence",
+      "routing": {
+        "kind": "independent",
+        "reason": "no_history",
+        "search_q": "具身智能有哪些公司",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "hybrid",
+        "n_hits": 40,
+        "n_context": 40,
+        "total": null,
+        "date_from": "2026-06-27",
+        "date_to": null,
+        "latency_ms": 5783,
+        "titles": [
+          "具身智能",
+          "具身智能",
+          "几硕",
+          "短测未来",
+          "李源",
+          "具身智能"
+        ],
+        "issues": [
+          "2026-08-14",
+          "2026-08-17"
+        ],
+        "direct_answer": false
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=no_history"
+        },
+        {
+          "check": "mode",
+          "ok": true,
+          "detail": "mode=hybrid"
+        },
+        {
+          "check": "min_context",
+          "ok": true,
+          "detail": "n_ctx=40"
+        },
+        {
+          "check": "context_has_具身",
+          "ok": true,
+          "detail": "found=True"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": false,
+          "detail": "rejected=22"
+        }
+      ],
+      "evidence": {
+        "analysis_id": "09a531c3f1aedc11",
+        "sources": [
+          {
+            "group_id": "g1",
+            "source": "编辑部",
+            "issue": "2026-08-17",
+            "n_facts": 7,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "几硕 · 编辑部 · T3 · 几硕（CMO）受访者陈述（非核实事实）：今年具身智能与世界模型赛道很火，人才竞争激烈、抢不过热钱更多的具身智能；PR 核心目标之一是让人才了解公司背景实力与成熟成功经验后做选择。 · 编辑部沟通记录 · 几硕IFA规划沟通（有原始记录）"
+              },
+              {
+                "ref": "e2",
+                "quote": "李源 · 编辑部 · T6 · 编辑部要做账号矩阵/垂类矩阵，用内容吸引不同垂类创业者；李源负责一个新的具身智能（硬件方向）账号，X 账号已建立，名字尚未定 · 品牌创意团队周会复盘"
+              },
+              {
+                "ref": "e3",
+                "quote": "李天羽 · 编辑部 · T3 · 受访者陈述（非核实事实，李天羽/戴博/Tianyu Li）：现有具身模型连常规 case 未解决；人一生物理交互数据约4万小时会见顶，应拼任务/物体/场景广度；对接方仍是教授、要到纯产业人士对接才算行业 GPT-3 时刻；人形全身 teleop 不够自然，倾向普通人自然采集加强 pip"
+              },
+              {
+                "ref": "e4",
+                "quote": "拓竹科技 · 编辑部 · T7 · 极客早知道 8/25 http://www.geekpark.net/news/369303 — 拓竹科技回应 2027 IPO 传闻称消息不实，2025 全球消费级3D打印以42.7%份额居首、营收破百亿；蔡崇信、吴泳铭合计增持约1.2亿港元阿里股票；小米发布玄戒 O3/O100/"
+              },
+              {
+                "ref": "e5",
+                "quote": "擎羽科技 · 编辑部 · T3 · 擎羽科技（晴雨科技）：做柔性具身机器人，核心是纯绳驱机械臂（电机集成臂尾、臂身无电机），覆盖1/2/3节及工业级版本。第一优先场景是扫地机器人、机器狗等轻型移动平台，第二是工厂无防护部署。已完成实验室客户全量覆盖，与宇树（维他动力）达成合作，下月联合发布搭载柔性机械臂的机器狗。自研六"
+              },
+              {
+                "ref": "e6",
+                "quote": "擎羽科技 · 编辑部 · T3 · 擎羽科技受访者陈述（非核实事实）：硅谷头部企业对 ego 数据采购需求远超国内；投资人已从模型概念转向回归硬件本体价值；无触觉传感器的机器人普遍停留在简单 pick and place 阶段。 · 编辑部沟通记录 · 柔性具身机器人产品与业务讨论（有原始记录）"
+              }
+            ]
+          },
+          {
+            "group_id": "g2",
+            "source": "硅谷 BD 团队",
+            "issue": "2026-08-17",
+            "n_facts": 6,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "短测未来 · 硅谷 BD 团队 · T6 · 短测未来（李洪洋团队）：已接触，专注人形机器人具身大脑研发，确认参与 8 月 4 日新加坡活动具身智能板块 · 硅谷 BD 团队建联记录 · 具身智能活动及数据圆桌讨论"
+              },
+              {
+                "ref": "e2",
+                "quote": "李源 · 硅谷 BD 团队 · T6 · 新加坡具身智能活动数据圆桌初步安排：李源主持，短测未来与戴若黎博士为嘉宾，圆桌人数控制在不超过 4 人，暂不将 ROPIDIA 与戴博安排在同一圆桌 · 硅谷 BD 团队建联记录 · 具身智能活动及数据圆桌讨论"
+              },
+              {
+                "ref": "e3",
+                "quote": "源策 · 硅谷 BD 团队 · T6 · 源策（李天羽）具身智能活动交流：活动主题 go physical go action，今年首次移至新加坡，8 月 4 日上午举办；数据领域热点为 Ego、手、全身、触觉，UMI 数据在工业界已有验证但不再是热门（受访者陈述，非核实事实） · 硅谷 BD 团队建联记录 · 具身智"
+              },
+              {
+                "ref": "e4",
+                "quote": "Allen Ren · 硅谷 BD 团队 · T3 · Allen Ren（Physical Intelligence 技术成员，通用机器人策略方向，旧金山）：Physical Intelligence（具身智能/机器人，Series B）研发通用机器人基础模型 π 系列（数据库人物，尚未接触，投资团队用得上） · 硅"
+              },
+              {
+                "ref": "e5",
+                "quote": "Calvin Zhou · 硅谷 BD 团队 · T3 · Calvin Z.（Calvin Zhou，RoboForce 联合创始人，硅谷湾区）：RoboForce（具身智能/机器人）做 Physical AI 驱动的机器人劳动力，面向工业现场作业（数据库人物，尚未接触，投资团队/编辑部用得上） · 硅谷 BD 团队"
+              },
+              {
+                "ref": "e6",
+                "quote": "Aaron Li · 硅谷 BD 团队 · T3 · Aaron Li（小正，Rhoda AI 机器人数据系统负责人，前 Apple/Tesla/NIO，帕洛阿尔托）：Rhoda AI（具身智能/机器人）研发通用机器人模型与机器人数据系统（数据库人物，尚未接触） · 硅谷 BD 团队创业者数据库"
+              }
+            ]
+          },
+          {
+            "group_id": "g3",
+            "source": "未标注来源",
+            "issue": "2026-08-14",
+            "n_facts": 6,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "李天羽 · CEO 具身智能 身份 CEO 李天羽 · 具身智能数据 时间 8 月 5 日 要点 物理交互数据拼广度不拼时长；业内称 GPT-3 时刻至少 5 年；不优先砸全身遥操作（含转述业内两位人士观点） 来源 编辑部沟通记录"
+              },
+              {
+                "ref": "e2",
+                "quote": "rex · CEO 具身智能 身份 CEO rex · 人形本体 时间 8 月 7 日 要点 3D 打印人形本体；认为收敛为时尚早；与触觉团队合作 来源 编辑部沟通记录"
+              },
+              {
+                "ref": "e3",
+                "quote": "姜易卓 具身智能 身份 创始人 姜易卓 · 球形机器人 + 开发平台 时间 8 月 7 日 要点 平台优先硬件后置；早期由大厂高管个人出资 来源 编辑部沟通记录"
+              },
+              {
+                "ref": "e4",
+                "quote": "关注的领域 编辑部 4 场对话：源策 李天羽、taks rex、跃空维度 谢金荣、FrontierX 姜易卓；选题：宇树上市稿（进行中） 商业化团队 选题会提及柔性绳驱机械臂（晴雨科技）"
+              },
+              {
+                "ref": "e5",
+                "quote": "已联动 编辑部启动具身智能垂类号，走矩阵式账号路线；品牌创意团队为其提供站点 tag 归集与视觉。 具身智能号先行，后续按垂类扩展；站点按 tag 归集内容；博客/newsletter 同挂 tag 品牌创意团队同期在做设计 AI 工具（目标 10/1 前 80% 设计由 AI 完成），垂类视觉可能由此产出 品牌创意团"
+              },
+              {
+                "ref": "e6",
+                "quote": "谢金荣 · CEO 具身智能 身份 CEO 谢金荣 · 灵巧手 时间 8 月 7 日 要点 十几克碳纤维轻手 to B（无人机等）；核心成员出自知名开源机器人项目；正准备融资 来源 编辑部沟通记录"
+              }
+            ]
+          },
+          {
+            "group_id": "g4",
+            "source": "未标注来源",
+            "issue": "2026-08-17",
+            "n_facts": 6,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "CMO 车与端侧 要点 IFA 规划沟通，谈具身智能与世界模型赛道人才竞争 来源 编辑部沟通记录 · 几硕IFA规划沟通（有原始记录）"
+              },
+              {
+                "ref": "e2",
+                "quote": "已联动 编辑部在建具身智能硬件方向新账号，并与品牌创意团队协同确定栏目与呈现形式。 编辑部记录：李源负责新的具身智能硬件方向账号，X 账号已建立，名字未定。 品牌创意团队记录：新账号内容在网站单独开 tag，UI 与现有网站一致，锦涛提供 Web Coding Blog 风格参考。 品牌创意团队周会复盘 编辑部 品牌创"
+              },
+              {
+                "ref": "e3",
+                "quote": "晴雨科技 具身智能与机器人 身份 柔性具身机器人，纯绳驱机械臂 要点 与宇树（维他动力）达成合作，下月联合发布搭载柔性机械臂的机器狗；自研六目头环做 ego 数据采集 来源 编辑部沟通记录 · 柔性具身机器人产品与业务讨论（有原始记录）"
+              },
+              {
+                "ref": "e4",
+                "quote": "杨昕怡 · PR 具身智能与机器人 身份 原生 3D 路线，Rodin 系列 要点 即将发布世界生成模型供具身机器人进场训练，定位 3D 基础设施，现有收入主要来自游戏 来源 编辑部沟通记录 · 影眸科技沟通会（有原始记录）"
+              },
+              {
+                "ref": "e5",
+                "quote": "关注的领域 编辑部 多场硬件与具身团队对话，含擎羽科技、影眸科技 硅谷 BD 团队 数据库新进 RoboForce、FieldAI、Physical Intelligence 等一批 Physical AI 创业者 Global Partnership 以 Physical AI 为主题做深圳近场研究 视频号团队"
+              },
+              {
+                "ref": "e6",
+                "quote": "关注的类型 编辑部 具身智能硬件方向新账号搭建 品牌创意团队 网站栏目改造与小红书 AI-native 内容试点 视频号团队 按行业建内容合集分类"
+              }
+            ]
+          }
+        ],
+        "context_refs": {
+          "analysis_id": "09a531c3f1aedc11",
+          "parent_analysis_id": null,
+          "last_user_q": "具身智能有哪些公司",
+          "entities": [
+            "具身智能",
+            "几硕",
+            "短测未来",
+            "李源",
+            "源策",
+            "宇树科技",
+            "Allen Ren",
+            "Calvin Zhou",
+            "Aaron Li",
+            "Ali Agha",
+            "taks",
+            "李天羽",
+            "李源 · 具身智能账号矩阵",
+            "FrontierX",
+            "拓竹科技",
+            "擎羽科技",
+            "影眸科技",
+            "面壁智能",
+            "具身智能与 Physical AI",
+            "内容矩阵与账号",
+            "AI智能体安全",
+            "编辑部垂类账号矩阵",
+            "黑马 Future X Demo Show",
+            "上海跃空维度"
+          ],
+          "teams": [
+            "视频号团队",
+            "社群",
+            "编辑部",
+            "硅谷 BD 团队",
+            "未标注来源"
+          ],
+          "issues": [
+            "2026-08-17",
+            "2026-08-14"
+          ],
+          "chunk_ids": [],
+          "item_ids": [
+            "657",
+            "645",
+            "744",
+            "704",
+            "807",
+            "644",
+            "705",
+            "703",
+            "652",
+            "782",
+            "772",
+            "773",
+            "781",
+            "727",
+            "737",
+            "791",
+            "723",
+            "724",
+            "686",
+            "673",
+            "687",
+            "668",
+            "675",
+            "722"
+          ]
+        },
+        "steps_n": 14
+      },
+      "answer": {
+        "text": "擎羽科技（又称晴雨科技）专注于柔性具身机器人，核心技术是纯绳驱机械臂，特点在于电机集成在臂尾、臂身不设电机，产品覆盖1节、2节、3节以及工业级版本。其第一优先应用场景是扫地机器人、机器狗等轻型移动平台，第二则是工厂的无防护部署。此外，材料中还提及了影眸科技，以及几硕（在其IFA规划沟通中，几硕CMO曾谈到具身智能与世界模型赛道很火、人才竞争激烈的情况，这属于该负责人的表述而非核实事实）。需要说明的是，上述几硕的相关内容仅为其CMO在沟通中的陈述，并非经过核实的事实。这属于内容运营层面的安排，并非具身智能行业公司本身。\n\n来源：2026-08-17·编辑部；2026-08-17·硅谷 BD 团队；2026-08-14·未标注来源；2026-08-17·未标注来源\n（注：部分表述因可用记录中缺少对应依据，已省略。）",
+        "len": 360,
+        "correctness": "fail"
+      },
+      "verify": {
+        "verified": 5,
+        "rejected": 22,
+        "downgraded": 0,
+        "flags": [
+          "具身智能×编辑部"
+        ]
+      },
+      "latency": {
+        "retrieve_ms": 5783,
+        "analysis_ms": 108476,
+        "total_ms": 114259
+      },
+      "usage": {
+        "llm_calls": 5,
+        "source_groups": 4,
+        "elapsed_ms": 108472,
+        "path": "analysis",
+        "cross": false,
+        "prompt_tokens": 5899,
+        "completion_tokens": 4085,
+        "total_tokens": 9984,
+        "n_calls": 5,
+        "n_retries": 0,
+        "analysis_ms": 108476,
+        "retrieve_ms": 5783,
+        "total_ms": 114259
+      },
+      "n_retries": 0,
+      "n_llm_calls": 5
+    },
+    {
+      "id": "e04",
+      "q": "还有哪些",
+      "tags": [
+        "followup"
+      ],
+      "pass": false,
+      "failure_layer": "evidence",
+      "routing": {
+        "kind": "followup",
+        "reason": "anaphora",
+        "search_q": "具身智能有哪些公司 还有哪些 优必选",
+        "parent_analysis_id": "eval-prior"
+      },
+      "recall": {
+        "mode": "hybrid",
+        "n_hits": 40,
+        "n_context": 40,
+        "total": null,
+        "date_from": "2026-06-27",
+        "date_to": null,
+        "latency_ms": 159,
+        "titles": [
+          "具身智能",
+          "具身智能",
+          "具身智能",
+          "Founder Park",
+          "cumora",
+          "黑马 Future X Demo Show"
+        ],
+        "issues": [
+          "2026-08-14",
+          "2026-08-17"
+        ],
+        "direct_answer": false
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=followup reason=anaphora"
+        },
+        {
+          "check": "no_answer_in_search_q",
+          "ok": true,
+          "detail": "search_q=具身智能有哪些公司 还有哪些 优必选"
+        },
+        {
+          "check": "min_context",
+          "ok": true,
+          "detail": "n_ctx=40"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": false,
+          "detail": "rejected=17"
+        }
+      ],
+      "evidence": {
+        "analysis_id": "ce67164d01a33019",
+        "sources": [
+          {
+            "group_id": "g1",
+            "source": "编辑部",
+            "issue": "2026-08-17",
+            "n_facts": 6,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "网信办 · 编辑部 · T6 · 国内 Agent 治理进入强制合规阶段：网信办/发改委/工信部要求智能体建立身份管理体系，千问、豆包宣布 2026 年 7 月 15 日智能体全部下线，腾讯 6 月底已下线。做 Agent 产品的团队用得上。 · 编辑部沟通记录 · 政策与市场动态"
+              },
+              {
+                "ref": "e2",
+                "quote": "AI智能体安全 · 编辑部 · T6 · 市场测算认为到 2030 年 AI 智能体安全赛道年市场规模约 5 万亿人民币（受访者陈述，非核实事实）。 · 编辑部沟通记录 · 政策与市场动态"
+              },
+              {
+                "ref": "e3",
+                "quote": "以色列 · 编辑部 · T6 · AI 智能体安全全球竞争格局：以色列第一梯队（6 家公司 2026 年 6 月单月融资 11 亿美元，最高估值 30 亿美元），新加坡/美国第二梯队，中国目前排名靠后（受访者陈述，非核实事实）。 · 编辑部沟通记录 · 政策与市场动态"
+              },
+              {
+                "ref": "e4",
+                "quote": "面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：端侧模型在旗舰手机应用的限制与发展方向（已接触）。 · 编辑部沟通记录 · 与面壁智能的对话"
+              },
+              {
+                "ref": "e5",
+                "quote": "阿里 · 编辑部 · T6 · 阿里千问（公关）：智能体相关动态沟通（已接触）。 · 编辑部沟通记录 · 与千问的对话"
+              },
+              {
+                "ref": "e6",
+                "quote": "安谋科技 · 编辑部 · T6 · 安谋科技（CPU 产品总监朱晓鸣）就端侧 AI 芯片的判断：到 2025-2026 年接近 1B 体量的模型可达 60 分商用最低标准线，模型变小后有机会装入端侧小芯片；端侧从被动响应走向具备一定主动性与自我进化能力；端侧 AI 受内存墙和带宽墙约束更重，路径包括 CPU 增加向量张"
+              }
+            ]
+          },
+          {
+            "group_id": "g2",
+            "source": "未标注来源",
+            "issue": "2026-08-17",
+            "n_facts": 10,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "晴雨科技 具身智能与机器人 身份 柔性具身机器人，纯绳驱机械臂 要点 与宇树（维他动力）达成合作，下月联合发布搭载柔性机械臂的机器狗；自研六目头环做 ego 数据采集 来源 编辑部沟通记录 · 柔性具身机器人产品与业务讨论（有原始记录）"
+              },
+              {
+                "ref": "e2",
+                "quote": "杨昕怡 · PR 具身智能与机器人 身份 原生 3D 路线，Rodin 系列 要点 即将发布世界生成模型供具身机器人进场训练，定位 3D 基础设施，现有收入主要来自游戏 来源 编辑部沟通记录 · 影眸科技沟通会（有原始记录）"
+              },
+              {
+                "ref": "e3",
+                "quote": "CMO 车与端侧 要点 IFA 规划沟通，谈具身智能与世界模型赛道人才竞争 来源 编辑部沟通记录 · 几硕IFA规划沟通（有原始记录）"
+              },
+              {
+                "ref": "e4",
+                "quote": "关注的领域 编辑部 多场硬件与具身团队对话，含擎羽科技、影眸科技 硅谷 BD 团队 数据库新进 RoboForce、FieldAI、Physical Intelligence 等一批 Physical AI 创业者 Global Partnership 以 Physical AI 为主题做深圳近场研究 视频号团队"
+              },
+              {
+                "ref": "e5",
+                "quote": "关注的类型 编辑部 具身智能硬件方向新账号搭建 品牌创意团队 网站栏目改造与小红书 AI-native 内容试点 视频号团队 按行业建内容合集分类"
+              },
+              {
+                "ref": "e6",
+                "quote": "海外接触，国内可能承接 Global Partnership 在做深圳 Physical AI 主题近场研究，编辑部与硅谷 BD 同期在深圳硬件带有一手对话。 Global Partnership 记录：以 Physical AI 为主题做深圳近场研究，已联系妙动杨硕、拟联系破壳创智。 编辑部记录：本期在深圳一带接触擎"
+              }
+            ]
+          },
+          {
+            "group_id": "g3",
+            "source": "未标注来源",
+            "issue": "2026-08-14",
+            "n_facts": 5,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "李天羽 · CEO 具身智能 身份 CEO 李天羽 · 具身智能数据 时间 8 月 5 日 要点 物理交互数据拼广度不拼时长；业内称 GPT-3 时刻至少 5 年；不优先砸全身遥操作（含转述业内两位人士观点） 来源 编辑部沟通记录"
+              },
+              {
+                "ref": "e2",
+                "quote": "rex · CEO 具身智能 身份 CEO rex · 人形本体 时间 8 月 7 日 要点 3D 打印人形本体；认为收敛为时尚早；与触觉团队合作 来源 编辑部沟通记录"
+              },
+              {
+                "ref": "e3",
+                "quote": "谢金荣 · CEO 具身智能 身份 CEO 谢金荣 · 灵巧手 时间 8 月 7 日 要点 十几克碳纤维轻手 to B（无人机等）；核心成员出自知名开源机器人项目；正准备融资 来源 编辑部沟通记录"
+              },
+              {
+                "ref": "e4",
+                "quote": "姜易卓 具身智能 身份 创始人 姜易卓 · 球形机器人 + 开发平台 时间 8 月 7 日 要点 平台优先硬件后置；早期由大厂高管个人出资 来源 编辑部沟通记录"
+              },
+              {
+                "ref": "e5",
+                "quote": "关注的领域 编辑部 4 场对话：源策 李天羽、taks rex、跃空维度 谢金荣、FrontierX 姜易卓；选题：宇树上市稿（进行中） 商业化团队 选题会提及柔性绳驱机械臂（晴雨科技）"
+              }
+            ]
+          },
+          {
+            "group_id": "g4",
+            "source": "社群",
+            "issue": "2026-08-17",
+            "n_facts": 4,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "具身智能 · 社群 · T6 · 具身智能行业观察：多重身份与交叉交易已成普遍现象，产业伙伴可同时向机器人公司销售零部件、承接代工、参与基金投资、运营数采基地并采购机器人；此类关联交易营收在资本市场存在争议，有头部机器人公司递交上市文件时部分关联交易营收被审计机构要求剔除（受访者陈述与会议判断，非核实事实） · 社群例"
+              },
+              {
+                "ref": "e2",
+                "quote": "具身智能 · 社群 · T6 · 具身智能技术路线尚未收敛，公司持续融资但资金难迅速转化为技术优势；随本体硬件路线逐渐收敛、供应链趋成熟，新增研发投入开始集中到算力和数据两个方向（会议判断，非核实事实） · 社群例会提及"
+              },
+              {
+                "ref": "e3",
+                "quote": "Founder Park · 社群 · T6 · 3-7 月 FounderPark Workshop/Meetup 落地情况：北美市场、GTC After Party、Openclaw 专场、百度智能硬件 Workshop、Waffo、San Francisco 专场、Google I/O 专场、Make for A"
+              },
+              {
+                "ref": "e4",
+                "quote": "cumora · 社群 · T6 · 独立开发者 yetone（关星鹏，北京，GitHub 官方认证明星开发者，代表作 avante.nvim 编程插件）新项目 cumora：跨平台团队聊天软件，AI 智能体作为群成员与真人同群协作，可 @ 智能体分任务、评审代码、把本地 Claude Code/Codex 拉进群，支"
+              },
+              {
+                "ref": "e5",
+                "quote": "黑马 Future X Demo Show · 社群 · T6 · 黑马 Future X Demo Show 上海站（8/16）：200 多项目报名，60 多投资人筛出 10 个登台，覆盖端侧 AI 芯片、铁路智能巡检、农业采摘机器人、无创脑机接口、智能家居 AI OS、风电智能运维等方向 · 社群例会提及"
+              }
+            ]
+          }
+        ],
+        "context_refs": {
+          "analysis_id": "ce67164d01a33019",
+          "parent_analysis_id": null,
+          "last_user_q": "还有哪些",
+          "entities": [
+            "具身智能",
+            "Founder Park",
+            "cumora",
+            "黑马 Future X Demo Show",
+            "网信办",
+            "AI智能体安全",
+            "以色列",
+            "擎羽科技",
+            "面壁智能",
+            "影眸科技",
+            "阿里",
+            "几硕",
+            "安谋科技",
+            "具身智能与 Physical AI",
+            "内容矩阵与账号",
+            "源策",
+            "taks",
+            "詹杨帆",
+            "威诚资本",
+            "上海跃空维度",
+            "FrontierX",
+            "BMC 瑞迈特",
+            "宇树科技",
+            "深圳 Physical AI 近场研究",
+            "李源 · 具身智能账号矩阵"
+          ],
+          "teams": [
+            "社群",
+            "视频号团队",
+            "编辑部",
+            "硅谷 BD 团队",
+            "未标注来源"
+          ],
+          "issues": [
+            "2026-08-17",
+            "2026-08-14"
+          ],
+          "chunk_ids": [],
+          "item_ids": [
+            "644",
+            "645",
+            "657",
+            "638",
+            "646",
+            "648",
+            "659",
+            "660",
+            "661",
+            "668",
+            "669",
+            "671",
+            "672",
+            "673",
+            "674",
+            "675",
+            "676",
+            "677",
+            "678",
+            "684",
+            "685",
+            "686",
+            "687",
+            "688"
+          ]
+        },
+        "steps_n": 14
+      },
+      "answer": {
+        "text": "你问的“还有哪些”，以下内容主要依据 2026 年 8 月中旬（8 月 14 日至 17 日）的几期材料整理，并非当下正在发生的最新动态。在具身智能和 3D 方向，影眸科技走的是原生 3D 路线，代表产品为 Rodin 系列，即将发布面向具身机器人训练的世界生成模型，定位为 3D 基础设施，目前收入主要来自游戏，对接 PR 为杨昕怡。围绕 Physical AI 主题，Global Partnership 正在深圳做近场研究，已联系妙动的杨硕，并计划联系破壳创智。行业层面有两点观察（均属受访者陈述或会议判断，非核实事实）：一是具身智能领域普遍存在多重身份与交叉交易，产业伙伴可能同时向机器人公司销售零部件、承接代工、参与基金投资、运营数采基地并采购机器人，这类关联交易营收在资本市场存在争议，有头部机器人公司递交上市文件时，部分关联交易营收被审计机构要求剔除；二是技术路线尚未收敛，公司持续融资但资金难以迅速转化为技术优势，随着本体硬件路线逐渐收敛、供应链趋于成熟，新增研发投入开始向算力和数据两个方向集中。此外，有市场测算认为到 2030 年 AI 智能体安全赛道的年市场规模约为 5 万亿人民币（受访者陈述，非核实事实）。在开发者生态方面，独立开发者 yetone（关星鹏，常驻北京，GitHub 官方认证明星开发者，代表作为编程插件 avante.nvim）推出了新项目 cumora，这是一款跨平台团队聊天软件，让 AI 智能体作为群成员与真人同群协作，可以 @ 智能体分派任务、评审代码，也能把本地的 Claude Code、Codex 拉进群，支持 Windows、macOS、Linux 与移动端，并可自托管。社群活动方面，2026 年 3 月至 7 月 FounderPark 的 Workshop 与 Meetup 已落地多场，包括北美市场专场、GTC After Party",
+        "len": 1002,
+        "correctness": "fail"
+      },
+      "verify": {
+        "verified": 8,
+        "rejected": 17,
+        "downgraded": 0,
+        "flags": []
+      },
+      "latency": {
+        "retrieve_ms": 159,
+        "analysis_ms": 42951,
+        "total_ms": 43110
+      },
+      "usage": {
+        "llm_calls": 5,
+        "source_groups": 4,
+        "elapsed_ms": 42946,
+        "path": "analysis",
+        "cross": false,
+        "prompt_tokens": 5787,
+        "completion_tokens": 4513,
+        "total_tokens": 10300,
+        "n_calls": 5,
+        "n_retries": 0,
+        "analysis_ms": 42951,
+        "retrieve_ms": 159,
+        "total_ms": 43110
+      },
+      "n_retries": 0,
+      "n_llm_calls": 5
+    },
+    {
+      "id": "e05",
+      "q": "面壁智能",
+      "tags": [
+        "short",
+        "independent"
+      ],
+      "pass": true,
+      "failure_layer": null,
+      "routing": {
+        "kind": "independent",
+        "reason": "standalone",
+        "search_q": "面壁智能",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "structured",
+        "n_hits": 12,
+        "n_context": 12,
+        "total": 12,
+        "date_from": "2026-06-27",
+        "date_to": null,
+        "latency_ms": 11473,
+        "titles": [
+          "詹杨帆",
+          "高通",
+          "AMD",
+          "吉利银河",
+          "联发科",
+          "英伟达"
+        ],
+        "issues": [
+          "2026-08-27"
+        ],
+        "direct_answer": false
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=standalone"
+        },
+        {
+          "check": "context_has_面壁",
+          "ok": true,
+          "detail": "found=True"
+        },
+        {
+          "check": "answer_forbid_#",
+          "ok": true,
+          "detail": "hit=False"
+        },
+        {
+          "check": "answer_forbid_##",
+          "ok": true,
+          "detail": "hit=False"
+        },
+        {
+          "check": "no_markdown_headers",
+          "ok": true,
+          "detail": "md_headers=False"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": true,
+          "detail": "rejected=3"
+        }
+      ],
+      "evidence": {
+        "analysis_id": "95d051bc7b42d968",
+        "sources": [
+          {
+            "group_id": "g1",
+            "source": "硅谷 BD 团队",
+            "issue": "2026-08-27",
+            "n_facts": 6,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "团队 硅谷 BD 团队 · 关联 4 条记录 · 面壁智能：与吉利银河、长安马自达等车企在智能座舱方向有具体合作（已接触，合作内容已披露） · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话"
+              },
+              {
+                "ref": "e2",
+                "quote": "团队 硅谷 BD 团队 · 关联 4 条记录 · 面壁智能（沟通对象为高通侧芯片调优负责人）：端侧模型在旗舰手机应用的限制与发展方向（已接触）。 · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话"
+              },
+              {
+                "ref": "e3",
+                "quote": "团队 硅谷 BD 团队 · 关联 2 条记录 · 面壁智能端侧模型芯片适配：已适配高通 8958538/8397/9075、联发科、英特尔、英伟达、AMD 及国产平台；模型尺寸 0.9B 到 4B 到 9B，覆盖不同算力场景，并部署支持视频流分析的 Omni 跨模态模型 · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话"
+              },
+              {
+                "ref": "e4",
+                "quote": "团队 硅谷 BD 团队 · 关联 2 条记录 · 面壁智能端侧模型芯片适配：已适配高通 8958538/8397/9075、联发科、英特尔、英伟达、AMD 及国产平台；模型尺寸 0.9B 到 4B 到 9B，覆盖不同算力场景，并部署支持视频流分析的 Omni 跨模态模型 · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话"
+              },
+              {
+                "ref": "e5",
+                "quote": "团队 硅谷 BD 团队 · 关联 2 条记录 · 面壁智能端侧模型芯片适配：已适配高通 8958538/8397/9075、联发科、英特尔、英伟达、AMD 及国产平台；模型尺寸 0.9B 到 4B 到 9B，覆盖不同算力场景，并部署支持视频流分析的 Omni 跨模态模型 · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话"
+              },
+              {
+                "ref": "e6",
+                "quote": "团队 硅谷 BD 团队 · 关联 1 条记录 · 面壁智能詹杨帆认为赛力斯与字节合作中开放合作心态是场景创新催化剂，有望找到智能座舱的 iPhone 时刻（受访者陈述，非核实事实） · 来源 硅谷 BD 团队建联记录 · 与面壁智能詹杨帆的对话"
+              }
+            ]
+          },
+          {
+            "group_id": "g2",
+            "source": "编辑部",
+            "issue": "2026-08-27",
+            "n_facts": 5,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "团队 编辑部 · 关联 2 条记录 · 面壁智能：与吉利银河、长安马自达等车企在智能座舱方向有具体合作（已接触，合作内容已披露） · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话（有原始记录）"
+              },
+              {
+                "ref": "e2",
+                "quote": "团队 编辑部 · 关联 1 条记录 · 面壁智能：与吉利银河、长安等车企在智能座舱合作。舱内做端侧跨模态视频流分析（识别儿童危险动作、数据不出车）、车内物品溯源、情境感知自动响应；舱外做本地化倒车物品识别，已在量产车型验证；并做事故处理 Agent（端云协同的责任判定与理赔）。 · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话（有原始记录）"
+              },
+              {
+                "ref": "e3",
+                "quote": "团队 编辑部 · 关联 1 条记录 · 面壁智能端侧模型芯片适配：已适配高通 8958538/8397/9075、联发科、英特尔、英伟达、AMD 及国产平台；模型尺寸 0.9B 到 4B 到 9B，覆盖不同算力场景，并部署支持视频流分析的 Omni 跨模态模型 · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话"
+              },
+              {
+                "ref": "e4",
+                "quote": "团队 编辑部 · 关联 1 条记录 · 面壁智能：与吉利银河、长安等车企在智能座舱合作。舱内做端侧跨模态视频流分析（识别儿童危险动作、数据不出车）、车内物品溯源、情境感知自动响应；舱外做本地化倒车物品识别，已在量产车型验证；并做事故处理 Agent（端云协同的责任判定与理赔）。 · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话（有原始记录）"
+              },
+              {
+                "ref": "e5",
+                "quote": "团队 编辑部 · 关联 1 条记录 · 面壁智能：与吉利银河、长安马自达等车企在智能座舱方向有具体合作（已接触，合作内容已披露） · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话"
+              }
+            ]
+          }
+        ],
+        "context_refs": {
+          "analysis_id": "95d051bc7b42d968",
+          "parent_analysis_id": null,
+          "last_user_q": "面壁智能",
+          "entities": [
+            "詹杨帆",
+            "高通",
+            "AMD",
+            "吉利银河",
+            "联发科",
+            "英伟达",
+            "字节",
+            "智能座舱",
+            "英特尔",
+            "赛力斯",
+            "长安",
+            "长安马自达"
+          ],
+          "teams": [
+            "硅谷 BD 团队",
+            "编辑部"
+          ],
+          "issues": [
+            "2026-08-27"
+          ],
+          "chunk_ids": [],
+          "item_ids": []
+        },
+        "steps_n": 8
+      },
+      "answer": {
+        "text": "车企方面：面壁智能与吉利银河、长安马自达等车企在智能座舱方向有具体合作，已接触且合作内容已披露。更细的内容是——与吉利银河、长安等车企在智能座舱合作，舱内做端侧跨模态视频流分析（识别儿童危险动作、数据不出车）、车内物品溯源、情境感知自动响应；舱外做本地化倒车物品识别，已在量产车型验证；此外还做事故处理 Agent，做端云协同的责任判定与理赔。芯片与平台方面，共现主体包括高通、联发科、英特尔、英伟达、AMD 及国产平台。记录显示面壁智能的端侧模型已适配高通 8958538/8397/9075、联发科、英特尔、英伟达、AMD 及国产平台；模型尺寸从 0.9B 到 4B 到 9B，覆盖不同算力场景，并部署了支持视频流分析的 Omni 跨模态模型。其中与高通侧的沟通对象是芯片调优负责人，讨论的是端侧模型在旗舰手机应用的限制与发展方向。另外，詹杨帆还提到赛力斯与字节的合作，认为其中开放合作的心态是场景创新的催化剂，有望找到智能座舱的 iPhone 时刻——这是他作为受访者的陈述，非已核实事实。\n\n来源：2026-08-27·硅谷 BD 团队；2026-08-27·编辑部\n（注：部分表述因可用记录中缺少对应依据，已省略。）",
+        "len": 513,
+        "correctness": "pass"
+      },
+      "verify": {
+        "verified": 11,
+        "rejected": 3,
+        "downgraded": 0,
+        "flags": [
+          "记录×其他",
+          "团队×其他",
+          "硅谷×其他",
+          "詹杨帆×编辑部",
+          "字节×编辑部",
+          "字节×其他",
+          "赛力斯×编辑部",
+          "赛力斯×其他",
+          "詹杨帆×其他"
+        ]
+      },
+      "latency": {
+        "retrieve_ms": 11473,
+        "analysis_ms": 15232,
+        "total_ms": 26705
+      },
+      "usage": {
+        "llm_calls": 1,
+        "source_groups": 2,
+        "elapsed_ms": 15227,
+        "path": "structured",
+        "cross": false,
+        "prompt_tokens": 3567,
+        "completion_tokens": 758,
+        "total_tokens": 4325,
+        "n_calls": 1,
+        "n_retries": 0,
+        "analysis_ms": 15232,
+        "retrieve_ms": 11473,
+        "total_ms": 26705
+      },
+      "n_retries": 0,
+      "n_llm_calls": 1
+    },
+    {
+      "id": "e06",
+      "q": "面壁智能",
+      "tags": [
+        "team_scope"
+      ],
+      "pass": false,
+      "failure_layer": "evidence",
+      "routing": {
+        "kind": "independent",
+        "reason": "no_history",
+        "search_q": "面壁智能",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "hybrid",
+        "n_hits": 40,
+        "n_context": 40,
+        "total": null,
+        "date_from": "2026-06-27",
+        "date_to": null,
+        "latency_ms": 4308,
+        "titles": [
+          "面壁智能",
+          "面壁智能",
+          "面壁智能",
+          "面壁智能",
+          "面壁智能",
+          "面壁智能"
+        ],
+        "issues": [
+          "2026-08-14",
+          "2026-08-17"
+        ],
+        "direct_answer": false
+      },
+      "rerank": {
+        "old_fts_with_owner_team": 0,
+        "fts_total": 24,
+        "new_hybrid": 24,
+        "date_from": "2026-06-27",
+        "date_to": null
+      },
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=no_history"
+        },
+        {
+          "check": "min_context",
+          "ok": true,
+          "detail": "n_ctx=40"
+        },
+        {
+          "check": "context_has_面壁",
+          "ok": true,
+          "detail": "found=True"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": false,
+          "detail": "rejected=13"
+        }
+      ],
+      "evidence": {
+        "analysis_id": "441a42344cbd04e7",
+        "sources": [
+          {
+            "group_id": "g1",
+            "source": "编辑部",
+            "issue": "2026-08-17",
+            "n_facts": 7,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "面壁智能（沟通对象为高通侧芯片调优负责人）：端侧模型在旗舰手机应用的限制与发展方向（已接触）。"
+              },
+              {
+                "ref": "e2",
+                "quote": "面壁智能：与吉利银河、长安马自达等车企在智能座舱方向有具体合作（已接触，合作内容已披露）"
+              },
+              {
+                "ref": "e3",
+                "quote": "面壁智能舱外方案：本地化处理替代传统云端哨兵模式，在精度和能耗上有优势，倒车物品识别已在量产车型中验证"
+              }
+            ]
+          },
+          {
+            "group_id": "g2",
+            "source": "未标注来源",
+            "issue": "2026-08-17",
+            "n_facts": 6,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "詹杨帆 车与端侧 身份 端侧模型上车、智能座舱 要点 与吉利银河、长安车企合作，做舱内视频流分析、事故处理 Agent；端云协同与路由模型判断 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话（有原始记录）"
+              }
+            ]
+          },
+          {
+            "group_id": "g3",
+            "source": "未标注来源",
+            "issue": "2026-08-14",
+            "n_facts": 0,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "CMO 智能硬件 身份 CMO · 智能硬件 时间 8 月 4 日 要点 IFA 规划 来源 编辑部沟通记录"
+              },
+              {
+                "ref": "e2",
+                "quote": "刘李正 · CEO 智能硬件 身份 CEO 刘李正 · 智能桌游硬件 时间 8 月 5 日 要点 智能棋子 + DM copilot；核心桌游玩家抗拒电子化；纯 AI-DM 收不到钱 来源 编辑部沟通记录"
+              },
+              {
+                "ref": "e3",
+                "quote": "李天羽 · CEO 具身智能 身份 CEO 李天羽 · 具身智能数据 时间 8 月 5 日 要点 物理交互数据拼广度不拼时长；业内称 GPT-3 时刻至少 5 年；不优先砸全身遥操作（含转述业内两位人士观点） 来源 编辑部沟通记录"
+              },
+              {
+                "ref": "e4",
+                "quote": "孙旭 · PR 智能硬件 身份 PR 孙旭 · AR 眼镜 时间 8 月 6 日 要点 下半年新品；Project Aura 来源 编辑部沟通记录"
+              },
+              {
+                "ref": "e5",
+                "quote": "韩乾源 · 创始人 智能硬件 身份 创始人 韩乾源 · 智能健身一体机 时间 8 月 4 日 要点 家用健身渗透率不足 1%；留存靠间歇强化；硬件价值看心理账户；出海借手机厂商本地团队；融资多轮同步（条款需授权） 来源 编辑部沟通记录（挂有原始记录）"
+              }
+            ]
+          }
+        ],
+        "context_refs": {
+          "analysis_id": "441a42344cbd04e7",
+          "parent_analysis_id": null,
+          "last_user_q": "面壁智能",
+          "entities": [
+            "面壁智能",
+            "面壁智能 · 詹杨帆",
+            "端侧 AI 与芯片",
+            "AI智能体安全",
+            "詹杨帆",
+            "几硕",
+            "李源",
+            "网信办",
+            "阿里",
+            "威诚资本",
+            "氧刻",
+            "Agent 与模型商品化",
+            "以色列",
+            "奥术造物",
+            "李天羽",
+            "源策",
+            "亲宝宝",
+            "拓竹科技",
+            "XREAL",
+            "李源 · 具身智能账号矩阵",
+            "安谋科技",
+            "乙烯众筹",
+            "天机智能、跃迁"
+          ],
+          "teams": [
+            "编辑部",
+            "未标注来源"
+          ],
+          "issues": [
+            "2026-08-17",
+            "2026-08-14"
+          ],
+          "chunk_ids": [],
+          "item_ids": [
+            "668",
+            "673",
+            "675",
+            "677",
+            "674",
+            "722",
+            "676",
+            "678",
+            "660",
+            "721",
+            "684",
+            "744",
+            "807",
+            "659",
+            "669",
+            "685",
+            "748",
+            "661",
+            "682",
+            "683",
+            "727",
+            "747",
+            "735",
+            "791"
+          ]
+        },
+        "steps_n": 12
+      },
+      "answer": {
+        "text": "关于面壁智能，目前我手头没有可供引用的具体要点内容，因此无法提供关于这家公司的实质性信息或近期动态。如果你对面壁智能的某个具体方面感兴趣，比如它的模型产品、融资情况或技术进展，欢迎进一步说明，我会在有相应材料时为你梳理。\n\n来源：2026-08-17·编辑部；2026-08-17·未标注来源；2026-08-14·未标注来源",
+        "len": 163,
+        "correctness": "fail"
+      },
+      "verify": {
+        "verified": 0,
+        "rejected": 13,
+        "downgraded": 0,
+        "flags": []
+      },
+      "latency": {
+        "retrieve_ms": 4308,
+        "analysis_ms": 18934,
+        "total_ms": 23242
+      },
+      "usage": {
+        "llm_calls": 4,
+        "source_groups": 3,
+        "elapsed_ms": 18928,
+        "path": "analysis",
+        "cross": false,
+        "prompt_tokens": 3801,
+        "completion_tokens": 1989,
+        "total_tokens": 5790,
+        "n_calls": 4,
+        "n_retries": 0,
+        "analysis_ms": 18934,
+        "retrieve_ms": 4308,
+        "total_ms": 23242
+      },
+      "n_retries": 0,
+      "n_llm_calls": 4
+    },
+    {
+      "id": "e07",
+      "q": "面壁智能",
+      "tags": [
+        "slug_scope"
+      ],
+      "pass": false,
+      "failure_layer": "retrieval",
+      "routing": {
+        "kind": "independent",
+        "reason": "no_history",
+        "search_q": "面壁智能",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "structured",
+        "n_hits": 12,
+        "n_context": 12,
+        "total": 12,
+        "date_from": "2026-06-27",
+        "date_to": null,
+        "latency_ms": 4171,
+        "titles": [
+          "詹杨帆",
+          "高通",
+          "AMD",
+          "吉利银河",
+          "联发科",
+          "英伟达"
+        ],
+        "issues": [
+          "2026-08-27"
+        ],
+        "direct_answer": false
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=no_history"
+        },
+        {
+          "check": "min_context",
+          "ok": true,
+          "detail": "n_ctx=12"
+        },
+        {
+          "check": "scope_issues",
+          "ok": false,
+          "detail": "issues=['2026-08-27'] expect=['2026-8-17']"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": true,
+          "detail": "rejected=3"
+        }
+      ],
+      "evidence": {
+        "analysis_id": "6e45a83a5836211e",
+        "sources": [
+          {
+            "group_id": "g1",
+            "source": "硅谷 BD 团队",
+            "issue": "2026-08-27",
+            "n_facts": 6,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "团队 硅谷 BD 团队 · 关联 4 条记录 · 面壁智能：与吉利银河、长安马自达等车企在智能座舱方向有具体合作（已接触，合作内容已披露） · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话"
+              },
+              {
+                "ref": "e2",
+                "quote": "团队 硅谷 BD 团队 · 关联 4 条记录 · 面壁智能（沟通对象为高通侧芯片调优负责人）：端侧模型在旗舰手机应用的限制与发展方向（已接触）。 · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话"
+              },
+              {
+                "ref": "e3",
+                "quote": "团队 硅谷 BD 团队 · 关联 2 条记录 · 面壁智能端侧模型芯片适配：已适配高通 8958538/8397/9075、联发科、英特尔、英伟达、AMD 及国产平台；模型尺寸 0.9B 到 4B 到 9B，覆盖不同算力场景，并部署支持视频流分析的 Omni 跨模态模型 · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话"
+              },
+              {
+                "ref": "e4",
+                "quote": "团队 硅谷 BD 团队 · 关联 2 条记录 · 面壁智能端侧模型芯片适配：已适配高通 8958538/8397/9075、联发科、英特尔、英伟达、AMD 及国产平台；模型尺寸 0.9B 到 4B 到 9B，覆盖不同算力场景，并部署支持视频流分析的 Omni 跨模态模型 · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话"
+              },
+              {
+                "ref": "e5",
+                "quote": "团队 硅谷 BD 团队 · 关联 2 条记录 · 面壁智能端侧模型芯片适配：已适配高通 8958538/8397/9075、联发科、英特尔、英伟达、AMD 及国产平台；模型尺寸 0.9B 到 4B 到 9B，覆盖不同算力场景，并部署支持视频流分析的 Omni 跨模态模型 · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话"
+              },
+              {
+                "ref": "e6",
+                "quote": "团队 硅谷 BD 团队 · 关联 1 条记录 · 面壁智能詹杨帆认为赛力斯与字节合作中开放合作心态是场景创新催化剂，有望找到智能座舱的 iPhone 时刻（受访者陈述，非核实事实） · 来源 硅谷 BD 团队建联记录 · 与面壁智能詹杨帆的对话"
+              }
+            ]
+          },
+          {
+            "group_id": "g2",
+            "source": "编辑部",
+            "issue": "2026-08-27",
+            "n_facts": 5,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "团队 编辑部 · 关联 2 条记录 · 面壁智能：与吉利银河、长安马自达等车企在智能座舱方向有具体合作（已接触，合作内容已披露） · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话（有原始记录）"
+              },
+              {
+                "ref": "e2",
+                "quote": "团队 编辑部 · 关联 1 条记录 · 面壁智能：与吉利银河、长安等车企在智能座舱合作。舱内做端侧跨模态视频流分析（识别儿童危险动作、数据不出车）、车内物品溯源、情境感知自动响应；舱外做本地化倒车物品识别，已在量产车型验证；并做事故处理 Agent（端云协同的责任判定与理赔）。 · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话（有原始记录）"
+              },
+              {
+                "ref": "e3",
+                "quote": "团队 编辑部 · 关联 1 条记录 · 面壁智能端侧模型芯片适配：已适配高通 8958538/8397/9075、联发科、英特尔、英伟达、AMD 及国产平台；模型尺寸 0.9B 到 4B 到 9B，覆盖不同算力场景，并部署支持视频流分析的 Omni 跨模态模型 · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话"
+              },
+              {
+                "ref": "e4",
+                "quote": "团队 编辑部 · 关联 1 条记录 · 面壁智能：与吉利银河、长安等车企在智能座舱合作。舱内做端侧跨模态视频流分析（识别儿童危险动作、数据不出车）、车内物品溯源、情境感知自动响应；舱外做本地化倒车物品识别，已在量产车型验证；并做事故处理 Agent（端云协同的责任判定与理赔）。 · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话（有原始记录）"
+              },
+              {
+                "ref": "e5",
+                "quote": "团队 编辑部 · 关联 1 条记录 · 面壁智能：与吉利银河、长安马自达等车企在智能座舱方向有具体合作（已接触，合作内容已披露） · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话"
+              }
+            ]
+          }
+        ],
+        "context_refs": {
+          "analysis_id": "6e45a83a5836211e",
+          "parent_analysis_id": null,
+          "last_user_q": "面壁智能",
+          "entities": [
+            "詹杨帆",
+            "高通",
+            "AMD",
+            "吉利银河",
+            "联发科",
+            "英伟达",
+            "字节",
+            "智能座舱",
+            "英特尔",
+            "赛力斯",
+            "长安",
+            "长安马自达"
+          ],
+          "teams": [
+            "硅谷 BD 团队",
+            "编辑部"
+          ],
+          "issues": [
+            "2026-08-27"
+          ],
+          "chunk_ids": [],
+          "item_ids": []
+        },
+        "steps_n": 8
+      },
+      "answer": {
+        "text": "车企方面：面壁智能与吉利银河、长安马自达等车企在智能座舱方向有具体合作，已接触且合作内容已披露。更细的内容是——与吉利银河、长安等车企在智能座舱合作，舱内做端侧跨模态视频流分析（识别儿童危险动作、数据不出车）、车内物品溯源、情境感知自动响应；舱外做本地化倒车物品识别，已在量产车型验证；此外还做事故处理 Agent，做端云协同的责任判定与理赔。芯片与平台方面，共现主体包括高通、联发科、英特尔、英伟达、AMD 及国产平台。记录显示面壁智能的端侧模型已适配高通 8958538/8397/9075、联发科、英特尔、英伟达、AMD 及国产平台；模型尺寸从 0.9B 到 4B 到 9B，覆盖不同算力场景，并部署了支持视频流分析的 Omni 跨模态模型。其中与高通侧的沟通对象是芯片调优负责人，讨论的是端侧模型在旗舰手机应用的限制与发展方向。另外，詹杨帆还提到赛力斯与字节的合作，认为其中开放合作的心态是场景创新的催化剂，有望找到智能座舱的 iPhone 时刻——这是他作为受访者的陈述，非已核实事实。\n\n来源：2026-08-27·硅谷 BD 团队；2026-08-27·编辑部\n（注：部分表述因可用记录中缺少对应依据，已省略。）",
+        "len": 513,
+        "correctness": "fail"
+      },
+      "verify": {
+        "verified": 11,
+        "rejected": 3,
+        "downgraded": 0,
+        "flags": [
+          "记录×其他",
+          "团队×其他",
+          "硅谷×其他",
+          "詹杨帆×编辑部",
+          "字节×编辑部",
+          "字节×其他",
+          "赛力斯×编辑部",
+          "赛力斯×其他",
+          "詹杨帆×其他"
+        ]
+      },
+      "latency": {
+        "retrieve_ms": 4171,
+        "analysis_ms": 28,
+        "total_ms": 4199
+      },
+      "usage": {
+        "llm_calls": 1,
+        "source_groups": 2,
+        "elapsed_ms": 24,
+        "path": "structured",
+        "cross": false,
+        "analysis_ms": 28,
+        "retrieve_ms": 4171,
+        "total_ms": 4199
+      },
+      "n_retries": null,
+      "n_llm_calls": 1
+    },
+    {
+      "id": "e08",
+      "q": "商业化团队跟进了但编辑部还没接触的主体有哪些？",
+      "tags": [
+        "structured",
+        "diff"
+      ],
+      "pass": true,
+      "failure_layer": null,
+      "routing": {
+        "kind": "independent",
+        "reason": "no_history",
+        "search_q": "商业化团队跟进了但编辑部还没接触的主体有哪些？",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "structured",
+        "n_hits": 25,
+        "n_context": 25,
+        "total": 25,
+        "date_from": "2026-06-27",
+        "date_to": null,
+        "latency_ms": 4269,
+        "titles": [
+          "OPPO",
+          "亚马逊广告",
+          "天机智能、跃迁",
+          "追觅",
+          "阿里云千问",
+          "AI 小镇"
+        ],
+        "issues": [
+          "2026-08-14",
+          "2026-08-17"
+        ],
+        "direct_answer": false
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=no_history"
+        },
+        {
+          "check": "mode",
+          "ok": true,
+          "detail": "mode=structured"
+        },
+        {
+          "check": "set_op",
+          "ok": true,
+          "detail": "set_op=diff expect=diff"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": true,
+          "detail": "rejected=1"
+        }
+      ],
+      "evidence": {
+        "analysis_id": "eaa16adff9b3e58c",
+        "sources": [
+          {
+            "group_id": "g1",
+            "source": "商业化团队",
+            "issue": "2026-08-17",
+            "n_facts": 5,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "团队 商业化团队 · 执行与签约 · 已签约执行中 · 要点 新签合作敲定，跟进年底 Pocket 4 形态产品单独预算 · 来源 商业化团队例会提及 · 来源提示 商业化团队例会提及"
+              },
+              {
+                "ref": "e2",
+                "quote": "团队 商业化团队 · 新增商机 · 沟通中 · 要点 11 月白皮书线下直播活动，拟邀彭总担任圆桌主持 · 来源 商业化团队例会提及 · 来源提示 商业化团队例会提及"
+              },
+              {
+                "ref": "e3",
+                "quote": "团队 商业化团队 · 新增商机 · 接触中 · 要点 均计划近期首次产品发布，正对接合作形式 · 来源 商业化团队例会提及 · 来源提示 商业化团队例会提及"
+              },
+              {
+                "ref": "e4",
+                "quote": "团队 商业化团队 · 执行与签约 · 沟通中 · 要点 IFA 探展头条内容合作初步敲定，框架改为开口框架 · 来源 商业化团队例会提及 · 来源提示 商业化团队例会提及"
+              },
+              {
+                "ref": "e5",
+                "quote": "团队 商业化团队 · 执行与签约 · 已签约执行中 · 要点 APP 及 PC 端助理功能更新排期敲定，8 月 27 日发布 · 来源 商业化团队例会提及 · 来源提示 商业化团队例会提及"
+              }
+            ]
+          },
+          {
+            "group_id": "g2",
+            "source": "商业化团队",
+            "issue": "2026-08-14",
+            "n_facts": 6,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "团队 商业化团队 · 沟通中 / 推进中 · 身份 客户 · 推进中 · 时间 8 月 10 日例会 · 要点 项目推进中 · 来源 商业化团队例会提及（8/10） · 来源提示 商业化团队例会提及（8/10）"
+              },
+              {
+                "ref": "e2",
+                "quote": "团队 商业化团队 · 执行中 · 身份 客户 · 已签约执行中 · 时间 8 月 10 日例会 · 要点 按 PO 推进 · 来源 商业化团队例会提及（8/10） · 来源提示 商业化团队例会提及（8/10）"
+              },
+              {
+                "ref": "e3",
+                "quote": "团队 商业化团队 · 合同 / 方案中 · 身份 客户 · 合同流程中 · 时间 8 月 10 日例会 · 要点 发布渠道待确认 · 来源 商业化团队例会提及（8/10） · 来源提示 商业化团队例会提及（8/10）"
+              },
+              {
+                "ref": "e4",
+                "quote": "团队 商业化团队 · 接触中 · 身份 意向客户 · 接触中 · 时间 8 月 10 日例会 · 要点 早期接触 · 来源 商业化团队例会提及（8/10） · 来源提示 商业化团队例会提及（8/10）"
+              },
+              {
+                "ref": "e5",
+                "quote": "团队 商业化团队 · 新签 / 新进展 · 原阿哈 · 身份 客户 · 沟通中 · 时间 8 月 10 日例会 · 要点 模型 8 月中下旬上线，9 月初专访 · 来源 商业化团队例会提及（8/10） · 来源提示 商业化团队例会提及（8/10）"
+              },
+              {
+                "ref": "e6",
+                "quote": "团队 商业化团队 · 新签 / 新进展 · 创造力大赛 · 身份 客户 · 已签约执行中 · 时间 8 月 10 日例会 · 要点 两位主嘉宾已确认，第三位待定 · 来源 商业化团队例会提及（8/10） · 来源提示 商业化团队例会提及（8/10）"
+              }
+            ]
+          }
+        ],
+        "context_refs": {
+          "analysis_id": "eaa16adff9b3e58c",
+          "parent_analysis_id": null,
+          "last_user_q": "商业化团队跟进了但编辑部还没接触的主体有哪些？",
+          "entities": [
+            "OPPO",
+            "亚马逊广告",
+            "天机智能、跃迁",
+            "追觅",
+            "阿里云千问",
+            "AI 小镇",
+            "AWS",
+            "HDD",
+            "MiniMax",
+            "TUTTI",
+            "Trae",
+            "liblib",
+            "优派",
+            "华为",
+            "名仕视频",
+            "奔驰纯电",
+            "尚诚起源",
+            "志维",
+            "未来不远",
+            "比亚迪",
+            "海量科普",
+            "百度",
+            "英伟达",
+            "荔枝",
+            "银河通用"
+          ],
+          "teams": [
+            "商业化团队"
+          ],
+          "issues": [
+            "2026-08-17",
+            "2026-08-14"
+          ],
+          "chunk_ids": [],
+          "item_ids": []
+        },
+        "steps_n": 8
+      },
+      "answer": {
+        "text": "根据商业化团队 2026 年 8 月 14 日与 8 月 17 日的例会记录，以下主体已由商业化团队跟进，但在已上线的编辑部周报中没有对应接触记录。在执行与签约方面，OPPO 已签约执行中，新签合作敲定，并在跟进年底 Pocket 4 形态产品的单独预算；阿里云千问已签约执行中，APP 及 PC 端助理功能更新排期敲定，定于 8 月 27 日发布；追觅处于沟通中阶段，IFA 探展的头条内容合作初步敲定，框架改为开口框架。在新增商机方面，亚马逊广告处于沟通中，计划在 11 月举办白皮书线下直播活动，拟邀彭总担任圆桌主持；天机智能与跃迁均处于接触中，两者都计划近期首次产品发布，正对接合作形式。在 8 月 10 日例会涉及的客户中，AI 小镇作为客户项目推进中；AWS 已签约执行中，按 PO 推进；HDD 处于合同流程中，发布渠道待确认；MiniMax 作为意向客户处于早期接触阶段；TUTTI（原阿哈）沟通中，模型 8 月中下旬上线、9 月初安排专访；Trae（创造力大赛）已签约执行中，两位主嘉宾已确认，第三位待定。以上主体在编辑部一侧均无已上线周报记录。\n\n来源：2026-08-17·商业化团队；2026-08-14·商业化团队\n（注：部分表述因可用记录中缺少对应依据，已省略。）",
+        "len": 546,
+        "correctness": "pass"
+      },
+      "verify": {
+        "verified": 11,
+        "rejected": 1,
+        "downgraded": 0,
+        "flags": [
+          "内容×编辑部"
+        ]
+      },
+      "latency": {
+        "retrieve_ms": 4269,
+        "analysis_ms": 11378,
+        "total_ms": 15647
+      },
+      "usage": {
+        "llm_calls": 1,
+        "source_groups": 2,
+        "elapsed_ms": 11374,
+        "path": "structured",
+        "cross": false,
+        "prompt_tokens": 3148,
+        "completion_tokens": 620,
+        "total_tokens": 3768,
+        "n_calls": 1,
+        "n_retries": 0,
+        "analysis_ms": 11378,
+        "retrieve_ms": 4269,
+        "total_ms": 15647
+      },
+      "n_retries": 0,
+      "n_llm_calls": 1
+    },
+    {
+      "id": "e09",
+      "q": "海外团队有接触、国内团队还没跟进的公司有哪些？",
+      "tags": [
+        "structured",
+        "overseas"
+      ],
+      "pass": false,
+      "failure_layer": "evidence",
+      "routing": {
+        "kind": "independent",
+        "reason": "no_history",
+        "search_q": "海外团队有接触、国内团队还没跟进的公司有哪些？",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "structured",
+        "n_hits": 28,
+        "n_context": 28,
+        "total": 28,
+        "date_from": "2026-06-27",
+        "date_to": null,
+        "latency_ms": 4245,
+        "titles": [
+          "AdsGency AI",
+          "Eigent AI",
+          "Flowtica",
+          "Generation Lab",
+          "HeyGen",
+          "Mentiforce"
+        ],
+        "issues": [
+          "2026-08-14",
+          "2026-08-17"
+        ],
+        "direct_answer": false
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=no_history"
+        },
+        {
+          "check": "mode",
+          "ok": true,
+          "detail": "mode=structured"
+        },
+        {
+          "check": "set_op",
+          "ok": true,
+          "detail": "set_op=overseas_gap expect=overseas_gap"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": false,
+          "detail": "rejected=5"
+        }
+      ],
+      "evidence": {
+        "analysis_id": "6b107782af99feba",
+        "sources": [
+          {
+            "group_id": "g1",
+            "source": "硅谷 BD 团队",
+            "issue": "2026-08-17",
+            "n_facts": 6,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "团队 硅谷 BD 团队 · 数据库新进（尚未接触） · Bolbi Liu · CEO · 要点 广告投放 AI Agent 平台，商业化团队用得上 · 来源 硅谷 BD 团队创业者数据库 · 来源提示 硅谷 BD 团队创业者数据库"
+              },
+              {
+                "ref": "e2",
+                "quote": "团队 硅谷 BD 团队 · 本期已会面 · Guohao Li 李国豪 · 创始人 · 身份 Oxford/KAUST 背景，多智能体 workforce 自动化产品 · 时间 8-23 沟通会 · 要点 跟进对接投资人、安排后续专访、找湾区潜在客户 · 来源 硅谷 BD 团队创业者数据库 · 来源提示 硅谷 BD 团队创业者数据库"
+              },
+              {
+                "ref": "e3",
+                "quote": "团队 硅谷 BD 团队 · AGI FF 储备项目 · 成旭然 Ryan、陈洁茹 Ria · 要点 AI 录音笔个人助理，总部新加坡；二代 9 月 IFA 发布用墨水屏 · 来源 硅谷 BD 团队建联记录 · Flowtica 陈洁茹｜AGI FF 储备项目 · 来源提示 硅谷 BD 团队建联记录 · Flowtica 陈洁茹｜AGI FF 储备项目"
+              },
+              {
+                "ref": "e4",
+                "quote": "团队 硅谷 BD 团队 · 数据库新进（尚未接触） · Alina Su 孙邻家 · CEO · 要点 器官级生物年龄检测 SystemAge 与长寿疗法，Forbes 30U30，编辑部用得上 · 来源 硅谷 BD 团队创业者数据库 · 来源提示 硅谷 BD 团队创业者数据库"
+              },
+              {
+                "ref": "e5",
+                "quote": "团队 硅谷 BD 团队 · 数据库新进（尚未接触） · Joshua X. 徐卓 · 联合创始人 · 要点 AI 数字人视频生成与翻译平台，编辑部/视频号团队用得上 · 来源 硅谷 BD 团队创业者数据库 · 来源提示 硅谷 BD 团队创业者数据库"
+              },
+              {
+                "ref": "e6",
+                "quote": "团队 硅谷 BD 团队 · 本期已会面 · Kein Tung · CEO · 时间 8-25 Zoom 沟通会 · 要点 确认长期互相对接彼此认识的优秀早期项目创始人、定期同步进展 · 来源 硅谷 BD 团队创业者数据库 · 来源提示 硅谷 BD 团队创业者数据库"
+              }
+            ]
+          },
+          {
+            "group_id": "g2",
+            "source": "硅谷 BD 团队",
+            "issue": "2026-08-14",
+            "n_facts": 2,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "团队 硅谷 BD 团队 · 日历 · 日历 · 身份 会期日历条目 · 时间 显示 2027/4/7（疑为下届订阅） · 要点 HumanX 注册与取证（运营性条目） · 来源 硅谷 BD 团队日历（ICS） · 来源提示 硅谷 BD 团队日历（ICS）"
+              },
+              {
+                "ref": "e2",
+                "quote": "团队 硅谷 BD 团队 · 待接入 · 待接入 · 状态 未在本期聚合中 · 说明 按《同事行程日报规范 v2.1》处理硅谷日程表；建联记录与 LinkedIn 动向为待接入类型 · 来源 硅谷 BD 团队 · 来源提示 硅谷 BD 团队"
+              }
+            ]
+          },
+          {
+            "group_id": "g3",
+            "source": "Global Partnership 团队",
+            "issue": "2026-08-14",
+            "n_facts": 6,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "团队 Global Partnership 团队 · 在谈 · 身份 海外投资机构 · 时间 截至 8 月 14 日 · 要点 9 月拟带企业家团来华 · 备注 落地在国内，社群/商业化团队可能承接 · 来源 Global Partnership 工作周报提及 · 来源提示 Global Partnership 工作周报提及"
+              },
+              {
+                "ref": "e2",
+                "quote": "团队 Global Partnership 团队 · 在谈 · 身份 海外基金 · 时间 截至 8 月 14 日 · 要点 新基金设立，保持接触 · 来源 Global Partnership 工作周报提及 · 来源提示 Global Partnership 工作周报提及"
+              },
+              {
+                "ref": "e3",
+                "quote": "团队 Global Partnership 团队 · 在谈 · 身份 Google Global Partnership · 时间 截至 8 月 14 日 · 要点 拟建立季度高层活动机制 · 来源 Global Partnership 工作周报提及 · 来源提示 Global Partnership 工作周报提及"
+              },
+              {
+                "ref": "e4",
+                "quote": "团队 Global Partnership 团队 · AGI Playground 特别活动 / Founder's Night · 身份 嘉宾 · 时间 AGI Playground 2026 · 新加坡 · 要点 出席 · 来源 Global Partnership 工作周报 · 来源提示 Global Partnership 工作周报"
+              },
+              {
+                "ref": "e5",
+                "quote": "团队 Global Partnership 团队 · 在谈 · 身份 合作方 · 时间 截至 8 月 14 日 · 要点 有偿服务 · 来源 Global Partnership 工作周报提及 · 来源提示 Global Partnership 工作周报提及"
+              },
+              {
+                "ref": "e6",
+                "quote": "团队 Global Partnership 团队 · 新发现 · 赵越 · 身份 创业者（上市主体） · 时间 截至 8 月 14 日 · 要点 Global Partnership 新发现；投资版过滤 · 来源 Global Partnership 工作周报提及 · 来源提示 Global Partnership 工作周报提及"
+              }
+            ]
+          }
+        ],
+        "context_refs": {
+          "analysis_id": "6b107782af99feba",
+          "parent_analysis_id": null,
+          "last_user_q": "海外团队有接触、国内团队还没跟进的公司有哪些？",
+          "entities": [
+            "AdsGency AI",
+            "Eigent AI",
+            "Flowtica",
+            "Generation Lab",
+            "HeyGen",
+            "Mentiforce",
+            "Pure Global",
+            "Reverie AI",
+            "RoboForce",
+            "memopin",
+            "runpad / 词元开物 / 数美万物 / 笔盒",
+            "雷鸟创新",
+            "HumanX",
+            "硅谷日程表 · 建联记录 · LinkedIn 动向",
+            "Armaro Capital",
+            "Asu Capital",
+            "Google GP",
+            "Google 高管",
+            "MOOVERS",
+            "仙工智能",
+            "俞永福",
+            "值得买 / Airwallex",
+            "其他嘉宾",
+            "基元律动",
+            "将门 PMI",
+            "张志东",
+            "新加坡机构",
+            "王小川",
+            "硅谷日程表"
+          ],
+          "teams": [
+            "硅谷 BD 团队",
+            "Global Partnership 团队"
+          ],
+          "issues": [
+            "2026-08-17",
+            "2026-08-14"
+          ],
+          "chunk_ids": [],
+          "item_ids": []
+        },
+        "steps_n": 9
+      },
+      "answer": {
+        "text": "硅谷 BD 团队方面，数据库有若干新进项目仅完成录入、尚未接触，可供国内相关团队承接。HeyGen（联合创始人 Joshua X.此外，Flowtica（成旭然 Ryan、陈洁茹 Ria）为 AGI FF 储备项目，做 AI 录音笔个人助理，总部在新加坡，二代产品于 9 月 IFA 发布并采用墨水屏——这一项已由硅谷 BD 团队建联，国内暂无对应承接记录。此外，Asu Capital（海外基金，新基金设立、保持接触）、Google GP（拟建立季度高层活动机制）、MOOVERS（合作方，有偿服务）均在海外一侧在谈，国内承接侧同样无记录。需要说明的是，硅谷 BD 团队的 Eigent AI（李国豪，8-23 沟通会）与 Mentiforce（Kein Tung，8-25 Zoom 沟通会）在窗口内已完成会面，不属于「尚未跟进」范畴；HumanX 为运营性日历条目，硅谷日程表中的建联记录与 LinkedIn 动向属待接入类型，未在本期聚合，故均不列入缺口清单。国内团队针对上述海外接触主体的具体承接动作，已上线周报无记录。\n\n来源：2026-08-17·硅谷 BD 团队；2026-08-14·硅谷 BD 团队；2026-08-14·Global Partnership 团队\n（注：部分表述因可用记录中缺少对应依据，已省略。）",
+        "len": 568,
+        "correctness": "fail"
+      },
+      "verify": {
+        "verified": 14,
+        "rejected": 5,
+        "downgraded": 0,
+        "flags": [
+          "硅谷×Global Partnership 团队",
+          "Global×Global Partnership 团队",
+          "AI×CEO / 总裁办",
+          "AI×商业化团队",
+          "AdsGency AI×CEO / 总裁办",
+          "AdsGency AI×商业化团队",
+          "AdsGency×CEO / 总裁办",
+          "AdsGency×商业化团队",
+          "Lab×CEO / 总裁办",
+          "Lab×编辑部",
+          "Generation Lab×CEO / 总裁办",
+          "Generation Lab×编辑部",
+          "Generation×CEO / 总裁办",
+          "Generation×编辑部",
+          "AI×编辑部",
+          "AI×视频号团队",
+          "状态×Global Partnership 团队",
+          "状态×社群",
+          "状态×商业化团队",
+          "Armaro×社群",
+          "Armaro×商业化团队",
+          "Capital×社群",
+          "Capital×商业化团队",
+          "Global×社群",
+          "Global×商业化团队",
+          "Armaro Capital×社群",
+          "Armaro Capital×商业化团队"
+        ]
+      },
+      "latency": {
+        "retrieve_ms": 4245,
+        "analysis_ms": 15372,
+        "total_ms": 19617
+      },
+      "usage": {
+        "llm_calls": 1,
+        "source_groups": 3,
+        "elapsed_ms": 15367,
+        "path": "structured",
+        "cross": false,
+        "prompt_tokens": 4736,
+        "completion_tokens": 897,
+        "total_tokens": 5633,
+        "n_calls": 1,
+        "n_retries": 0,
+        "analysis_ms": 15372,
+        "retrieve_ms": 4245,
+        "total_ms": 19617
+      },
+      "n_retries": 0,
+      "n_llm_calls": 1
+    },
+    {
+      "id": "e10",
+      "q": "各团队最近关注了哪些硬件相关话题？",
+      "tags": [
+        "structured",
+        "by_team"
+      ],
+      "pass": false,
+      "failure_layer": "evidence",
+      "routing": {
+        "kind": "independent",
+        "reason": "no_history",
+        "search_q": "各团队最近关注了哪些硬件相关话题？",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "structured",
+        "n_hits": 55,
+        "n_context": 30,
+        "total": 55,
+        "date_from": "2026-06-27",
+        "date_to": null,
+        "latency_ms": 4497,
+        "titles": [
+          "具身智能与 Physical AI",
+          "深圳 Physical AI 近场研究",
+          "破壳创智",
+          "内容矩阵与账号",
+          "李源 · 具身智能账号矩阵",
+          "视频号与内容传播"
+        ],
+        "issues": [
+          "2026-08-14",
+          "2026-08-17"
+        ],
+        "direct_answer": false
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=no_history"
+        },
+        {
+          "check": "mode",
+          "ok": true,
+          "detail": "mode=structured"
+        },
+        {
+          "check": "set_op",
+          "ok": true,
+          "detail": "set_op=by_team expect=by_team"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": false,
+          "detail": "rejected=4"
+        }
+      ],
+      "evidence": {
+        "analysis_id": "6c48372cfc0963b6",
+        "sources": [
+          {
+            "group_id": "g1",
+            "source": "Global Partnership 团队",
+            "issue": "2026-08-17、2026-08-14",
+            "n_facts": 3,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "团队 Global Partnership 团队 · 关注的领域 · 编辑部 多场硬件与具身团队对话，含擎羽科技、影眸科技 · 硅谷 BD 团队 数据库新进 RoboForce、FieldAI、Physical Intelligence 等一批 Physical AI 创业者 · Global Partnership 以 Physical AI 为主题做深圳近场研究 · 视频号团队 王兴兴与人形机"
+              },
+              {
+                "ref": "e2",
+                "quote": "团队 Global Partnership 团队 · 海外接触，国内可能承接 · 海外接触，国内可能承接 Global Partnership 在做深圳 Physical AI 主题近场研究，编辑部与硅谷 BD 同期在深圳硬件带有一手对话。 Global Partnership 记录：以 Physical AI 为主题做深圳近场研究，已联系妙动杨硕、拟联系破壳创智。 编辑部记录：本期在深圳一带接触"
+              },
+              {
+                "ref": "e3",
+                "quote": "团队 Global Partnership 团队 · 两处记录待核对 · 两处记录待核对 桌面 UV 打印机 + AI 创作平台，创始团队出自消费硬件头部公司。编辑部与 Global Partnership 两个团队在同一周各自碰到它，两边记录的股东名单与官宣时间略有出入。 编辑部记录：股东为云启、光速、红杉、影石；公司原计划不做融资官宣，后定 8 月中旬官宣；PR 目标是抢人才而非获客 Glob"
+              }
+            ]
+          },
+          {
+            "group_id": "g2",
+            "source": "品牌创意团队",
+            "issue": "2026-08-17、2026-08-14",
+            "n_facts": 5,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "团队 品牌创意团队 · 关注的类型 · 编辑部 具身智能硬件方向新账号搭建 · 品牌创意团队 网站栏目改造与小红书 AI-native 内容试点 · 视频号团队 按行业建内容合集分类"
+              },
+              {
+                "ref": "e2",
+                "quote": "团队 品牌创意团队 · 已联动 · 已联动 编辑部在建具身智能硬件方向新账号，并与品牌创意团队协同确定栏目与呈现形式。 编辑部记录：李源负责新的具身智能硬件方向账号，X 账号已建立，名字未定。 品牌创意团队记录：新账号内容在网站单独开 tag，UI 与现有网站一致，锦涛提供 Web Coding Blog 风格参考。 品牌创意团队周会复盘 · 来源提示 品牌创意团队周会复盘"
+              },
+              {
+                "ref": "e3",
+                "quote": "团队 品牌创意团队 · 硬件类内容单纯夸赞难获传播，猎奇点或颠覆过去的观点更易带来流量；创业者访谈中破旧、陈述市场事实的部分更有传播力；好选题加好呈现即使被看出是 AI 生成也不会被读者排斥（会议判断，非核实事实）。 视频号团队例会 · 品牌创意团队周会 · 来源提示 视频号团队例会 · 品牌创意团队周会"
+              },
+              {
+                "ref": "e4",
+                "quote": "团队 品牌创意团队 · 关注的领域 · 编辑部 8 场对话：氧刻、飞声、奥术造物、破壳创智、XREAL、几硕、vivo、亲宝宝；文章 <a href=\"https://www.geekpark.net/news/368847\" target=\"_blank\">《这家靠全景起步的公司，正在逐步让用户「忘掉相机」》</a> 8/14 siqi、<a href=\"https://www.geekpark"
+              },
+              {
+                "ref": "e5",
+                "quote": "团队 品牌创意团队 · 一方有需求，另一方尚未接触 · 一方有需求，另一方尚未接触 创意视频团队希望开始承接商务，已有外部方主动表达付费/合作意向；两边尚未就此对接。 创意视频团队判断：初创硬件公司有付费意愿，大厂无；转发 100+ 的内容值得复盘成可售形态 外部方：live tv 有意购买样片；tapnow 表达合作意向 本期记录中两边尚未就此对接 创意视频团队周会提及 商业化团队例会 · 来源"
+              }
+            ]
+          },
+          {
+            "group_id": "g3",
+            "source": "商业化团队",
+            "issue": "2026-08-17、2026-08-14",
+            "n_facts": 4,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "团队 商业化团队 · AI 硬件共识为硬件是物理世界传感器、核心价值是采集数据提供上下文，硬件公司需将过半资源投入软件算法与内容；单一录音功能的 AI 硬件难以支撑大规模公司体量；对 AI 硬件定位（AI 物理载体或智能消费硬件）各有判断（会议判断，非核实事实）。 商业化团队例会 · 视频号团队例会 · 来源提示 商业化团队例会 · 视频号团队例会"
+              },
+              {
+                "ref": "e2",
+                "quote": "团队 商业化团队 · 众筹大盘变大但严重分化，头部虹吸流量，投资人已不把众筹当风向标；日本市场严格执行电商法、上线后不可改，是检验 agency 实力的照妖镜；AI 原生硬件出海可探索普惠式路线与海外高溢价路线区分（受访者陈述，非核实事实）。 编辑部沟通记录 · 商业化团队例会 · 来源提示 编辑部沟通记录 · 商业化团队例会"
+              },
+              {
+                "ref": "e3",
+                "quote": "团队 商业化团队 · 具身数据拼广度不拼时长，\"GPT-3 时刻\"至少 5 年 · 柔性绳驱机械臂值得关注与影像/户外的结合 · AI 健身镜、智能婴儿床暂不作重点覆盖 · 硬件价值看\"心理账户\"、留存靠间歇强化 编辑部沟通记录 · 商业化团队例会选题会 · 来源提示 编辑部沟通记录 · 商业化团队例会选题会"
+              },
+              {
+                "ref": "e4",
+                "quote": "团队 商业化团队 · 一方有需求，另一方尚未接触 · 一方有需求，另一方尚未接触 创意视频团队希望开始承接商务，已有外部方主动表达付费/合作意向；两边尚未就此对接。 创意视频团队判断：初创硬件公司有付费意愿，大厂无；转发 100+ 的内容值得复盘成可售形态 外部方：live tv 有意购买样片；tapnow 表达合作意向 本期记录中两边尚未就此对接 创意视频团队周会提及 商业化团队例会 · 来源提"
+              }
+            ]
+          },
+          {
+            "group_id": "g4",
+            "source": "硅谷 BD 团队",
+            "issue": "2026-08-17",
+            "n_facts": 6,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "团队 硅谷 BD 团队 · 关注的领域 · 编辑部 与乙烯众筹、迈思创新、硅羽科技谈日本市场与众筹数据读法 · 硅谷 BD 团队 wapitee Ken 调研 AI 硬件出海与众筹 · 社群 Substack 与产品市集面向出海创业者铺开"
+              },
+              {
+                "ref": "e2",
+                "quote": "团队 硅谷 BD 团队 · 海外新发现，国内尚未接触 · 海外新发现，国内尚未接触 硅谷 BD 团队新接触 AGI FF 储备项目 memopin，方向为 AI 语音穿戴个人助手，编辑部硬件选题用得上。 硅谷 BD 团队记录：叶志伟为小巨蛋麦克风/听夏科技创始人，产品方法论强调微创新与声音垂直赛道，第二增长曲线为 AI 无感穿戴语音硬件。 硅谷 BD 团队建联记录 · Memopin 叶志伟｜AG"
+              },
+              {
+                "ref": "e3",
+                "quote": "团队 硅谷 BD 团队 · 同一赛道，各自在做 · 同一赛道，各自在做 编辑部与硅谷 BD 团队本期都在做众筹与硬件出海方向的一手调研。 编辑部记录：与乙烯众筹、迈思创新、硅羽科技分别沟通，涉及日本市场、agency 生态、众筹数据读法。 硅谷 BD 团队记录：wapitee 联合创始人 Ken 的智能纪要涉及 AI 硬件出海与众筹模式调研。 编辑部沟通记录 · 乙烯众筹x极客公园沟通会（有原始记"
+              },
+              {
+                "ref": "e4",
+                "quote": "团队 硅谷 BD 团队 · 关注的领域 · 编辑部 多场硬件与具身团队对话，含擎羽科技、影眸科技 · 硅谷 BD 团队 数据库新进 RoboForce、FieldAI、Physical Intelligence 等一批 Physical AI 创业者 · Global Partnership 以 Physical AI 为主题做深圳近场研究 · 视频号团队 王兴兴与人形机器人相关视频本周靠前"
+              },
+              {
+                "ref": "e5",
+                "quote": "团队 硅谷 BD 团队 · 海外接触，国内可能承接 · 海外接触，国内可能承接 Global Partnership 在做深圳 Physical AI 主题近场研究，编辑部与硅谷 BD 同期在深圳硬件带有一手对话。 Global Partnership 记录：以 Physical AI 为主题做深圳近场研究，已联系妙动杨硕、拟联系破壳创智。 编辑部记录：本期在深圳一带接触擎羽科技、氧刻、超有氛围等"
+              },
+              {
+                "ref": "e6",
+                "quote": "团队 硅谷 BD 团队 · 智能硬件与消费电子 · Julie · 市场负责人 · 身份 AI 眼镜方向 · 要点 单绿 AI 眼镜外观接近常规眼镜，交互改为旋转按钮，定位长期记忆助理 · 来源 硅谷 BD 团队建联记录 · 来源提示 硅谷 BD 团队建联记录"
+              }
+            ]
+          }
+        ],
+        "context_refs": {
+          "analysis_id": "6c48372cfc0963b6",
+          "parent_analysis_id": null,
+          "last_user_q": "各团队最近关注了哪些硬件相关话题？",
+          "entities": [
+            "具身智能与 Physical AI",
+            "深圳 Physical AI 近场研究",
+            "破壳创智",
+            "内容矩阵与账号",
+            "李源 · 具身智能账号矩阵",
+            "视频号与内容传播",
+            "智能硬件",
+            "短视频团队的商务诉求",
+            "AI 硬件与消费电子",
+            "众筹与出海",
+            "具身与硬件",
+            "AI 硬件出海与众筹",
+            "memopin · 叶志伟",
+            "众筹与出海调研",
+            "雷鸟创新",
+            "AI 助听器与健康硬件",
+            "AI 硬件测评与形态",
+            "乙烯众筹",
+            "亲宝宝",
+            "李源",
+            "memopin"
+          ],
+          "teams": [
+            "Global Partnership 团队",
+            "品牌创意团队",
+            "商业化团队",
+            "硅谷 BD 团队",
+            "社群",
+            "编辑部"
+          ],
+          "issues": [
+            "2026-08-17",
+            "2026-08-14",
+            "2026-08-17、2026-08-14"
+          ],
+          "chunk_ids": [],
+          "item_ids": []
+        },
+        "steps_n": 10
+      },
+      "answer": {
+        "text": "根据 2026 年 8 月 14 日与 8 月 17 日的几份团队周报，硬件相关话题主要集中在四个团队，具体如下。Global Partnership 团队以 Physical AI 为主题在深圳做近场研究，已联系妙动的杨硕，并计划联系破壳创智。融资细节按 embargo 暂扣至官宣，股东名单以公司官宣为准。品牌创意团队关注的是硬件方向的内容与账号。团队还判断硬件类内容单纯夸赞难以传播，猎奇点或颠覆性观点更易带流量。创意视频团队希望承接商务，已有 live tv 有意购买样片、tapnow 表达合作意向，但两边尚未对接（此为会议判断，非核实事实）。团队形成的共识是：硬件是物理世界的传感器，核心价值在采集数据提供上下文，硬件公司需将过半资源投入软件算法与内容，单一录音功能的 AI 硬件难以支撑大规模体量。具身方面，认为具身数据拼广度不拼时长，\"GPT-3 时刻\"至少 5 年，柔性绳驱机械臂值得关注与影像/户外的结合，AI 健身镜、智能婴儿床暂不作重点覆盖，硬件价值看\"心理账户\"、留存靠间歇强化。出海与众筹方面，众筹大盘变大但严重分化、头部虹吸流量，日本市场严格执行电商法、上线后不可改，AI 原生硬件出海可探索普惠式与海外高溢价两条路线（以上为会议判断或受访者陈述，非核实事实）。硅谷 BD 团队聚焦 AI 硬件出海、众筹与消费电子。wapitee 联合创始人 Ken 的纪要涉及 AI 硬件出海与众筹模式调研，与编辑部对乙烯众筹、迈思创新、硅羽科技的沟通同属一个赛道。团队新接触了 AGI FF 储备项目 memopin，创始人叶志伟为小巨蛋麦克风/听夏科技创始人，方向是 AI 语音穿戴个人助手，第二增长曲线为 AI 无感穿戴语音硬件。此外还接触雷鸟创新，市场负责人 Julie 介绍其单绿 AI 眼镜外观接近常规眼镜、交互改为旋转按钮、定位长期记忆助理。数据库中还新进了 RoboF",
+        "len": 885,
+        "correctness": "fail"
+      },
+      "verify": {
+        "verified": 18,
+        "rejected": 4,
+        "downgraded": 0,
+        "flags": [
+          "破壳创智×编辑部",
+          "李源×编辑部",
+          "智能硬件×编辑部",
+          "破壳创智×品牌创意团队",
+          "破壳创智×视频号团队",
+          "亲宝宝×品牌创意团队",
+          "亲宝宝×视频号团队",
+          "智能硬件×视频号团队",
+          "硬件与具身×商业化团队"
+        ]
+      },
+      "latency": {
+        "retrieve_ms": 4497,
+        "analysis_ms": 41614,
+        "total_ms": 46111
+      },
+      "usage": {
+        "llm_calls": 1,
+        "source_groups": 4,
+        "elapsed_ms": 41610,
+        "path": "structured",
+        "cross": false,
+        "prompt_tokens": 5811,
+        "completion_tokens": 1400,
+        "total_tokens": 7211,
+        "n_calls": 1,
+        "n_retries": 0,
+        "analysis_ms": 41614,
+        "retrieve_ms": 4497,
+        "total_ms": 46111
+      },
+      "n_retries": 0,
+      "n_llm_calls": 1
+    },
+    {
+      "id": "e11",
+      "q": "詹杨帆最近有什么动态",
+      "tags": [
+        "entity",
+        "person"
+      ],
+      "pass": false,
+      "failure_layer": "evidence",
+      "routing": {
+        "kind": "independent",
+        "reason": "no_history",
+        "search_q": "詹杨帆最近有什么动态",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "hybrid",
+        "n_hits": 25,
+        "n_context": 25,
+        "total": null,
+        "date_from": "2026-06-27",
+        "date_to": null,
+        "latency_ms": 8378,
+        "titles": [
+          "面壁智能",
+          "詹杨帆",
+          "詹杨帆",
+          "詹杨帆",
+          "詹杨帆",
+          "詹杨帆"
+        ],
+        "issues": [
+          "2026-08-17"
+        ],
+        "direct_answer": false
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=no_history"
+        },
+        {
+          "check": "min_context",
+          "ok": true,
+          "detail": "n_ctx=25"
+        },
+        {
+          "check": "context_has_詹杨",
+          "ok": true,
+          "detail": "found=True"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": false,
+          "detail": "rejected=5"
+        }
+      ],
+      "evidence": {
+        "analysis_id": "61cd9e4abc6e720b",
+        "sources": [
+          {
+            "group_id": "g1",
+            "source": "编辑部",
+            "issue": "2026-08-17",
+            "n_facts": 6,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "面壁智能 · 编辑部 · T6 · 面壁智能事故处理 Agent：车辆碰撞后行车记录仪自动截取关键帧上传，结合车险合作数据完成责任判定、法规匹配、沟通话术生成、理赔方案推荐、定损方案输出；端云协同架构（车端小模型识别剪辑、云端大模型法律推理）；詹杨帆称行业内尚无先例（受访者陈述，待核对） · 编辑部沟通记录 · 与面壁"
+              },
+              {
+                "ref": "e2",
+                "quote": "詹杨帆 · 编辑部 · T1 · 端云协同技术逻辑：端侧优势为响应速度快、数据本地化、断网可用；云端优势为复杂语义理解、多轮推理和个性化查询。詹杨帆认为二者各有不可替代的场景（受访者陈述，非核实事实） · 编辑部沟通记录 · 与詹杨帆的对话（有原始记录）"
+              },
+              {
+                "ref": "e3",
+                "quote": "詹杨帆 · 编辑部 · T1 · 詹杨帆提出未来架构方向为路由模型：由路由模型负责语义分析与任务拆解，再分发给各专精子模型执行，与 MoE 混合专家架构演进方向吻合，也是 MCP 工具调用生态的底层逻辑（受访者陈述，非核实事实） · 编辑部沟通记录 · 与詹杨帆的对话（有原始记录）"
+              },
+              {
+                "ref": "e4",
+                "quote": "詹杨帆 · 编辑部 · T1 · 詹杨帆认为 MCP 当前最大障碍不是技术，而是数据安全与权限监管尚未完善；端侧模型调用本地硬件能力，数据泄露风险更低（受访者陈述，非核实事实） · 编辑部沟通记录 · 与詹杨帆的对话（有原始记录）"
+              },
+              {
+                "ref": "e5",
+                "quote": "詹杨帆 · 编辑部 · T3 · 詹杨帆（车联天下）就「Agent上车」给出赛道级判断（受访者陈述，非核实事实）：假设单个Agent准确率95%，10个Agent协作完成一个任务，最终成功率约59.9%，这是当前多Agent系统的瓶颈，也是各家座舱Demo高度雷同的原因之一。 · 编辑部沟通记录 · 与詹杨帆的对话"
+              },
+              {
+                "ref": "e6",
+                "quote": "詹杨帆 · 编辑部 · T3 · 詹杨帆判断（受访者陈述，非核实事实）：当前大模型在严格工作流中出错率较高，只能做允许容错的场景（如行程规划、内容创作）；涉及车控和安全的严肃场景，很多厂商仍在用传统规则判定型AI而非通用大模型。 · 编辑部沟通记录 · 与詹杨帆的对话"
+              }
+            ]
+          },
+          {
+            "group_id": "g2",
+            "source": "未标注来源",
+            "issue": "2026-08-17",
+            "n_facts": 4,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "詹杨帆 车与端侧 身份 端侧模型上车、智能座舱 要点 与吉利银河、长安车企合作，做舱内视频流分析、事故处理 Agent；端云协同与路由模型判断 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话（有原始记录）"
+              },
+              {
+                "ref": "e2",
+                "quote": "关注的公司与人 编辑部 端侧上车、事故处理 Agent、路由模型一手对话 硅谷 BD 团队 终端是 AI 进入物理世界的路径判断"
+              },
+              {
+                "ref": "e3",
+                "quote": "编辑部记录：与詹杨帆谈端云协同、路由模型、事故处理 Agent，及与吉利银河、长安车企的智能座舱合作。 硅谷 BD 团队记录：与詹杨帆谈终端是 AI 进入物理世界的路径、汽车算力强于手机、端侧模型芯片适配情况。"
+              }
+            ]
+          },
+          {
+            "group_id": "g3",
+            "source": "硅谷 BD 团队",
+            "issue": "2026-08-17",
+            "n_facts": 2,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车算力强于手机、场景标准化，是端侧模型优质载体；智能座舱是小型智能空间 IoT 原型（受访者陈述，非核实事实）"
+              },
+              {
+                "ref": "e2",
+                "quote": "面壁智能詹杨帆认为赛力斯与字节合作中开放合作心态是场景创新催化剂，有望找到智能座舱的 iPhone 时刻（受访者陈述，非核实事实）"
+              },
+              {
+                "ref": "e3",
+                "quote": "面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车算力强于手机、场景标准化，是端侧模型优质载体；智能座舱是小型智能空间 IoT 原型（受访者陈述，非核实事实）"
+              },
+              {
+                "ref": "e4",
+                "quote": "面壁智能詹杨帆认为赛力斯与字节合作中开放合作心态是场景创新催化剂，有望找到智能座舱的 iPhone 时刻（受访者陈述，非核实事实）"
+              }
+            ]
+          }
+        ],
+        "context_refs": {
+          "analysis_id": "61cd9e4abc6e720b",
+          "parent_analysis_id": null,
+          "last_user_q": "詹杨帆最近有什么动态",
+          "entities": [
+            "面壁智能",
+            "詹杨帆",
+            "面壁智能 · 詹杨帆",
+            "网信办",
+            "AI智能体安全",
+            "以色列",
+            "阿里",
+            "中兴通讯",
+            "阿里千问",
+            "编辑部"
+          ],
+          "teams": [
+            "编辑部",
+            "硅谷 BD 团队",
+            "未标注来源"
+          ],
+          "issues": [
+            "2026-08-17"
+          ],
+          "chunk_ids": [],
+          "item_ids": [
+            "676",
+            "679",
+            "680",
+            "681",
+            "682",
+            "683",
+            "684",
+            "686",
+            "687",
+            "720",
+            "721",
+            "659",
+            "660",
+            "661",
+            "669",
+            "670",
+            "673"
+          ]
+        },
+        "steps_n": 12
+      },
+      "answer": {
+        "text": "根据 2026-08-17 期的记录，詹杨帆围绕端侧模型上车和智能座舱这一方向有多方面的表述。需要说明的是，来源对詹杨帆所属机构的记载存在出入：部分记录称其来自车联天下，另有记录称其来自面壁智能，两说并列供参考。在合作与业务方向上，记录显示詹杨帆聚焦端侧模型上车、智能座舱，与吉利银河、长安等车企合作，开展舱内视频流分析、事故处理 Agent 等工作，涉及端云协同与路由模型判断。关于 MCP，他认为当前最大障碍不在技术，而在于数据安全与权限监管尚未完善；端侧模型调用本地硬件能力，数据泄露风险相对更低。在「Agent 上车」的判断上，他给出了赛道级的测算：假设单个 Agent 准确率为 95%，10 个 Agent 协作完成一个任务，最终成功率约 59.9%，这是当前多 Agent 系统的瓶颈，也是各家座舱 Demo 高度雷同的原因之一。他还认为当前大模型在严格工作流中出错率较高，只能用于允许容错的场景（如行程规划、内容创作）；而涉及车控和安全的严肃场景，很多厂商仍在使用传统规则判定型 AI，而非通用大模型。在同期硅谷 BD 团队的建联记录中，他进一步阐述：终端是 AI 进入物理世界的路径，汽车算力强于手机、场景标准化，是端侧模型的优质载体；智能座舱可视为小型智能空间 IoT 的原型。此外，他认为赛力斯与字节合作中体现出的开放合作心态是场景创新的催化剂，有望找到智能座舱的「iPhone 时刻」。以上观点均为受访者本人陈述。\n\n来源：2026-08-17·编辑部；2026-08-17·未标注来源；2026-08-17·硅谷 BD 团队",
+        "len": 675,
+        "correctness": "fail"
+      },
+      "verify": {
+        "verified": 7,
+        "rejected": 5,
+        "downgraded": 0,
+        "flags": []
+      },
+      "latency": {
+        "retrieve_ms": 8378,
+        "analysis_ms": 29396,
+        "total_ms": 37774
+      },
+      "usage": {
+        "llm_calls": 4,
+        "source_groups": 3,
+        "elapsed_ms": 29392,
+        "path": "analysis",
+        "cross": false,
+        "prompt_tokens": 4539,
+        "completion_tokens": 3132,
+        "total_tokens": 7671,
+        "n_calls": 4,
+        "n_retries": 0,
+        "analysis_ms": 29396,
+        "retrieve_ms": 8378,
+        "total_ms": 37774
+      },
+      "n_retries": 0,
+      "n_llm_calls": 4
+    },
+    {
+      "id": "e12",
+      "q": "吉利银河 智能座舱",
+      "tags": [
+        "entity",
+        "topic"
+      ],
+      "pass": false,
+      "failure_layer": "evidence",
+      "routing": {
+        "kind": "independent",
+        "reason": "no_history",
+        "search_q": "吉利银河 智能座舱",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "hybrid",
+        "n_hits": 16,
+        "n_context": 16,
+        "total": null,
+        "date_from": "2026-06-27",
+        "date_to": null,
+        "latency_ms": 4203,
+        "titles": [
+          "面壁智能",
+          "面壁智能",
+          "詹杨帆",
+          "面壁智能",
+          "面壁智能",
+          "面壁智能"
+        ],
+        "issues": [
+          "2026-08-14",
+          "2026-08-17"
+        ],
+        "direct_answer": false
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=no_history"
+        },
+        {
+          "check": "min_context",
+          "ok": true,
+          "detail": "n_ctx=16"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": false,
+          "detail": "rejected=6"
+        }
+      ],
+      "evidence": {
+        "analysis_id": "0cdd15e5e6d9500b",
+        "sources": [
+          {
+            "group_id": "g1",
+            "source": "编辑部",
+            "issue": "2026-08-17",
+            "n_facts": 4,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "面壁智能：与吉利银河、长安马自达等车企在智能座舱方向有具体合作（已接触，合作内容已披露）"
+              },
+              {
+                "ref": "e2",
+                "quote": "面壁智能：与吉利银河、长安等车企在智能座舱合作。舱内做端侧跨模态视频流分析（识别儿童危险动作、数据不出车）、车内物品溯源、情境感知自动响应；舱外做本地化倒车物品识别，已在量产车型验证；并做事故处理 Agent（端云协同的责任判定与理赔）。"
+              },
+              {
+                "ref": "e5",
+                "quote": "面壁智能：与吉利银河、长安马自达等车企在智能座舱方向有具体合作（已接触，合作内容已披露）"
+              },
+              {
+                "ref": "e6",
+                "quote": "面壁智能：与吉利银河、长安等车企在智能座舱合作。舱内做端侧跨模态视频流分析（识别儿童危险动作、数据不出车）、车内物品溯源、情境感知自动响应；舱外做本地化倒车物品识别，已在量产车型验证；并做事故处理 Agent（端云协同的责任判定与理赔）。"
+              }
+            ]
+          },
+          {
+            "group_id": "g2",
+            "source": "未标注来源",
+            "issue": "2026-08-17",
+            "n_facts": 4,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "詹杨帆 车与端侧 身份 端侧模型上车、智能座舱 要点 与吉利银河、长安车企合作，做舱内视频流分析、事故处理 Agent；端云协同与路由模型判断"
+              },
+              {
+                "ref": "e2",
+                "quote": "编辑部记录：与詹杨帆谈端云协同、路由模型、事故处理 Agent，及与吉利银河、长安车企的智能座舱合作。 硅谷 BD 团队记录：与詹杨帆谈终端是 AI 进入物理世界的路径、汽车算力强于手机、端侧模型芯片适配情况。"
+              }
+            ]
+          },
+          {
+            "group_id": "g3",
+            "source": "硅谷 BD 团队",
+            "issue": "2026-08-17",
+            "n_facts": 2,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车算力强于手机、场景标准化，是端侧模型优质载体；智能座舱是小型智能空间 IoT 原型（受访者陈述，非核实事实）"
+              },
+              {
+                "ref": "e2",
+                "quote": "面壁智能詹杨帆认为赛力斯与字节合作中开放合作心态是场景创新催化剂，有望找到智能座舱的 iPhone 时刻（受访者陈述，非核实事实）"
+              }
+            ]
+          },
+          {
+            "group_id": "g4",
+            "source": "未标注来源",
+            "issue": "2026-08-14",
+            "n_facts": 2,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "商业化团队本周完成银河通用单推头条合作；编辑部同周与源策、taks、跃空维度、FrontierX 四家具身团队一手对话。"
+              }
+            ]
+          }
+        ],
+        "context_refs": {
+          "analysis_id": "0cdd15e5e6d9500b",
+          "parent_analysis_id": null,
+          "last_user_q": "吉利银河 智能座舱",
+          "entities": [
+            "面壁智能",
+            "詹杨帆",
+            "面壁智能 · 詹杨帆",
+            "吉利银河",
+            "智能座舱",
+            "具身智能 · 银河通用与四家团队"
+          ],
+          "teams": [
+            "编辑部",
+            "硅谷 BD 团队",
+            "未标注来源"
+          ],
+          "issues": [
+            "2026-08-17",
+            "2026-08-14"
+          ],
+          "chunk_ids": [],
+          "item_ids": [
+            "673",
+            "722",
+            "684",
+            "686",
+            "687",
+            "721",
+            "682",
+            "683"
+          ]
+        },
+        "steps_n": 14
+      },
+      "answer": {
+        "text": "根据2026年8月17日这期的记录，面壁智能与吉利银河（以及长安马自达、长安等车企）在智能座舱方向已经展开了具体合作，双方已经接触并披露了合作内容。在合作的具体内容上，舱内方面主要做端侧的跨模态视频流分析，能够识别儿童的危险动作，并且做到数据不出车；此外还包括车内物品溯源，以及情境感知的自动响应。舱外方面，面壁智能做本地化的倒车物品识别，这一功能已经在量产车型上完成验证。除了座舱内外的能力，面壁智能还在做事故处理 Agent，采用端云协同的方式进行责任判定与理赔。关于行业趋势，面壁智能的詹杨帆在这期记录中谈到，赛力斯与字节合作中所体现的开放合作心态，是场景创新的催化剂，有望帮助行业找到智能座舱的「iPhone 时刻」。这一说法为受访者本人的观点陈述。\n\n来源：2026-08-17·编辑部；2026-08-17·未标注来源；2026-08-17·硅谷 BD 团队；2026-08-14·未标注来源",
+        "len": 402,
+        "correctness": "fail"
+      },
+      "verify": {
+        "verified": 6,
+        "rejected": 6,
+        "downgraded": 0,
+        "flags": []
+      },
+      "latency": {
+        "retrieve_ms": 4203,
+        "analysis_ms": 29313,
+        "total_ms": 33516
+      },
+      "usage": {
+        "llm_calls": 5,
+        "source_groups": 4,
+        "elapsed_ms": 29308,
+        "path": "analysis",
+        "cross": false,
+        "prompt_tokens": 3827,
+        "completion_tokens": 2862,
+        "total_tokens": 6689,
+        "n_calls": 5,
+        "n_retries": 0,
+        "analysis_ms": 29313,
+        "retrieve_ms": 4203,
+        "total_ms": 33516
+      },
+      "n_retries": 0,
+      "n_llm_calls": 5
+    },
+    {
+      "id": "e13",
+      "q": "近30天编辑部接触了谁",
+      "tags": [
+        "time_window",
+        "team"
+      ],
+      "pass": true,
+      "failure_layer": null,
+      "routing": {
+        "kind": "independent",
+        "reason": "no_history",
+        "search_q": "近30天编辑部接触了谁",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "structured",
+        "n_hits": 14,
+        "n_context": 14,
+        "total": 14,
+        "date_from": "2026-08-26",
+        "date_to": null,
+        "latency_ms": 3682,
+        "titles": [
+          "乙烯众筹",
+          "亲宝宝",
+          "几硕",
+          "影眸科技",
+          "擎羽科技",
+          "氧刻"
+        ],
+        "issues": [],
+        "direct_answer": false
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=no_history"
+        },
+        {
+          "check": "min_context",
+          "ok": true,
+          "detail": "n_ctx=14"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": true,
+          "detail": "rejected=0"
+        }
+      ],
+      "evidence": {
+        "analysis_id": "c647a2764057e877",
+        "sources": [
+          {
+            "group_id": "g1",
+            "source": "编辑部",
+            "issue": "未知期",
+            "n_facts": 6,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "团队 编辑部 · 记录 1 条 · 类型 company"
+              },
+              {
+                "ref": "e2",
+                "quote": "团队 编辑部 · 记录 1 条 · 类型 company"
+              },
+              {
+                "ref": "e3",
+                "quote": "团队 编辑部 · 记录 1 条 · 类型 company"
+              },
+              {
+                "ref": "e4",
+                "quote": "团队 编辑部 · 记录 1 条 · 类型 company"
+              },
+              {
+                "ref": "e5",
+                "quote": "团队 编辑部 · 记录 1 条 · 类型 company"
+              },
+              {
+                "ref": "e6",
+                "quote": "团队 编辑部 · 记录 1 条 · 类型 company"
+              }
+            ]
+          }
+        ],
+        "context_refs": {
+          "analysis_id": "c647a2764057e877",
+          "parent_analysis_id": null,
+          "last_user_q": "近30天编辑部接触了谁",
+          "entities": [
+            "乙烯众筹",
+            "亲宝宝",
+            "几硕",
+            "影眸科技",
+            "擎羽科技",
+            "氧刻",
+            "灵瑙科技",
+            "熠序科技",
+            "硅羽科技",
+            "超有氛围",
+            "迈思创新",
+            "零跑汽车",
+            "面壁智能",
+            "飞声助听器"
+          ],
+          "teams": [
+            "编辑部"
+          ],
+          "issues": [
+            "未知期"
+          ],
+          "chunk_ids": [],
+          "item_ids": []
+        },
+        "steps_n": 7
+      },
+      "answer": {
+        "text": "结构化类型=count：按查询结果列表如实陈述，禁止改写成「多源印证/提及实体」。乙烯众筹：团队 编辑部 · 记录 1 条 · 类型 company\n亲宝宝：团队 编辑部 · 记录 1 条 · 类型 company\n几硕：团队 编辑部 · 记录 1 条 · 类型 company\n影眸科技：团队 编辑部 · 记录 1 条 · 类型 company\n擎羽科技：团队 编辑部 · 记录 1 条 · 类型 company\n氧刻：团队 编辑部 · 记录 1 条 · 类型 company\n\n来源：未知期·编辑部",
+        "len": 251,
+        "correctness": "pass"
+      },
+      "verify": {
+        "verified": 6,
+        "rejected": 0,
+        "downgraded": 0,
+        "flags": []
+      },
+      "latency": {
+        "retrieve_ms": 3682,
+        "analysis_ms": 128551,
+        "total_ms": 132233
+      },
+      "usage": {
+        "llm_calls": 1,
+        "source_groups": 1,
+        "elapsed_ms": 128546,
+        "path": "structured",
+        "cross": false,
+        "analysis_ms": 128551,
+        "retrieve_ms": 3682,
+        "total_ms": 132233
+      },
+      "n_retries": null,
+      "n_llm_calls": 1
+    },
+    {
+      "id": "e14",
+      "q": "全部历史以来具身智能有哪些公司",
+      "tags": [
+        "time_all"
+      ],
+      "pass": false,
+      "failure_layer": "evidence",
+      "routing": {
+        "kind": "independent",
+        "reason": "no_history",
+        "search_q": "全部历史以来具身智能有哪些公司",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "hybrid",
+        "n_hits": 40,
+        "n_context": 40,
+        "total": null,
+        "date_from": null,
+        "date_to": null,
+        "latency_ms": 6101,
+        "titles": [
+          "具身智能",
+          "具身智能",
+          "几硕",
+          "短测未来",
+          "李源",
+          "具身智能"
+        ],
+        "issues": [
+          "2026-08-14",
+          "2026-08-17"
+        ],
+        "direct_answer": false
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=no_history"
+        },
+        {
+          "check": "min_context",
+          "ok": true,
+          "detail": "n_ctx=40"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": false,
+          "detail": "rejected=15"
+        }
+      ],
+      "evidence": {
+        "analysis_id": "4937dfc1578efbbd",
+        "sources": [
+          {
+            "group_id": "g1",
+            "source": "编辑部",
+            "issue": "2026-08-17",
+            "n_facts": 6,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "几硕 · 编辑部 · T3 · 几硕（CMO）受访者陈述（非核实事实）：今年具身智能与世界模型赛道很火，人才竞争激烈、抢不过热钱更多的具身智能；PR 核心目标之一是让人才了解公司背景实力与成熟成功经验后做选择。 · 编辑部沟通记录 · 几硕IFA规划沟通（有原始记录）"
+              },
+              {
+                "ref": "e2",
+                "quote": "李源 · 编辑部 · T6 · 编辑部要做账号矩阵/垂类矩阵，用内容吸引不同垂类创业者；李源负责一个新的具身智能（硬件方向）账号，X 账号已建立，名字尚未定 · 品牌创意团队周会复盘"
+              },
+              {
+                "ref": "e3",
+                "quote": "李天羽 · 编辑部 · T3 · 受访者陈述（非核实事实，李天羽/戴博/Tianyu Li）：现有具身模型连常规 case 未解决；人一生物理交互数据约4万小时会见顶，应拼任务/物体/场景广度；对接方仍是教授、要到纯产业人士对接才算行业 GPT-3 时刻；人形全身 teleop 不够自然，倾向普通人自然采集加强 pip"
+              },
+              {
+                "ref": "e4",
+                "quote": "拓竹科技 · 编辑部 · T7 · 极客早知道 8/25 http://www.geekpark.net/news/369303 — 拓竹科技回应 2027 IPO 传闻称消息不实，2025 全球消费级3D打印以42.7%份额居首、营收破百亿；蔡崇信、吴泳铭合计增持约1.2亿港元阿里股票；小米发布玄戒 O3/O100/"
+              },
+              {
+                "ref": "e5",
+                "quote": "擎羽科技 · 编辑部 · T3 · 擎羽科技（晴雨科技）：做柔性具身机器人，核心是纯绳驱机械臂（电机集成臂尾、臂身无电机），覆盖1/2/3节及工业级版本。第一优先场景是扫地机器人、机器狗等轻型移动平台，第二是工厂无防护部署。已完成实验室客户全量覆盖，与宇树（维他动力）达成合作，下月联合发布搭载柔性机械臂的机器狗。自研六"
+              },
+              {
+                "ref": "e6",
+                "quote": "擎羽科技 · 编辑部 · T3 · 擎羽科技受访者陈述（非核实事实）：硅谷头部企业对 ego 数据采购需求远超国内；投资人已从模型概念转向回归硬件本体价值；无触觉传感器的机器人普遍停留在简单 pick and place 阶段。 · 编辑部沟通记录 · 柔性具身机器人产品与业务讨论（有原始记录）"
+              }
+            ]
+          },
+          {
+            "group_id": "g2",
+            "source": "硅谷 BD 团队",
+            "issue": "2026-08-17",
+            "n_facts": 6,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "短测未来 · 硅谷 BD 团队 · T6 · 短测未来（李洪洋团队）：已接触，专注人形机器人具身大脑研发，确认参与 8 月 4 日新加坡活动具身智能板块 · 硅谷 BD 团队建联记录 · 具身智能活动及数据圆桌讨论"
+              },
+              {
+                "ref": "e2",
+                "quote": "李源 · 硅谷 BD 团队 · T6 · 新加坡具身智能活动数据圆桌初步安排：李源主持，短测未来与戴若黎博士为嘉宾，圆桌人数控制在不超过 4 人，暂不将 ROPIDIA 与戴博安排在同一圆桌 · 硅谷 BD 团队建联记录 · 具身智能活动及数据圆桌讨论"
+              },
+              {
+                "ref": "e3",
+                "quote": "源策 · 硅谷 BD 团队 · T6 · 源策（李天羽）具身智能活动交流：活动主题 go physical go action，今年首次移至新加坡，8 月 4 日上午举办；数据领域热点为 Ego、手、全身、触觉，UMI 数据在工业界已有验证但不再是热门（受访者陈述，非核实事实） · 硅谷 BD 团队建联记录 · 具身智"
+              },
+              {
+                "ref": "e4",
+                "quote": "Allen Ren · 硅谷 BD 团队 · T3 · Allen Ren（Physical Intelligence 技术成员，通用机器人策略方向，旧金山）：Physical Intelligence（具身智能/机器人，Series B）研发通用机器人基础模型 π 系列（数据库人物，尚未接触，投资团队用得上） · 硅"
+              },
+              {
+                "ref": "e5",
+                "quote": "Calvin Zhou · 硅谷 BD 团队 · T3 · Calvin Z.（Calvin Zhou，RoboForce 联合创始人，硅谷湾区）：RoboForce（具身智能/机器人）做 Physical AI 驱动的机器人劳动力，面向工业现场作业（数据库人物，尚未接触，投资团队/编辑部用得上） · 硅谷 BD 团队"
+              },
+              {
+                "ref": "e6",
+                "quote": "Aaron Li · 硅谷 BD 团队 · T3 · Aaron Li（小正，Rhoda AI 机器人数据系统负责人，前 Apple/Tesla/NIO，帕洛阿尔托）：Rhoda AI（具身智能/机器人）研发通用机器人模型与机器人数据系统（数据库人物，尚未接触） · 硅谷 BD 团队创业者数据库"
+              }
+            ]
+          },
+          {
+            "group_id": "g3",
+            "source": "未标注来源",
+            "issue": "2026-08-14",
+            "n_facts": 5,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "李天羽 · CEO 具身智能 身份 CEO 李天羽 · 具身智能数据 时间 8 月 5 日 要点 物理交互数据拼广度不拼时长；业内称 GPT-3 时刻至少 5 年；不优先砸全身遥操作（含转述业内两位人士观点） 来源 编辑部沟通记录"
+              },
+              {
+                "ref": "e2",
+                "quote": "rex · CEO 具身智能 身份 CEO rex · 人形本体 时间 8 月 7 日 要点 3D 打印人形本体；认为收敛为时尚早；与触觉团队合作 来源 编辑部沟通记录"
+              },
+              {
+                "ref": "e3",
+                "quote": "姜易卓 具身智能 身份 创始人 姜易卓 · 球形机器人 + 开发平台 时间 8 月 7 日 要点 平台优先硬件后置；早期由大厂高管个人出资 来源 编辑部沟通记录"
+              },
+              {
+                "ref": "e4",
+                "quote": "关注的领域 编辑部 4 场对话：源策 李天羽、taks rex、跃空维度 谢金荣、FrontierX 姜易卓；选题：宇树上市稿（进行中） 商业化团队 选题会提及柔性绳驱机械臂（晴雨科技）"
+              },
+              {
+                "ref": "e5",
+                "quote": "已联动 编辑部启动具身智能垂类号，走矩阵式账号路线；品牌创意团队为其提供站点 tag 归集与视觉。 具身智能号先行，后续按垂类扩展；站点按 tag 归集内容；博客/newsletter 同挂 tag 品牌创意团队同期在做设计 AI 工具（目标 10/1 前 80% 设计由 AI 完成），垂类视觉可能由此产出 品牌创意团"
+              },
+              {
+                "ref": "e6",
+                "quote": "谢金荣 · CEO 具身智能 身份 CEO 谢金荣 · 灵巧手 时间 8 月 7 日 要点 十几克碳纤维轻手 to B（无人机等）；核心成员出自知名开源机器人项目；正准备融资 来源 编辑部沟通记录"
+              }
+            ]
+          },
+          {
+            "group_id": "g4",
+            "source": "未标注来源",
+            "issue": "2026-08-17",
+            "n_facts": 6,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "CMO 车与端侧 要点 IFA 规划沟通，谈具身智能与世界模型赛道人才竞争"
+              },
+              {
+                "ref": "e3",
+                "quote": "晴雨科技 具身智能与机器人 身份 柔性具身机器人，纯绳驱机械臂 要点 与宇树（维他动力）达成合作，下月联合发布搭载柔性机械臂的机器狗；自研六目头环做 ego 数据采集"
+              },
+              {
+                "ref": "e4",
+                "quote": "影眸科技 ... 身份 原生 3D 路线，Rodin 系列 要点 即将发布世界生成模型供具身机器人进场训练，定位 3D 基础设施，现有收入主要来自游戏"
+              },
+              {
+                "ref": "e5",
+                "quote": "多场硬件与具身团队对话，含擎羽科技、影眸科技 硅谷 BD 团队 数据库新进 RoboForce、FieldAI、Physical Intelligence 等一批 Physical AI 创业者"
+              }
+            ]
+          }
+        ],
+        "context_refs": {
+          "analysis_id": "4937dfc1578efbbd",
+          "parent_analysis_id": null,
+          "last_user_q": "全部历史以来具身智能有哪些公司",
+          "entities": [
+            "具身智能",
+            "几硕",
+            "短测未来",
+            "李源",
+            "源策",
+            "宇树科技",
+            "Allen Ren",
+            "Calvin Zhou",
+            "Aaron Li",
+            "Ali Agha",
+            "taks",
+            "李天羽",
+            "李源 · 具身智能账号矩阵",
+            "FrontierX",
+            "视频号",
+            "擎羽科技",
+            "拓竹科技",
+            "影眸科技",
+            "面壁智能",
+            "具身智能与 Physical AI",
+            "内容矩阵与账号",
+            "编辑部垂类账号矩阵",
+            "AI智能体安全",
+            "上海跃空维度"
+          ],
+          "teams": [
+            "视频号团队",
+            "社群",
+            "编辑部",
+            "硅谷 BD 团队",
+            "未标注来源"
+          ],
+          "issues": [
+            "2026-08-17",
+            "2026-08-14"
+          ],
+          "chunk_ids": [],
+          "item_ids": [
+            "657",
+            "645",
+            "744",
+            "704",
+            "807",
+            "644",
+            "705",
+            "703",
+            "652",
+            "782",
+            "772",
+            "773",
+            "781",
+            "727",
+            "737",
+            "814",
+            "791",
+            "723",
+            "724",
+            "686",
+            "673",
+            "687",
+            "668",
+            "675"
+          ]
+        },
+        "steps_n": 14
+      },
+      "answer": {
+        "text": "擎羽科技（亦记为晴雨科技）从事具身智能与机器人，定位柔性具身机器人，核心是纯绳驱机械臂，其电机集成在臂尾、臂身无电机，覆盖 1/2/3 节及工业级版本。第一优先场景是扫地机器人、机器狗等轻型移动平台，第二是工厂无防护部署。该公司已完成实验室客户全量覆盖，并与宇树（维他动力）达成合作，计划联合发布搭载柔性机械臂的机器狗；同时自研六目头环做 ego 数据采集作为现金流业务。Physical Intelligence 为具身智能/机器人公司，处于 Series B 阶段，研发通用机器人基础模型 π 系列，Allen Ren 为其技术成员，方向为通用机器人策略，位于旧金山。其观点包括：物理交互数据拼广度不拼时长；业内称 GPT-3 时刻至少还要 5 年；不优先投入全身遥操作（其中含转述业内两位人士的观点）。FrontierX 由创始人姜易卓创办，做球形机器人加开发平台，平台优先、硬件后置，早期由大厂高管个人出资。几硕（CMO 车与端侧）为具身智能与世界模型赛道相关方，涉及该赛道的人才竞争。影眸科技走原生 3D 路线（Rodin 系列），定位 3D 基础设施，现有收入主要来自游戏，面向具身机器人训练。此外，硅谷 BD 团队数据库中还新进了 RoboForce、FieldAI、Physical Intelligence 等一批 Physical AI 创业者。\n\n来源：2026-08-17·编辑部；2026-08-17·硅谷 BD 团队；2026-08-14·未标注来源；2026-08-17·未标注来源\n（注：部分表述因可用记录中缺少对应依据，已省略。）",
+        "len": 682,
+        "correctness": "fail"
+      },
+      "verify": {
+        "verified": 11,
+        "rejected": 15,
+        "downgraded": 0,
+        "flags": [
+          "具身智能×编辑部",
+          "李天羽×CEO / 总裁办",
+          "具身智能×CEO / 总裁办",
+          "源策×CEO / 总裁办"
+        ]
+      },
+      "latency": {
+        "retrieve_ms": 6101,
+        "analysis_ms": 55217,
+        "total_ms": 61318
+      },
+      "usage": {
+        "llm_calls": 5,
+        "source_groups": 4,
+        "elapsed_ms": 55212,
+        "path": "analysis",
+        "cross": false,
+        "prompt_tokens": 6480,
+        "completion_tokens": 4392,
+        "total_tokens": 10872,
+        "n_calls": 5,
+        "n_retries": 0,
+        "analysis_ms": 55217,
+        "retrieve_ms": 6101,
+        "total_ms": 61318
+      },
+      "n_retries": 0,
+      "n_llm_calls": 5
+    },
+    {
+      "id": "e15",
+      "q": "编辑部和商业化团队两边同时跟进了哪些客户？",
+      "tags": [
+        "structured",
+        "intersect"
+      ],
+      "pass": true,
+      "failure_layer": null,
+      "routing": {
+        "kind": "independent",
+        "reason": "no_history",
+        "search_q": "编辑部和商业化团队两边同时跟进了哪些客户？",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "structured",
+        "n_hits": 0,
+        "n_context": 0,
+        "total": 0,
+        "date_from": "2026-06-27",
+        "date_to": null,
+        "latency_ms": 4442,
+        "titles": [],
+        "issues": [],
+        "direct_answer": true
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=no_history"
+        },
+        {
+          "check": "mode",
+          "ok": true,
+          "detail": "mode=structured"
+        },
+        {
+          "check": "set_op",
+          "ok": true,
+          "detail": "set_op=intersect expect=intersect"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": true,
+          "detail": "rejected=0"
+        }
+      ],
+      "evidence": {
+        "analysis_id": null,
+        "sources": [],
+        "context_refs": {},
+        "steps_n": 0
+      },
+      "answer": {
+        "text": "在 2026-06-27 起至今（约 90 天） 范围内，未找到同时出现在「编辑部」与「商业化团队」的主体。\n\n来源：结构化检索（主体×团队事实表）",
+        "len": 74,
+        "correctness": "pass"
+      },
+      "verify": {},
+      "latency": {
+        "retrieve_ms": 4442,
+        "analysis_ms": 0,
+        "total_ms": 4442
+      },
+      "usage": {
+        "path": "direct",
+        "retrieve_ms": 4442,
+        "analysis_ms": 0,
+        "total_ms": 4442
+      },
+      "n_retries": null,
+      "n_llm_calls": null
+    },
+    {
+      "id": "e16",
+      "q": "那家最近怎么样",
+      "tags": [
+        "followup",
+        "anaphora"
+      ],
+      "pass": false,
+      "failure_layer": "evidence",
+      "routing": {
+        "kind": "followup",
+        "reason": "anaphora",
+        "search_q": "编辑部接触了面壁智能吗 那家最近怎么样",
+        "parent_analysis_id": "eval-prior"
+      },
+      "recall": {
+        "mode": "hybrid",
+        "n_hits": 40,
+        "n_context": 40,
+        "total": null,
+        "date_from": "2026-06-27",
+        "date_to": null,
+        "latency_ms": 132,
+        "titles": [
+          "面壁智能",
+          "面壁智能",
+          "面壁智能",
+          "面壁智能",
+          "面壁智能",
+          "面壁智能"
+        ],
+        "issues": [
+          "2026-08-14",
+          "2026-08-17"
+        ],
+        "direct_answer": false
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=followup reason=anaphora"
+        },
+        {
+          "check": "no_answer_in_search_q",
+          "ok": true,
+          "detail": "search_q=编辑部接触了面壁智能吗 那家最近怎么样"
+        },
+        {
+          "check": "min_context",
+          "ok": true,
+          "detail": "n_ctx=40"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": false,
+          "detail": "rejected=11"
+        }
+      ],
+      "evidence": {
+        "analysis_id": "747d659254e769f3",
+        "sources": [
+          {
+            "group_id": "g1",
+            "source": "编辑部",
+            "issue": "2026-08-17",
+            "n_facts": 6,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "面壁智能（沟通对象为高通侧芯片调优负责人）：端侧模型在旗舰手机应用的限制与发展方向（已接触）。"
+              },
+              {
+                "ref": "e2",
+                "quote": "面壁智能：与吉利银河、长安马自达等车企在智能座舱方向有具体合作（已接触，合作内容已披露）"
+              },
+              {
+                "ref": "e3",
+                "quote": "面壁智能舱内方案：端侧跨模态视频流分析，识别儿童站立探头等危险动作，数据不出车；车内物品溯源支持关键帧回溯；情境感知自动响应（接电话自动升窗降音量、后排儿童哭闹自动推送安抚内容）"
+              },
+              {
+                "ref": "e4",
+                "quote": "面壁智能舱外方案：本地化处理替代传统云端哨兵模式，在精度和能耗上有优势，倒车物品识别已在量产车型中验证"
+              },
+              {
+                "ref": "e5",
+                "quote": "面壁智能事故处理 Agent：车辆碰撞后行车记录仪自动截取关键帧上传，结合车险合作数据完成责任判定、法规匹配、沟通话术生成、理赔方案推荐、定损方案输出；端云协同架构（车端小模型识别剪辑、云端大模型法律推理）；詹杨帆称行业内尚无先例（受访者陈述，待核对）"
+              },
+              {
+                "ref": "e6",
+                "quote": "面壁智能端侧模型芯片适配：已适配高通 8958538/8397/9075、联发科、英特尔、英伟达、AMD 及国产平台；模型尺寸 0.9B 到 4B 到 9B，覆盖不同算力场景，并部署支持视频流分析的 Omni 跨模态模型"
+              }
+            ]
+          },
+          {
+            "group_id": "g2",
+            "source": "未标注来源",
+            "issue": "2026-08-14",
+            "n_facts": 7,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "韩乾源 · 创始人 智能硬件 身份 创始人 韩乾源 · 智能健身一体机 时间 8 月 4 日 要点 家用健身渗透率不足 1%；留存靠间歇强化；硬件价值看心理账户；出海借手机厂商本地团队；融资多轮同步（条款需授权） 来源 编辑部沟通记录（挂有原始记录）"
+              },
+              {
+                "ref": "e2",
+                "quote": "彭守昆 · 创始人 智能硬件 身份 创始人 彭守昆 · AI 助听器 时间 8 月 4 日 要点 五大厂三道墙被同时绕过；日本 ODM 已交付万套；海外重线上国内重线下；营收目标数千万级 来源 编辑部沟通记录（挂有原始记录）"
+              },
+              {
+                "ref": "e3",
+                "quote": "刘李正 · CEO 智能硬件 身份 CEO 刘李正 · 智能桌游硬件 时间 8 月 5 日 要点 智能棋子 + DM copilot；核心桌游玩家抗拒电子化；纯 AI-DM 收不到钱 来源 编辑部沟通记录"
+              },
+              {
+                "ref": "e4",
+                "quote": "vivi · 市场负责人 智能硬件 身份 市场负责人 vivi · 桌面 UV 打印机 + AI 平台 时间 8 月 5 日 要点 创始团队出自消费硬件头部公司；PR 目标是抢人才；融资官宣 8 月中旬（embargo，暂扣） 备注 Global Partnership 工作周报同周亦有记录，股东名单略有出入 来源 编"
+              },
+              {
+                "ref": "e5",
+                "quote": "孙旭 · PR 智能硬件 身份 PR 孙旭 · AR 眼镜 时间 8 月 6 日 要点 下半年新品；Project Aura 来源 编辑部沟通记录"
+              },
+              {
+                "ref": "e6",
+                "quote": "CMO 智能硬件 身份 CMO · 智能硬件 时间 8 月 4 日 要点 IFA 规划 来源 编辑部沟通记录"
+              }
+            ]
+          },
+          {
+            "group_id": "g3",
+            "source": "社群",
+            "issue": "2026-08-17",
+            "n_facts": 1,
+            "evidence": [
+              {
+                "ref": "e4",
+                "quote": "独立开发者 yetone（关星鹏，北京，GitHub 官方认证明星开发者，代表作 avante.nvim 编程插件）新项目 cumora：跨平台团队聊天软件，AI 智能体作为群成员与真人同群协作，可 @ 智能体分任务、评审代码、把本地 Claude Code/Codex 拉进群，支持 Windows/macOS/Linux 与移动端、可自托管；8/17 上线 24 小时 GitHub 948 星"
+              }
+            ]
+          },
+          {
+            "group_id": "g4",
+            "source": "硅谷 BD 团队",
+            "issue": "2026-08-17",
+            "n_facts": 1,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车算力强于手机、场景标准化，是端侧模型优质载体；智能座舱是小型智能空间 IoT 原型（受访者陈述，非核实事实）"
+              },
+              {
+                "ref": "e2",
+                "quote": "面壁智能詹杨帆认为赛力斯与字节合作中开放合作心态是场景创新催化剂，有望找到智能座舱的 iPhone 时刻（受访者陈述，非核实事实）"
+              },
+              {
+                "ref": "e3",
+                "quote": "面壁智能端侧模型芯片适配广，已适配高通、联发科、英特尔、英伟达、AMD 及国产平台，模型尺寸 0.9B 到 9B，并部署支持视频流分析的 Omni 跨模态模型；车端模型效果受车企算力配额限制（受访者陈述，非核实事实）"
+              }
+            ]
+          }
+        ],
+        "context_refs": {
+          "analysis_id": "747d659254e769f3",
+          "parent_analysis_id": null,
+          "last_user_q": "那家最近怎么样",
+          "entities": [
+            "面壁智能",
+            "具身智能",
+            "氧刻",
+            "网信办",
+            "飞声助听器",
+            "AI智能体安全",
+            "奥术造物",
+            "以色列",
+            "阿里",
+            "破壳创智",
+            "安谋科技",
+            "XREAL",
+            "詹杨帆",
+            "几硕",
+            "威诚资本",
+            "vivo",
+            "杨硕",
+            "亲宝宝",
+            "源策",
+            "Founder Park",
+            "taks",
+            "上海跃空维度",
+            "cumora",
+            "黑马 Future X Demo Show",
+            "FrontierX",
+            "宇树科技"
+          ],
+          "teams": [
+            "编辑部",
+            "硅谷 BD 团队",
+            "视频号团队",
+            "Global Partnership 团队",
+            "社群",
+            "未标注来源"
+          ],
+          "issues": [
+            "2026-08-17",
+            "2026-08-14"
+          ],
+          "chunk_ids": [],
+          "item_ids": [
+            "668",
+            "673",
+            "674",
+            "675",
+            "676",
+            "677",
+            "678",
+            "686",
+            "687",
+            "688",
+            "657",
+            "659",
+            "660",
+            "661",
+            "669",
+            "671",
+            "672",
+            "684",
+            "685",
+            "626",
+            "682",
+            "683",
+            "638",
+            "644"
+          ]
+        },
+        "steps_n": 14
+      },
+      "answer": {
+        "text": "你的问题里没有明确指出是哪一家，我这里可提供几家近期动向，供你确认所指对象。根据2026年8月17日的记录，破壳创智（市场负责人vivi）的产品为桌面UV打印机加AI平台，创始团队出自消费硬件头部公司，其对外传播的目标是抢夺人才，融资官宣原计划在2026年8月中旬（当时处于暂扣状态）。几硕方面，其CMO所在业务为智能硬件，有IFA参展规划。独立开发者yetone（关星鹏，北京，GitHub官方认证明星开发者，代表作为avante.nvim编程插件）推出了新项目cumora，这是一款跨平台团队聊天软件，AI智能体可作为群成员与真人同群协作，能通过@智能体分派任务、评审代码，把本地的Claude Code或Codex拉进群，支持Windows、macOS、Linux及移动端，并可自托管。此外，在2026年8月17日的同期记录中，面壁智能的端侧模型芯片适配范围较广，已适配高通、联发科、英特尔、英伟达、AMD以及国产平台，模型尺寸覆盖0.9B到9B，并部署了支持视频流分析的Omni跨模态模型；关于车端模型效果受车企算力配额限制的说法，为受访者陈述，未经核实。如果你能告诉我具体指哪一家，我可以进一步聚焦。\n\n来源：2026-08-17·编辑部；2026-08-14·未标注来源；2026-08-17·社群；2026-08-17·硅谷 BD 团队",
+        "len": 575,
+        "correctness": "fail"
+      },
+      "verify": {
+        "verified": 4,
+        "rejected": 11,
+        "downgraded": 0,
+        "flags": []
+      },
+      "latency": {
+        "retrieve_ms": 132,
+        "analysis_ms": 36361,
+        "total_ms": 36493
+      },
+      "usage": {
+        "llm_calls": 5,
+        "source_groups": 4,
+        "elapsed_ms": 36357,
+        "path": "analysis",
+        "cross": false,
+        "prompt_tokens": 5209,
+        "completion_tokens": 3615,
+        "total_tokens": 8824,
+        "n_calls": 5,
+        "n_retries": 0,
+        "analysis_ms": 36361,
+        "retrieve_ms": 132,
+        "total_ms": 36493
+      },
+      "n_retries": 0,
+      "n_llm_calls": 5
+    },
+    {
+      "id": "e17",
+      "q": "他们对比一下",
+      "tags": [
+        "followup",
+        "weak"
+      ],
+      "pass": false,
+      "failure_layer": "evidence",
+      "routing": {
+        "kind": "followup",
+        "reason": "anaphora",
+        "search_q": "编辑部和商业化团队两边同时跟进了哪些客户？ 他们对比一下",
+        "parent_analysis_id": "eval-prior"
+      },
+      "recall": {
+        "mode": "hybrid",
+        "n_hits": 40,
+        "n_context": 40,
+        "total": null,
+        "date_from": "2026-06-27",
+        "date_to": null,
+        "latency_ms": 143,
+        "titles": [
+          "拓竹",
+          "华为",
+          "陈宇森",
+          "Bolbi Liu",
+          "豆包",
+          "杨硕"
+        ],
+        "issues": [
+          "2026-08-14",
+          "2026-08-17"
+        ],
+        "direct_answer": false
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=followup reason=anaphora"
+        },
+        {
+          "check": "min_context",
+          "ok": true,
+          "detail": "n_ctx=40"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": false,
+          "detail": "rejected=6"
+        }
+      ],
+      "evidence": {
+        "analysis_id": "e5964210bc94e106",
+        "sources": [
+          {
+            "group_id": "g1",
+            "source": "未标注来源",
+            "issue": "2026-08-14",
+            "n_facts": 6,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "云台相机项目团队 智能硬件 身份 项目研发团队（不具名） 时间 8 月 4 日 要点 手持影像云台项目研发 备注 商业化团队以 vivo 项目为结案案例（客户主体） 来源 编辑部沟通记录"
+              },
+              {
+                "ref": "e2",
+                "quote": "新签 / 新进展 身份 客户 · 已签约执行中 时间 8 月 10 日例会 要点 合同已签署，进入执行；此前已确认策划并邀约车主 来源 商业化团队例会提及（8/10）"
+              },
+              {
+                "ref": "e3",
+                "quote": "新签 / 新进展 身份 客户 · 已签约执行中 时间 8 月 10 日例会 要点 合同已到，本周启动执行 来源 商业化团队例会提及（8/10）"
+              },
+              {
+                "ref": "e4",
+                "quote": "新签 / 新进展 身份 客户 · 方案待确认 时间 8 月 10 日例会 要点 客户已更新需求，最终版提纲后启动嘉宾邀约 来源 商业化团队例会提及（8/10）"
+              },
+              {
+                "ref": "e5",
+                "quote": "原阿哈 新签 / 新进展 身份 客户 · 沟通中 时间 8 月 10 日例会 要点 模型 8 月中下旬上线，9 月初专访 来源 商业化团队例会提及（8/10）"
+              },
+              {
+                "ref": "e6",
+                "quote": "创造力大赛 新签 / 新进展 身份 客户 · 已签约执行中 时间 8 月 10 日例会 要点 两位主嘉宾已确认，第三位待定 来源 商业化团队例会提及（8/10）"
+              }
+            ]
+          },
+          {
+            "group_id": "g2",
+            "source": "视频号团队",
+            "issue": "2026-08-17",
+            "n_facts": 4,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "华为 · 视频号团队 · T11 · 脚本涉及智能硬件与消费电子品牌：华为/小米/vivo/OPPO 的 AI Agent 手机与 L3 认证、谷歌 Fitbit Air、豆包手机、索尼 PlayStation、腾讯 QQ 邮箱 AI 身份等。若其中品牌为商业化团队客户或意向客户可对照。 · 视频号周数据"
+              },
+              {
+                "ref": "e2",
+                "quote": "豆包 · 视频号团队 · T11 · 脚本涉及大模型公司豆包（字节）、Genspark（景鲲）、OpenAI、Anthropic、Google、月之暗面 Kimi K3 等公司的产品与商业化话题，供编辑部与音频播客团队对照。 · 视频号周数据"
+              },
+              {
+                "ref": "e3",
+                "quote": "具身智能 · 视频号团队 · T11 · 本周观众明显更关注具身智能与人形机器人方向（宇树相关多条靠前），以及手机换机节奏话题（数据判断，非核实事实），供编辑部与播客对照 · 视频号周数据"
+              },
+              {
+                "ref": "e4",
+                "quote": "AGI Playground · 视频号团队 · T6 · AGI Playground活动相关稿件由编辑部逐步产出，视频号团队据此提炼观点做视频，待编辑部继续跟进出稿 · 视频号团队例会提及"
+              },
+              {
+                "ref": "e5",
+                "quote": "思琪 · 视频号团队 · T6 · 编辑部同事思琪将负责海外内容方向，拟在两周后参加视频号团队选题会，探讨其在国外接触到的人和公司能否成为视频选题信源，实现团队间协作 · 视频号团队例会提及"
+              },
+              {
+                "ref": "e6",
+                "quote": "AI硬件 · 视频号团队 · T11 · 本期脚本选题集中指向几个方向：AI 硬件的新形态（睡眠贴片 DUSQ、墨水屏阅星曈、无屏手环 Fitbit Air、AI 挂坠、语音戒指 OASIS）、AI 入口与交易变现（豆包、Genspark、支付宝 Agent）、中美 AI 开源与算力话题（Kimi、长鑫、SpaceX/"
+              }
+            ]
+          },
+          {
+            "group_id": "g3",
+            "source": "硅谷 BD 团队",
+            "issue": "2026-08-17",
+            "n_facts": 5,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "陈宇森 · 硅谷 BD 团队 · T3 · 陈宇森（Chen Yusen，Alibaba Cloud LATAM 总经理，浙江余杭）：阿里云为云计算与 AI 服务平台（数据库人物，尚未接触，商业化团队/出海方向用得上） · 硅谷 BD 团队创业者数据库"
+              },
+              {
+                "ref": "e2",
+                "quote": "Bolbi Liu · 硅谷 BD 团队 · T3 · Bolbi L.（Bolbi Liu，AdsGency AI CEO，硅谷湾区）：AdsGency AI（AI 应用/Agent）做广告投放 AI Agent 平台（自称广告主的 Cursor），面向广告主（数据库人物，尚未接触，商业化团队用得上） · 硅谷 BD"
+              },
+              {
+                "ref": "e3",
+                "quote": "Joshua X. · 硅谷 BD 团队 · T3 · Joshua X.（徐卓，HeyGen 联合创始人兼 CEO，洛杉矶）：HeyGen（AI 应用/Agent，Series A）做 AI 数字人视频生成与翻译平台，面向企业营销与创作者（数据库人物，尚未接触，编辑部/视频号团队用得上） · 硅谷 BD 团队创业者数"
+              },
+              {
+                "ref": "e4",
+                "quote": "Calvin Zhou · 硅谷 BD 团队 · T3 · Calvin Z.（Calvin Zhou，RoboForce 联合创始人，硅谷湾区）：RoboForce（具身智能/机器人）做 Physical AI 驱动的机器人劳动力，面向工业现场作业（数据库人物，尚未接触，投资团队/编辑部用得上） · 硅谷 BD 团队"
+              },
+              {
+                "ref": "e5",
+                "quote": "Alina Su · 硅谷 BD 团队 · T3 · Alina Su（孙邻家，Generation Lab 创始人兼 CEO，旧金山，Forbes 30U30）：Generation Lab（医疗/生物）做器官级生物年龄检测 SystemAge 与长寿疗法，面向消费者（数据库人物，尚未接触，编辑部用得上） · 硅谷"
+              }
+            ]
+          },
+          {
+            "group_id": "g4",
+            "source": "Global Partnership 团队",
+            "issue": "2026-08-17",
+            "n_facts": 3,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "深圳以 Physical AI 为主题的近场研究：已联系妙动创始人杨硕，对方尚未回复。编辑部也通过 PR 这条线联系同一人，尚无反馈。"
+              }
+            ]
+          }
+        ],
+        "context_refs": {
+          "analysis_id": "e5964210bc94e106",
+          "parent_analysis_id": null,
+          "last_user_q": "他们对比一下",
+          "entities": [
+            "拓竹",
+            "华为",
+            "陈宇森",
+            "Bolbi Liu",
+            "豆包",
+            "杨硕",
+            "具身智能",
+            "Joshua X.",
+            "Calvin Zhou",
+            "Alina Su",
+            "李源",
+            "vivo",
+            "AGI Playground",
+            "奔驰纯电",
+            "思琪",
+            "优派",
+            "AI硬件",
+            "刘靖康",
+            "英伟达",
+            "DUSQ",
+            "TUTTI",
+            "长鑫",
+            "李楠",
+            "Trae",
+            "银河通用",
+            "比亚迪",
+            "AWS",
+            "名仕视频",
+            "荔枝",
+            "HDD"
+          ],
+          "teams": [
+            "商业化团队",
+            "视频号团队",
+            "硅谷 BD 团队",
+            "Global Partnership 团队",
+            "编辑部",
+            "未标注来源"
+          ],
+          "issues": [
+            "2026-08-17",
+            "2026-08-14"
+          ],
+          "chunk_ids": [],
+          "item_ids": [
+            "875",
+            "909",
+            "766",
+            "771",
+            "906",
+            "626",
+            "657",
+            "764",
+            "772",
+            "774",
+            "807",
+            "888",
+            "899",
+            "903",
+            "904",
+            "905",
+            "907",
+            "908"
+          ]
+        },
+        "steps_n": 15
+      },
+      "answer": {
+        "text": "你问的这几份材料对比，需要说明的是它们分属四个不同团队、两个时间点。对比之下，这几份材料存在两处明显的交叉点。第一处是实体层面：vivo 这个品牌同时出现在 2026-08-14 商业化团队的记录里（作为结案客户）和 2026-08-17 视频号团队的脚本里（作为涉及 AI Agent 的手机品牌）。需要补充的是，这几份材料之间未发现明确的信息冲突，差异主要体现在团队归属和时间先后上。\n\n来源：2026-08-14·未标注来源；2026-08-17·视频号团队；2026-08-17·硅谷 BD 团队；2026-08-17·Global Partnership 团队\n（注：部分表述因可用记录中缺少对应依据，已省略。）",
+        "len": 311,
+        "correctness": "fail"
+      },
+      "verify": {
+        "verified": 0,
+        "rejected": 6,
+        "downgraded": 1,
+        "flags": [
+          "脚本选题×商业化团队",
+          "脚本选题×硅谷 BD 团队",
+          "脚本选题×Global Partnership 团队",
+          "以及×商业化团队",
+          "以及×硅谷 BD 团队",
+          "以及×Global Partnership 团队",
+          "硅谷×Global Partnership 团队",
+          "具身智能×硅谷 BD 团队",
+          "具身智能×Global Partnership 团队"
+        ]
+      },
+      "latency": {
+        "retrieve_ms": 143,
+        "analysis_ms": 61988,
+        "total_ms": 62131
+      },
+      "usage": {
+        "llm_calls": 6,
+        "source_groups": 4,
+        "elapsed_ms": 61984,
+        "path": "analysis",
+        "cross": true,
+        "prompt_tokens": 7686,
+        "completion_tokens": 4965,
+        "total_tokens": 12651,
+        "n_calls": 6,
+        "n_retries": 0,
+        "analysis_ms": 61988,
+        "retrieve_ms": 143,
+        "total_ms": 62131
+      },
+      "n_retries": 0,
+      "n_llm_calls": 6
+    },
+    {
+      "id": "e18",
+      "q": "硅谷 BD 团队有没有接触面壁智能",
+      "tags": [
+        "team_in_q",
+        "entity"
+      ],
+      "pass": true,
+      "failure_layer": null,
+      "routing": {
+        "kind": "independent",
+        "reason": "no_history",
+        "search_q": "硅谷 BD 团队有没有接触面壁智能",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "hybrid",
+        "n_hits": 40,
+        "n_context": 40,
+        "total": null,
+        "date_from": "2026-06-27",
+        "date_to": null,
+        "latency_ms": 4290,
+        "titles": [
+          "面壁智能",
+          "面壁智能",
+          "面壁智能",
+          "矽递科技",
+          "短测未来",
+          "Calvin Zhou"
+        ],
+        "issues": [
+          "2026-08-17"
+        ],
+        "direct_answer": false
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=no_history"
+        },
+        {
+          "check": "min_context",
+          "ok": true,
+          "detail": "n_ctx=40"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": true,
+          "detail": "rejected=0"
+        }
+      ],
+      "evidence": {
+        "analysis_id": "bb23d9401b5dbd59",
+        "sources": [
+          {
+            "group_id": "g1",
+            "source": "硅谷 BD 团队",
+            "issue": "2026-08-17",
+            "n_facts": 3,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "面壁智能 · 硅谷 BD 团队 · T6 · 面壁智能詹杨帆认为赛力斯与字节合作中开放合作心态是场景创新催化剂，有望找到智能座舱的 iPhone 时刻（受访者陈述，非核实事实） · 硅谷 BD 团队建联记录 · 与面壁智能詹杨帆的对话"
+              }
+            ]
+          },
+          {
+            "group_id": "g2",
+            "source": "未标注来源",
+            "issue": "2026-08-17",
+            "n_facts": 3,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "端侧上车、事故处理 Agent、路由模型一手对话 硅谷 BD 团队 终端是 AI 进入物理世界的路径判断"
+              },
+              {
+                "ref": "e2",
+                "quote": "与面壁智能、安谋科技谈端侧模型与端云协同；整理端侧芯片框架能力 硅谷 BD 团队"
+              },
+              {
+                "ref": "e3",
+                "quote": "硅谷 BD 团队记录：与詹杨帆谈终端是 AI 进入物理世界的路径、汽车算力强于手机、端侧模型芯片适配情况。 硅谷 BD 团队建联记录 · 与面壁智能詹杨帆的对话"
+              }
+            ]
+          }
+        ],
+        "context_refs": {
+          "analysis_id": "bb23d9401b5dbd59",
+          "parent_analysis_id": null,
+          "last_user_q": "硅谷 BD 团队有没有接触面壁智能",
+          "entities": [
+            "面壁智能",
+            "矽递科技",
+            "短测未来",
+            "Calvin Zhou",
+            "Allen Ren",
+            "Aaron Li",
+            "Ali Agha",
+            "Anita Wang",
+            "面壁智能 · 詹杨帆",
+            "Weilun Chen",
+            "端侧 AI 与芯片",
+            "大晓机器人",
+            "Eigent AI",
+            "FoveaSocial",
+            "Anushrav Vatsa",
+            "Arthur Cheung",
+            "wapitee",
+            "Physical AI 机器人创业者一批",
+            "Insta360",
+            "memopin · 叶志伟",
+            "AdsGency AI",
+            "Chen Geng",
+            "Cecilia Cao",
+            "Flowtica · 成旭然、陈洁茹",
+            "runpad / 词元开物 / 数美万物 / 笔盒",
+            "Shuyang Gao",
+            "Generation Lab",
+            "Brad (Bodi) Yuan · Reverie AI",
+            "Pure Global",
+            "Chi Li"
+          ],
+          "teams": [
+            "硅谷 BD 团队",
+            "未标注来源"
+          ],
+          "issues": [
+            "2026-08-17"
+          ],
+          "chunk_ids": [],
+          "item_ids": [
+            "687",
+            "686",
+            "688",
+            "691",
+            "704",
+            "772",
+            "782",
+            "773",
+            "781",
+            "778",
+            "767",
+            "707",
+            "756",
+            "693",
+            "779",
+            "780",
+            "750",
+            "710",
+            "765",
+            "761",
+            "770",
+            "758",
+            "763",
+            "768"
+          ]
+        },
+        "steps_n": 10
+      },
+      "answer": {
+        "text": "根据现有材料，目前只能确认涉及「硅谷 BD 团队」「面壁智能」以及「詹杨帆」这几个相关实体在来源中被提及，但并没有足够信息能够明确说明硅谷 BD 团队是否实际接触过面壁智能，也无法还原双方接触的具体经过或结论。需要说明的是，其中关于「詹杨帆」和「面壁智能」的记录仍有待进一步核对，尚不能作为确凿依据。因此，对于「硅谷 BD 团队是否接触过面壁智能」这一问题，目前材料无法给出确定回答，需要更多可靠信息才能判断。\n\n来源：2026-08-17·硅谷 BD 团队；2026-08-17·未标注来源",
+        "len": 246,
+        "correctness": "pass"
+      },
+      "verify": {
+        "verified": 1,
+        "rejected": 0,
+        "downgraded": 2,
+        "flags": []
+      },
+      "latency": {
+        "retrieve_ms": 4290,
+        "analysis_ms": 17578,
+        "total_ms": 21868
+      },
+      "usage": {
+        "llm_calls": 3,
+        "source_groups": 2,
+        "elapsed_ms": 17572,
+        "path": "analysis",
+        "cross": false,
+        "prompt_tokens": 3136,
+        "completion_tokens": 1981,
+        "total_tokens": 5117,
+        "n_calls": 3,
+        "n_retries": 0,
+        "analysis_ms": 17578,
+        "retrieve_ms": 4290,
+        "total_ms": 21868
+      },
+      "n_retries": 0,
+      "n_llm_calls": 3
+    },
+    {
+      "id": "e19",
+      "q": "面壁智能",
+      "tags": [
+        "date_scope"
+      ],
+      "pass": true,
+      "failure_layer": null,
+      "routing": {
+        "kind": "independent",
+        "reason": "no_history",
+        "search_q": "面壁智能",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "structured",
+        "n_hits": 12,
+        "n_context": 12,
+        "total": 12,
+        "date_from": "2026-06-27",
+        "date_to": null,
+        "latency_ms": 4394,
+        "titles": [
+          "詹杨帆",
+          "高通",
+          "AMD",
+          "吉利银河",
+          "联发科",
+          "英伟达"
+        ],
+        "issues": [
+          "2026-08-27"
+        ],
+        "direct_answer": false
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=no_history"
+        },
+        {
+          "check": "min_context",
+          "ok": true,
+          "detail": "n_ctx=12"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": true,
+          "detail": "rejected=1"
+        }
+      ],
+      "evidence": {
+        "analysis_id": "b22088b5ce46e7bf",
+        "sources": [
+          {
+            "group_id": "g1",
+            "source": "硅谷 BD 团队",
+            "issue": "2026-08-27",
+            "n_facts": 6,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "团队 硅谷 BD 团队 · 关联 4 条记录 · 面壁智能：与吉利银河、长安马自达等车企在智能座舱方向有具体合作（已接触，合作内容已披露） · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话"
+              },
+              {
+                "ref": "e2",
+                "quote": "团队 硅谷 BD 团队 · 关联 4 条记录 · 面壁智能（沟通对象为高通侧芯片调优负责人）：端侧模型在旗舰手机应用的限制与发展方向（已接触）。 · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话"
+              },
+              {
+                "ref": "e3",
+                "quote": "团队 硅谷 BD 团队 · 关联 2 条记录 · 面壁智能端侧模型芯片适配：已适配高通 8958538/8397/9075、联发科、英特尔、英伟达、AMD 及国产平台；模型尺寸 0.9B 到 4B 到 9B，覆盖不同算力场景，并部署支持视频流分析的 Omni 跨模态模型 · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话"
+              },
+              {
+                "ref": "e4",
+                "quote": "团队 硅谷 BD 团队 · 关联 2 条记录 · 面壁智能端侧模型芯片适配：已适配高通 8958538/8397/9075、联发科、英特尔、英伟达、AMD 及国产平台；模型尺寸 0.9B 到 4B 到 9B，覆盖不同算力场景，并部署支持视频流分析的 Omni 跨模态模型 · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话"
+              },
+              {
+                "ref": "e5",
+                "quote": "团队 硅谷 BD 团队 · 关联 2 条记录 · 面壁智能端侧模型芯片适配：已适配高通 8958538/8397/9075、联发科、英特尔、英伟达、AMD 及国产平台；模型尺寸 0.9B 到 4B 到 9B，覆盖不同算力场景，并部署支持视频流分析的 Omni 跨模态模型 · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话"
+              },
+              {
+                "ref": "e6",
+                "quote": "团队 硅谷 BD 团队 · 关联 1 条记录 · 面壁智能詹杨帆认为赛力斯与字节合作中开放合作心态是场景创新催化剂，有望找到智能座舱的 iPhone 时刻（受访者陈述，非核实事实） · 来源 硅谷 BD 团队建联记录 · 与面壁智能詹杨帆的对话"
+              }
+            ]
+          },
+          {
+            "group_id": "g2",
+            "source": "编辑部",
+            "issue": "2026-08-27",
+            "n_facts": 5,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "团队 编辑部 · 关联 2 条记录 · 面壁智能：与吉利银河、长安马自达等车企在智能座舱方向有具体合作（已接触，合作内容已披露） · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话（有原始记录）"
+              },
+              {
+                "ref": "e2",
+                "quote": "团队 编辑部 · 关联 1 条记录 · 面壁智能：与吉利银河、长安等车企在智能座舱合作。舱内做端侧跨模态视频流分析（识别儿童危险动作、数据不出车）、车内物品溯源、情境感知自动响应；舱外做本地化倒车物品识别，已在量产车型验证；并做事故处理 Agent（端云协同的责任判定与理赔）。 · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话（有原始记录）"
+              },
+              {
+                "ref": "e3",
+                "quote": "团队 编辑部 · 关联 1 条记录 · 面壁智能端侧模型芯片适配：已适配高通 8958538/8397/9075、联发科、英特尔、英伟达、AMD 及国产平台；模型尺寸 0.9B 到 4B 到 9B，覆盖不同算力场景，并部署支持视频流分析的 Omni 跨模态模型 · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话"
+              },
+              {
+                "ref": "e4",
+                "quote": "团队 编辑部 · 关联 1 条记录 · 面壁智能：与吉利银河、长安等车企在智能座舱合作。舱内做端侧跨模态视频流分析（识别儿童危险动作、数据不出车）、车内物品溯源、情境感知自动响应；舱外做本地化倒车物品识别，已在量产车型验证；并做事故处理 Agent（端云协同的责任判定与理赔）。 · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话（有原始记录）"
+              },
+              {
+                "ref": "e5",
+                "quote": "团队 编辑部 · 关联 1 条记录 · 面壁智能：与吉利银河、长安马自达等车企在智能座舱方向有具体合作（已接触，合作内容已披露） · 来源 编辑部沟通记录 · 与面壁智能詹杨帆的对话"
+              }
+            ]
+          }
+        ],
+        "context_refs": {
+          "analysis_id": "b22088b5ce46e7bf",
+          "parent_analysis_id": null,
+          "last_user_q": "面壁智能",
+          "entities": [
+            "詹杨帆",
+            "高通",
+            "AMD",
+            "吉利银河",
+            "联发科",
+            "英伟达",
+            "字节",
+            "智能座舱",
+            "英特尔",
+            "赛力斯",
+            "长安",
+            "长安马自达"
+          ],
+          "teams": [
+            "硅谷 BD 团队",
+            "编辑部"
+          ],
+          "issues": [
+            "2026-08-27"
+          ],
+          "chunk_ids": [],
+          "item_ids": []
+        },
+        "steps_n": 8
+      },
+      "answer": {
+        "text": "与之关联最强的是芯片平台一侧。面壁智能的端侧模型已适配高通 8958538/8397/9075、联发科、英特尔、英伟达、AMD 以及国产平台，模型尺寸从 0.9B 到 4B 到 9B，覆盖不同算力场景，并部署了支持视频流分析的 Omni 跨模态模型。其中与高通侧的沟通对象是芯片调优负责人，谈的是端侧模型在旗舰手机应用上的限制与发展方向。另一组强关联是车企与智能座舱。面壁智能与吉利银河、长安马自达等车企在智能座舱方向有具体合作，合作内容已披露。落到场景上：舱内做端侧跨模态视频流分析，包括识别儿童危险动作、数据不出车，还做车内物品溯源和情境感知自动响应；舱外做本地化倒车物品识别，已在量产车型验证；此外还做事故处理 Agent，走端云协同做责任判定与理赔。还有一条属于受访者观点而非核实事实：詹杨帆认为赛力斯与字节的合作中，开放合作心态是场景创新的催化剂，有望找到智能座舱的 iPhone 时刻。需要说明的是，上述共现主体中未出现团队或集合侧的对应记录，已上线周报无相关记载。\n\n来源：2026-08-27·硅谷 BD 团队；2026-08-27·编辑部\n（注：部分表述因可用记录中缺少对应依据，已省略。）",
+        "len": 504,
+        "correctness": "pass"
+      },
+      "verify": {
+        "verified": 11,
+        "rejected": 1,
+        "downgraded": 0,
+        "flags": [
+          "詹杨帆×编辑部"
+        ]
+      },
+      "latency": {
+        "retrieve_ms": 4394,
+        "analysis_ms": 13027,
+        "total_ms": 17421
+      },
+      "usage": {
+        "llm_calls": 1,
+        "source_groups": 2,
+        "elapsed_ms": 13023,
+        "path": "structured",
+        "cross": false,
+        "prompt_tokens": 3567,
+        "completion_tokens": 572,
+        "total_tokens": 4139,
+        "n_calls": 1,
+        "n_retries": 0,
+        "analysis_ms": 13027,
+        "retrieve_ms": 4394,
+        "total_ms": 17421
+      },
+      "n_retries": 0,
+      "n_llm_calls": 1
+    },
+    {
+      "id": "e20",
+      "q": "xyzrandomquery999nodata",
+      "tags": [
+        "no_evidence",
+        "guard"
+      ],
+      "pass": true,
+      "failure_layer": null,
+      "routing": {
+        "kind": "independent",
+        "reason": "no_history",
+        "search_q": "xyzrandomquery999nodata",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "guard",
+        "n_hits": 0,
+        "n_context": 0,
+        "total": null,
+        "date_from": null,
+        "date_to": null,
+        "latency_ms": 0,
+        "titles": [],
+        "issues": [],
+        "direct_answer": true
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=no_history"
+        },
+        {
+          "check": "direct_answer",
+          "ok": true,
+          "detail": "direct=True"
+        },
+        {
+          "check": "max_hits",
+          "ok": true,
+          "detail": "n_hits=0 max=0"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": true,
+          "detail": "rejected=0"
+        }
+      ],
+      "evidence": {
+        "analysis_id": null,
+        "sources": [],
+        "context_refs": {},
+        "steps_n": 0
+      },
+      "answer": {
+        "text": "无法识别该问题，请用中文或常见英文公司/产品名重新描述。未在已上线周报中检索。",
+        "len": 39,
+        "correctness": "pass"
+      },
+      "verify": {},
+      "latency": {
+        "retrieve_ms": 0,
+        "analysis_ms": 0,
+        "total_ms": 0
+      },
+      "usage": {
+        "path": "direct",
+        "retrieve_ms": 0,
+        "analysis_ms": 0,
+        "total_ms": 0
+      },
+      "n_retries": null,
+      "n_llm_calls": null
+    },
+    {
+      "id": "e25",
+      "q": "asdfghjklqwertyuiop123456",
+      "tags": [
+        "no_evidence",
+        "guard"
+      ],
+      "pass": true,
+      "failure_layer": null,
+      "routing": {
+        "kind": "independent",
+        "reason": "no_history",
+        "search_q": "asdfghjklqwertyuiop123456",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "guard",
+        "n_hits": 0,
+        "n_context": 0,
+        "total": null,
+        "date_from": null,
+        "date_to": null,
+        "latency_ms": 0,
+        "titles": [],
+        "issues": [],
+        "direct_answer": true
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=no_history"
+        },
+        {
+          "check": "direct_answer",
+          "ok": true,
+          "detail": "direct=True"
+        },
+        {
+          "check": "max_hits",
+          "ok": true,
+          "detail": "n_hits=0 max=0"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": true,
+          "detail": "rejected=0"
+        }
+      ],
+      "evidence": {
+        "analysis_id": null,
+        "sources": [],
+        "context_refs": {},
+        "steps_n": 0
+      },
+      "answer": {
+        "text": "无法识别该问题，请用中文或常见英文公司/产品名重新描述。未在已上线周报中检索。",
+        "len": 39,
+        "correctness": "pass"
+      },
+      "verify": {},
+      "latency": {
+        "retrieve_ms": 0,
+        "analysis_ms": 0,
+        "total_ms": 0
+      },
+      "usage": {
+        "path": "direct",
+        "retrieve_ms": 0,
+        "analysis_ms": 0,
+        "total_ms": 0
+      },
+      "n_retries": null,
+      "n_llm_calls": null
+    },
+    {
+      "id": "e21",
+      "q": "编辑部和商业化团队在可同步关系上有哪些重叠？",
+      "tags": [
+        "structured",
+        "relation"
+      ],
+      "pass": false,
+      "failure_layer": "evidence",
+      "routing": {
+        "kind": "independent",
+        "reason": "no_history",
+        "search_q": "编辑部和商业化团队在可同步关系上有哪些重叠？",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "structured",
+        "n_hits": 8,
+        "n_context": 8,
+        "total": 8,
+        "date_from": "2026-06-27",
+        "date_to": null,
+        "latency_ms": 4625,
+        "titles": [
+          "字节豆包 · Agent 巨头战役",
+          "阿里千问",
+          "AI 助听器 · 飞声",
+          "WorkBuddy",
+          "vivo",
+          "具身智能 · 银河通用与四家团队"
+        ],
+        "issues": [
+          "2026-08-14",
+          "2026-08-17"
+        ],
+        "direct_answer": false
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=no_history"
+        },
+        {
+          "check": "mode",
+          "ok": true,
+          "detail": "mode=structured"
+        },
+        {
+          "check": "set_op",
+          "ok": true,
+          "detail": "set_op=intersect expect=intersect"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": false,
+          "detail": "rejected=9"
+        }
+      ],
+      "evidence": {
+        "analysis_id": "cf4e9647087f7f51",
+        "sources": [
+          {
+            "group_id": "g1",
+            "source": "编辑部",
+            "issue": "2026-08-17",
+            "n_facts": 2,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "同时出现在 编辑部 与 商业化团队 · 团队 编辑部 · 外部在热聊，我们还没碰 · 外部在热聊，我们还没碰 外部媒体报道字节把 AI 产品向豆包集结、对标腾讯 WorkBuddy 与阿里千问办公，内部办公 AI 选题在关注。 外部媒体：字节 8/25 发布生产力 Agent「豆包工作」，TRAE、扣子并入豆包体系；商业化团队选题会将 Work Buddy 深度稿列为高优先级。 外部媒体 · 极客"
+              },
+              {
+                "ref": "e2",
+                "quote": "同时出现在 编辑部 与 商业化团队 · 团队 编辑部 · 采访对象也是客户 · 采访对象也是客户 编辑部就智能体动态做过沟通，商业化团队同期在推进产品更新稿件合作。 编辑部记录：与阿里千问公关就智能体相关动态沟通。 商业化团队记录：阿里云千问 APP 及 PC 端助理功能更新排期敲定，8 月 27 日发布，稿件已签约执行中。 编辑部沟通记录 · 与千问的对话 商业化团队例会提及 · 来源提示 编辑"
+              }
+            ]
+          },
+          {
+            "group_id": "g2",
+            "source": "编辑部",
+            "issue": "2026-08-14",
+            "n_facts": 6,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "同时出现在 编辑部 与 商业化团队 · 团队 编辑部 · 一方接触了，另一方正在关注 · 一方接触了，另一方正在关注 编辑部拿到了创始人一手数据，商业化团队选题会同周判断该赛道值得长期关注；两边各自推进中。 编辑部：五大厂三道墙（芯片/算法/门店）2022–24 被同时绕过；国产突破的领先信号是欧美实验室华人专家回流；日本 ODM 已交付万套；海外重线上、国内重线下；今年营收目标数千万级 商业化团"
+              },
+              {
+                "ref": "e2",
+                "quote": "同时出现在 编辑部 与 商业化团队 · 团队 编辑部 · 已公开报道，内部也在用 · 已公开报道，内部也在用 编辑部本周发了它的深度实测；商业化团队例会同周把它评为办公 AI 工具第一并安排全员分享。 已发布：资料库升级为 HTML/Markdown 人机双写、协作与版本回退，轻应用以 CSV 存数据实现多端同步 商业化团队：按普通职场/前端设计/重度研究三类受众评测，WorkBuddy 均排第一"
+              },
+              {
+                "ref": "e3",
+                "quote": "同时出现在 编辑部 与 商业化团队 · 团队 编辑部 · 采访对象也是客户 · 采访对象也是客户 编辑部接触其云台相机项目研发团队；商业化团队以 vivo 项目为已结案的可复用案例。客户与采访对象是同一家。 编辑部：手持影像云台项目研发（沟通对象不具名，仅一句要点） 商业化团队：vivo 项目内容框架相近、无需过深研究，作为复杂结案案例待专场分享 编辑部沟通记录 · 与 vivo 云台相机项目团队"
+              },
+              {
+                "ref": "e4",
+                "quote": "同时出现在 编辑部 与 商业化团队 · 团队 编辑部 · 同一赛道，各自在做 · 同一赛道，各自在做 商业化团队本周完成银河通用单推头条合作；编辑部同周与源策、taks、跃空维度、FrontierX 四家具身团队一手对话。 商业化团队例会提及 编辑部沟通记录 · 来源提示 商业化团队例会提及；编辑部沟通记录"
+              },
+              {
+                "ref": "e5",
+                "quote": "同时出现在 编辑部 与 商业化团队 · 团队 编辑部 · 两个部门各有判断 · 两个部门各有判断 编辑部本周分别与两家公司一手沟通并纳入报道池；商业化团队选题会同周判断此类产品暂不作重点覆盖。两处事实并列。 编辑部：亲宝宝 AI 睡眠舱 8900 元，避开医疗承诺陷阱（已进选题）；氧刻智能健身一体机，创始人一手长谈（入重点） 商业化团队选题会：AI 健身镜、智能婴儿床等叠加基础 AI 能力，暂不做"
+              },
+              {
+                "ref": "e6",
+                "quote": "同时出现在 编辑部 与 商业化团队 · 团队 编辑部 · 同一公司，不同触点 · 同一公司，不同触点 编辑部 8/14 发阿里云智驾深度稿；商业化团队选题会同周判断阿里是 AI 手机潜在入局者。 已发布文章 · 8/14 <a href=\"https://www.geekpark.net/news/368846\" style=\"color:var(--tif);text-decoration:un"
+              }
+            ]
+          }
+        ],
+        "context_refs": {
+          "analysis_id": "cf4e9647087f7f51",
+          "parent_analysis_id": null,
+          "last_user_q": "编辑部和商业化团队在可同步关系上有哪些重叠？",
+          "entities": [
+            "字节豆包 · Agent 巨头战役",
+            "阿里千问",
+            "AI 助听器 · 飞声",
+            "WorkBuddy",
+            "vivo",
+            "具身智能 · 银河通用与四家团队",
+            "智能婴儿床 / 四臂健身设备",
+            "阿里体系",
+            "字节豆包",
+            "AI 助听器",
+            "具身智能"
+          ],
+          "teams": [
+            "编辑部"
+          ],
+          "issues": [
+            "2026-08-17",
+            "2026-08-14"
+          ],
+          "chunk_ids": [],
+          "item_ids": []
+        },
+        "steps_n": 8
+      },
+      "answer": {
+        "text": "依据 2026-08-14 与 2026-08-17 两期编辑部记录，编辑部和商业化团队在可同步关系上重叠的主体有九组：\n阿里千问：属「采访对象也是客户」一类。AI 助听器 · 飞声：编辑部拿到了创始人一手数据（与飞声助听器创始人彭守昆的对话，挂有原始记录），要点包括五大厂三道墙（芯片/算法/门店）2022—24 被同时绕过、国产突破的领先信号是欧美实验室华人专家回流、日本 ODM 已交付万套、海外重线上而国内重线下、今年营收目标数千万级。两边各自推进。WorkBuddy：编辑部发了它的深度实测，文章为 2026-08-15 发布的《当 AI 开始批量写 HTML，WorkBuddy 想解决「生成之后」的问题》（连然）。已公开的功能要点是资料库升级为 HTML/Markdown 人机双写、协作与版本回退，轻应用以 CSV 存数据实现多端同步。vivo：同样是「采访对象也是客户」。具身智能 · 银河通用与四家团队：同一赛道，各自在做。商业化团队该周完成银河通用单推头条合作；编辑部同周与源策、taks、跃空维度、FrontierX 四家具身团队做了一手对话。智能婴儿床 / 四臂健身设备：两个部门各有判断。编辑部与两家公司一手沟通并纳入报道池——亲宝宝 AI 睡眠舱 8900 元、避开医疗承诺陷阱（已进选题），氧刻智能健身一体机、创始人一手长谈（入重点），两场对话分别对应亲宝宝产品经理 leo 和氧刻创始人韩乾源，均挂有原始记录。阿里体系：同一公司，不同触点。\n（注：部分表述因可用记录中缺少对应依据，已省略。）",
+        "len": 663,
+        "correctness": "fail"
+      },
+      "verify": {
+        "verified": 8,
+        "rejected": 9,
+        "downgraded": 0,
+        "flags": [
+          "字节豆包×外部媒体",
+          "WorkBuddy×外部媒体",
+          "阿里千问×外部媒体",
+          "AI×外部媒体",
+          "Agent×外部媒体",
+          "字节豆包 · Agent 巨头战役×外部媒体",
+          "巨头战役×外部媒体",
+          "Agent×商业化团队",
+          "日发布×外部媒体",
+          "AI×商业化团队",
+          "巨头战役×商业化团队",
+          "阿里千问×商业化团队",
+          "助听器×商业化团队",
+          "vivo×商业化团队",
+          "智能婴儿床×商业化团队"
+        ]
+      },
+      "latency": {
+        "retrieve_ms": 4625,
+        "analysis_ms": 37786,
+        "total_ms": 42411
+      },
+      "usage": {
+        "llm_calls": 1,
+        "source_groups": 2,
+        "elapsed_ms": 37782,
+        "path": "structured",
+        "cross": false,
+        "prompt_tokens": 5286,
+        "completion_tokens": 1400,
+        "total_tokens": 6686,
+        "n_calls": 1,
+        "n_retries": 0,
+        "analysis_ms": 37786,
+        "retrieve_ms": 4625,
+        "total_ms": 42411
+      },
+      "n_retries": 0,
+      "n_llm_calls": 1
+    },
+    {
+      "id": "e22",
+      "q": "Global Partnership 团队本周接触了谁",
+      "tags": [
+        "team",
+        "alias"
+      ],
+      "pass": true,
+      "failure_layer": null,
+      "routing": {
+        "kind": "independent",
+        "reason": "no_history",
+        "search_q": "Global Partnership 团队本周接触了谁",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "hybrid",
+        "n_hits": 0,
+        "n_context": 0,
+        "total": null,
+        "date_from": "2026-09-21",
+        "date_to": "2026-09-25",
+        "latency_ms": 31686,
+        "titles": [],
+        "issues": [],
+        "direct_answer": true
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=no_history"
+        },
+        {
+          "check": "min_context",
+          "ok": true,
+          "detail": "n_ctx=0"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": true,
+          "detail": "rejected=0"
+        }
+      ],
+      "evidence": {
+        "analysis_id": null,
+        "sources": [],
+        "context_refs": {},
+        "steps_n": 0
+      },
+      "answer": {
+        "text": "未在已上线周报中找到与问题直接相关的记录。请尝试换关键词、缩小或扩大时间范围，或确认相关内容是否已上线。\n（本次检索时间范围：2026-09-21 至 2026-09-25）",
+        "len": 87,
+        "correctness": "pass"
+      },
+      "verify": {},
+      "latency": {
+        "retrieve_ms": 31686,
+        "analysis_ms": 0,
+        "total_ms": 31686
+      },
+      "usage": {
+        "path": "direct",
+        "retrieve_ms": 31686,
+        "analysis_ms": 0,
+        "total_ms": 31686
+      },
+      "n_retries": null,
+      "n_llm_calls": null
+    },
+    {
+      "id": "e23",
+      "q": "视频号团队最近关注了什么",
+      "tags": [
+        "team",
+        "topic"
+      ],
+      "pass": false,
+      "failure_layer": "evidence",
+      "routing": {
+        "kind": "independent",
+        "reason": "no_history",
+        "search_q": "视频号团队最近关注了什么",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "hybrid",
+        "n_hits": 40,
+        "n_context": 40,
+        "total": null,
+        "date_from": "2026-06-27",
+        "date_to": null,
+        "latency_ms": 8537,
+        "titles": [
+          "MiniMax",
+          "具身智能",
+          "拓竹",
+          "AGI 2026",
+          "小红书",
+          "面壁智能"
+        ],
+        "issues": [
+          "2026-08-14",
+          "2026-08-17"
+        ],
+        "direct_answer": false
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=no_history"
+        },
+        {
+          "check": "min_context",
+          "ok": true,
+          "detail": "n_ctx=40"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": false,
+          "detail": "rejected=16"
+        }
+      ],
+      "evidence": {
+        "analysis_id": "a74ef7ca0156b3d8",
+        "sources": [
+          {
+            "group_id": "g1",
+            "source": "硅谷 BD 团队",
+            "issue": "2026-08-17",
+            "n_facts": 0,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "面壁智能 · 硅谷 BD 团队 · T6 · 面壁智能端侧模型芯片适配广，已适配高通、联发科、英特尔、英伟达、AMD 及国产平台，模型尺寸 0.9B 到 9B，并部署支持视频流分析的 Omni 跨模态模型；车端模型效果受车企算力配额限制（受访者陈述，非核实事实） · 硅谷 BD 团队建联记录 · 与面壁智能的对话"
+              },
+              {
+                "ref": "e2",
+                "quote": "面壁智能 · 硅谷 BD 团队 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车算力强于手机、场景标准化，是端侧模型优质载体；智能座舱是小型智能空间 IoT 原型（受访者陈述，非核实事实） · 硅谷 BD 团队建联记录 · 与面壁智能詹杨帆的对话"
+              },
+              {
+                "ref": "e3",
+                "quote": "面壁智能 · 硅谷 BD 团队 · T6 · 面壁智能詹杨帆认为赛力斯与字节合作中开放合作心态是场景创新催化剂，有望找到智能座舱的 iPhone 时刻（受访者陈述，非核实事实） · 硅谷 BD 团队建联记录 · 与面壁智能詹杨帆的对话"
+              },
+              {
+                "ref": "e4",
+                "quote": "徐珊 · 硅谷 BD 团队 · T6 · 投资人徐珊认为 AI for Science 市场进展不及预期，落地的蛋白质变体公司较少；WAIC 上自动化制药企业在国内投资回报有限，该叙事在硅谷更受认可；今年好项目变少、进入门槛提高（受访者陈述，非核实事实） · 硅谷 BD 团队建联记录"
+              },
+              {
+                "ref": "e5",
+                "quote": "BMC 瑞迈特 · 硅谷 BD 团队 · T6 · BMC 瑞迈特（田老师）介绍呼吸机核心差异化：算法与硬件双维度壁垒对标欧美医疗级，舒适度终极标准为让用户忘记呼吸；AI 落地方向为用户报告智能解读、辅助调参、临床决策支持，当前 AI 直接干预治疗属监管敏感领域（受访者陈述，非核实事实） · 硅谷 BD 团队建联记录"
+              },
+              {
+                "ref": "e6",
+                "quote": "矽递科技 · 硅谷 BD 团队 · T6 · 矽递科技 MAX：已接触（智能硬件方向） · 硅谷 BD 团队建联记录"
+              }
+            ]
+          },
+          {
+            "group_id": "g2",
+            "source": "未标注来源",
+            "issue": "2026-08-17",
+            "n_facts": 5,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "关注的公司与人 视频号团队 《王兴兴的十年豪赌》本周播放靠前 英文站 IPO afterparty 演讲英文编译，含物理 AI 机器人自进化 1.0"
+              },
+              {
+                "ref": "e2",
+                "quote": "关注的类型 视频号团队 睡眠贴片、墨水屏、无屏手环、语音戒指等新品类脚本"
+              },
+              {
+                "ref": "e3",
+                "quote": "视频号团队 《豆包开始收过路费》相关脚本"
+              },
+              {
+                "ref": "e5",
+                "quote": "视频号团队 按行业建内容合集分类"
+              }
+            ]
+          },
+          {
+            "group_id": "g3",
+            "source": "视频号团队",
+            "issue": "2026-08-17",
+            "n_facts": 7,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "团队关注到近期视频模型进展：MiniMax开源模型M3（适合meme与二维/矢量动画、成本低）、字节Seedance 2.5、字节及火山引擎音频模型（情绪可调）；正推进AI动画与配音在视频制作中的应用 · 视频号团队例会提及"
+              },
+              {
+                "ref": "e2",
+                "quote": "本周观众明显更关注具身智能与人形机器人方向（宇树相关多条靠前），以及手机换机节奏话题（数据判断，非核实事实），供编辑部与播客对照 · 视频号周数据"
+              },
+              {
+                "ref": "e3",
+                "quote": "《王兴兴的十年豪赌》：本周播放 23337、点赞 217、评论 33（相对本周其余视频处于前列）"
+              }
+            ]
+          },
+          {
+            "group_id": "g4",
+            "source": "未标注来源",
+            "issue": "2026-08-14",
+            "n_facts": 9,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "关注的类型 品牌创意团队 创意视频：视频号脚本库最新《「失眠」要被印度产品解决了》"
+              },
+              {
+                "ref": "e2",
+                "quote": "关注的领域 编辑部 8 场对话：氧刻、飞声、奥术造物、破壳创智、XREAL、几硕、vivo、亲宝宝；文章 <a href=\"https://www.geekpark.net/news/368847\" target=\"_blank\">《这家靠全景起步的公司，正在逐步让用户「忘掉相机」》</a> 8/14 siqi、<"
+              },
+              {
+                "ref": "e3",
+                "quote": "关注的领域 编辑部 对话：飞声 彭守昆（有原始记录） 商业化团队 选题会提及：长期关注、非处方路线"
+              },
+              {
+                "ref": "e4",
+                "quote": "关注的技术 商业化团队 选题会提及：拟做趋势选题"
+              },
+              {
+                "ref": "e5",
+                "quote": "关注的技术 商业化团队 选题会提及：晴雨科技绳驱路线"
+              }
+            ]
+          }
+        ],
+        "context_refs": {
+          "analysis_id": "a74ef7ca0156b3d8",
+          "parent_analysis_id": null,
+          "last_user_q": "视频号团队最近关注了什么",
+          "entities": [
+            "MiniMax",
+            "具身智能",
+            "拓竹",
+            "AGI 2026",
+            "小红书",
+            "面壁智能",
+            "cumora",
+            "Founder Park",
+            "宇树科技",
+            "宇树 · 王兴兴",
+            "手机",
+            "AI 硬件测评与形态",
+            "豆包",
+            "字节豆包",
+            "追觅",
+            "2026.8.17 - 8.27 本期概览",
+            "网信办",
+            "内容矩阵与账号",
+            "具身智能与 Physical AI",
+            "短视频",
+            "Agent 与模型商品化",
+            "徐珊",
+            "BMC 瑞迈特",
+            "矽递科技",
+            "智能硬件",
+            "FoveaSocial",
+            "云迹科技",
+            "PPIO",
+            "AI 助听器",
+            "绕开 CUDA 直连芯片"
+          ],
+          "teams": [
+            "视频号团队",
+            "商业化团队",
+            "品牌创意团队",
+            "社群",
+            "硅谷 BD 团队",
+            "编辑部",
+            "未标注来源"
+          ],
+          "issues": [
+            "2026-08-17",
+            "2026-08-14"
+          ],
+          "chunk_ids": [],
+          "item_ids": [
+            "893",
+            "657",
+            "868",
+            "825",
+            "636",
+            "688",
+            "646",
+            "649",
+            "652",
+            "653",
+            "654",
+            "658",
+            "659",
+            "674",
+            "677",
+            "686",
+            "687",
+            "689",
+            "690",
+            "691",
+            "692",
+            "693",
+            "694",
+            "695"
+          ]
+        },
+        "steps_n": 14
+      },
+      "answer": {
+        "text": "品牌创意团队当时关注短视频创意视频类型，视频号脚本库中最新的一篇为《「失眠」要被印度产品解决了》。需要说明的是，在 2026 年 8 月 17 日一期的记录中，还提到该区间内的商业内容（商单）有多条按规则不列入排序。除此之外，现有材料中关于视频号团队的直接信息较为有限。不过这些内容并非直接归属于视频号团队。\n\n来源：2026-08-17·硅谷 BD 团队；2026-08-17·未标注来源；2026-08-17·视频号团队；2026-08-14·未标注来源\n（注：部分表述因可用记录中缺少对应依据，已省略。）",
+        "len": 255,
+        "correctness": "fail"
+      },
+      "verify": {
+        "verified": 7,
+        "rejected": 16,
+        "downgraded": 0,
+        "flags": [
+          "2026×视频号团队",
+          "场对话×商业化团队",
+          "场对话×其他",
+          "助听器×其他",
+          "飞声×其他",
+          "AI×其他",
+          "绕开 CUDA 直连芯片×编辑部",
+          "绕开 CUDA 直连芯片×其他",
+          "CUDA×编辑部",
+          "CUDA×其他",
+          "几硕×商业化团队",
+          "几硕×其他",
+          "奥术造物×商业化团队",
+          "奥术造物×其他",
+          "路线×其他",
+          "AI 助听器×其他",
+          "直连芯片×编辑部",
+          "直连芯片×其他",
+          "拟做趋势选题×编辑部",
+          "拟做趋势选题×其他",
+          "破壳创智×其他",
+          "绕开×编辑部",
+          "绕开×其他",
+          "亲宝宝×商业化团队",
+          "亲宝宝×其他",
+          "智能硬件×商业化团队",
+          "智能硬件×其他"
+        ]
+      },
+      "latency": {
+        "retrieve_ms": 8537,
+        "analysis_ms": 31271,
+        "total_ms": 39808
+      },
+      "usage": {
+        "llm_calls": 5,
+        "source_groups": 4,
+        "elapsed_ms": 31267,
+        "path": "analysis",
+        "cross": false,
+        "prompt_tokens": 5129,
+        "completion_tokens": 3243,
+        "total_tokens": 8372,
+        "n_calls": 5,
+        "n_retries": 0,
+        "analysis_ms": 31271,
+        "retrieve_ms": 8537,
+        "total_ms": 39808
+      },
+      "n_retries": 0,
+      "n_llm_calls": 5
+    },
+    {
+      "id": "e24",
+      "q": "哪些是一队接触过、另一队该知道的？",
+      "tags": [
+        "relation_cue",
+        "hybrid"
+      ],
+      "pass": false,
+      "failure_layer": "evidence",
+      "routing": {
+        "kind": "independent",
+        "reason": "no_history",
+        "search_q": "哪些是一队接触过、另一队该知道的？",
+        "parent_analysis_id": null
+      },
+      "recall": {
+        "mode": "hybrid",
+        "n_hits": 8,
+        "n_context": 8,
+        "total": null,
+        "date_from": "2026-06-27",
+        "date_to": null,
+        "latency_ms": 2692,
+        "titles": [
+          "面壁智能 · 詹杨帆",
+          "Flowtica · 成旭然、陈洁茹",
+          "意图即服务 · HarmonyOS 7",
+          "Brad (Bodi) Yuan · Reverie AI",
+          "短视频团队的商务诉求",
+          "AI 助听器 · 飞声"
+        ],
+        "issues": [
+          "2026-08-14",
+          "2026-08-17"
+        ],
+        "direct_answer": false
+      },
+      "rerank": {},
+      "checks": [
+        {
+          "check": "routing",
+          "ok": true,
+          "detail": "kind=independent reason=no_history"
+        },
+        {
+          "check": "min_context",
+          "ok": true,
+          "detail": "n_ctx=8"
+        },
+        {
+          "check": "unsupported_claims_bounded",
+          "ok": false,
+          "detail": "rejected=7"
+        }
+      ],
+      "evidence": {
+        "analysis_id": "66e3dc2bfe9b82af",
+        "sources": [
+          {
+            "group_id": "g1",
+            "source": "未标注来源",
+            "issue": "2026-08-14",
+            "n_facts": 8,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "一方有需求，另一方尚未接触 创意视频团队希望开始承接商务，已有外部方主动表达付费/合作意向；两边尚未就此对接。 创意视频团队判断：初创硬件公司有付费意愿，大厂无；转发 100+ 的内容值得复盘成可售形态 外部方：live tv 有意购买样片；tapnow 表达合作意向 本期记录中两边尚未就此对接 创意视频团队周会提及"
+              },
+              {
+                "ref": "e2",
+                "quote": "一方接触了，另一方正在关注 编辑部拿到了创始人一手数据，商业化团队选题会同周判断该赛道值得长期关注；两边各自推进中。 编辑部：五大厂三道墙（芯片/算法/门店）2022–24 被同时绕过；国产突破的领先信号是欧美实验室华人专家回流；日本 ODM 已交付万套；海外重线上、国内重线下；今年营收目标数千万级 商业化团队选题会："
+              },
+              {
+                "ref": "e3",
+                "quote": "一方报道了，另一方在接触 英文站 8/10 发 MiniMax Agent 观察；商业化团队例会将 MiniMax 列为接触中的意向客户。 英文站：MiniMax Agent 观察 8/10 商业化团队：意向客户，接触中（不写概率） 英文站 <a href=\"https://about.geekpark.net/blo"
+              },
+              {
+                "ref": "e4",
+                "quote": "一方接触，另一方用得上 编辑部与两家出海众筹代运营方的创始人分别对话，两家对市场的判断相互印证；硅谷 BD 团队、Global Partnership 团队与商业化团队尚未接触过这两家。 刷单已无法从平台数据识别；国内众筹平台衰败根因是平台主动要求刷单；日本市场因电商法严格是服务商实力\"照妖镜\"；48 小时金额按团队类"
+              }
+            ]
+          },
+          {
+            "group_id": "g2",
+            "source": "未标注来源",
+            "issue": "2026-08-17",
+            "n_facts": 10,
+            "evidence": [
+              {
+                "ref": "e1",
+                "quote": "一方接触，另一方用得上 端侧模型上车与智能座舱方向，编辑部与硅谷 BD 团队各有一手对话记录。 编辑部记录：与詹杨帆谈端云协同、路由模型、事故处理 Agent，及与吉利银河、长安车企的智能座舱合作。 硅谷 BD 团队记录：与詹杨帆谈终端是 AI 进入物理世界的路径、汽车算力强于手机、端侧模型芯片适配情况。 编辑部沟通记"
+              },
+              {
+                "ref": "e2",
+                "quote": "一方接触，另一方用得上 硅谷 BD 团队接触了 AGI FF 储备项目 Flowtica，国内发声与产品体验报道可由编辑部承接。 硅谷 BD 团队记录：Flowtica 为 AI 录音笔个人助理，总部新加坡；二代产品计划 9 月 IFA 发布用墨水屏，Mac 端 9 月同步上线。 硅谷 BD 团队记录：国内发声约 8"
+              },
+              {
+                "ref": "e3",
+                "quote": "一方报道了，另一方在接触 编辑部已就 HarmonyOS 7 意图即服务成稿，外部媒体同步报道 HDD 深圳站 AI 专场。 编辑部记录：HarmonyOS 7 意图即服务为不依赖首屏位置的新分发入口，小艺每天被唤醒超 30 亿次。 外部媒体：8/21 HDD 深圳站 AI 专场拆成五议题，快递100、知乎、南航e家、"
+              },
+              {
+                "ref": "e4",
+                "quote": "一方接触，另一方用得上 硅谷 BD 团队本期两次会面 Reverie AI 联合创始人 Brad Yuan，可对接 LP 方向与 SF Tech Week Demo Day。 硅谷 BD 团队记录：8-23、8-24 两次会面，会后跟进 LP 方向对接、陆川团队、10 月 SF Tech Week Demo Day，R"
+              }
+            ]
+          }
+        ],
+        "context_refs": {
+          "analysis_id": "66e3dc2bfe9b82af",
+          "parent_analysis_id": null,
+          "last_user_q": "哪些是一队接触过、另一队该知道的？",
+          "entities": [
+            "面壁智能 · 詹杨帆",
+            "Flowtica · 成旭然、陈洁茹",
+            "意图即服务 · HarmonyOS 7",
+            "Brad (Bodi) Yuan · Reverie AI",
+            "短视频团队的商务诉求",
+            "AI 助听器 · 飞声",
+            "MiniMax",
+            "众筹服务商 · 乙烯 & 迈斯"
+          ],
+          "teams": [
+            "未标注来源"
+          ],
+          "issues": [
+            "2026-08-17",
+            "2026-08-14"
+          ],
+          "chunk_ids": [],
+          "item_ids": []
+        },
+        "steps_n": 10
+      },
+      "answer": {
+        "text": "根据 2026-08-14 与 2026-08-17 两期记录，梳理出几处一队已经接触、另一队应当知晓的信息交叉点。首先是面壁智能詹杨帆，编辑部与硅谷 BD 团队各有一手对话记录，方向互补。编辑部与詹杨帆谈的是端云协同、路由模型、事故处理 Agent，以及与吉利银河、长安等车企的智能座舱合作；硅谷 BD 团队则谈到终端是 AI 进入物理世界的路径、汽车算力强于手机、端侧模型芯片适配情况。两边同属端侧模型上车与智能座舱方向，值得互通。其次是 Flowtica，这是一款 AI 录音笔个人助理，总部在新加坡，二代产品计划于 9 月的 IFA 发布并采用墨水屏，Mac 端也在 9 月同步上线。该项目由硅谷 BD 团队作为 AGI FF 储备项目接触，其国内发声约在 8 月底至 9 月配合上线，国内发声与产品体验报道可由编辑部承接。极客公园代表表示可先做 AI 上新栏目的产品体验报道，再做深度访谈。第三是乙烯众筹创始人 Andy Peng 与迈斯创新创始人王磊。第四是创意视频团队的商务承接意向。截至 2026-08-14，创意视频团队希望开始承接商务，已有外部方主动表达付费或合作意向，但创意视频团队与商业化团队尚未就此对接，商业化团队应当知晓这一情况。此外还有两条可供参照的线索。其一是 HarmonyOS 7 的意图即服务，编辑部已就此成稿，这是一种不依赖首屏位置的新分发入口，小艺每天被唤醒超 30 亿次；外部媒体同步报道了 HDD 深圳站 AI 专场。2026-08-17 记录中提到，2026-08-21 的 HDD 深圳站 AI 专场拆成五个议题，快递100、知乎、南航e家、京东金融等已接入。其二是硅谷 BD 团队于 2026-08-23 和 2026-08-24 两次会面 Reverie AI 联合创始人 Brad Yuan，可对接 LP 方向与 SF Tech Week De",
+        "len": 871,
+        "correctness": "fail"
+      },
+      "verify": {
+        "verified": 12,
+        "rejected": 7,
+        "downgraded": 0,
+        "flags": [
+          "硅谷×其他",
+          "团队与商业化团队尚未接触×其他",
+          "过这两家×其他",
+          "团队×其他"
+        ]
+      },
+      "latency": {
+        "retrieve_ms": 2692,
+        "analysis_ms": 25437,
+        "total_ms": 28129
+      },
+      "usage": {
+        "llm_calls": 3,
+        "source_groups": 2,
+        "elapsed_ms": 25432,
+        "path": "analysis",
+        "cross": false,
+        "prompt_tokens": 4060,
+        "completion_tokens": 2737,
+        "total_tokens": 6797,
+        "n_calls": 3,
+        "n_retries": 0,
+        "analysis_ms": 25437,
+        "retrieve_ms": 2692,
+        "total_ms": 28129
+      },
+      "n_retries": 0,
+      "n_llm_calls": 3
+    }
+  ],
+  "retrieval_summary": "10/25 pass",
+  "e2e_mode": "all",
+  "verified": [
+    "25 题逐条指标（检索 10/25 通过）"
+  ],
+  "not_verified": [
+    "生产 PG 全库（需在 prod 容器重跑）"
+  ],
+  "known_limits": [
+    "黄金语料以 2026-8-17 为主，不等同生产 PG 全库",
+    "LLM E2E 存在输出波动"
+  ],
+  "failures": [
+    "e02(evidence): ['unsupported_claims_bounded']",
+    "e03(evidence): ['unsupported_claims_bounded']",
+    "e04(evidence): ['unsupported_claims_bounded']",
+    "e06(evidence): ['unsupported_claims_bounded']",
+    "e07(retrieval): ['scope_issues']",
+    "e09(evidence): ['unsupported_claims_bounded']",
+    "e10(evidence): ['unsupported_claims_bounded']",
+    "e11(evidence): ['unsupported_claims_bounded']",
+    "e12(evidence): ['unsupported_claims_bounded']",
+    "e14(evidence): ['unsupported_claims_bounded']",
+    "e16(evidence): ['unsupported_claims_bounded']",
+    "e17(evidence): ['unsupported_claims_bounded']",
+    "e21(evidence): ['unsupported_claims_bounded']",
+    "e23(evidence): ['unsupported_claims_bounded']",
+    "e24(evidence): ['unsupported_claims_bounded']"
+  ],
+  "prod_pg_verified": "否（本地黄金 SQLite）",
+  "failures_by_layer": {
+    "routing": [],
+    "retrieval": [
+      "e07:['scope_issues']"
+    ],
+    "evidence": [
+      "e02:['unsupported_claims_bounded']",
+      "e03:['unsupported_claims_bounded']",
+      "e04:['unsupported_claims_bounded']",
+      "e06:['unsupported_claims_bounded']",
+      "e09:['unsupported_claims_bounded']",
+      "e10:['unsupported_claims_bounded']",
+      "e11:['unsupported_claims_bounded']",
+      "e12:['unsupported_claims_bounded']",
+      "e14:['unsupported_claims_bounded']",
+      "e16:['unsupported_claims_bounded']",
+      "e17:['unsupported_claims_bounded']",
+      "e21:['unsupported_claims_bounded']",
+      "e23:['unsupported_claims_bounded']",
+      "e24:['unsupported_claims_bounded']"
+    ],
+    "answer": [],
+    "other": []
+  },
+  "e2e_summary": "1/3 e2e pass",
+  "elapsed_sec": 909
+}

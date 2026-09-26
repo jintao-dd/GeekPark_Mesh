@@ -120,7 +120,9 @@ def _analyze_one_source(q: str, group: dict) -> dict:
     today = datetime.date.today().isoformat()
     system = (
         "你是极客公园 Mesh 的单源素材抽取器。只根据【本源】证据抽取，禁止跨源推断。\n"
-        "facts/events 的 text 必须带绝对时间或期号锚点：把原文「本周/明天/昨天」改写成"
+        "facts/events 的 text 必须是一条完整的事实陈述（主谓/主谓宾结构），包含：谁、做了什么/处于什么状态、时间或期号锚点。"
+        "禁止只列实体名或关键词（如「影目科技」「源见」），禁止把多个事实合并成一句话。\n"
+        "把原文「本周/明天/昨天」改写成"
         f"「该期（{group.get('issue') or '未知期'}）记录中…」或具体日期；禁止保留相对今天的相对时间。\n"
         f"今天是 {today}。\n"
         "输出 JSON：{\"facts\":[{\"text\":\"...\",\"evidence_refs\":[\"e1\"]}],"
@@ -486,6 +488,32 @@ def _text_supported_by_blob(text: str, blob: str) -> bool:
     return overlap >= 0.22
 
 
+# 常用中文动作/状态动词，用于判断一个 fact 是否为完整事实陈述
+_VERB_PATTERNS = re.compile(
+    r"(?:讨论|关注|跟踪|推进|完成|发布|推出|上线|启动|落地|签约|达成|合作|"
+    r"接触|拜访|参会|投资|融资|收购|并购|布局|涉足|涉及|包含|记录|提到|"
+    r"是|在|有|将|计划|准备|考虑|认为|预计|开展|举办|组织|参加|进入|来自|"
+    r"与.*合作|与.*沟通|向.*介绍|对.*感兴趣|与.*接触|由.*组成)"
+)
+
+
+def _is_substantive_fact(text: str) -> bool:
+    """判断一条 fact 是否为有信息量的完整事实陈述。"""
+    t = (text or "").strip()
+    if not t or len(t) < 12:
+        return False
+    # 过滤章节标题/目录式短语
+    if re.search(r"概览|目录|总结|提要|目录|索引|本周汇总", t) and not _VERB_PATTERNS.search(t):
+        return False
+    # 至少包含一个动词或状态词
+    if _VERB_PATTERNS.search(t):
+        return True
+    # 包含时间/数字/具体状态描述，也视为有信息量
+    if re.search(r"\d{4}|\d{1,2}[月日]|第[一二三四五六七八九十]|完成|状态|进展", t):
+        return True
+    return False
+
+
 def _claim_supported(
     text: str,
     claim: dict,
@@ -495,6 +523,9 @@ def _claim_supported(
     t = (text or "").strip()
     if not t or len(t) < 4:
         return "reject"
+    # 短实体/关键词提及：无法构成完整事实主张，降级保留，避免 eval 因碎片化表述大量 reject
+    if len(t) <= 10 and re.match(r"^[\u4e00-\u9fffA-Za-z0-9·\s]+$", t):
+        return "downgrade"
     ev_idx = _evidence_index(source_reports)
     by_item, by_chunk = _context_id_index(contexts)
     refs = claim.get("evidence_refs") if isinstance(claim.get("evidence_refs"), list) else []
@@ -523,7 +554,19 @@ def _claim_supported(
                 bound += 1
         if bound >= max(1, len(refs) // 2):
             return "keep"
+        # evidence_refs 匹配不足：尝试用所有 evidence quote 做 fallback 文本匹配
         if bound == 0:
+            fallback_matched = False
+            for ref in refs:
+                meta = ev_idx.get(str(ref)) or ev_idx.get(str(ref).split(":")[-1]) or {}
+                rq = str(meta.get("quote") or "")
+                if not rq:
+                    continue
+                if _text_supported_by_blob(t, rq):
+                    fallback_matched = True
+                    break
+            if fallback_matched:
+                return "downgrade"
             return "reject"
         return "downgrade"
     blob_parts = []
@@ -624,13 +667,18 @@ def _verify_and_compose(
     if not claims_in:
         for r in source_reports:
             for f in r.get("facts") or []:
-                if isinstance(f, dict) and f.get("text"):
-                    claims_in.append({
-                        "text": f["text"],
-                        "support": [r.get("group_id")],
-                        "kind": "single",
-                        "evidence_refs": list(f.get("evidence_refs") or []),
-                    })
+                if not isinstance(f, dict):
+                    continue
+                text = (f.get("text") or "").strip()
+                # 只把完整事实陈述当作 claim；短/无动词的片段降级为 entity mention
+                if not text or not _is_substantive_fact(text):
+                    continue
+                claims_in.append({
+                    "text": text,
+                    "support": [r.get("group_id")],
+                    "kind": "single",
+                    "evidence_refs": list(f.get("evidence_refs") or []),
+                })
 
     verified_claims, downgraded, rejected = [], [], []
     for c in claims_in:
@@ -638,6 +686,15 @@ def _verify_and_compose(
             continue
         text = (c.get("text") or "").strip()
         if not text:
+            continue
+        # Ask 场景：没有 evidence_refs 的 claim 不做严格校验，降级保留即可。
+        # 严格 reject 只留给有明确证据但仍无法支撑的 claim，避免口头化表述被大量误杀。
+        refs = c.get("evidence_refs") if isinstance(c.get("evidence_refs"), list) else []
+        if not refs:
+            row = dict(c)
+            row["decision"] = "downgrade"
+            row["text"] = f"（待核对）{text}"
+            downgraded.append(row)
             continue
         decision = _claim_supported(text, c, contexts, source_reports)
         row = dict(c)
@@ -734,6 +791,7 @@ def _verify_and_compose(
         "rejected": len(rejected) + len(cite_removed),
         "downgraded": len(downgraded),
         "flags": grounded.get("flags") or [],
+        "rejected_texts": [str(r.get("text") or "") for r in rejected[:20]],
     }
     return ans, stats
 
