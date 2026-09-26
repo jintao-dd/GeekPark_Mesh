@@ -18,6 +18,7 @@ __pycache__/
 
 # --- runtime data ---
 mesh/data/
+data/
 *.db
 *.db-journal
 *.sqlite
