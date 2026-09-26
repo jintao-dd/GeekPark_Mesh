@@ -28,14 +28,59 @@ def test_rerank_prefers_title_match():
         {"title": "无关", "body": "x", "score": -0.1, "source": "fts"},
         {"title": "面壁智能", "body": "y", "score": -0.05, "source": "fts"},
     ]
-    ranked = retriever.rerank_hits(hits, "面壁智能", limit=2)
+    # legacy 融合：score 越小越好
+    import os
+    prev = os.environ.get("MESH_FUSION")
+    os.environ["MESH_FUSION"] = "legacy"
+    try:
+        ranked = retriever.rerank_hits(hits, "面壁智能", limit=2)
+    finally:
+        if prev is None:
+            os.environ.pop("MESH_FUSION", None)
+        else:
+            os.environ["MESH_FUSION"] = prev
     assert ranked[0]["title"] == "面壁智能"
 
 
-def test_merge_hits_prefers_better_bm25():
+def test_merge_hits_rrf_scale_immune():
+    """RRF 只用通道内位次：词法小整数 vs 向量 -cosine 的量纲差异不再影响融合。"""
+    fts = [
+        {"issue_slug": "a", "section": "记录", "title": "t1", "body": "b1", "score": -9.0, "source": "fts"},
+        {"issue_slug": "a", "section": "记录", "title": "t2", "body": "b2", "score": -2.0, "source": "fts"},
+    ]
+    vec = [
+        {"issue_slug": "a", "section": "记录", "title": "t3", "body": "b3", "score": -0.71, "source": "vector", "chunk_id": "c3"},
+        {"issue_slug": "a", "section": "记录", "title": "t4", "body": "b4", "score": -0.66, "source": "vector", "chunk_id": "c4"},
+    ]
+    merged = search.merge_hits(fts, vec, limit=10)
+    # 两通道各取 rank1：RRF 分数应相等（量纲不可比 → 只看位次）
+    top2 = {h["title"] for h in merged[:2]}
+    assert top2 == {"t1", "t3"}
+    assert abs(float(merged[0]["score"]) - float(merged[1]["score"])) < 1e-9
+
+
+def test_merge_hits_rrf_consensus_beats_single_channel():
+    """同一文档被多路召回 → 贡献累加，胜过只被单路召回的同位次文档。"""
+    shared = "面壁智能与编辑部沟通端云协同方案落地细节"
+    a = [
+        {"issue_slug": "a", "section": "记录", "title": "both", "body": shared, "score": -5.0, "source": "fts"},
+        {"issue_slug": "a", "section": "记录", "title": "fts_only", "body": "完全无关的另外一段内容描述", "score": -1.0, "source": "fts"},
+    ]
+    b = [
+        {"issue_slug": "a", "section": "记录", "title": "both", "body": shared, "score": -0.9, "source": "vector", "chunk_id": "cx"},
+    ]
+    merged = search.merge_hits(a, b, limit=10)
+    # 共识文档（两路各命中）应排在最前，且分数 = 两路贡献之和
+    assert merged[0]["title"] == "both"
+    assert float(merged[0]["_rrf_score"]) > float(merged[1]["_rrf_score"])
+    assert set(merged[0]["_rrf_ranks"].keys()) == {"g0", "g1"}
+
+
+def test_merge_hits_legacy_still_available():
+    """legacy 融合保留（A/B 对照）：仍按原始分比较。"""
     fts = [{"issue_slug": "a", "section": "记录", "title": "t1", "body": "b", "score": -8.0, "source": "fts"}]
     weak = [{"issue_slug": "a", "section": "记录", "title": "t1", "body": "b", "score": -2.0, "source": "fts"}]
-    merged = search.merge_hits(fts, weak, limit=1)
+    merged = search.merge_hits_legacy(fts, weak, limit=1)
     assert float(merged[0]["score"]) < float(weak[0]["score"])
 
 
@@ -47,6 +92,69 @@ def test_is_configured_requires_key_when_base_set(monkeypatch):
     assert embeddings.is_configured() is False
     monkeypatch.setenv("MESH_EMBED_API_KEY", "sk-test")
     assert embeddings.is_configured() is True
+
+
+def test_vector_default_off_even_if_keys_present(monkeypatch):
+    """冻结：Vector OFF 默认；仅有 key 不得进热路径 embed。"""
+    monkeypatch.delenv("MESH_EMBED_ENABLED", raising=False)
+    monkeypatch.delenv("MESH_VECTOR_ENABLED", raising=False)
+    monkeypatch.setenv("MESH_EMBED_BASE_URL", "https://example.com/v1")
+    monkeypatch.setenv("MESH_EMBED_API_KEY", "sk-test")
+    assert embeddings.enabled() is False
+    assert embeddings.is_configured() is False
+    assert embeddings.retrieval_execution_mode(structured_candidate=False) == "lexical"
+
+
+def test_vector_on_requires_explicit_enable(monkeypatch):
+    monkeypatch.setenv("MESH_EMBED_ENABLED", "1")
+    monkeypatch.setenv("MESH_EMBED_BASE_URL", "https://example.com/v1")
+    monkeypatch.setenv("MESH_EMBED_API_KEY", "sk-test")
+    assert embeddings.enabled() is True
+    assert embeddings.retrieval_execution_mode(structured_candidate=False) == "hybrid"
+    assert embeddings.retrieval_execution_mode(structured_candidate=True) == "structured"
+
+
+def test_vector_cache_respects_slug_filter(monkeypatch):
+    """全量矩阵缓存不得让无 slug 查询污染后续 slug 过滤（e07 串期根因）。"""
+    embeddings.clear_vector_cache()
+
+    class _R(dict):
+        def __getitem__(self, k):
+            return dict.__getitem__(self, k)
+
+    rows_data = [
+        _R(
+            chunk_id="c1", issue_slug="2026-8-17", date_end="2026-08-17",
+            layer="item", section="接触", title="面壁智能", body="面壁",
+            owner_team="编辑部", stype="", item_id=1, source_label="",
+            meta_json="{}", vector_json="[1,0,0]",
+        ),
+        _R(
+            chunk_id="c2", issue_slug="2026-08-21", date_end="2026-08-21",
+            layer="item", section="接触", title="面壁智能", body="面壁他期",
+            owner_team="编辑部", stype="", item_id=2, source_label="",
+            meta_json="{}", vector_json="[0.99,0.1,0]",
+        ),
+    ]
+
+    class _Con:
+        def execute(self, sql, params=()):
+            sql_l = str(sql).lower()
+            if "count(*)" in sql_l and "chunk_embeddings" in sql_l:
+                class One:
+                    def __getitem__(self, k):
+                        return 2 if k == "c" else 20
+                return type("X", (), {"fetchone": lambda self: One()})()
+            return rows_data
+
+    hits_all = embeddings.vector_search(_Con(), [1.0, 0.0, 0.0], limit=10)
+    assert {h["issue_slug"] for h in hits_all} == {"2026-8-17", "2026-08-21"}
+    hits_scoped = embeddings.vector_search(
+        _Con(), [1.0, 0.0, 0.0], slug="2026-8-17", limit=10,
+    )
+    assert hits_scoped
+    assert {h["issue_slug"] for h in hits_scoped} == {"2026-8-17"}
+    embeddings.clear_vector_cache()
 
 
 def test_base_urls_supports_comma_fallback(monkeypatch):

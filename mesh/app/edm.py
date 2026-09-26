@@ -38,7 +38,8 @@ FLAG_COLORS = {
     "中英文站同周各自成稿": "#0E7490",
     "一方报道了，另一方在接触": "#7C3AED",
     "同一赛道，各自在做": "#57534E",
-    "同一公司，不同触点": "#57534E",
+    "同一条赛道，各自在做": "#57534E",
+    "同一公司，不同触点": "#B45309",
     "已排期，内容侧待安排": "#9D174D",
 }
 
@@ -329,8 +330,8 @@ def _relation_search_prompt(r: dict) -> dict | None:
 
 
 def _build_search_links(data: dict) -> list[dict]:
-    """启发式预搜索：聚焦各团队之间的关联与协同，而非查人查公司。"""
-    relations = data.get("relations") or []
+    """本期相关的搜问入口：优先具体关系卡，避免空泛模板句。"""
+    relations = [r for r in (data.get("relations") or []) if isinstance(r, dict)]
     out: list[dict] = []
     seen: set[str] = set()
 
@@ -341,48 +342,50 @@ def _build_search_links(data: dict) -> list[dict]:
         seen.add(label)
         out.append({"label": label, "q": q})
 
-    ranked = sorted(
-        relations,
-        key=lambda r: (0 if r.get("weak") else 1, len(_relation_teams(r)), len(r.get("title") or "")),
-        reverse=True,
-    )
-    for r in ranked:
-        if len(out) >= 4:
+    # 优先：有实质叙事的关系（strong/parallel 先，再 watch）
+    def _rank(r: dict) -> tuple:
+        tier = (r.get("decision_tier") or "").strip().lower()
+        tier_score = {"strong": 3, "parallel": 2, "watch": 1}.get(tier, 0)
+        if not tier_score:
+            # 无 tier 时：双实线团队优先
+            solid = [t for t in (r.get("teams") or []) if not str(t).strip().startswith(("→", "->"))]
+            tier_score = 2 if len(solid) >= 2 else 1
+        return (tier_score, 0 if r.get("weak") else 1, len(r.get("evidence") or []))
+
+    for r in sorted(relations, key=_rank, reverse=True):
+        if len(out) >= 5:
             break
         item = _relation_search_prompt(r)
         if item:
             add(item["label"], item["q"])
 
-    label_questions = [
-        ("同一件事，两个部门各知一半", "哪些事两个团队各只知道一半？", "各知一半"),
-        ("一方接触了，另一方正在接触", "哪些接触两队在并行、还没对齐？", "一方接触 另一方"),
-        ("一方接触，另一方用得上", "哪些是一队接触过、另一队该知道的？", "一方接触 用得上"),
-        ("海外接触，国内可能承接", "海外团队在推进、国内该谁承接？", "海外 国内"),
-        ("已联动", "哪些事项已经跨团队联动了？", "已联动"),
-        ("两个部门各有判断", "哪些主题两个团队判断不一致？", "各有判断"),
-    ]
-    present_labels = {(r.get("label") or "") for r in relations}
-    for pattern, question, q in label_questions:
-        if len(out) >= 6:
+    # 补一条：本期具体主体（从关系 title 抽）
+    if len(out) < 6:
+        for r in sorted(relations, key=_rank, reverse=True):
+            title = _trunc((r.get("title") or "").strip(), 18)
+            if not title or "：" in title and len(title) < 4:
+                continue
+            # 取冒号前主体
+            subject = title.split("：", 1)[0].strip() if "：" in title else title
+            if len(subject) < 2:
+                continue
+            q = quote(f"{subject} 跨团队")
+            add(f"本期「{subject}」各团队分别记了什么？", q)
             break
-        if any(pattern in lbl for lbl in present_labels):
-            add(question, quote(q))
 
-    team_set: list[str] = []
-    for r in relations:
-        for t in _relation_teams(r):
-            if t not in team_set:
-                team_set.append(t)
-    if len(team_set) >= 2 and len(out) < 6:
-        add(
-            f"本期 {team_set[0]} 与 {team_set[1]} 有没有碰到同一主题？",
-            quote(f"{team_set[0]} {team_set[1]} 关系"),
-        )
-
+    # 最后才用极少数标签型问题，且必须能对应到本期真实 label
     if len(out) < 6:
-        add("哪些关系最值得拉齐两个团队？", quote("可同步 关系 团队"))
-    if len(out) < 6:
-        add("同一事项各团队分别记录了什么？", quote("跨团队 各团队"))
+        present = {(r.get("label") or "") for r in relations}
+        extras = [
+            ("同一件事，两个部门各知一半", "本期还有哪些事两边各只知道一半？", "各知一半 本期"),
+            ("同一公司，不同触点", "本期同一公司还有哪些不同触点？", "同一公司 不同触点"),
+            ("一方接触，另一方用得上", "本期还有哪些一队碰到、另一队该知道的？", "一方接触 用得上 本期"),
+        ]
+        for pattern, question, q in extras:
+            if len(out) >= 6:
+                break
+            if any(pattern in lbl for lbl in present):
+                add(question, quote(q))
 
     return out[:6]
 

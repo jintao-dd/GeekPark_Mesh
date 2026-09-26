@@ -1,0 +1,2195 @@
+{
+  "phase": "answer_evidence_acceptance",
+  "tag": "unseen_v23e",
+  "baseline": {
+    "ranking_version": "v1.4",
+    "vector": "OFF",
+    "agent_contract": "frozen_v1",
+    "mesh_agent_use_llm": "0",
+    "mesh_ranking_quality": "1",
+    "claim_support_module": "app.agent.claim_support",
+    "harness": "eval.run_evidence_baseline._ask",
+    "note": "harness 对齐 Temporal early + claim_support；默认不成文 LLM",
+    "model_version": "anthropic/claude-4.8-opus",
+    "prompt_version": "ask_engine+temporal_hard_rules+claim_support"
+  },
+  "elapsed_s": 0.48,
+  "answer_gold": "answer_gold_unseen_v23e.jsonl",
+  "evidence_gold": "evidence_gold_unseen_v23e.jsonl",
+  "answer": {
+    "phase": "answer",
+    "n": 7,
+    "pass_rate": 0.0,
+    "n_fail": 7,
+    "n_soft_flag": 7,
+    "fails": [
+      {
+        "id": "A22",
+        "fail_class": "C",
+        "category": "unseen_claim_strength",
+        "query": "端侧座舱方案是否已经实现装车",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 0.0,
+          "faithfulness": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 0.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；安谋科技：安谋科技 · 编辑部 · T6 · 安谋科技（CPU产品总监徐瑞迪陈述）端侧AI判断：2025-2026年接近1B体量模型可达60分商用最低标准线并装入端侧小芯；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+        "claim_support": {
+          "entity": "端侧座舱方案是否",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4112",
+            "ev:item:4114",
+            "ev:item:4116",
+            "ev:item:4118",
+            "ev:item:4120",
+            "ev:item:4383",
+            "ev:item:4121",
+            "ev:item:4264",
+            "ev:item:4276",
+            "ev:item:4280",
+            "ev:item:4125",
+            "ev:item:4137"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 33
+      },
+      {
+        "id": "A23",
+        "fail_class": "C",
+        "category": "unseen_claim_strength",
+        "query": "资料能否证明智能座舱已经实现规模化生产",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 0.0,
+          "faithfulness": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 0.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能：已接触并有对话记录，其与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触） · 编辑部沟通记录 · 与面壁智；詹杨帆：詹杨帆 · 编辑部 · T3 · 詹杨帆（汽车行业）：已接触，围绕 Agent 上车、智能座舱话题做过交流（2026/07/24） · 编辑部沟通记录 · 与詹；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱是",
+        "claim_support": {
+          "entity": "资料能否证明智能",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4115",
+            "ev:item:4131",
+            "ev:item:4116",
+            "ev:item:4117",
+            "ev:item:4167",
+            "ev:item:4130"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 6
+      },
+      {
+        "id": "A24",
+        "fail_class": "C",
+        "category": "unseen_claim_strength",
+        "query": "是否已有量产车型采用这套端侧模型",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 0.0,
+          "faithfulness": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 0.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T3 · 面壁智能（詹杨帆）与吉利银河、长安在智能座舱有合作：舱内做端侧跨模态视频流分析（数据不出车）、车内物品溯源、情境感知自动响应；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+        "claim_support": {
+          "entity": "是否已有量产车型",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4167",
+            "ev:item:4112",
+            "ev:item:4116",
+            "ev:item:4118",
+            "ev:item:4121",
+            "ev:item:4258",
+            "ev:item:4123",
+            "ev:item:4127",
+            "ev:item:4124",
+            "ev:ctx:2026-8-17:11",
+            "ev:ctx:2026-8-17:12"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 12
+      },
+      {
+        "id": "A25",
+        "fail_class": "C",
+        "category": "unseen_claim_strength",
+        "query": "能否证明该方案已经装车落地",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 0.0,
+          "faithfulness": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 0.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能舱外方向：本地化方案对比传统云端哨兵模式在精度和能耗上有优势，倒车物品识别已在量产车型验证 · 编辑部沟通记录 · ；传奇极客：传奇极客 · 品牌创意团队 · T6 · 传奇极客名下部分域名将砍掉，部分转到前沿极客，另有几个新域名会转过来；今天已与相关方（静逸对接）确定域名处置方案 · ；AGI 2026：AGI 2026 · 品牌创意团队 · T6 · AGI 复盘：多人上台切换环节尴尬，AI 口播与搬凳子节奏不匹配、卡片播放时长无精确值、第二天控",
+        "claim_support": {
+          "entity": "能否证明该方案已",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4121",
+            "ev:item:4264",
+            "ev:item:4276",
+            "ev:item:4280",
+            "ev:item:4122",
+            "ev:item:4298",
+            "ev:item:4137",
+            "ev:item:4323",
+            "ev:item:4173",
+            "ev:item:4167",
+            "ev:ctx:2026-8-17:11"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 11
+      },
+      {
+        "id": "A26",
+        "fail_class": "C",
+        "category": "unseen_claim_strength",
+        "query": "确认座舱方案已批量交付整车厂",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 0.0,
+          "faithfulness": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 0.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；多比：多比 · 商业化团队 · T6 · 多比客户：已确认走FP专版头条，正在推进执行（已签约执行中） · 商业化团队例会提及；靖亚：靖亚 · 商业化团队 · T6 · 靖亚、AWS相关行程将尽快与彭总敲定，AWS项目已完成邮件确认待入库执行（合同流程中） · 商业化团队例会提及；源策：源策 · 编辑部 · T6 · 源策（沟通对象李天羽，CEO，短测未来相关）就新加坡具身智能活动沟通中：活动主题 go physical go action、8；ROPIDIA：ROPIDIA · 编辑部 · T6 · ",
+        "claim_support": {
+          "entity": "确认座舱方案已批",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4320",
+            "ev:item:4337",
+            "ev:item:4153",
+            "ev:item:4155",
+            "ev:item:4356",
+            "ev:item:4196"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 6
+      },
+      {
+        "id": "A27",
+        "fail_class": "C",
+        "category": "unseen_claim_strength",
+        "query": "端侧模型讨论说明它已进入规模化量产阶段吗",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 0.0,
+          "faithfulness": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 0.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；安谋科技：安谋科技 · 编辑部 · T6 · 安谋科技（CPU产品总监徐瑞迪陈述）端侧AI判断：2025-2026年接近1B体量模型可达60分商用最低标准线并装入端侧小芯；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+        "claim_support": {
+          "entity": "端侧模型讨论说明",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4112",
+            "ev:item:4114",
+            "ev:item:4116",
+            "ev:item:4118",
+            "ev:item:4120",
+            "ev:item:4123",
+            "ev:item:4124",
+            "ev:item:4125",
+            "ev:item:4127",
+            "ev:item:4149",
+            "ev:item:4176",
+            "ev:item:4184"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 25
+      },
+      {
+        "id": "A28",
+        "fail_class": "C",
+        "category": "unseen_claim_strength",
+        "query": "相关交流能否证明面壁方案已实现装车",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 0.0,
+          "faithfulness": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 0.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；零跑：零跑 · 编辑部 · T6 · 零跑汽车：已就战略及经营相关问题做过沟通交流（已接触）。 · 编辑部沟通记录 · 与零跑的对话；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；詹杨帆：詹杨帆 · 编辑部 · T3 · 詹杨帆（汽车行业）：已接触，围绕 Agent 上车、智能座舱话题做过交流（2026/07/24） · 编辑部沟通记录 · 与詹；vivo：vivo · 编辑部 ",
+        "claim_support": {
+          "entity": "相关交流能否证明",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4108",
+            "ev:item:4112",
+            "ev:item:4131",
+            "ev:item:4185",
+            "ev:item:4183",
+            "ev:item:4189",
+            "ev:item:4159",
+            "ev:item:4191"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 8
+      }
+    ],
+    "soft_flag_cases": [
+      {
+        "id": "A22",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；安谋科技：安谋科"
+      },
+      {
+        "id": "A23",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能：已接触并有对话记录，其与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触） · 编辑部沟通记录 · 与面壁智；詹杨帆：詹杨帆 "
+      },
+      {
+        "id": "A24",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T3 · 面壁智能（詹杨帆）与吉利银河、长安在智能座舱有合作：舱内做端侧跨模态视频流分析（数据不出车）、车内物品溯源、情境感知自动响应；面壁智能：面壁智"
+      },
+      {
+        "id": "A25",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能舱外方向：本地化方案对比传统云端哨兵模式在精度和能耗上有优势，倒车物品识别已在量产车型验证 · 编辑部沟通记录 · ；传奇极客：传奇极"
+      },
+      {
+        "id": "A26",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；多比：多比 · 商业化团队 · T6 · 多比客户：已确认走FP专版头条，正在推进执行（已签约执行中） · 商业化团队例会提及；靖亚：靖亚 · 商业化团队 · T6 · 靖亚、AWS相关行"
+      },
+      {
+        "id": "A27",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；安谋科技：安谋科"
+      },
+      {
+        "id": "A28",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；零跑：零跑 · 编辑部 · T6 · 零跑汽车：已就战略及经营相关问题做过沟通交流（已接触）。 · 编辑部沟通记录 · 与零跑的对话；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能"
+      }
+    ]
+  },
+  "evidence": {
+    "phase": "evidence",
+    "n": 8,
+    "pass_rate": 0.125,
+    "n_fail": 7,
+    "n_soft_flag": 0,
+    "fails": [
+      {
+        "id": "E21",
+        "fail_class": "C",
+        "category": "unseen_adversarial",
+        "query": "端侧座舱方案是否已经实现装车",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 0.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；安谋科技：安谋科技 · 编辑部 · T6 · 安谋科技（CPU产品总监徐瑞迪陈述）端侧AI判断：2025-2026年接近1B体量模型可达60分商用最低标准线并装入端侧小芯；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+        "item_ids": [
+          "4112",
+          "4114",
+          "4116",
+          "4118",
+          "4120",
+          "4383",
+          "4121",
+          "4264",
+          "4276",
+          "4280",
+          "4125",
+          "4137"
+        ]
+      },
+      {
+        "id": "E22",
+        "fail_class": "C",
+        "category": "unseen_adversarial",
+        "query": "资料能否证明智能座舱已经实现规模化生产",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 0.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能：已接触并有对话记录，其与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触） · 编辑部沟通记录 · 与面壁智；詹杨帆：詹杨帆 · 编辑部 · T3 · 詹杨帆（汽车行业）：已接触，围绕 Agent 上车、智能座舱话题做过交流（2026/07/24） · 编辑部沟通记录 · 与詹；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱是",
+        "item_ids": [
+          "4115",
+          "4131",
+          "4116",
+          "4117",
+          "4167",
+          "4130"
+        ]
+      },
+      {
+        "id": "E23",
+        "fail_class": "C",
+        "category": "unseen_adversarial",
+        "query": "是否已有量产车型采用这套端侧模型",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 0.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T3 · 面壁智能（詹杨帆）与吉利银河、长安在智能座舱有合作：舱内做端侧跨模态视频流分析（数据不出车）、车内物品溯源、情境感知自动响应；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+        "item_ids": [
+          "4167",
+          "4112",
+          "4116",
+          "4118",
+          "4121",
+          "4258",
+          "4123",
+          "4127",
+          "4124"
+        ]
+      },
+      {
+        "id": "E24",
+        "fail_class": "C",
+        "category": "unseen_adversarial",
+        "query": "能否证明该方案已经装车落地",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 0.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能舱外方向：本地化方案对比传统云端哨兵模式在精度和能耗上有优势，倒车物品识别已在量产车型验证 · 编辑部沟通记录 · ；传奇极客：传奇极客 · 品牌创意团队 · T6 · 传奇极客名下部分域名将砍掉，部分转到前沿极客，另有几个新域名会转过来；今天已与相关方（静逸对接）确定域名处置方案 · ；AGI 2026：AGI 2026 · 品牌创意团队 · T6 · AGI 复盘：多人上台切换环节尴尬，AI 口播与搬凳子节奏不匹配、卡片播放时长无精确值、第二天控",
+        "item_ids": [
+          "4121",
+          "4264",
+          "4276",
+          "4280",
+          "4122",
+          "4298",
+          "4137",
+          "4323",
+          "4173",
+          "4167"
+        ]
+      },
+      {
+        "id": "E25",
+        "fail_class": "C",
+        "category": "unseen_adversarial",
+        "query": "确认座舱方案已批量交付整车厂",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 0.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；多比：多比 · 商业化团队 · T6 · 多比客户：已确认走FP专版头条，正在推进执行（已签约执行中） · 商业化团队例会提及；靖亚：靖亚 · 商业化团队 · T6 · 靖亚、AWS相关行程将尽快与彭总敲定，AWS项目已完成邮件确认待入库执行（合同流程中） · 商业化团队例会提及；源策：源策 · 编辑部 · T6 · 源策（沟通对象李天羽，CEO，短测未来相关）就新加坡具身智能活动沟通中：活动主题 go physical go action、8；ROPIDIA：ROPIDIA · 编辑部 · T6 · ",
+        "item_ids": [
+          "4320",
+          "4337",
+          "4153",
+          "4155",
+          "4356",
+          "4196"
+        ]
+      },
+      {
+        "id": "E26",
+        "fail_class": "C",
+        "category": "unseen_adversarial",
+        "query": "端侧模型讨论说明它已进入规模化量产阶段吗",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 0.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；安谋科技：安谋科技 · 编辑部 · T6 · 安谋科技（CPU产品总监徐瑞迪陈述）端侧AI判断：2025-2026年接近1B体量模型可达60分商用最低标准线并装入端侧小芯；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+        "item_ids": [
+          "4112",
+          "4114",
+          "4116",
+          "4118",
+          "4120",
+          "4123",
+          "4124",
+          "4125",
+          "4127",
+          "4149",
+          "4176",
+          "4184"
+        ]
+      },
+      {
+        "id": "E27",
+        "fail_class": "C",
+        "category": "unseen_adversarial",
+        "query": "相关交流能否证明面壁方案已实现装车",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 0.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；零跑：零跑 · 编辑部 · T6 · 零跑汽车：已就战略及经营相关问题做过沟通交流（已接触）。 · 编辑部沟通记录 · 与零跑的对话；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；詹杨帆：詹杨帆 · 编辑部 · T3 · 詹杨帆（汽车行业）：已接触，围绕 Agent 上车、智能座舱话题做过交流（2026/07/24） · 编辑部沟通记录 · 与詹；vivo：vivo · 编辑部 ",
+        "item_ids": [
+          "4108",
+          "4112",
+          "4131",
+          "4185",
+          "4183",
+          "4189",
+          "4159",
+          "4191"
+        ]
+      }
+    ],
+    "soft_flag_cases": []
+  },
+  "answer_results": [
+    {
+      "id": "A22",
+      "category": "unseen_claim_strength",
+      "query": "端侧座舱方案是否已经实现装车",
+      "expect_abstain": true,
+      "must_mention": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；安谋科技：安谋科技 · 编辑部 · T6 · 安谋科技（CPU产品总监徐瑞迪陈述）端侧AI判断：2025-2026年接近1B体量模型可达60分商用最低标准线并装入端侧小芯；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+      "n_hits": 33,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "端侧座舱方案是否",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4112",
+          "ev:item:4114",
+          "ev:item:4116",
+          "ev:item:4118",
+          "ev:item:4120",
+          "ev:item:4383",
+          "ev:item:4121",
+          "ev:item:4264",
+          "ev:item:4276",
+          "ev:item:4280",
+          "ev:item:4125",
+          "ev:item:4137"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4112",
+        "ev:item:4114",
+        "ev:item:4116",
+        "ev:item:4118",
+        "ev:item:4120",
+        "ev:item:4383",
+        "ev:item:4121",
+        "ev:item:4264"
+      ],
+      "metrics": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "faithfulness": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 0.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": false,
+        "scoring": "v2_2_hard",
+        "fail_class": "C"
+      },
+      "fail_class": "C",
+      "soft_flags": [
+        "abstain_query_but_support_supported"
+      ],
+      "error": null
+    },
+    {
+      "id": "A23",
+      "category": "unseen_claim_strength",
+      "query": "资料能否证明智能座舱已经实现规模化生产",
+      "expect_abstain": true,
+      "must_mention": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能：已接触并有对话记录，其与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触） · 编辑部沟通记录 · 与面壁智；詹杨帆：詹杨帆 · 编辑部 · T3 · 詹杨帆（汽车行业）：已接触，围绕 Agent 上车、智能座舱话题做过交流（2026/07/24） · 编辑部沟通记录 · 与詹；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱是",
+      "n_hits": 6,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "资料能否证明智能",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4115",
+          "ev:item:4131",
+          "ev:item:4116",
+          "ev:item:4117",
+          "ev:item:4167",
+          "ev:item:4130"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4115",
+        "ev:item:4131",
+        "ev:item:4116",
+        "ev:item:4117",
+        "ev:item:4167",
+        "ev:item:4130"
+      ],
+      "metrics": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "faithfulness": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 0.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": false,
+        "scoring": "v2_2_hard",
+        "fail_class": "C"
+      },
+      "fail_class": "C",
+      "soft_flags": [
+        "abstain_query_but_support_supported"
+      ],
+      "error": null
+    },
+    {
+      "id": "A24",
+      "category": "unseen_claim_strength",
+      "query": "是否已有量产车型采用这套端侧模型",
+      "expect_abstain": true,
+      "must_mention": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T3 · 面壁智能（詹杨帆）与吉利银河、长安在智能座舱有合作：舱内做端侧跨模态视频流分析（数据不出车）、车内物品溯源、情境感知自动响应；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+      "n_hits": 12,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "是否已有量产车型",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4167",
+          "ev:item:4112",
+          "ev:item:4116",
+          "ev:item:4118",
+          "ev:item:4121",
+          "ev:item:4258",
+          "ev:item:4123",
+          "ev:item:4127",
+          "ev:item:4124",
+          "ev:ctx:2026-8-17:11",
+          "ev:ctx:2026-8-17:12"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4167",
+        "ev:item:4112",
+        "ev:item:4116",
+        "ev:item:4118",
+        "ev:item:4121",
+        "ev:item:4258",
+        "ev:item:4123",
+        "ev:item:4127"
+      ],
+      "metrics": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "faithfulness": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 0.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": false,
+        "scoring": "v2_2_hard",
+        "fail_class": "C"
+      },
+      "fail_class": "C",
+      "soft_flags": [
+        "abstain_query_but_support_supported"
+      ],
+      "error": null
+    },
+    {
+      "id": "A25",
+      "category": "unseen_claim_strength",
+      "query": "能否证明该方案已经装车落地",
+      "expect_abstain": true,
+      "must_mention": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能舱外方向：本地化方案对比传统云端哨兵模式在精度和能耗上有优势，倒车物品识别已在量产车型验证 · 编辑部沟通记录 · ；传奇极客：传奇极客 · 品牌创意团队 · T6 · 传奇极客名下部分域名将砍掉，部分转到前沿极客，另有几个新域名会转过来；今天已与相关方（静逸对接）确定域名处置方案 · ；AGI 2026：AGI 2026 · 品牌创意团队 · T6 · AGI 复盘：多人上台切换环节尴尬，AI 口播与搬凳子节奏不匹配、卡片播放时长无精确值、第二天控",
+      "n_hits": 11,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "能否证明该方案已",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4121",
+          "ev:item:4264",
+          "ev:item:4276",
+          "ev:item:4280",
+          "ev:item:4122",
+          "ev:item:4298",
+          "ev:item:4137",
+          "ev:item:4323",
+          "ev:item:4173",
+          "ev:item:4167",
+          "ev:ctx:2026-8-17:11"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4121",
+        "ev:item:4264",
+        "ev:item:4276",
+        "ev:item:4280",
+        "ev:item:4122",
+        "ev:item:4298",
+        "ev:item:4137",
+        "ev:item:4323"
+      ],
+      "metrics": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "faithfulness": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 0.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": false,
+        "scoring": "v2_2_hard",
+        "fail_class": "C"
+      },
+      "fail_class": "C",
+      "soft_flags": [
+        "abstain_query_but_support_supported"
+      ],
+      "error": null
+    },
+    {
+      "id": "A26",
+      "category": "unseen_claim_strength",
+      "query": "确认座舱方案已批量交付整车厂",
+      "expect_abstain": true,
+      "must_mention": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；多比：多比 · 商业化团队 · T6 · 多比客户：已确认走FP专版头条，正在推进执行（已签约执行中） · 商业化团队例会提及；靖亚：靖亚 · 商业化团队 · T6 · 靖亚、AWS相关行程将尽快与彭总敲定，AWS项目已完成邮件确认待入库执行（合同流程中） · 商业化团队例会提及；源策：源策 · 编辑部 · T6 · 源策（沟通对象李天羽，CEO，短测未来相关）就新加坡具身智能活动沟通中：活动主题 go physical go action、8；ROPIDIA：ROPIDIA · 编辑部 · T6 · ",
+      "n_hits": 6,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "确认座舱方案已批",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4320",
+          "ev:item:4337",
+          "ev:item:4153",
+          "ev:item:4155",
+          "ev:item:4356",
+          "ev:item:4196"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4320",
+        "ev:item:4337",
+        "ev:item:4153",
+        "ev:item:4155",
+        "ev:item:4356",
+        "ev:item:4196"
+      ],
+      "metrics": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "faithfulness": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 0.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": false,
+        "scoring": "v2_2_hard",
+        "fail_class": "C"
+      },
+      "fail_class": "C",
+      "soft_flags": [
+        "abstain_query_but_support_supported"
+      ],
+      "error": null
+    },
+    {
+      "id": "A27",
+      "category": "unseen_claim_strength",
+      "query": "端侧模型讨论说明它已进入规模化量产阶段吗",
+      "expect_abstain": true,
+      "must_mention": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；安谋科技：安谋科技 · 编辑部 · T6 · 安谋科技（CPU产品总监徐瑞迪陈述）端侧AI判断：2025-2026年接近1B体量模型可达60分商用最低标准线并装入端侧小芯；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+      "n_hits": 25,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "端侧模型讨论说明",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4112",
+          "ev:item:4114",
+          "ev:item:4116",
+          "ev:item:4118",
+          "ev:item:4120",
+          "ev:item:4123",
+          "ev:item:4124",
+          "ev:item:4125",
+          "ev:item:4127",
+          "ev:item:4149",
+          "ev:item:4176",
+          "ev:item:4184"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4112",
+        "ev:item:4114",
+        "ev:item:4116",
+        "ev:item:4118",
+        "ev:item:4120",
+        "ev:item:4123",
+        "ev:item:4124",
+        "ev:item:4125"
+      ],
+      "metrics": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "faithfulness": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 0.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": false,
+        "scoring": "v2_2_hard",
+        "fail_class": "C"
+      },
+      "fail_class": "C",
+      "soft_flags": [
+        "abstain_query_but_support_supported"
+      ],
+      "error": null
+    },
+    {
+      "id": "A28",
+      "category": "unseen_claim_strength",
+      "query": "相关交流能否证明面壁方案已实现装车",
+      "expect_abstain": true,
+      "must_mention": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；零跑：零跑 · 编辑部 · T6 · 零跑汽车：已就战略及经营相关问题做过沟通交流（已接触）。 · 编辑部沟通记录 · 与零跑的对话；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；詹杨帆：詹杨帆 · 编辑部 · T3 · 詹杨帆（汽车行业）：已接触，围绕 Agent 上车、智能座舱话题做过交流（2026/07/24） · 编辑部沟通记录 · 与詹；vivo：vivo · 编辑部 ",
+      "n_hits": 8,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "相关交流能否证明",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4108",
+          "ev:item:4112",
+          "ev:item:4131",
+          "ev:item:4185",
+          "ev:item:4183",
+          "ev:item:4189",
+          "ev:item:4159",
+          "ev:item:4191"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4108",
+        "ev:item:4112",
+        "ev:item:4131",
+        "ev:item:4185",
+        "ev:item:4183",
+        "ev:item:4189",
+        "ev:item:4159",
+        "ev:item:4191"
+      ],
+      "metrics": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "faithfulness": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 0.0,
+        "nonempty": 1.0,
+        "must_mention_ok": 1.0,
+        "pass": false,
+        "scoring": "v2_2_hard",
+        "fail_class": "C"
+      },
+      "fail_class": "C",
+      "soft_flags": [
+        "abstain_query_but_support_supported"
+      ],
+      "error": null
+    }
+  ],
+  "evidence_results": [
+    {
+      "id": "E21",
+      "category": "unseen_adversarial",
+      "query": "端侧座舱方案是否已经实现装车",
+      "expect_support": "insufficient",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "strong_deterministic",
+        "temporal": "completed_certain",
+        "evidence_ref": "published_item_optional",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；安谋科技：安谋科技 · 编辑部 · T6 · 安谋科技（CPU产品总监徐瑞迪陈述）端侧AI判断：2025-2026年接近1B体量模型可达60分商用最低标准线并装入端侧小芯；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+      "n_hits": 33,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "端侧座舱方案是否",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4112",
+          "ev:item:4114",
+          "ev:item:4116",
+          "ev:item:4118",
+          "ev:item:4120",
+          "ev:item:4383",
+          "ev:item:4121",
+          "ev:item:4264",
+          "ev:item:4276",
+          "ev:item:4280",
+          "ev:item:4125",
+          "ev:item:4137"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4112",
+        "ev:item:4114",
+        "ev:item:4116",
+        "ev:item:4118",
+        "ev:item:4120",
+        "ev:item:4383",
+        "ev:item:4121",
+        "ev:item:4264"
+      ],
+      "item_ids": [
+        "4112",
+        "4114",
+        "4116",
+        "4118",
+        "4120",
+        "4383",
+        "4121",
+        "4264",
+        "4276",
+        "4280",
+        "4125",
+        "4137"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 0.0,
+        "unsupported_claim": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 0.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 0.0,
+        "pass": false,
+        "fail_class": "C"
+      },
+      "fail_class": "C",
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E22",
+      "category": "unseen_adversarial",
+      "query": "资料能否证明智能座舱已经实现规模化生产",
+      "expect_support": "insufficient",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "strong_deterministic",
+        "temporal": "completed_certain",
+        "evidence_ref": "published_item_optional",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能：已接触并有对话记录，其与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触） · 编辑部沟通记录 · 与面壁智；詹杨帆：詹杨帆 · 编辑部 · T3 · 詹杨帆（汽车行业）：已接触，围绕 Agent 上车、智能座舱话题做过交流（2026/07/24） · 编辑部沟通记录 · 与詹；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱是",
+      "n_hits": 6,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "资料能否证明智能",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4115",
+          "ev:item:4131",
+          "ev:item:4116",
+          "ev:item:4117",
+          "ev:item:4167",
+          "ev:item:4130"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4115",
+        "ev:item:4131",
+        "ev:item:4116",
+        "ev:item:4117",
+        "ev:item:4167",
+        "ev:item:4130"
+      ],
+      "item_ids": [
+        "4115",
+        "4131",
+        "4116",
+        "4117",
+        "4167",
+        "4130"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 0.0,
+        "unsupported_claim": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 0.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 0.0,
+        "pass": false,
+        "fail_class": "C"
+      },
+      "fail_class": "C",
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E23",
+      "category": "unseen_adversarial",
+      "query": "是否已有量产车型采用这套端侧模型",
+      "expect_support": "insufficient",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "strong_deterministic",
+        "temporal": "completed_certain",
+        "evidence_ref": "published_item_optional",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T3 · 面壁智能（詹杨帆）与吉利银河、长安在智能座舱有合作：舱内做端侧跨模态视频流分析（数据不出车）、车内物品溯源、情境感知自动响应；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+      "n_hits": 12,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "是否已有量产车型",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4167",
+          "ev:item:4112",
+          "ev:item:4116",
+          "ev:item:4118",
+          "ev:item:4121",
+          "ev:item:4258",
+          "ev:item:4123",
+          "ev:item:4127",
+          "ev:item:4124",
+          "ev:ctx:2026-8-17:11",
+          "ev:ctx:2026-8-17:12"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4167",
+        "ev:item:4112",
+        "ev:item:4116",
+        "ev:item:4118",
+        "ev:item:4121",
+        "ev:item:4258",
+        "ev:item:4123",
+        "ev:item:4127"
+      ],
+      "item_ids": [
+        "4167",
+        "4112",
+        "4116",
+        "4118",
+        "4121",
+        "4258",
+        "4123",
+        "4127",
+        "4124"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 0.0,
+        "unsupported_claim": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 0.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 0.0,
+        "pass": false,
+        "fail_class": "C"
+      },
+      "fail_class": "C",
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E24",
+      "category": "unseen_adversarial",
+      "query": "能否证明该方案已经装车落地",
+      "expect_support": "insufficient",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "strong_deterministic",
+        "temporal": "completed_certain",
+        "evidence_ref": "published_item_optional",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能舱外方向：本地化方案对比传统云端哨兵模式在精度和能耗上有优势，倒车物品识别已在量产车型验证 · 编辑部沟通记录 · ；传奇极客：传奇极客 · 品牌创意团队 · T6 · 传奇极客名下部分域名将砍掉，部分转到前沿极客，另有几个新域名会转过来；今天已与相关方（静逸对接）确定域名处置方案 · ；AGI 2026：AGI 2026 · 品牌创意团队 · T6 · AGI 复盘：多人上台切换环节尴尬，AI 口播与搬凳子节奏不匹配、卡片播放时长无精确值、第二天控",
+      "n_hits": 11,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "能否证明该方案已",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4121",
+          "ev:item:4264",
+          "ev:item:4276",
+          "ev:item:4280",
+          "ev:item:4122",
+          "ev:item:4298",
+          "ev:item:4137",
+          "ev:item:4323",
+          "ev:item:4173",
+          "ev:item:4167",
+          "ev:ctx:2026-8-17:11"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4121",
+        "ev:item:4264",
+        "ev:item:4276",
+        "ev:item:4280",
+        "ev:item:4122",
+        "ev:item:4298",
+        "ev:item:4137",
+        "ev:item:4323"
+      ],
+      "item_ids": [
+        "4121",
+        "4264",
+        "4276",
+        "4280",
+        "4122",
+        "4298",
+        "4137",
+        "4323",
+        "4173",
+        "4167"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 0.0,
+        "unsupported_claim": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 0.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 0.0,
+        "pass": false,
+        "fail_class": "C"
+      },
+      "fail_class": "C",
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E25",
+      "category": "unseen_adversarial",
+      "query": "确认座舱方案已批量交付整车厂",
+      "expect_support": "insufficient",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "strong_deterministic",
+        "temporal": "completed_certain",
+        "evidence_ref": "published_item_optional",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；多比：多比 · 商业化团队 · T6 · 多比客户：已确认走FP专版头条，正在推进执行（已签约执行中） · 商业化团队例会提及；靖亚：靖亚 · 商业化团队 · T6 · 靖亚、AWS相关行程将尽快与彭总敲定，AWS项目已完成邮件确认待入库执行（合同流程中） · 商业化团队例会提及；源策：源策 · 编辑部 · T6 · 源策（沟通对象李天羽，CEO，短测未来相关）就新加坡具身智能活动沟通中：活动主题 go physical go action、8；ROPIDIA：ROPIDIA · 编辑部 · T6 · ",
+      "n_hits": 6,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "确认座舱方案已批",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4320",
+          "ev:item:4337",
+          "ev:item:4153",
+          "ev:item:4155",
+          "ev:item:4356",
+          "ev:item:4196"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4320",
+        "ev:item:4337",
+        "ev:item:4153",
+        "ev:item:4155",
+        "ev:item:4356",
+        "ev:item:4196"
+      ],
+      "item_ids": [
+        "4320",
+        "4337",
+        "4153",
+        "4155",
+        "4356",
+        "4196"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 0.0,
+        "unsupported_claim": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 0.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 0.0,
+        "pass": false,
+        "fail_class": "C"
+      },
+      "fail_class": "C",
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E26",
+      "category": "unseen_adversarial",
+      "query": "端侧模型讨论说明它已进入规模化量产阶段吗",
+      "expect_support": "insufficient",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "strong_deterministic",
+        "temporal": "completed_certain",
+        "evidence_ref": "published_item_optional",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；安谋科技：安谋科技 · 编辑部 · T6 · 安谋科技（CPU产品总监徐瑞迪陈述）端侧AI判断：2025-2026年接近1B体量模型可达60分商用最低标准线并装入端侧小芯；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+      "n_hits": 25,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "端侧模型讨论说明",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4112",
+          "ev:item:4114",
+          "ev:item:4116",
+          "ev:item:4118",
+          "ev:item:4120",
+          "ev:item:4123",
+          "ev:item:4124",
+          "ev:item:4125",
+          "ev:item:4127",
+          "ev:item:4149",
+          "ev:item:4176",
+          "ev:item:4184"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4112",
+        "ev:item:4114",
+        "ev:item:4116",
+        "ev:item:4118",
+        "ev:item:4120",
+        "ev:item:4123",
+        "ev:item:4124",
+        "ev:item:4125"
+      ],
+      "item_ids": [
+        "4112",
+        "4114",
+        "4116",
+        "4118",
+        "4120",
+        "4123",
+        "4124",
+        "4125",
+        "4127",
+        "4149",
+        "4176",
+        "4184"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 0.0,
+        "unsupported_claim": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 0.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 0.0,
+        "pass": false,
+        "fail_class": "C"
+      },
+      "fail_class": "C",
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E27",
+      "category": "unseen_adversarial",
+      "query": "相关交流能否证明面壁方案已实现装车",
+      "expect_support": "insufficient",
+      "claim_schema": {
+        "entity": "from_query",
+        "relation": "strong_deterministic",
+        "temporal": "completed_certain",
+        "evidence_ref": "published_item_optional",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；零跑：零跑 · 编辑部 · T6 · 零跑汽车：已就战略及经营相关问题做过沟通交流（已接触）。 · 编辑部沟通记录 · 与零跑的对话；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；詹杨帆：詹杨帆 · 编辑部 · T3 · 詹杨帆（汽车行业）：已接触，围绕 Agent 上车、智能座舱话题做过交流（2026/07/24） · 编辑部沟通记录 · 与詹；vivo：vivo · 编辑部 ",
+      "n_hits": 8,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "相关交流能否证明",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4108",
+          "ev:item:4112",
+          "ev:item:4131",
+          "ev:item:4185",
+          "ev:item:4183",
+          "ev:item:4189",
+          "ev:item:4159",
+          "ev:item:4191"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4108",
+        "ev:item:4112",
+        "ev:item:4131",
+        "ev:item:4185",
+        "ev:item:4183",
+        "ev:item:4189",
+        "ev:item:4159",
+        "ev:item:4191"
+      ],
+      "item_ids": [
+        "4108",
+        "4112",
+        "4131",
+        "4185",
+        "4183",
+        "4189",
+        "4159",
+        "4191"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 0.0,
+        "unsupported_claim": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 0.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 0.0,
+        "pass": false,
+        "fail_class": "C"
+      },
+      "fail_class": "C",
+      "soft_flags": [],
+      "error": null
+    },
+    {
+      "id": "E28",
+      "category": "unseen_should_answer",
+      "query": "锦涛做了什么",
+      "expect_support": "supported",
+      "claim_schema": {
+        "entity": "锦涛",
+        "relation": "mention_or_activity",
+        "temporal": "issue_time",
+        "evidence_ref": "must_cite_items",
+        "provenance": "published_only"
+      },
+      "must_cite_items": [
+        "4251"
+      ],
+      "answer_snip": "时间过滤：from=2026-06-11 to=…；锦涛：锦涛 · 品牌创意团队 · T6 · 关于是否开源锦涛做的工具，团队内各有判断：一方认为开源能沉淀 GitHub 记录、体现在 build 产品、立 build；李源：李源 · 品牌创意团队 · T6 · 李源的账号内容形式想做行业 MAP、互动 Map、互动图文等更复杂形态，计划在思琪网站下单开一个 tag，UI 与站点保持；Snowball：Snowball · 品牌创意团队 · T6 · 思琪站点用独立建站（非 WordPress），已发文章及每日日报；Snowball 相关小工具计划开源，",
+      "n_hits": 3,
+      "status": "grounded",
+      "claim_support": {
+        "entity": "锦涛做了什么",
+        "relation": "mention",
+        "temporal": "unspecified",
+        "evidence_refs": [
+          "ev:item:4260",
+          "ev:item:4251",
+          "ev:item:4259"
+        ],
+        "provenance": "published_only",
+        "support": "supported",
+        "claim_strength": "weak",
+        "speculative_certainty": false,
+        "universal_denial": false,
+        "reason": "has_published_evidence"
+      },
+      "evidence_refs": [
+        "ev:item:4260",
+        "ev:item:4251",
+        "ev:item:4259"
+      ],
+      "item_ids": [
+        "4260",
+        "4251",
+        "4259"
+      ],
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      },
+      "fail_class": null,
+      "soft_flags": [],
+      "error": null
+    }
+  ],
+  "verdict": {
+    "answer_hard_clean": false,
+    "evidence_hard_clean": false,
+    "has_soft_risks": true,
+    "ready_for_ontology_closeout": false,
+    "ready_for_model_ab": false
+  },
+  "remaining_for_triage": {
+    "answer_fails": [
+      {
+        "id": "A22",
+        "fail_class": "C",
+        "category": "unseen_claim_strength",
+        "query": "端侧座舱方案是否已经实现装车",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 0.0,
+          "faithfulness": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 0.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；安谋科技：安谋科技 · 编辑部 · T6 · 安谋科技（CPU产品总监徐瑞迪陈述）端侧AI判断：2025-2026年接近1B体量模型可达60分商用最低标准线并装入端侧小芯；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+        "claim_support": {
+          "entity": "端侧座舱方案是否",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4112",
+            "ev:item:4114",
+            "ev:item:4116",
+            "ev:item:4118",
+            "ev:item:4120",
+            "ev:item:4383",
+            "ev:item:4121",
+            "ev:item:4264",
+            "ev:item:4276",
+            "ev:item:4280",
+            "ev:item:4125",
+            "ev:item:4137"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 33
+      },
+      {
+        "id": "A23",
+        "fail_class": "C",
+        "category": "unseen_claim_strength",
+        "query": "资料能否证明智能座舱已经实现规模化生产",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 0.0,
+          "faithfulness": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 0.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能：已接触并有对话记录，其与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触） · 编辑部沟通记录 · 与面壁智；詹杨帆：詹杨帆 · 编辑部 · T3 · 詹杨帆（汽车行业）：已接触，围绕 Agent 上车、智能座舱话题做过交流（2026/07/24） · 编辑部沟通记录 · 与詹；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱是",
+        "claim_support": {
+          "entity": "资料能否证明智能",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4115",
+            "ev:item:4131",
+            "ev:item:4116",
+            "ev:item:4117",
+            "ev:item:4167",
+            "ev:item:4130"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 6
+      },
+      {
+        "id": "A24",
+        "fail_class": "C",
+        "category": "unseen_claim_strength",
+        "query": "是否已有量产车型采用这套端侧模型",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 0.0,
+          "faithfulness": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 0.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T3 · 面壁智能（詹杨帆）与吉利银河、长安在智能座舱有合作：舱内做端侧跨模态视频流分析（数据不出车）、车内物品溯源、情境感知自动响应；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+        "claim_support": {
+          "entity": "是否已有量产车型",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4167",
+            "ev:item:4112",
+            "ev:item:4116",
+            "ev:item:4118",
+            "ev:item:4121",
+            "ev:item:4258",
+            "ev:item:4123",
+            "ev:item:4127",
+            "ev:item:4124",
+            "ev:ctx:2026-8-17:11",
+            "ev:ctx:2026-8-17:12"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 12
+      },
+      {
+        "id": "A25",
+        "fail_class": "C",
+        "category": "unseen_claim_strength",
+        "query": "能否证明该方案已经装车落地",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 0.0,
+          "faithfulness": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 0.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能舱外方向：本地化方案对比传统云端哨兵模式在精度和能耗上有优势，倒车物品识别已在量产车型验证 · 编辑部沟通记录 · ；传奇极客：传奇极客 · 品牌创意团队 · T6 · 传奇极客名下部分域名将砍掉，部分转到前沿极客，另有几个新域名会转过来；今天已与相关方（静逸对接）确定域名处置方案 · ；AGI 2026：AGI 2026 · 品牌创意团队 · T6 · AGI 复盘：多人上台切换环节尴尬，AI 口播与搬凳子节奏不匹配、卡片播放时长无精确值、第二天控",
+        "claim_support": {
+          "entity": "能否证明该方案已",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4121",
+            "ev:item:4264",
+            "ev:item:4276",
+            "ev:item:4280",
+            "ev:item:4122",
+            "ev:item:4298",
+            "ev:item:4137",
+            "ev:item:4323",
+            "ev:item:4173",
+            "ev:item:4167",
+            "ev:ctx:2026-8-17:11"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 11
+      },
+      {
+        "id": "A26",
+        "fail_class": "C",
+        "category": "unseen_claim_strength",
+        "query": "确认座舱方案已批量交付整车厂",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 0.0,
+          "faithfulness": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 0.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；多比：多比 · 商业化团队 · T6 · 多比客户：已确认走FP专版头条，正在推进执行（已签约执行中） · 商业化团队例会提及；靖亚：靖亚 · 商业化团队 · T6 · 靖亚、AWS相关行程将尽快与彭总敲定，AWS项目已完成邮件确认待入库执行（合同流程中） · 商业化团队例会提及；源策：源策 · 编辑部 · T6 · 源策（沟通对象李天羽，CEO，短测未来相关）就新加坡具身智能活动沟通中：活动主题 go physical go action、8；ROPIDIA：ROPIDIA · 编辑部 · T6 · ",
+        "claim_support": {
+          "entity": "确认座舱方案已批",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4320",
+            "ev:item:4337",
+            "ev:item:4153",
+            "ev:item:4155",
+            "ev:item:4356",
+            "ev:item:4196"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 6
+      },
+      {
+        "id": "A27",
+        "fail_class": "C",
+        "category": "unseen_claim_strength",
+        "query": "端侧模型讨论说明它已进入规模化量产阶段吗",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 0.0,
+          "faithfulness": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 0.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；安谋科技：安谋科技 · 编辑部 · T6 · 安谋科技（CPU产品总监徐瑞迪陈述）端侧AI判断：2025-2026年接近1B体量模型可达60分商用最低标准线并装入端侧小芯；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+        "claim_support": {
+          "entity": "端侧模型讨论说明",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4112",
+            "ev:item:4114",
+            "ev:item:4116",
+            "ev:item:4118",
+            "ev:item:4120",
+            "ev:item:4123",
+            "ev:item:4124",
+            "ev:item:4125",
+            "ev:item:4127",
+            "ev:item:4149",
+            "ev:item:4176",
+            "ev:item:4184"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 25
+      },
+      {
+        "id": "A28",
+        "fail_class": "C",
+        "category": "unseen_claim_strength",
+        "query": "相关交流能否证明面壁方案已实现装车",
+        "metrics": {
+          "accuracy": 0.0,
+          "completeness": 0.0,
+          "faithfulness": 0.0,
+          "citation_correctness": 1.0,
+          "abstention_correctness": 0.0,
+          "nonempty": 1.0,
+          "must_mention_ok": 1.0,
+          "pass": false,
+          "scoring": "v2_2_hard",
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；零跑：零跑 · 编辑部 · T6 · 零跑汽车：已就战略及经营相关问题做过沟通交流（已接触）。 · 编辑部沟通记录 · 与零跑的对话；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；詹杨帆：詹杨帆 · 编辑部 · T3 · 詹杨帆（汽车行业）：已接触，围绕 Agent 上车、智能座舱话题做过交流（2026/07/24） · 编辑部沟通记录 · 与詹；vivo：vivo · 编辑部 ",
+        "claim_support": {
+          "entity": "相关交流能否证明",
+          "relation": "mention",
+          "temporal": "unspecified",
+          "evidence_refs": [
+            "ev:item:4108",
+            "ev:item:4112",
+            "ev:item:4131",
+            "ev:item:4185",
+            "ev:item:4183",
+            "ev:item:4189",
+            "ev:item:4159",
+            "ev:item:4191"
+          ],
+          "provenance": "published_only",
+          "support": "supported",
+          "claim_strength": "weak",
+          "speculative_certainty": false,
+          "universal_denial": false,
+          "reason": "has_published_evidence"
+        },
+        "n_hits": 8
+      }
+    ],
+    "evidence_fails": [
+      {
+        "id": "E21",
+        "fail_class": "C",
+        "category": "unseen_adversarial",
+        "query": "端侧座舱方案是否已经实现装车",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 0.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；安谋科技：安谋科技 · 编辑部 · T6 · 安谋科技（CPU产品总监徐瑞迪陈述）端侧AI判断：2025-2026年接近1B体量模型可达60分商用最低标准线并装入端侧小芯；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+        "item_ids": [
+          "4112",
+          "4114",
+          "4116",
+          "4118",
+          "4120",
+          "4383",
+          "4121",
+          "4264",
+          "4276",
+          "4280",
+          "4125",
+          "4137"
+        ]
+      },
+      {
+        "id": "E22",
+        "fail_class": "C",
+        "category": "unseen_adversarial",
+        "query": "资料能否证明智能座舱已经实现规模化生产",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 0.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能：已接触并有对话记录，其与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触） · 编辑部沟通记录 · 与面壁智；詹杨帆：詹杨帆 · 编辑部 · T3 · 詹杨帆（汽车行业）：已接触，围绕 Agent 上车、智能座舱话题做过交流（2026/07/24） · 编辑部沟通记录 · 与詹；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱是",
+        "item_ids": [
+          "4115",
+          "4131",
+          "4116",
+          "4117",
+          "4167",
+          "4130"
+        ]
+      },
+      {
+        "id": "E23",
+        "fail_class": "C",
+        "category": "unseen_adversarial",
+        "query": "是否已有量产车型采用这套端侧模型",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 0.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T3 · 面壁智能（詹杨帆）与吉利银河、长安在智能座舱有合作：舱内做端侧跨模态视频流分析（数据不出车）、车内物品溯源、情境感知自动响应；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+        "item_ids": [
+          "4167",
+          "4112",
+          "4116",
+          "4118",
+          "4121",
+          "4258",
+          "4123",
+          "4127",
+          "4124"
+        ]
+      },
+      {
+        "id": "E24",
+        "fail_class": "C",
+        "category": "unseen_adversarial",
+        "query": "能否证明该方案已经装车落地",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 0.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能舱外方向：本地化方案对比传统云端哨兵模式在精度和能耗上有优势，倒车物品识别已在量产车型验证 · 编辑部沟通记录 · ；传奇极客：传奇极客 · 品牌创意团队 · T6 · 传奇极客名下部分域名将砍掉，部分转到前沿极客，另有几个新域名会转过来；今天已与相关方（静逸对接）确定域名处置方案 · ；AGI 2026：AGI 2026 · 品牌创意团队 · T6 · AGI 复盘：多人上台切换环节尴尬，AI 口播与搬凳子节奏不匹配、卡片播放时长无精确值、第二天控",
+        "item_ids": [
+          "4121",
+          "4264",
+          "4276",
+          "4280",
+          "4122",
+          "4298",
+          "4137",
+          "4323",
+          "4173",
+          "4167"
+        ]
+      },
+      {
+        "id": "E25",
+        "fail_class": "C",
+        "category": "unseen_adversarial",
+        "query": "确认座舱方案已批量交付整车厂",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 0.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；多比：多比 · 商业化团队 · T6 · 多比客户：已确认走FP专版头条，正在推进执行（已签约执行中） · 商业化团队例会提及；靖亚：靖亚 · 商业化团队 · T6 · 靖亚、AWS相关行程将尽快与彭总敲定，AWS项目已完成邮件确认待入库执行（合同流程中） · 商业化团队例会提及；源策：源策 · 编辑部 · T6 · 源策（沟通对象李天羽，CEO，短测未来相关）就新加坡具身智能活动沟通中：活动主题 go physical go action、8；ROPIDIA：ROPIDIA · 编辑部 · T6 · ",
+        "item_ids": [
+          "4320",
+          "4337",
+          "4153",
+          "4155",
+          "4356",
+          "4196"
+        ]
+      },
+      {
+        "id": "E26",
+        "fail_class": "C",
+        "category": "unseen_adversarial",
+        "query": "端侧模型讨论说明它已进入规模化量产阶段吗",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 0.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；安谋科技：安谋科技 · 编辑部 · T6 · 安谋科技（CPU产品总监徐瑞迪陈述）端侧AI判断：2025-2026年接近1B体量模型可达60分商用最低标准线并装入端侧小芯；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能詹杨帆认为终端是 AI 进入物理世界的路径，汽车因算力、场景标准化、电池容量等条件是端侧模型优质载体，智能座舱",
+        "item_ids": [
+          "4112",
+          "4114",
+          "4116",
+          "4118",
+          "4120",
+          "4123",
+          "4124",
+          "4125",
+          "4127",
+          "4149",
+          "4176",
+          "4184"
+        ]
+      },
+      {
+        "id": "E27",
+        "fail_class": "C",
+        "category": "unseen_adversarial",
+        "query": "相关交流能否证明面壁方案已实现装车",
+        "expect_support": "insufficient",
+        "obs_support": "supported",
+        "metrics": {
+          "evidence_coverage": 1.0,
+          "evidence_correctness": 0.0,
+          "unsupported_claim": 1.0,
+          "citation_correctness": 1.0,
+          "abstention_ok": 0.0,
+          "claim_support_leak": 0.0,
+          "claim_support": "supported",
+          "claim_support_ok": 0.0,
+          "pass": false,
+          "fail_class": "C"
+        },
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；零跑：零跑 · 编辑部 · T6 · 零跑汽车：已就战略及经营相关问题做过沟通交流（已接触）。 · 编辑部沟通记录 · 与零跑的对话；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；詹杨帆：詹杨帆 · 编辑部 · T3 · 詹杨帆（汽车行业）：已接触，围绕 Agent 上车、智能座舱话题做过交流（2026/07/24） · 编辑部沟通记录 · 与詹；vivo：vivo · 编辑部 ",
+        "item_ids": [
+          "4108",
+          "4112",
+          "4131",
+          "4185",
+          "4183",
+          "4189",
+          "4159",
+          "4191"
+        ]
+      }
+    ],
+    "answer_soft": [
+      {
+        "id": "A22",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；安谋科技：安谋科"
+      },
+      {
+        "id": "A23",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能：已接触并有对话记录，其与吉利银河、长安马自达等车企在智能座舱有具体合作（已接触） · 编辑部沟通记录 · 与面壁智；詹杨帆：詹杨帆 "
+      },
+      {
+        "id": "A24",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T3 · 面壁智能（詹杨帆）与吉利银河、长安在智能座舱有合作：舱内做端侧跨模态视频流分析（数据不出车）、车内物品溯源、情境感知自动响应；面壁智能：面壁智"
+      },
+      {
+        "id": "A25",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能舱外方向：本地化方案对比传统云端哨兵模式在精度和能耗上有优势，倒车物品识别已在量产车型验证 · 编辑部沟通记录 · ；传奇极客：传奇极"
+      },
+      {
+        "id": "A26",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；多比：多比 · 商业化团队 · T6 · 多比客户：已确认走FP专版头条，正在推进执行（已签约执行中） · 商业化团队例会提及；靖亚：靖亚 · 商业化团队 · T6 · 靖亚、AWS相关行"
+      },
+      {
+        "id": "A27",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能（沟通对象为高通侧芯片调优负责人）：就端侧模型在旗舰手机应用的限制与发展方向做过交流（已接触）。做智能硬件与端侧AI；安谋科技：安谋科"
+      },
+      {
+        "id": "A28",
+        "flags": [
+          "abstain_query_but_support_supported"
+        ],
+        "answer_snip": "时间过滤：from=2026-06-11 to=…；零跑：零跑 · 编辑部 · T6 · 零跑汽车：已就战略及经营相关问题做过沟通交流（已接触）。 · 编辑部沟通记录 · 与零跑的对话；面壁智能：面壁智能 · 编辑部 · T6 · 面壁智能"
+      }
+    ],
+    "evidence_soft": []
+  }
+}

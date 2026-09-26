@@ -1,0 +1,151 @@
+[mesh] pg pool min=2 max=20
+{
+  "slug": "2026-08-21",
+  "lane": "published_json",
+  "mode": "shadow",
+  "n_relations": 5,
+  "n_valid": 0,
+  "n_invalid": 5,
+  "n_uncertain": 0,
+  "invalid_ratio": 1.0,
+  "by_reason": {
+    "status_upgrade": 5
+  },
+  "invalid_rows": [
+    {
+      "candidate_id": null,
+      "title": "海外众筹与出海操盘",
+      "claim_verdict": "invalid",
+      "claim_reason_code": "status_upgrade",
+      "claim_reason": "detail:0 论断强度 3 > 证据有效强度 0",
+      "claim_strength": 3,
+      "evidence_strength": 0
+    },
+    {
+      "candidate_id": null,
+      "title": "具身智能本体与开发平台",
+      "claim_verdict": "invalid",
+      "claim_reason_code": "status_upgrade",
+      "claim_reason": "detail:0 论断强度 3 > 证据有效强度 0",
+      "claim_strength": 3,
+      "evidence_strength": 0
+    },
+    {
+      "candidate_id": null,
+      "title": "拓竹系创业脉络",
+      "claim_verdict": "invalid",
+      "claim_reason_code": "status_upgrade",
+      "claim_reason": "detail:0 论断强度 2 > 证据有效强度 0",
+      "claim_strength": 2,
+      "evidence_strength": 0
+    },
+    {
+      "candidate_id": null,
+      "title": "AI 家庭健康与睡眠硬件",
+      "claim_verdict": "invalid",
+      "claim_reason_code": "status_upgrade",
+      "claim_reason": "detail:0 论断强度 3 > 证据有效强度 0",
+      "claim_strength": 3,
+      "evidence_strength": 0
+    },
+    {
+      "candidate_id": null,
+      "title": "端侧推理生态资源线索",
+      "claim_verdict": "invalid",
+      "claim_reason_code": "status_upgrade",
+      "claim_reason": "detail:0 论断强度 3 > 证据有效强度 0",
+      "claim_strength": 3,
+      "evidence_strength": 0
+    }
+  ],
+  "invalid_details": [
+    {
+      "title": "海外众筹与出海操盘",
+      "body": "编辑部与多家众筹操盘方沟通了海外市场变化与选品流程，硅谷 BD 团队订阅了 HumanX2026 会议日历。",
+      "details": [
+        "编辑部记录：与乙烯众筹 Andy Peng、迈思创新沟通海外众筹市场变化、48 小时金额解读、日本电商法（已接触，有沟通记录）",
+        "硅谷 BD 团队记录：HumanX2026 大会日历订阅一条（已订阅）"
+      ],
+      "tier": null,
+      "type": null,
+      "weak": true,
+      "evidence": [],
+      "reason_code": "status_upgrade",
+      "reason": "detail:0 论断强度 3 > 证据有效强度 0",
+      "claim_strength": 3,
+      "evidence_strength": 0,
+      "lexical_body_pass": false
+    },
+    {
+      "title": "具身智能本体与开发平台",
+      "body": "编辑部本期接触多家具身智能本体与开发平台方向的创业公司，各自方向不同。",
+      "details": [
+        "编辑部记录：源策围绕具身数据与自然采集 pipeline；FrontierX 做球形机器人加线上开发平台；taks 做 3D 打印人形本体与关节力反馈、与舞肌合作；上海跃空维度做碳纤维超轻机械手（均已接触）"
+      ],
+      "tier": null,
+      "type": null,
+      "weak": true,
+      "evidence": [],
+      "reason_code": "status_upgrade",
+      "reason": "detail:0 论断强度 3 > 证据有效强度 0",
+      "claim_strength": 3,
+      "evidence_strength": 0,
+      "lexical_body_pass": false
+    },
+    {
+      "title": "拓竹系创业脉络",
+      "body": "破壳创智创始人履历涉及拓竹与影石，编辑部对话中同时提及这几家的关联。",
+      "details": [
+        "编辑部记录：破壳创智聚焦桌面级 UV 打印机加 AI 创作平台，创始人吴伟履历为大疆→拓竹→影石→破壳创智（受访者陈述，非核实事实）"
+      ],
+      "tier": null,
+      "type": null,
+      "weak": true,
+      "evidence": [],
+      "reason_code": "status_upgrade",
+      "reason": "detail:0 论断强度 2 > 证据有效强度 0",
+      "claim_strength": 2,
+      "evidence_strength": 0,
+      "lexical_body_pass": false
+    },
+    {
+      "title": "AI 家庭健康与睡眠硬件",
+      "body": "编辑部接触了亲宝宝 AI 睡眠舱与氧刻家用健身设备两条家庭健康硬件线索。",
+      "details": [
+        "编辑部记录：亲宝宝 AI 睡眠舱定价 8900 元、含多模态感知，海外竞品 SNOO；氧刻 All-in-one 家用健身设备、四臂形态、正与博世孵化基金对接（均已接触）"
+      ],
+      "tier": null,
+      "type": null,
+      "weak": true,
+      "evidence": [],
+      "reason_code": "status_upgrade",
+      "reason": "detail:0 论断强度 3 > 证据有效强度 0",
+      "claim_strength": 3,
+      "evidence_strength": 0,
+      "lexical_body_pass": false
+    },
+    {
+      "title": "端侧推理生态资源线索",
+      "body": "编辑部与华清创投项目沟通了端侧芯片模型框架进展，涉及多家芯片厂后端。",
+      "details": [
+        "编辑部记录：围绕 llama.cpp 硬件后端进展、高通 GenieX、Intel OpenVINO 官方后端等交流（已接触）"
+      ],
+      "tier": null,
+      "type": null,
+      "weak": true,
+      "evidence": [],
+      "reason_code": "status_upgrade",
+      "reason": "detail:0 论断强度 3 > 证据有效强度 0",
+      "claim_strength": 3,
+      "evidence_strength": 0,
+      "lexical_body_pass": false
+    }
+  ],
+  "uncertain_rows": [],
+  "valid_watch_parallel_sample": [],
+  "lexical_pass_but_claim_invalid": [],
+  "go_nogo_hints": {
+    "invalid_ratio_warn_if_gt": 0.25,
+    "note": "A1 shadow only; do not enforce until human review of invalid_details"
+  }
+}

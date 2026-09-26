@@ -1,0 +1,125 @@
+{
+  "baseline_kind": "environment_reproducibility",
+  "timestamp": "2026-09-17T03:31:26.353599+00:00",
+  "in_container": true,
+  "identity": {
+    "git_commit": "ddb983447763",
+    "git_commit_short": "ddb983447763",
+    "git_dirty": false,
+    "image_tag": "2026-09-17-ddb983447763",
+    "image_id": "sha256:a91ab0622c060c76bb917e833dc386267ca9ae6963c031700fd5d393b9f5af7d",
+    "image_digest": "geekpark-mesh@sha256:a91ab0622c060c76bb917e833dc386267ca9ae6963c031700fd5d393b9f5af7d",
+    "build_date": "2026-09-17T03:26:36.2377431Z"
+  },
+  "runtime": {
+    "python": "3.12.14",
+    "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.41",
+    "node": "n/a (backend image has no Node runtime requirement)"
+  },
+  "dependencies": {
+    "requirements_txt_sha256": "907c76f1a87d0ffd6cb5fdfb459316805bf80441c1f2799f96955f5643f0235c",
+    "pins": [
+      "fastapi==0.115.6",
+      "starlette==0.41.3",
+      "uvicorn[standard]==0.32.1",
+      "jinja2==3.1.4",
+      "python-multipart==0.0.17",
+      "itsdangerous==2.2.0",
+      "python-dotenv==1.0.1",
+      "anthropic>=0.40.0",
+      "feedparser==6.0.11",
+      "python-docx==1.1.2",
+      "requests==2.32.3",
+      "psycopg2-binary==2.9.10",
+      "pycryptodome==3.21.0"
+    ]
+  },
+  "llm": {
+    "env": {
+      "MESH_LLM_PROVIDER": "openai_compat",
+      "MESH_LLM_BASE_URL": "https://kspmas.ksyun.com/v1",
+      "MESH_LLM_MODEL": "mco-6",
+      "MESH_LLM_MODEL_ANSWER": "mco-6",
+      "MESH_LLM_MODEL_SEMANTIC": "mco-6",
+      "MESH_LLM_MODEL_SENSITIVE": "mco-6",
+      "MESH_EMBED_BASE_URL": "https://kspmas.ksyun.com/v1",
+      "MESH_EMBED_MODEL": "qwen3-embedding-8b"
+    },
+    "task_models": {
+      "answer": "mco-6",
+      "semantic": "mco-6",
+      "sensitive": "mco-6"
+    }
+  },
+  "embedding": {
+    "vector": "OFF",
+    "retrieval_execution_mode_default": "lexical",
+    "model": "qwen3-embedding-8b",
+    "base_url_set": true
+  },
+  "feature_flags": {
+    "MESH_EMBED_ENABLED": "0",
+    "MESH_VECTOR_ENABLED": "0",
+    "MESH_AGENT_USE_LLM": "",
+    "MESH_CLAIM_SEMANTIC": "",
+    "MESH_CLAIM_CHECK_MODE": "enforce",
+    "MESH_ALLOW_PROD_PUBLISH": "",
+    "MESH_JOB_INLINE": "0"
+  },
+  "versions": {
+    "schema_version": "1.9.0",
+    "ranking_version": "v1.4",
+    "claim_support_version": "v2.4c-2_semantic_extension_frozen",
+    "retrieval_version": "lexical_fts_recall_frozen",
+    "quality_baseline": "v3.0_production_baseline",
+    "agent_contract": "v1_frozen"
+  },
+  "prompts": {
+    "prompt_files": 30,
+    "prompt_set_sha256_16": "723fba4db8c2e0c21bee490f",
+    "files": [
+      "00_base_rules.md:29f748b7267fd004",
+      "05_owner_attrib.md:cd0da515ca45192c",
+      "90_output_items.md:f6552c8c3d25ab0e",
+      "91_output_issue.md:0a73162455d8901e",
+      "WXVIDEO.md:94193e80ebdbd9bf",
+      "card_team.md:da7e88f1f5c69ebb",
+      "edm_subject.md:40c6ca4063d7e5da",
+      "extract_T1.md:250c4395aec6842b",
+      "extract_T10.md:d2e7c5e951e1af2f",
+      "extract_T11.md:ca8077ee77392218",
+      "extract_T12.md:44d2065466c93028",
+      "extract_T13.md:c031418f0ce83bec",
+      "extract_T2.md:9d38476c30f4e042",
+      "extract_T3.md:ad1abbf6a3538259",
+      "extract_T4.md:0f5d6eff4a748d79",
+      "extract_T5.md:ead415996e6ad2e6",
+      "extract_T6.md:1a5f95ff8764d254",
+      "extract_T7.md:4f4686eac71a2e9b",
+      "extract_T8.md:6388032dcfc88dd0",
+      "extract_T9.md:b76afa75088bbdf7",
+      "issue_draft.md:dfbc54fbf7b5ec57",
+      "issue_draft_candidates.md:01333afa8010b597",
+      "issue_relation_decisions.md:410ecfcb1e5a1266",
+      "issue_relation_narratives.md:c3d865c0c393d71d",
+      "issue_relation_writer.md:4ef823aa69c55a60",
+      "qa.md:62a5b0e3a7cd7501",
+      "team_gp.md:1c9bfa5a4f7ad3cb",
+      "team_podcast.md:50631e99f72ddfb7",
+      "team_svbd.md:ad7b14dadb3f9b6b",
+      "team_video.md:1d5b860797d7e7f1"
+    ]
+  },
+  "gold": {},
+  "deploy_policy": {
+    "forbidden": [
+      "docker cp hot-patch into running app container as release path"
+    ],
+    "required": [
+      "git commit",
+      "docker build → image tag + digest",
+      "compose up --force-recreate from image",
+      "emit this baseline after ship"
+    ]
+  }
+}

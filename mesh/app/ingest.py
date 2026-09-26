@@ -19,11 +19,29 @@ SOURCE_TYPES = {
     "T13": "内容中心·数据聚合（混合多类型，系统按段分别抽取）",
 }
 AGG_STYPE = "T13"
+AGG_TEAM = "内容中心·数据聚合"
+
+
+def is_aggregation_source(*, stype: str = "", team: str = "", channel: str = "") -> bool:
+    """仅内容中心混合包需要拆段/混挂确认。
+
+    其他来源上传时选了哪个团队，就是该团队提供的内容，不因「长文只拆 1 段」拦预览。
+    channel=aggregator 不能单独作依据（单团队纪要也可能被标成 aggregator）。
+    """
+    if (stype or "").strip() == AGG_STYPE:
+        return True
+    if (team or "").strip() == AGG_TEAM:
+        return True
+    return False
+
+
 TEAMS = [
     "编辑部", "商业化团队", "硅谷 BD 团队", "Global Partnership 团队", "英文站",
-    "品牌创意团队", "社群", "投资团队", "音频播客团队", "视频号团队",
+    "品牌创意团队", "海外拓展", "社群", "投资团队", "音频播客团队", "视频号团队",
     "CEO / 总裁办", "外部媒体", "内容中心·数据聚合", "其他",
 ]
+# 「海外拓展」：飞书挂在品牌创意部下，业务上是独立周报/同事队（思琪/Sean/胡清远）。
+# parent_team=品牌创意团队 仅用于「问品牌创意时仍纳入该子队人员」，见 dept_team_map。
 
 # 编辑部在 UI 拆成三种材料（owner 仍归「编辑部」）
 EDITORIAL_PICKS = {
@@ -40,6 +58,7 @@ TEAM_DEFAULT_STYPE = {
     "Global Partnership 团队": "T10",
     "英文站": "T5",
     "品牌创意团队": "T6",
+    "海外拓展": "T3",  # 海外关系/CRM，与硅谷 BD 同口径材料类型
     "社群": "T4",
     "投资团队": "T8",
     "音频播客团队": "T12",
@@ -174,6 +193,7 @@ def _match_team(name: str, text: str, *, filename_only: bool = False) -> str:
         ("英文站", ("英文站", "geekpark.media", "geekpark english", "about.geekpark", "极客公园英文站")),
         ("商业化团队", ("商业化", "广告销售")),
         ("品牌创意团队", ("品牌创意", "品牌部")),
+        ("海外拓展", ("海外拓展", "海外 BD", "海外关系")),
         ("社群", ("社群", "私域运营")),
         ("投资团队", ("投资团队", "投资部")),
         ("音频播客团队", ("音频播客", "播客第", "播客 ·", "播客", "podcast")),

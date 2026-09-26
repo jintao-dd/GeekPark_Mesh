@@ -1,0 +1,30 @@
+{"id": "R01", "category": "name", "query": "锦涛做了什么", "scope": {"issue": "explicit:2026-8-17", "time_basis": "unknown", "window": "none"}, "relevant_items": ["4251", "4259", "4260"], "notes": "人名召回；内容在品牌创意"}
+{"id": "R02", "category": "name_recent", "query": "锦涛最近做了什么", "scope": {"issue": "latest_published", "time_basis": "unknown", "window": "recent"}, "relevant_items": ["4251", "4259", "4260"], "notes": "Scope 验证样本：latest+recent 可跨已发布（非 Recall 缺陷）"}
+{"id": "R03", "category": "company", "query": "破壳创智有什么进展", "scope": {"issue": "explicit:2026-8-17", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4356"]}
+{"id": "R04", "category": "company", "query": "面壁智能接触了什么", "scope": {"issue": "explicit:2026-8-17", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4112", "4115", "4116", "4118", "4120"]}
+{"id": "R05", "category": "company", "query": "PPIO 姚欣说了什么", "scope": {"issue": "explicit:2026-8-17", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4141", "4142", "4143", "4144", "4145"]}
+{"id": "R06", "category": "company", "query": "英伟达 EDC 培训讲了什么", "scope": {"issue": "explicit:2026-8-17", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4147", "4148", "4149", "4150", "4151"]}
+{"id": "R07", "category": "company", "query": "OdyssLife 众筹节奏", "scope": {"issue": "explicit:2026-09-08", "time_basis": "issue_time", "window": "explicit"}, "relevant_items": ["4429"]}
+{"id": "R08", "category": "company", "query": "FREELANDER 神行者怎么定义产品", "scope": {"issue": "explicit:2026-09-08", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4423", "4424", "4425"]}
+{"id": "R09", "category": "company", "query": "未来脑律 ZenoWell 是什么", "scope": {"issue": "explicit:2026-09-08", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4428"]}
+{"id": "R10", "category": "company", "query": "程天科技外骨骼", "scope": {"issue": "explicit:2026-09-08", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4431"]}
+{"id": "R11", "category": "topic", "query": "Agent 治理与合规 7 月 15 日", "scope": {"issue": "explicit:2026-8-17", "time_basis": "event_time", "window": "explicit"}, "relevant_items": ["4105", "4106"]}
+{"id": "R12", "category": "topic", "query": "端侧模型与智能座舱", "scope": {"issue": "explicit:2026-8-17", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4116", "4120", "4125", "4128"]}
+{"id": "R13", "category": "topic", "query": "具身智能数据圆桌讨论了什么", "scope": {"issue": "explicit:2026-8-17", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4154", "4155", "4156"]}
+{"id": "R14", "category": "topic", "query": "视频号本周播放较好的片子", "scope": {"issue": "explicit:2026-09-08", "time_basis": "issue_time", "window": "this_week"}, "relevant_items": ["4408", "4409", "4410", "4411", "4412"]}
+{"id": "R15", "category": "topic", "query": "编辑部选题里 IFA 相关", "scope": {"issue": "explicit:2026-09-08", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4416", "4417"]}
+{"id": "R16", "category": "person", "query": "詹杨帆怎么看端侧和云端", "scope": {"issue": "explicit:2026-8-17", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4125", "4126", "4127", "4131"]}
+{"id": "R17", "category": "person", "query": "滴滴战投牛一鸣怎么看智能硬件", "scope": {"issue": "explicit:2026-09-08", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4426", "4427"]}
+{"id": "R18", "category": "community", "query": "Founder Park 下半年规划", "scope": {"issue": "explicit:2026-8-17", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4358", "4271"]}
+{"id": "R19", "category": "community", "query": "社群小红书本周计划发什么", "scope": {"issue": "explicit:2026-8-17", "time_basis": "issue_time", "window": "this_week"}, "relevant_items": ["4368"]}
+{"id": "R20", "category": "gp", "query": "张鹏去深圳拜访吴伟", "scope": {"issue": "explicit:2026-8-17", "time_basis": "unknown", "window": "none"}, "relevant_items": ["4356"]}
+{"id": "R21", "category": "media", "query": "The Verge 写了哪些手机或隐私相关", "scope": {"issue": "explicit:2026-09-08", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4402", "4404"]}
+{"id": "R22", "category": "media", "query": "Seattle Times 起诉 OpenAI", "scope": {"issue": "explicit:2026-09-08", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4405"]}
+{"id": "R23", "category": "cross_issue", "query": "锦涛提供的建站风格参考", "scope": {"issue": "latest_published", "time_basis": "unknown", "window": "recent"}, "relevant_items": ["4251"], "notes": "Scope 验证样本：latest+recent 可跨已发布（非 Recall 缺陷）"}
+{"id": "R24", "category": "cross_issue", "query": "破壳创智吴伟拜访计划", "scope": {"issue": "latest_published", "time_basis": "unknown", "window": "recent"}, "relevant_items": ["4356"], "notes": "Scope 验证样本：latest+recent 可跨已发布（非 Recall 缺陷）"}
+{"id": "R25", "category": "explicit_ok", "query": "锦涛提供的建站风格参考", "scope": {"issue": "explicit:2026-8-17", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4251"]}
+{"id": "R26", "category": "hardware", "query": "灵瑙科技助眠头带", "scope": {"issue": "explicit:2026-8-17", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4110"]}
+{"id": "R27", "category": "hardware", "query": "BMC 瑞迈特呼吸机差异化", "scope": {"issue": "explicit:2026-8-17", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4135", "4136"]}
+{"id": "R28", "category": "hardware", "query": "云迹科技酒店机器人", "scope": {"issue": "explicit:2026-8-17", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4140"]}
+{"id": "R29", "category": "contact", "query": "腾讯 wb 生态应用接触", "scope": {"issue": "explicit:2026-09-08", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4421"]}
+{"id": "R30", "category": "contact", "query": "floatboat 少卿接触记录", "scope": {"issue": "explicit:2026-09-08", "time_basis": "issue_time", "window": "none"}, "relevant_items": ["4420"]}

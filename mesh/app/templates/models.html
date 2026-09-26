@@ -1,0 +1,119 @@
+{% extends "base.html" %}{% block title %}模型 · GeekPark Mesh{% endblock %}
+{% block head %}
+<style>
+.adm.models-page{max-width:1000px}
+.models-lead{margin:0 0 18px;font-size:14px;color:var(--ink2);line-height:1.65;max-width:760px}
+.models-lead code{font-family:var(--mono);font-size:12.5px;background:#F1F5F0;padding:1px 5px;border-radius:5px}
+.models-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin:0 0 16px}
+.models-card h2{margin:0 0 4px;font-size:16px}
+.models-card .hint{margin:0 0 12px;font-size:12.5px;color:var(--ink3);line-height:1.6}
+.models-table{width:100%;border-collapse:collapse;font-size:13.5px;margin:0}
+.models-table th,.models-table td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+.models-table th{font-size:12px;color:var(--ink3);font-weight:700;background:#FAFCF7;white-space:nowrap}
+.models-table tr:last-child td{border-bottom:0}
+.models-table .mono{font-family:var(--mono);font-size:12.5px;word-break:break-all}
+.models-table .col-task{width:170px}
+.models-table .col-env{color:var(--ink3);font-size:12px}
+.models-table .col-act{width:78px;text-align:right;white-space:nowrap}
+.models-table select{font-size:13px;padding:6px 8px;width:100%;min-width:0}
+.models-table .badge{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:2px 8px;color:#fff;background:#64748B}
+.models-table .badge.db{background:#166534}
+.models-table .badge.env{background:#94A3B8}
+.models-add{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap}
+.models-add input[type=text]{flex:1;min-width:220px;font-family:var(--mono);font-size:13px}
+.models-empty{padding:16px;text-align:center;color:var(--ink3);font-size:13.5px}
+.models-note{margin:12px 0 0;font-size:12.5px;color:var(--ink3);line-height:1.65}
+.models-row-test{font-size:12px;color:var(--ink3)}
+</style>
+{% endblock %}
+{% block body %}
+<div class="adm models-page">
+{% with nav='models' %}{% include "adm_top.html" %}{% endwith %}
+<h1>模型</h1>
+<p class="models-lead">这里维护可用的模型清单，并给每个任务指定用哪个。保存后<b>立即生效</b>，无需重启；未指定的任务按 <code>.env</code> 里的兜底配置执行。</p>
+{% if flash_ok %}<p class="tag ok" style="display:inline-block;margin:0 0 14px">{{ flash_ok }}</p>{% endif %}
+{% if flash_err %}<p class="tag pend" style="display:inline-block;margin:0 0 14px">{{ flash_err }}</p>{% endif %}
+
+<section class="models-card">
+  <h2>任务用哪个模型</h2>
+  <p class="hint">「生效」列是当前实际使用的模型：选了下拉就用下拉，没选就沿用 <code>.env</code> 兜底。</p>
+  <table class="models-table">
+    <thead>
+      <tr>
+        <th class="col-task">任务</th>
+        <th>选择</th>
+        <th>生效</th>
+        <th class="col-env">.env 兜底</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td class="col-task">{{ r.label }}<div class="models-row-test">{{ r.task }}</div></td>
+        <td>
+          <form method="post" action="/admin/models/task">
+            <input type="hidden" name="task" value="{{ r.task }}">
+            <select name="model" onchange="this.form.submit()">
+              <option value=""{% if not r.choice %} selected{% endif %}>— 跟随 .env 兜底 —</option>
+              {% for m in models %}
+              <option value="{{ m }}"{% if r.choice == m %} selected{% endif %}>{{ m }}</option>
+              {% endfor %}
+            </select>
+            <noscript><button class="btn pri" type="submit">保存</button></noscript>
+          </form>
+        </td>
+        <td class="mono">{{ r.effective or '—' }}
+          {% if r.overridden %}<span class="badge db">DB</span>{% else %}<span class="badge env">env</span>{% endif %}
+        </td>
+        <td class="col-env mono">{{ r.env_model or '—' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="models-card">
+  <h2>模型清单</h2>
+  <p class="hint">清单里的模型才能在上面的下拉里选。删除会同时清掉指向它的任务选择。</p>
+  {% if models %}
+  <table class="models-table">
+    <thead><tr><th>模型 id</th><th class="col-act"></th></tr></thead>
+    <tbody>
+    {% for m in models %}
+      <tr>
+        <td class="mono">{{ m }}</td>
+        <td class="col-act">
+          <form class="inline js-confirm" method="post" action="/admin/models/delete" data-title="删除模型" data-body="确定从清单移除「{{ m }}」？相关任务会回到 .env 兜底。" data-ok="移除">
+            <input type="hidden" name="model" value="{{ m }}">
+            <button class="btn ghost-del" type="submit">移除</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="models-empty">清单为空，先添加一个模型。</div>
+  {% endif %}
+  <form class="models-add" method="post" action="/admin/models/add" style="margin-top:14px">
+    <input type="text" name="model" required placeholder="例如 deepseek/deepseek-v4.1-flash" autocomplete="off" spellcheck="false">
+    <button class="btn pri" type="submit">添加模型</button>
+  </form>
+  <p class="models-note">模型 id 必须是网关（<code>MESH_LLM_BASE_URL</code>）真实提供的名字；不确定就照网关 <code>/v1/models</code> 里抄。</p>
+</section>
+</div>
+<script>
+document.querySelectorAll('form.js-confirm').forEach(function (form) {
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var ok = await MeshDialog.confirm({
+      title: form.dataset.title || '请确认',
+      body: form.dataset.body || '',
+      okText: form.dataset.ok || '确定',
+      danger: true,
+    });
+    if (ok) form.submit();
+  });
+});
+</script>
+{% endblock %}

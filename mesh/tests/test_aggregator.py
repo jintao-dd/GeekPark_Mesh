@@ -4,7 +4,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.aggregator import parse_content_stats_toc, split_bundle_ex
+from app.aggregator import (
+    parse_content_stats_toc,
+    should_pre_explode,
+    split_bundle_ex,
+    split_confidence,
+)
 
 
 PAD = "详细内容补充行。\n" * 12
@@ -134,6 +139,108 @@ def test_md_report_skips_ai_and_splits_by_toc_sections():
     assert "飞书多维表格" in names
     assert "编辑部 · 选题" in names
     assert "视频号数据" in names
+    assert split_confidence(r) in ("high", "medium")
+    assert should_pre_explode(r) is (split_confidence(r) == "high")
+
+
+def test_feishu_table_splits_three_h4_layers():
+    """飞书多维表格壳下 #### 三层；极客公园=自家站→编辑部 T5。"""
+    from app.aggregator import _strip_heading_noise
+
+    text = """## 🏢 内部飞书内容
+
+### 📊 飞书多维表格
+
+#### 编辑部 · 选题
+
+*表格 ID: tbl*
+""" + PAD + """
+
+#### 视频号数据
+
+视频标题 | 完播率
+某视频 | 12%
+""" + PAD + """
+
+#### 编辑部 · 沟通记录
+
+*表格 ID: tbl2*
+""" + PAD + """
+
+### 📓 Notion CRM
+
+People / Companies
+""" + PAD + """
+
+## 🌐 外部信息源
+
+### 🏟 极客公园
+
+作者: 编辑
+链接: https://www.geekpark.net/x
+发布时间: 2026-09-01
+""" + PAD
+
+    r = split_bundle_ex(text, source_title="内容聚合报告")
+    titles = [_strip_heading_noise(s.title) for s in r.segments]
+    assert any("选题" in t for t in titles)
+    assert any("视频号" in t for t in titles)
+    assert any("沟通记录" in t for t in titles)
+    assert not any(t == "飞书多维表格" for t in titles)
+    stypes = {s.stype for s in r.segments}
+    assert "T2" in stypes
+    assert "T11" in stypes
+    assert "T1" in stypes
+    geek = [s for s in r.segments if "极客公园" in s.title]
+    assert geek and geek[0].stype == "T7" and geek[0].team == "外部媒体"
+
+
+def test_geekpark_english_is_en_site():
+    from app.aggregator import _classify
+
+    assert _classify("### 🌐 GeekPark English", "作者: x\n发布时间: 2026") == ("T5", "英文站")
+    assert _classify("### 🏟 极客公园", "作者: x\n链接: http://www.geekpark.net/x\n发布时间: 2026") == ("T7", "外部媒体")
+
+
+def test_comm_records_not_split_by_emoji_topic_line():
+    """沟通记录正文里的 🎯 话题行不得二次切开。"""
+    from app.aggregator import _strip_heading_noise
+
+    text = """## 🏢 内部飞书内容
+
+### 📊 飞书多维表格
+
+#### 编辑部 · 沟通记录
+
+##### 记录 4
+
+- **对话主题/要点**: 行业认知
+""" + PAD + """
+🎯 产品定义与营销哲学的底层洞察
+“不被场景局限”的产品定义取舍
+""" + PAD + """
+
+##### 记录 5
+
+- **沟通对象**: 某人
+""" + PAD
+
+    r = split_bundle_ex(text, source_title="内容聚合报告")
+    titles = [_strip_heading_noise(s.title) for s in r.segments]
+    assert any("沟通记录" in t for t in titles)
+    assert not any("产品定义" in t for t in titles)
+    comm = [s for s in r.segments if "沟通记录" in _strip_heading_noise(s.title)]
+    assert len(comm) == 1
+    assert "产品定义与营销哲学" in comm[0].text
+    assert "记录 5" in comm[0].text
+
+
+def test_fallback_is_low_confidence_no_pre_explode():
+    plain = "📊 内容统计\n" + ("说明行无章节边界。\n" * 20)
+    r = split_bundle_ex(plain, source_title="误标聚合.txt")
+    assert r.mode == "fallback"
+    assert split_confidence(r) == "low"
+    assert not should_pre_explode(r)
 
 
 if __name__ == "__main__":
@@ -141,4 +248,6 @@ if __name__ == "__main__":
     test_skip_shell_with_inner_boundaries()
     test_fallback_never_empty_on_long_text()
     test_gp_internal_boundary()
+    test_md_report_skips_ai_and_splits_by_toc_sections()
+    test_fallback_is_low_confidence_no_pre_explode()
     print("ok")

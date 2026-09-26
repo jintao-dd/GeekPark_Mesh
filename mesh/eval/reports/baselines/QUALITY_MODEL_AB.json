@@ -1,0 +1,150 @@
+{
+  "phase": "quality_model_task_ab",
+  "status": "frozen",
+  "frozen_layers": {
+    "retrieval_ranking": "frozen",
+    "claim_support": "v2.4c-2_frozen_no_patch",
+    "agent_contract": "frozen",
+    "ontology": "frozen_doc_only",
+    "gold": "unchanged",
+    "dynamic_router": "forbidden"
+  },
+  "configs": [
+    {
+      "config": {
+        "id": "opus_all",
+        "label": "全 Opus（对照）",
+        "semantic": "anthropic/claude-4.8-opus",
+        "answer": "anthropic/claude-4.8-opus",
+        "role": "baseline"
+      },
+      "metrics": {
+        "answer_canonical": 1.0,
+        "evidence_canonical": 1.0,
+        "answer_unseen": 1.0,
+        "evidence_unseen": 1.0,
+        "answer_canonical_elapsed_s": 139.46,
+        "evidence_canonical_elapsed_s": 125.65,
+        "answer_unseen_elapsed_s": 24.23,
+        "evidence_unseen_elapsed_s": 28.4,
+        "answer_canonical_llm_used": 11,
+        "answer_unseen_llm_used": 0,
+        "fail_ids": {
+          "answer_canonical": [],
+          "evidence_canonical": [],
+          "answer_unseen": [],
+          "evidence_unseen": []
+        },
+        "usage": {
+          "prompt_tokens": 151060,
+          "completion_tokens": 17106,
+          "total_tokens": 168166,
+          "n_calls": 53
+        }
+      },
+      "quality_ok": true,
+      "cost": {
+        "usd_estimate": 0.50318,
+        "rate_model": "anthropic/claude-4.8-opus",
+        "note": "modelink opus cache_input proxy + output $25/M"
+      },
+      "wall_s": 317.74
+    },
+    {
+      "config": {
+        "id": "sonnet_all",
+        "label": "全 Sonnet（默认候选）",
+        "semantic": "claude-sonnet-4-6",
+        "answer": "claude-sonnet-4-6",
+        "role": "default_candidate"
+      },
+      "metrics": {
+        "answer_canonical": 1.0,
+        "evidence_canonical": 1.0,
+        "answer_unseen": 1.0,
+        "evidence_unseen": 1.0,
+        "answer_canonical_elapsed_s": 122.21,
+        "evidence_canonical_elapsed_s": 149.23,
+        "answer_unseen_elapsed_s": 39.41,
+        "evidence_unseen_elapsed_s": 53.0,
+        "answer_canonical_llm_used": 11,
+        "answer_unseen_llm_used": 0,
+        "fail_ids": {
+          "answer_canonical": [],
+          "evidence_canonical": [],
+          "answer_unseen": [],
+          "evidence_unseen": []
+        },
+        "usage": {
+          "prompt_tokens": 146823,
+          "completion_tokens": 17790,
+          "total_tokens": 164613,
+          "n_calls": 54
+        }
+      },
+      "quality_ok": true,
+      "cost": {
+        "usd_estimate": null,
+        "note": "sonnet rate unset on modelink snapshot"
+      },
+      "wall_s": 364.87
+    },
+    {
+      "config": {
+        "id": "sonnet_sem_opus_ans",
+        "label": "semantic=Sonnet / answer=Opus（敏感成文）",
+        "semantic": "claude-sonnet-4-6",
+        "answer": "anthropic/claude-4.8-opus",
+        "role": "sensitive_compose"
+      },
+      "metrics": {
+        "answer_canonical": 1.0,
+        "evidence_canonical": 1.0,
+        "answer_unseen": 1.0,
+        "evidence_unseen": 1.0,
+        "answer_canonical_elapsed_s": 143.05,
+        "evidence_canonical_elapsed_s": 163.32,
+        "answer_unseen_elapsed_s": 29.45,
+        "evidence_unseen_elapsed_s": 39.3,
+        "answer_canonical_llm_used": 11,
+        "answer_unseen_llm_used": 0,
+        "fail_ids": {
+          "answer_canonical": [],
+          "evidence_canonical": [],
+          "answer_unseen": [],
+          "evidence_unseen": []
+        },
+        "usage": {
+          "prompt_tokens": 148724,
+          "completion_tokens": 17885,
+          "total_tokens": 166609,
+          "n_calls": 53
+        }
+      },
+      "quality_ok": true,
+      "cost": {
+        "usd_estimate": 0.521487,
+        "rate_model": "anthropic/claude-4.8-opus",
+        "note": "modelink opus cache_input proxy + output $25/M"
+      },
+      "wall_s": 376.11
+    }
+  ],
+  "temporal_residual": {
+    "pass_rate": 0.9167,
+    "n_fail": 2,
+    "note": "Independent residual; do not modify Claim Support to chase 1.0"
+  },
+  "task_model_table": {
+    "Claim semantic judge": "claude-sonnet-4-6",
+    "Answer compose (default)": "claude-sonnet-4-6",
+    "Answer compose (sensitive/external)": "anthropic/claude-4.8-opus",
+    "Evidence label": "claim_support v2.4c-2 (frozen; model-light)",
+    "Temporal": "residual; do not patch claim_support"
+  },
+  "decision": {
+    "default": "sonnet_all",
+    "sensitive_compose": "sonnet_sem_opus_ans",
+    "note": "Quality gap negligible across configs when all quality_ok; prefer Sonnet default, Opus for sensitive answer compose."
+  }
+}

@@ -519,6 +519,12 @@
         try{const j=await r.json();msg+='：'+(j.detail||j.error||r.status);}catch(_){msg+='：'+r.status;}
         say(msg);return false;
       }
+      try{
+        const j=await r.json();
+        if(j && j.preview_gate_stale){
+          say('稿件已改，预览门禁已失效——请重新生成预览后再发布', 6000);
+        }
+      }catch(_){}
       return true;
     }
     function closePick(){if(pickEl){pickEl.remove();pickEl=null;}}
@@ -627,8 +633,19 @@
         });
         g.appendChild(a);
       }
-      document.querySelectorAll('.card').forEach(c=>{if(!c.dataset.path||c.querySelector('.del'))return;const d=document.createElement('button');d.type='button';d.className='del';d.title='删除卡片';d.textContent='×';
-        d.addEventListener('click',async e=>{e.preventDefault();e.stopPropagation();if(!(await MeshDialog.confirm({title:'删除卡片',body:'删除这张卡片？会写入版本记录。',okText:'删除',danger:true})))return;if(await save(c.dataset.path,null,'delete')){c.remove();say('已删除并保存');}});c.appendChild(d);});
+      function syncRelationsKpi(){
+      // 只计读者区 #rel 卡，不含 #rel-backlog 草稿积压
+      const n=document.querySelectorAll('#rel .cards > .card[data-path^="relations."]').length;
+      document.querySelectorAll('.kpis .kpi').forEach(k=>{
+        const lab=(k.querySelector('span')?.textContent||'').trim();
+        if(lab==='可同步的关系'){
+          const b=k.querySelector('b');
+          if(b) b.textContent=String(n);
+        }
+      });
+    }
+    document.querySelectorAll('.card').forEach(c=>{if(!c.dataset.path||c.querySelector('.del'))return;const d=document.createElement('button');d.type='button';d.className='del';d.title='删除卡片';d.textContent='×';
+        d.addEventListener('click',async e=>{e.preventDefault();e.stopPropagation();if(!(await MeshDialog.confirm({title:'删除卡片',body:'删除这张卡片？会写入版本记录。',okText:'删除',danger:true})))return;if(await save(c.dataset.path,null,'delete')){c.remove();if((c.dataset.path||'').startsWith('relations.'))syncRelationsKpi();say('已删除并保存');}});c.appendChild(d);});
       document.querySelectorAll('.cards[data-addable]').forEach(g=>{
         if(g.querySelector('.addcard'))return;
         const section=g.dataset.addable||'relations';
@@ -643,6 +660,9 @@
             const r=await fetch('/api/add_card',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({slug:CFG.slug,target:CFG.target,section})});
             const j=await r.json().catch(()=>({}));
             if(!r.ok){say('新增失败：'+(j.detail||j.error||r.status));return;}
+            if(j.preview_gate_stale){
+              say('稿件已改，预览门禁已失效——请重新生成预览后再发布', 6000);
+            }
             const idx=j.index;
             const card=j.card||{};
             const sec=j.section||section;
@@ -684,10 +704,11 @@
                 '<div class="deps">'+(card.teams||[]).map((t,ti)=>'<span class="dep'+((/^→|^->/.test(String(t||'')))?' dep-sug':'')+'" data-path="'+path+'.teams.'+ti+'">'+escHtml(t)+'</span>').join('')+'</div>';
             }
             g.insertBefore(el, a);
+            if(sec==='relations') syncRelationsKpi();
             // 给新卡挂删除钮
             if(!el.querySelector('.del')){
               const d=document.createElement('button');d.type='button';d.className='del';d.title='删除卡片';d.textContent='×';
-              d.addEventListener('click',async ev=>{ev.preventDefault();ev.stopPropagation();if(!(await MeshDialog.confirm({title:'删除卡片',body:'删除这张卡片？会写入版本记录。',okText:'删除',danger:true})))return;if(await save(el.dataset.path,null,'delete')){el.remove();say('已删除并保存');}});
+              d.addEventListener('click',async ev=>{ev.preventDefault();ev.stopPropagation();if(!(await MeshDialog.confirm({title:'删除卡片',body:'删除这张卡片？会写入版本记录。',okText:'删除',danger:true})))return;if(await save(el.dataset.path,null,'delete')){el.remove();if((el.dataset.path||'').startsWith('relations.'))syncRelationsKpi();say('已删除并保存');}});
               el.appendChild(d);
             }
             if(sec==='contacts' && !el.querySelector('.addgroup')){
@@ -847,7 +868,21 @@
     if(pubBtn&&mask){
       const ok=document.getElementById('pubOk');
       const cancel=document.getElementById('pubCancel');
+      const pubForm=mask.querySelector('form');
+      const okLabel=ok?(ok.textContent||'确认上线'):'确认上线';
+      let pubAbort=null;
+      function resetPubUi(){
+        if(pubForm) pubForm.dataset.submitting='0';
+        if(ok){
+          ok.disabled=false;
+          ok.textContent=okLabel;
+        }
+      }
       function openPub(){
+        // 上次上线卡住/失败后关闭弹窗时，必须清掉 disabled，否则再点「没反应」
+        if(pubAbort){try{pubAbort.abort();}catch(_){}}
+        pubAbort=null;
+        resetPubUi();
         mask.hidden=false;
         mask.classList.add('on');
         document.body.style.overflow='hidden';
@@ -856,18 +891,21 @@
         mask.classList.remove('on');
         mask.hidden=true;
         document.body.style.overflow='';
+        // 关闭时若未在飞行中，恢复按钮；飞行中保留禁用，等回调重置
+        if(!pubForm||pubForm.dataset.submitting!=='1') resetPubUi();
       }
       pubBtn.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();openPub();});
-      if(cancel)cancel.addEventListener('click',closePub);
-      mask.addEventListener('click',e=>{if(e.target===mask)closePub();});
-      document.addEventListener('keydown',e=>{if(e.key==='Escape'&&mask.classList.contains('on'))closePub();});
-      const pubForm=mask.querySelector('form');
+      if(cancel)cancel.addEventListener('click',()=>{if(pubAbort){try{pubAbort.abort();}catch(_){}}pubAbort=null;resetPubUi();closePub();});
+      mask.addEventListener('click',e=>{if(e.target===mask){if(pubAbort){try{pubAbort.abort();}catch(_){}}pubAbort=null;resetPubUi();closePub();}});
+      document.addEventListener('keydown',e=>{if(e.key==='Escape'&&mask.classList.contains('on')){if(pubAbort){try{pubAbort.abort();}catch(_){}}pubAbort=null;resetPubUi();closePub();}});
       if(pubForm){
         pubForm.addEventListener('submit',async e=>{
           e.preventDefault();
           if(pubForm.dataset.submitting==='1')return;
           pubForm.dataset.submitting='1';
-          if(ok)ok.disabled=true;
+          if(ok){ok.disabled=true;ok.textContent='上线中…';}
+          pubAbort=typeof AbortController!=='undefined'?new AbortController():null;
+          const timer=setTimeout(()=>{try{pubAbort&&pubAbort.abort();}catch(_){}},90000);
           try{
             const body=new URLSearchParams();
             const r=await fetch(pubForm.action,{
@@ -875,20 +913,70 @@
               headers:{Accept:'application/json','Content-Type':'application/x-www-form-urlencoded'},
               credentials:'same-origin',
               body:body.toString(),
+              signal:pubAbort?pubAbort.signal:undefined,
             });
             const data=await r.json().catch(()=>({}));
             if(!r.ok||data.ok===false) throw new Error((data&&data.error)||('HTTP '+r.status));
             location.href='/'+CFG.slug+'?published=1';
           }catch(err){
-            pubForm.dataset.submitting='0';
-            if(ok)ok.disabled=false;
+            const aborted=err&&(err.name==='AbortError'||/abort/i.test(String(err.message||'')));
+            pubAbort=null;
+            resetPubUi();
             closePub();
+            if(aborted){
+              if(window.MeshDialog) await MeshDialog.alert({title:'已取消',body:'上线请求已取消，可再试一次。'});
+              return;
+            }
             if(window.MeshDialog) await MeshDialog.alert({title:'上线失败',body:String(err.message||err)});
             else say('上线失败：'+String(err.message||err),8000);
+          }finally{
+            clearTimeout(timer);
           }
         });
       }
     }
+  })();
+
+  // ===== 渐进预览：后台仍在生成时轮询，完成后刷新 ——
+  (function(){
+    const building=CFG.previewBuilding||/building=1/.test(location.search);
+    if(!CFG.isPreview||!CFG.slug||!building)return;
+    const note=document.getElementById('buildingNote');
+    let lastPhase='';
+    let fails=0;
+    async function tick(){
+      try{
+        const r=await fetch('/admin/issue/'+encodeURIComponent(CFG.slug)+'/preview/status',{headers:{Accept:'application/json'},credentials:'same-origin'});
+        if(!r.ok)throw new Error('status '+r.status);
+        const st=await r.json();
+        fails=0;
+        const msg=st.message||'';
+        if(note&&msg) note.textContent='后台生成中：'+msg+'（完成后自动刷新；完成前请暂缓大改）';
+        if(st.phase&&st.phase!==lastPhase){
+          lastPhase=st.phase;
+          // 阶段切换时刷新 lead/关系（骨架→成稿）
+          if(st.phase==='draft'||st.phase==='relations'||st.phase==='done'){
+            /* keep polling; reload only on done/fail terminal */
+          }
+        }
+        if(st.done){
+          const u=new URL(location.href);
+          u.searchParams.delete('building');
+          location.replace(u.pathname+u.search+(u.search?'&':'?')+'edit=1');
+          return;
+        }
+        if(st.error&&!st.running){
+          if(note) note.textContent='生成未完全成功：'+st.error+'（可回素材页重试；本页仍保留已生成内容）';
+          return;
+        }
+        if(st.running) setTimeout(tick,2000);
+      }catch(e){
+        fails+=1;
+        if(fails<8) setTimeout(tick,3000);
+        else if(note) note.textContent='无法获取生成进度，请刷新页面。';
+      }
+    }
+    setTimeout(tick,1200);
   })();
 
   // ===== 菜单高亮 =====

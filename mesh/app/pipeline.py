@@ -1,16 +1,13 @@
 """GeekPark Mesh · 管线定义与执行器
 
-**这是 25 步的唯一事实源。** 后台界面显示的步骤、后端真正执行的动作，都读这一份，
-不允许两边各写一份——那正是"UI 上写了、后端没做"的来源。
-
-每步的 `by` 字段标明它由谁执行：
-  - "code"  : 后端代码离散执行，跑完能给出真实数字（可验收）
-  - "model" : 在抽取的提示词内部执行，随抽取阶段整体完成
-UI 会把两者区分显示。**不许给 model 步伪造独立进度条。**
+挖掘阶段真正执行的步骤以本文件 `_run` 为准。
+`PROC` / `DESIGN` 供控制台展示；`by=defer` 表示**不在挖掘阶段执行**（生成预览时做），
+UI 不得把它们显示成「本轮已完成」。
 """
 from __future__ import annotations
 import json
 import traceback
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from . import db, llm, merge, job_store, ask_concurrency
 
@@ -20,8 +17,8 @@ KIND = "pipeline"
 PROC = [
     dict(sk="intake", k="接收 · 隔离入库", by="code",
          h="原样写入原始层，与网站物理隔离"),
-    dict(sk="transcribe", k="转写与识别", by="code",
-         h="录音转文字、录屏抽帧拼接、按说话人分段；说话人归属可能不准，转写稿只进原始层"),
+    dict(sk="transcribe", k="转写统计", by="code",
+         h="统计标题含「录音」的 T6 条数（当前不做真实 ASR）"),
     dict(sk="normalize", k="清洗 · 去重", by="code",
          h="去掉寒暄与重复，统一格式"),
 ]
@@ -39,33 +36,33 @@ DESIGN = [
          h="对照信息池近 12 期，识别谁首次进入记录、谁与往期同名。没有这一步，周报只是一次性摘要"),
     dict(sk="cross-channel-merge", k="跨通道合并 · 同一件事只算一次", by="code",
          h="同一场会可能同时出现在日历、录音和聚合文档里。按实体加事件合并，合并后保留全部来源行。不做这一步，同团队的数据到达两次会被误判成跨部门关系"),
-    # 以下随「生成预览/草稿」执行，挖掘阶段只占位说明，避免 UI 假完成
+    # 以下不在挖掘阶段执行——控制台应标「生成预览时」，禁止假完成
     dict(sk="relation-link", k="关系匹配", by="defer",
-         h="在生成周报草稿时由关系候选 + 模型完成，挖掘阶段不单独跑"),
+         h="在「生成预览」时由关系候选 + 模型完成，挖掘阶段不跑"),
     dict(sk="sync-pick", k="可同步性判断", by="defer",
-         h="在生成周报草稿时执行（跨团队 provenance 校验）"),
+         h="在「生成预览」时执行（跨团队 provenance 校验）"),
     dict(sk="compose", k="五块合成", by="defer",
-         h="在生成周报草稿时合成五块结构"),
+         h="在「生成预览」时合成五块结构"),
     dict(sk="cite", k="来源行生成", by="defer",
-         h="在生成周报草稿时写入来源行"),
+         h="在「生成预览」时写入来源行"),
     dict(sk="lint", k="术语与标签检查", by="code",
          h="禁用词、日程确定度、「不代表承诺」提示、只列本期提交团队"),
     dict(sk="name-verify", k="姓名与职级核对", by="defer",
-         h="随抽取提示词约束；挖掘阶段不做二次模型核对"),
+         h="随抽取提示词约束；挖掘阶段不做独立二次核对"),
     dict(sk="zone-sort", k="六区分拣", by="defer",
-         h="随抽取写入 zone；代码硬拦⑤区/L3"),
+         h="随抽取写入 zone；代码硬拦⑤区/L3（本步非独立运行）"),
     dict(sk="decision-split", k="决定与想法分离", by="defer",
-         h="随 T6 等抽取提示词执行"),
+         h="随 T6 等抽取提示词执行，非独立步骤"),
     dict(sk="speaker-doubt", k="说话人存疑标记", by="defer",
-         h="随转写类抽取提示词执行"),
+         h="随转写类抽取提示词执行，非独立步骤"),
     dict(sk="value-extract", k="价值提取 · 有没有下一步", by="defer",
-         h="随抽取提示词执行"),
+         h="随抽取提示词执行，非独立步骤"),
     dict(sk="certainty-tag", k="确定度标注", by="defer",
-         h="随抽取提示词执行"),
+         h="随抽取提示词执行，非独立步骤"),
     dict(sk="first-seen", k="首次进入判定", by="code",
          h="对照信息池，确认哪些人和公司是本期第一次进入记录。本周导语从这里取角度"),
     dict(sk="invest-guard", k="投资侧合规二次过滤", by="defer",
-         h="随 listed / zone 规则与草稿生成"),
+         h="随 listed / zone 规则与草稿生成，挖掘阶段不单独跑"),
     dict(sk="contrib-list", k="贡献团队清点", by="code",
          h="按归属团队计，不按采集通道计。只列本期有材料进来的团队，不写谁没交"),
     dict(sk="trace-keep", k="可追溯留痕", by="code",
@@ -90,6 +87,7 @@ def _defaults(slug: str) -> dict:
     return {
         "slug": slug, "running": False, "done": False, "error": None,
         "cur": -1, "results": {}, "log": [], "token": 0,
+        "resilience": None, "final_status": None,
     }
 
 
@@ -124,11 +122,15 @@ def _is_current(slug: str, token: int) -> bool:
     return job_store.is_current(KIND, slug, token, _defaults(slug))
 
 
-def start(slug: str, force: bool = False) -> None:
-    """启动一次完整管线。force=True 时取消卡住/旧任务并重新开跑。"""
+def start(slug: str, force: bool = False, *, reextract: bool = False) -> None:
+    """启动一次完整管线。force=True 时取消卡住/旧任务并重新开跑。
+    reextract=True 时对已 extracted 的来源也重抽；默认跳过已抽取来源（避免大聚合文档反复卡死）。
+    """
     from . import job_runtime
 
-    claimed = job_store.try_claim(KIND, slug, _defaults(slug), _new_state(slug), force=force)
+    st0 = _new_state(slug)
+    st0["reextract"] = bool(reextract)
+    claimed = job_store.try_claim(KIND, slug, _defaults(slug), st0, force=force)
     if not claimed:
         return
     token = int(claimed.get("token") or 0)
@@ -140,51 +142,170 @@ def _run(slug: str, token: int = 0) -> None:
     try:
         if not _is_current(slug, token):
             return
+        st0 = job_store.get(KIND, slug, _defaults(slug))
+        reextract = bool(st0.get("reextract"))
         r = con.execute("SELECT * FROM issues WHERE slug=?", (slug,)).fetchone()
         iid = r["id"]
         srcs = [dict(x) for x in con.execute(
-            "SELECT id, stype, team, title, text, channel, meta FROM sources WHERE issue_id=? AND length(text)>0", (iid,))]
+            "SELECT id, stype, team, title, text, channel, meta, extracted FROM sources "
+            "WHERE issue_id=? AND length(text)>0", (iid,))]
 
         _mark(slug, "intake", f"{len(srcs)} 文件")
         n_aud = sum(1 for s in srcs if (s["stype"] or "") in ("T6",) and "录音" in (s["title"] or ""))
         _mark(slug, "transcribe", f"{n_aud or '—'} 段")
         _mark(slug, "normalize", "已整理")
 
-        # ---- 抽取（模型层：extract 及其后的 model 步随本阶段整体完成）----
+        # ---- 抽取：LLM 可并行（受 job llm_slot 限流）；写库与 resilience 记账仍串行 ----
+        from .aggregator import merge_source_meta
+        from .attribution import apply_attribution_to_item
+        from .job_resilience import ResilienceReport, try_unit
+
+        resilience = ResilienceReport()
         got = 0
+        ok_sources = 0
+        skipped_done = 0
         total = len(srcs)
+
+        pending: list[tuple[int, dict, bool, str]] = []
+        crm_skipped = 0
         for i, s in enumerate(srcs, 1):
             if not _is_current(slug, token):
                 return
             title = (s["title"] or f"来源 {s['id']}")[:36]
-            _mark(slug, "extract", f"抽取中 {i}/{total} · {title}")
+            unit = f"#{s['id']} {title}"
+            # CRM 来源由 crm_ingest 按消费窗口分块抽取后接入，且可能一条 source 对应
+            # 整个窗口的几百条 items。这里若整份重抽，会经下面的
+            # DELETE FROM items WHERE source_id 把分块成果一并抹掉，故一律跳过。
+            if (s.get("channel") or "") == "crm":
+                n_exist = con.execute(
+                    "SELECT COUNT(*) AS c FROM items WHERE source_id=?", (s["id"],)
+                ).fetchone()["c"]
+                got += int(n_exist or 0)
+                ok_sources += 1
+                crm_skipped += 1
+                _mark(slug, "extract", f"CRM 交叉已分块接入 {i}/{total} · {title}（{n_exist} 条）")
+                continue
+            if int(s.get("extracted") or 0) == 1 and not reextract:
+                n_exist = con.execute(
+                    "SELECT COUNT(*) AS c FROM items WHERE source_id=?", (s["id"],)
+                ).fetchone()["c"]
+                got += int(n_exist or 0)
+                ok_sources += 1
+                skipped_done += 1
+                _mark(slug, "extract", f"已抽取跳过 {i}/{total} · {title}（{n_exist} 条）")
+                continue
             skip_split = False
             try:
                 meta_obj = json.loads(s["meta"] or "{}") if isinstance(s.get("meta"), str) else (s.get("meta") or {})
                 skip_split = (meta_obj.get("split") or {}).get("mode") == "pre_split"
             except (json.JSONDecodeError, TypeError, AttributeError):
                 skip_split = False
-            items, split_meta = None, None
+            pending.append((i, s, skip_split, unit))
+
+        def _llm_extract(_s: dict, _skip: bool, _prior: list | None):
             try:
                 with ask_concurrency.llm_slot(pool="job"):
-                    items, split_meta = llm.extract_source(
-                        s["stype"], s["team"], s["title"], s["text"] or "",
+                    return llm.extract_source(
+                        _s["stype"], _s["team"], _s["title"], _s["text"] or "",
                         period_start=r["date_start"] or "",
                         period_end=r["date_end"] or "",
                         period_label=r["period_label"] or "",
-                        channel=s.get("channel") or "manual",
-                        skip_split=skip_split,
-                        source_id=s["id"],
+                        channel=_s.get("channel") or "manual",
+                        skip_split=_skip,
+                        source_id=_s["id"],
+                        prior_items=_prior or None,
                     )
             except ask_concurrency.AskBusyError as e:
                 raise RuntimeError(f"抽取排队超时：{e}") from e
             except ask_concurrency.JobBusyError as e:
                 raise RuntimeError(f"抽取排队超时：{e}") from e
+
+        # 预热并行 LLM：每源带上轮 items 做段级 reuse；try_unit/落库仍按序
+        llm_cache: dict[int, object] = {}
+        prior_by_i: dict[int, list] = {}
+        for i, s, skip_split, unit in pending:
+            prior_by_i[i] = [
+                dict(x)
+                for x in con.execute(
+                    "SELECT zone, level, kind, text, raw_snippet, entities, roles, signals, source_label, pointer, "
+                    "blocked, owner_team, channel, source_labels, owner_provenance, llm_owner_team_hint, "
+                    "stype, team FROM items WHERE source_id=?",
+                    (s["id"],),
+                )
+            ]
+
+        if len(pending) > 1:
+            _mark(slug, "extract", f"并行抽取 {len(pending)}/{total} 个来源…")
+            workers = min(len(pending), max(2, int(getattr(ask_concurrency, "_JOB_GLOBAL", 2) or 2)))
+
+            def _preheat(item: tuple[int, dict, bool, str]):
+                i, s, skip_split, _unit = item
+                try:
+                    return i, _llm_extract(s, skip_split, prior_by_i.get(i)), None
+                except Exception as e:
+                    return i, None, e
+
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                futs = [pool.submit(_preheat, item) for item in pending]
+                for fut in as_completed(futs):
+                    if not _is_current(slug, token):
+                        return
+                    i, val, err = fut.result()
+                    llm_cache[i] = (val, err)
+                    s = next(x[1] for x in pending if x[0] == i)
+                    title = (s["title"] or f"来源 {s['id']}")[:36]
+                    _mark(slug, "extract", f"抽取返回 {i}/{total} · {title}")
+
+        for i, s, skip_split, unit in pending:
+            if not _is_current(slug, token):
+                return
+            title = (s["title"] or f"来源 {s['id']}")[:36]
+            _mark(slug, "extract", f"抽取中 {i}/{total} · {title}")
+
+            cached_box = [llm_cache.get(i)] if llm_cache else [None]
+            prior = prior_by_i.get(i) or []
+
+            def _extract_one(_s=s, _skip=skip_split, _box=cached_box, _prior=prior):
+                if _box[0] is not None:
+                    val, err = _box[0]
+                    _box[0] = None
+                    if err is not None:
+                        raise err
+                    return val
+                return _llm_extract(_s, _skip, _prior)
+
+            extracted = try_unit(
+                _extract_one,
+                unit=unit,
+                kind="source",
+                report=resilience,
+                on_skip=lambda e, _unit=unit: _mark(
+                    slug, "extract", f"跳过 {_unit}：{str(e).replace(chr(10), ' ')[:80]}"
+                ),
+            )
+            if extracted is None:
+                try:
+                    meta_obj = json.loads(s.get("meta") or "{}") if isinstance(s.get("meta"), str) else dict(s.get("meta") or {})
+                except (json.JSONDecodeError, TypeError):
+                    meta_obj = {}
+                meta_obj["extract_error"] = {
+                    "error": next(
+                        (a.error for a in reversed(resilience.attempts) if a.unit == unit and a.error),
+                        "抽取失败",
+                    ),
+                    "action": "skipped",
+                }
+                con.execute(
+                    "UPDATE sources SET extracted=0, meta=? WHERE id=?",
+                    (json.dumps(meta_obj, ensure_ascii=False), s["id"]),
+                )
+                con.commit()
+                continue
+
+            items, split_meta = extracted
             if not _is_current(slug, token):
                 return
             con.execute("DELETE FROM items WHERE source_id=?", (s["id"],))
-            from .aggregator import merge_source_meta
-            from .attribution import apply_attribution_to_item
             for it in items:
                 item_stype = it.get("item_stype") or s["stype"]
                 attr = apply_attribution_to_item(
@@ -193,10 +314,11 @@ def _run(slug: str, token: int = 0) -> None:
                 owner = attr.owner_team
                 blocked = int(it.get("blocked") or 0)
                 con.execute(
-                    """INSERT INTO items(issue_id,source_id,team,stype,zone,level,kind,text,entities,roles,signals,
+                    """INSERT INTO items(issue_id,source_id,team,stype,zone,level,kind,text,raw_snippet,entities,roles,signals,
                        source_label,pointer,blocked,owner_team,channel,source_labels,owner_provenance,llm_owner_team_hint)
-                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (iid, s["id"], owner or it.get("team"), item_stype, it["zone"], it["level"], it["kind"], it["text"],
+                     it.get("raw_snippet") or it["text"],
                      json.dumps(it["entities"], ensure_ascii=False), json.dumps(it["roles"], ensure_ascii=False),
                      json.dumps(it["signals"], ensure_ascii=False), it["source_label"], it["pointer"], blocked,
                      owner, s["channel"] or "manual",
@@ -212,17 +334,58 @@ def _run(slug: str, token: int = 0) -> None:
                 meta_obj = json.loads(meta) if isinstance(meta, str) else dict(meta or {})
             except (json.JSONDecodeError, TypeError):
                 meta_obj = {}
-            if llm.split_needs_review(split_meta):
+            meta_obj.pop("extract_error", None)
+            if isinstance(split_meta, dict) and split_meta.get("segment_digests"):
+                sp = dict(meta_obj.get("split") or {})
+                sp["segment_digests"] = list(split_meta.get("segment_digests") or [])
+                if split_meta.get("segment_reuse"):
+                    sp["segment_reuse"] = split_meta["segment_reuse"]
+                meta_obj["split"] = sp
+            if llm.split_needs_review(
+                split_meta,
+                stype=s.get("stype") or "",
+                team=s.get("team") or "",
+                channel=s.get("channel") or "",
+            ):
                 sp = dict(meta_obj.get("split") or {})
                 sp["needs_review"] = True
                 meta_obj["split"] = sp
                 meta = json.dumps(meta_obj, ensure_ascii=False)
+            else:
+                sp = dict(meta_obj.get("split") or {})
+                if sp.get("needs_review"):
+                    sp["needs_review"] = False
+                    meta_obj["split"] = sp
+                meta = json.dumps(meta_obj, ensure_ascii=False)
             con.execute("UPDATE sources SET extracted=1, meta=? WHERE id=?", (meta, s["id"]))
             con.commit()
-            _mark(slug, "extract", f"已完成 {i}/{total} · 候选 {got}")
+            ok_sources += 1
+            reuse_note = ""
+            if isinstance(split_meta, dict) and (split_meta.get("segment_reuse") or {}).get("reused"):
+                ru = split_meta["segment_reuse"]
+                reuse_note = f" · 段复用 {ru.get('reused')}/{ru.get('total')}"
+            _mark(slug, "extract", f"已完成 {i}/{total} · 候选 {got}{reuse_note}")
         if not _is_current(slug, token):
             return
-        _mark(slug, "extract", f"候选 {got}")
+        extract_note = f"候选 {got}"
+        if skipped_done:
+            extract_note += f" · 复用已抽取 {skipped_done}"
+        if resilience.skipped:
+            extract_note += f" · 跳过来源 {len(resilience.skipped)}"
+        if resilience.retry_total:
+            extract_note += f" · 重试 {resilience.retry_total}"
+        _mark(slug, "extract", extract_note)
+        if total > 0 and ok_sources == 0:
+            _set(
+                slug,
+                running=False,
+                done=False,
+                error="全部来源抽取失败：" + resilience.summary_message(ok_units=0, unit_label="来源"),
+                final_status="failed",
+                resilience=resilience.to_dict(),
+            )
+            return
+        _set(slug, resilience=resilience.to_dict())
 
         # ---- 代码步：真跑，真数字 ----
         miss = con.execute("SELECT COUNT(*) c FROM items WHERE issue_id=? AND (owner_team IS NULL OR owner_team='')", (iid,)).fetchone()["c"]
@@ -245,19 +408,13 @@ def _run(slug: str, token: int = 0) -> None:
         st = merge.apply_merge(con, iid)
         _mark(slug, "cross-channel-merge", f"合并 {st['groups']} 组 · 来源 {st['source_lines']} 行")
 
-        for sk in ("relation-link", "sync-pick", "compose", "cite"):
-            _mark(slug, sk, "待预览/草稿阶段")
+        # defer 步不写假完成结果；UI 按 by=defer 显示「生成预览时」
 
         hits = llm.forbidden_hits(" ".join(
             (x["text"] or "") for x in con.execute("SELECT text FROM items WHERE issue_id=? AND blocked=0 AND merged_into IS NULL", (iid,))))
         _mark(slug, "lint", f"问题 {len(hits)}" + ("：" + "、".join(hits[:4]) if hits else ""))
 
-        for sk in ("name-verify", "zone-sort", "decision-split", "speaker-doubt",
-                   "value-extract", "certainty-tag"):
-            _mark(slug, sk, "随抽取提示词")
-
         _mark(slug, "first-seen", f"首次 {len(first)}")
-        _mark(slug, "invest-guard", "随草稿/规则")
 
         teams = [x["owner_team"] for x in con.execute(
             "SELECT DISTINCT owner_team FROM items WHERE issue_id=? AND blocked=0 AND merged_into IS NULL AND owner_team IS NOT NULL AND owner_team<>''", (iid,))]
@@ -271,9 +428,26 @@ def _run(slug: str, token: int = 0) -> None:
             return
         db.mark_draft_stale(con, iid)
         con.commit()
-        _set(slug, running=False, done=True)
+        final = "degraded" if resilience.skipped else "ok"
+        msg_extra = resilience.summary_message(ok_units=ok_sources, unit_label="来源")
+        _set(
+            slug,
+            running=False,
+            done=True,
+            error=None,
+            final_status=final,
+            resilience=resilience.to_dict(),
+            message=f"挖掘完成（{msg_extra}）" if final == "degraded" else "挖掘完成",
+        )
     except Exception as e:
         if _is_current(slug, token):
-            _set(slug, running=False, done=False, error=f"{e}", log=[traceback.format_exc()[-1200:]])
+            _set(
+                slug,
+                running=False,
+                done=False,
+                error=f"{e}",
+                final_status="failed",
+                log=[traceback.format_exc()[-1200:]],
+            )
     finally:
         con.close()

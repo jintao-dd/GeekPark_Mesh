@@ -1,15 +1,15 @@
 # Phase 1 Closeout Report
 
-- 生成时间：2026-08-31T04:32:48
+- 生成时间：2026-09-25T18:09:37
 - 语料：**golden_sqlite(_issue_2026-8-17.json)**
 - 生产 PG：**否（本地黄金 SQLite）**
-- 总耗时：29s
+- 总耗时：115s
 
 ## 验收摘要
 
 | 项 | 结果 |
 |----|------|
-| 检索 | 25/25 pass |
+| 检索 | 24/25 pass |
 | E2E | 未跑 |
 | Follow-up | 未跑 |
 | SSE | 未跑 |
@@ -22,7 +22,7 @@
 ## 失败分层
 
 - **routing** (0): —
-- **retrieval** (0): —
+- **retrieval** (1): e07:['scope_issues']
 - **evidence** (0): —
 - **answer** (0): —
 - **other** (0): —

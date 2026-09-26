@@ -1,0 +1,2787 @@
+{
+  "phase": "Retrieval Recall Baseline",
+  "gold": "retrieval_gold_v2.jsonl",
+  "tag": "p0_baseline_recall_fts",
+  "n": 30,
+  "n_with_chunk_truth": 30,
+  "embed": false,
+  "macro_recall@5": 0.8328,
+  "macro_recall@10": 0.9028,
+  "macro_recall@20": 0.95,
+  "macro_chunk_recall@5": 0.0,
+  "macro_chunk_recall@10": 0.0,
+  "macro_chunk_recall@20": 0.0,
+  "macro_chunk_in_pool": 0.0,
+  "channel_hist_total": {
+    "item_facts": 313,
+    "item_entity_facts": 22,
+    "fts": 121
+  },
+  "n_cases_with_vector": 0,
+  "mean_vector_rank": null,
+  "failure_pattern_hist": {
+    "ok": 30
+  },
+  "elapsed_s": 0.8,
+  "results": [
+    {
+      "id": "R01",
+      "category": "name",
+      "query": "锦涛做了什么",
+      "scope": {
+        "issue": "explicit:2026-8-17",
+        "time_basis": "unknown",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4251",
+        "4259",
+        "4260"
+      ],
+      "retrieved_items": [
+        "4260",
+        "4251",
+        "4259"
+      ],
+      "hit_items": [
+        "4251",
+        "4259",
+        "4260"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "d2ad48a6d8294b74fbbc",
+        "fe2cc89029efdc05267c",
+        "4192697fb4b46401c232"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 3.0
+      },
+      "channel_hist": {
+        "item_facts": 3
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-8-17",
+        "date_from": "2026-09-07",
+        "date_to": "2026-09-07",
+        "n_hits_raw": 3,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 3
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-8-17",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 183,
+      "notes": "人名召回；内容在品牌创意"
+    },
+    {
+      "id": "R02",
+      "category": "name_recent",
+      "query": "锦涛最近做了什么",
+      "scope": {
+        "issue": "latest_published",
+        "time_basis": "unknown",
+        "window": "recent"
+      },
+      "relevant_items": [
+        "4251",
+        "4259",
+        "4260"
+      ],
+      "retrieved_items": [
+        "4260",
+        "4251",
+        "4259"
+      ],
+      "hit_items": [
+        "4251",
+        "4259",
+        "4260"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "d2ad48a6d8294b74fbbc",
+        "fe2cc89029efdc05267c",
+        "4192697fb4b46401c232"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 5.0
+      },
+      "channel_hist": {
+        "item_facts": 3,
+        "item_entity_facts": 2
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "",
+        "date_from": "2026-06-23",
+        "date_to": null,
+        "n_hits_raw": 5,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 3,
+          "item_entity_facts": 2
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-09-08",
+        "issue_mode": "latest_published",
+        "filter_mode": "time_window",
+        "window": "recent"
+      },
+      "elapsed_ms": 12,
+      "notes": "Scope 验证样本：latest+recent 可跨已发布（非 Recall 缺陷）"
+    },
+    {
+      "id": "R03",
+      "category": "company",
+      "query": "破壳创智有什么进展",
+      "scope": {
+        "issue": "explicit:2026-8-17",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4356"
+      ],
+      "retrieved_items": [
+        "4356"
+      ],
+      "hit_items": [
+        "4356"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "03eb4ede0d6493b0e262"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 3.0
+      },
+      "channel_hist": {
+        "item_facts": 1,
+        "fts": 2
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-8-17",
+        "date_from": "2026-09-07",
+        "date_to": "2026-09-07",
+        "n_hits_raw": 3,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 1,
+          "fts": 2
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-8-17",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 20,
+      "notes": null
+    },
+    {
+      "id": "R04",
+      "category": "company",
+      "query": "面壁智能接触了什么",
+      "scope": {
+        "issue": "explicit:2026-8-17",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4112",
+        "4115",
+        "4116",
+        "4118",
+        "4120"
+      ],
+      "retrieved_items": [
+        "4120",
+        "4123",
+        "4112",
+        "4124",
+        "4115",
+        "4116",
+        "4117",
+        "4118",
+        "4122",
+        "4121",
+        "4167",
+        "4128",
+        "4129",
+        "4130",
+        "4106",
+        "4237",
+        "4105",
+        "4110",
+        "4111",
+        "4189"
+      ],
+      "hit_items": [
+        "4112",
+        "4115",
+        "4116",
+        "4118",
+        "4120"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "266c607bec49467a6fd0",
+        "e4b534b96655b86e45ec",
+        "4eb606f25b9735f670e9",
+        "b48f0e83e535396a2916",
+        "584a9705b070915706ff"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 0.6,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 40.0
+      },
+      "channel_hist": {
+        "item_facts": 21,
+        "fts": 15,
+        "item_entity_facts": 4
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-8-17",
+        "date_from": "2026-09-07",
+        "date_to": "2026-09-07",
+        "n_hits_raw": 40,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 21,
+          "fts": 15,
+          "item_entity_facts": 4
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-8-17",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 17,
+      "notes": null
+    },
+    {
+      "id": "R05",
+      "category": "company",
+      "query": "PPIO 姚欣说了什么",
+      "scope": {
+        "issue": "explicit:2026-8-17",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4141",
+        "4142",
+        "4143",
+        "4144",
+        "4145"
+      ],
+      "retrieved_items": [
+        "4146",
+        "4141",
+        "4142",
+        "4143",
+        "4144",
+        "4145"
+      ],
+      "hit_items": [
+        "4141",
+        "4142",
+        "4143",
+        "4144",
+        "4145"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "1dba837c7e598cac0b46",
+        "c0bd959ffa6f2f004af0",
+        "93315c2175f863bcfe8c",
+        "cce614a238988368eb2f",
+        "872a8699d207fb5f02a4"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 0.8,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 6.0
+      },
+      "channel_hist": {
+        "item_facts": 6
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 2,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-8-17",
+        "date_from": "2026-09-07",
+        "date_to": "2026-09-07",
+        "n_hits_raw": 6,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 6
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-8-17",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 12,
+      "notes": null
+    },
+    {
+      "id": "R06",
+      "category": "company",
+      "query": "英伟达 EDC 培训讲了什么",
+      "scope": {
+        "issue": "explicit:2026-8-17",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4147",
+        "4148",
+        "4149",
+        "4150",
+        "4151"
+      ],
+      "retrieved_items": [
+        "4147",
+        "4148",
+        "4149",
+        "4150",
+        "4151",
+        "4306",
+        "4139",
+        "4118",
+        "4123"
+      ],
+      "hit_items": [
+        "4147",
+        "4148",
+        "4149",
+        "4150",
+        "4151"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "02f7220d80710f3462d3",
+        "96d63a7eef95125d2194",
+        "9dc73717bf62fce4fd9b",
+        "78ab20c6e009a039aa39",
+        "c72b4c67c6d9654e25e4"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 11.0
+      },
+      "channel_hist": {
+        "item_facts": 8,
+        "item_entity_facts": 2,
+        "fts": 1
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-8-17",
+        "date_from": "2026-09-07",
+        "date_to": "2026-09-07",
+        "n_hits_raw": 11,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 8,
+          "item_entity_facts": 2,
+          "fts": 1
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-8-17",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 22,
+      "notes": null
+    },
+    {
+      "id": "R07",
+      "category": "company",
+      "query": "OdyssLife 众筹节奏",
+      "scope": {
+        "issue": "explicit:2026-09-08",
+        "time_basis": "issue_time",
+        "window": "explicit"
+      },
+      "relevant_items": [
+        "4649"
+      ],
+      "retrieved_items": [
+        "4649",
+        "4787",
+        "4718"
+      ],
+      "hit_items": [
+        "4649"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "93e4016f053383aa7f3a"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 3.0
+      },
+      "channel_hist": {
+        "item_facts": 3
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-09-08",
+        "date_from": "2026-09-16",
+        "date_to": "2026-09-16",
+        "n_hits_raw": 3,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 3
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-09-08",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "explicit"
+      },
+      "elapsed_ms": 19,
+      "notes": null
+    },
+    {
+      "id": "R08",
+      "category": "company",
+      "query": "FREELANDER 神行者怎么定义产品",
+      "scope": {
+        "issue": "explicit:2026-09-08",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4646",
+        "4644",
+        "4645"
+      ],
+      "retrieved_items": [
+        "4646",
+        "4644",
+        "4645",
+        "4756",
+        "4647"
+      ],
+      "hit_items": [
+        "4646",
+        "4644",
+        "4645"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "adee9fb5f5fab83a74e9",
+        "3f1e3c84a1df5cfe6609",
+        "536b6cc0b38b1bf16ad1"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 7.0
+      },
+      "channel_hist": {
+        "item_facts": 5,
+        "fts": 2
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-09-08",
+        "date_from": "2026-09-16",
+        "date_to": "2026-09-16",
+        "n_hits_raw": 7,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 5,
+          "fts": 2
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-09-08",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 24,
+      "notes": null
+    },
+    {
+      "id": "R09",
+      "category": "company",
+      "query": "未来脑律 ZenoWell 是什么",
+      "scope": {
+        "issue": "explicit:2026-09-08",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4648"
+      ],
+      "retrieved_items": [
+        "4648",
+        "4818",
+        "4647",
+        "4751",
+        "4812",
+        "4833"
+      ],
+      "hit_items": [
+        "4648"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "f71a56f20a635d71070f"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 8.0
+      },
+      "channel_hist": {
+        "item_facts": 6,
+        "fts": 2
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-09-08",
+        "date_from": "2026-09-16",
+        "date_to": "2026-09-16",
+        "n_hits_raw": 8,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 6,
+          "fts": 2
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-09-08",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 15,
+      "notes": null
+    },
+    {
+      "id": "R10",
+      "category": "company",
+      "query": "程天科技外骨骼",
+      "scope": {
+        "issue": "explicit:2026-09-08",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4651"
+      ],
+      "retrieved_items": [
+        "4651",
+        "4793",
+        "4652",
+        "4684",
+        "4757",
+        "4770",
+        "4789",
+        "4759"
+      ],
+      "hit_items": [
+        "4651"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "fffe2c2ac2ab36f74689"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 14.0
+      },
+      "channel_hist": {
+        "item_facts": 8,
+        "fts": 6
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-09-08",
+        "date_from": "2026-09-16",
+        "date_to": "2026-09-16",
+        "n_hits_raw": 14,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 8,
+          "fts": 6
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-09-08",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 18,
+      "notes": null
+    },
+    {
+      "id": "R11",
+      "category": "topic",
+      "query": "Agent 治理与合规 7 月 15 日",
+      "scope": {
+        "issue": "explicit:2026-8-17",
+        "time_basis": "event_time",
+        "window": "explicit"
+      },
+      "relevant_items": [
+        "4105",
+        "4106"
+      ],
+      "retrieved_items": [
+        "4105",
+        "4201",
+        "4340",
+        "4371",
+        "4146",
+        "4382",
+        "4228",
+        "4131",
+        "4122",
+        "4200",
+        "4344",
+        "4205",
+        "4206",
+        "4214",
+        "4220",
+        "4221",
+        "4232",
+        "4241",
+        "4242",
+        "4167"
+      ],
+      "hit_items": [
+        "4105",
+        "4106"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "ef322a1998d729c7221b",
+        "aab8a2cc537ef64e5fcd"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 0.5,
+        "recall@10": 0.5,
+        "recall@20": 0.5
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 32.0
+      },
+      "channel_hist": {
+        "item_facts": 28,
+        "fts": 4
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-8-17",
+        "date_from": "2026-09-07",
+        "date_to": "2026-09-07",
+        "n_hits_raw": 32,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 28,
+          "fts": 4
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-8-17",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "explicit"
+      },
+      "elapsed_ms": 27,
+      "notes": null
+    },
+    {
+      "id": "R12",
+      "category": "topic",
+      "query": "端侧模型与智能座舱",
+      "scope": {
+        "issue": "explicit:2026-8-17",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4116",
+        "4120",
+        "4125",
+        "4128"
+      ],
+      "retrieved_items": [
+        "4112",
+        "4116",
+        "4114",
+        "4118",
+        "4125",
+        "4127",
+        "4120",
+        "4123",
+        "4149",
+        "4383",
+        "4162",
+        "4345",
+        "4348",
+        "4128",
+        "4129",
+        "4130",
+        "4106",
+        "4242",
+        "4105",
+        "4110"
+      ],
+      "hit_items": [
+        "4116",
+        "4120",
+        "4125",
+        "4128"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "4eb606f25b9735f670e9",
+        "584a9705b070915706ff",
+        "bb5f1c3357e14fff70bb",
+        "6b2377c933c9c2b95317"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 0.5,
+        "recall@10": 0.75,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 40.0
+      },
+      "channel_hist": {
+        "item_facts": 17,
+        "fts": 19,
+        "item_entity_facts": 4
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 2,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-8-17",
+        "date_from": "2026-09-07",
+        "date_to": "2026-09-07",
+        "n_hits_raw": 40,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 17,
+          "fts": 19,
+          "item_entity_facts": 4
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-8-17",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 20,
+      "notes": null
+    },
+    {
+      "id": "R13",
+      "category": "topic",
+      "query": "具身智能数据圆桌讨论了什么",
+      "scope": {
+        "issue": "explicit:2026-8-17",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4154",
+        "4155",
+        "4156"
+      ],
+      "retrieved_items": [
+        "4153",
+        "4156",
+        "4158",
+        "4160",
+        "4168",
+        "4169",
+        "4174",
+        "4175",
+        "4182",
+        "4237",
+        "4379",
+        "4250",
+        "4380",
+        "4190",
+        "4154",
+        "4155",
+        "4334"
+      ],
+      "hit_items": [
+        "4154",
+        "4155",
+        "4156"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "5399a0cb558a209bb5c3",
+        "fa623bcc9d44f172d11e",
+        "0a982bc33bc9af926a62"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 0.3333,
+        "recall@10": 0.3333,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 20.0
+      },
+      "channel_hist": {
+        "item_facts": 17,
+        "fts": 3
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 2,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-8-17",
+        "date_from": "2026-09-07",
+        "date_to": "2026-09-07",
+        "n_hits_raw": 20,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 17,
+          "fts": 3
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-8-17",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 21,
+      "notes": null
+    },
+    {
+      "id": "R14",
+      "category": "topic",
+      "query": "视频号本周播放较好的片子",
+      "scope": {
+        "issue": "explicit:2026-09-08",
+        "time_basis": "issue_time",
+        "window": "this_week"
+      },
+      "relevant_items": [
+        "4632",
+        "4864",
+        "4633"
+      ],
+      "retrieved_items": [
+        "4822",
+        "4632",
+        "4633",
+        "4864",
+        "4821",
+        "4785"
+      ],
+      "hit_items": [
+        "4632",
+        "4864",
+        "4633"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "868d5349faa2d39fa649",
+        "42294932fc2ad7890893",
+        "e1f7d159e222637742af"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 11.0
+      },
+      "channel_hist": {
+        "item_facts": 6,
+        "fts": 5
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 2,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-09-08",
+        "date_from": "2026-09-16",
+        "date_to": "2026-09-16",
+        "n_hits_raw": 11,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 6,
+          "fts": 5
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-09-08",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "this_week"
+      },
+      "elapsed_ms": 11,
+      "notes": null
+    },
+    {
+      "id": "R15",
+      "category": "topic",
+      "query": "编辑部选题里 IFA 相关",
+      "scope": {
+        "issue": "explicit:2026-09-08",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4639",
+        "4640"
+      ],
+      "retrieved_items": [
+        "4639",
+        "4640",
+        "4631",
+        "4635",
+        "4838",
+        "4787",
+        "4634",
+        "4636"
+      ],
+      "hit_items": [
+        "4639",
+        "4640"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "c542de2900a0b2a44783",
+        "125ec66086dc65c9b004"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 40.0
+      },
+      "channel_hist": {
+        "item_facts": 8,
+        "fts": 32
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-09-08",
+        "date_from": "2026-09-16",
+        "date_to": "2026-09-16",
+        "n_hits_raw": 40,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 8,
+          "fts": 32
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-09-08",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 19,
+      "notes": null
+    },
+    {
+      "id": "R16",
+      "category": "person",
+      "query": "詹杨帆怎么看端侧和云端",
+      "scope": {
+        "issue": "explicit:2026-8-17",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4125",
+        "4126",
+        "4127",
+        "4131"
+      ],
+      "retrieved_items": [
+        "4121",
+        "4118",
+        "4120",
+        "4131",
+        "4122",
+        "4117",
+        "4123",
+        "4125",
+        "4126",
+        "4127",
+        "4130",
+        "4167",
+        "4124",
+        "4128",
+        "4129",
+        "4115",
+        "4116",
+        "4114",
+        "4302",
+        "4241"
+      ],
+      "hit_items": [
+        "4125",
+        "4126",
+        "4127",
+        "4131"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "bb5f1c3357e14fff70bb",
+        "745c00da0beac4f6f655",
+        "d1c9715b1f54573bb967",
+        "7db589ebd88cdc9284cf"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 0.25,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 27.0
+      },
+      "channel_hist": {
+        "item_facts": 20,
+        "fts": 3,
+        "item_entity_facts": 4
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 4,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-8-17",
+        "date_from": "2026-09-07",
+        "date_to": "2026-09-07",
+        "n_hits_raw": 27,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 20,
+          "fts": 3,
+          "item_entity_facts": 4
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-8-17",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 15,
+      "notes": null
+    },
+    {
+      "id": "R17",
+      "category": "person",
+      "query": "滴滴战投牛一鸣怎么看智能硬件",
+      "scope": {
+        "issue": "explicit:2026-09-08",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4647"
+      ],
+      "retrieved_items": [
+        "4647"
+      ],
+      "hit_items": [
+        "4647"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "115830562a984a7e076f"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 3.0
+      },
+      "channel_hist": {
+        "item_facts": 1,
+        "fts": 2
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-09-08",
+        "date_from": "2026-09-16",
+        "date_to": "2026-09-16",
+        "n_hits_raw": 3,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 1,
+          "fts": 2
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-09-08",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 23,
+      "notes": null
+    },
+    {
+      "id": "R18",
+      "category": "community",
+      "query": "Founder Park 下半年规划",
+      "scope": {
+        "issue": "explicit:2026-8-17",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4358",
+        "4271"
+      ],
+      "retrieved_items": [
+        "4368",
+        "4274",
+        "4221",
+        "4286",
+        "4183",
+        "4319",
+        "4358",
+        "4246",
+        "4247",
+        "4378",
+        "4385",
+        "4386",
+        "4387",
+        "4376",
+        "4377",
+        "4369",
+        "4241",
+        "4271",
+        "4370",
+        "4371"
+      ],
+      "hit_items": [
+        "4358",
+        "4271"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "7f73d8b8ba87e09d02bc",
+        "5cd815553c4706809f5d"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 0.0,
+        "recall@10": 0.5,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 32.0
+      },
+      "channel_hist": {
+        "item_facts": 28,
+        "fts": 4
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 7,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-8-17",
+        "date_from": "2026-09-07",
+        "date_to": "2026-09-07",
+        "n_hits_raw": 32,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 28,
+          "fts": 4
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-8-17",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 14,
+      "notes": null
+    },
+    {
+      "id": "R19",
+      "category": "community",
+      "query": "社群小红书本周计划发什么",
+      "scope": {
+        "issue": "explicit:2026-8-17",
+        "time_basis": "issue_time",
+        "window": "this_week"
+      },
+      "relevant_items": [
+        "4368"
+      ],
+      "retrieved_items": [
+        "4358",
+        "4359",
+        "4360",
+        "4361",
+        "4362",
+        "4363",
+        "4364",
+        "4365",
+        "4367",
+        "4366",
+        "4370",
+        "4371",
+        "4372",
+        "4369",
+        "4374",
+        "4379",
+        "4381",
+        "4382",
+        "4383",
+        "4373"
+      ],
+      "hit_items": [
+        "4368"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "361dcb60adb6c6503cb9"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "recall@20": 0.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 32.0
+      },
+      "channel_hist": {
+        "item_facts": 28,
+        "fts": 4
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 28,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-8-17",
+        "date_from": "2026-09-07",
+        "date_to": "2026-09-07",
+        "n_hits_raw": 32,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 28,
+          "fts": 4
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-8-17",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "this_week"
+      },
+      "elapsed_ms": 18,
+      "notes": null
+    },
+    {
+      "id": "R20",
+      "category": "gp",
+      "query": "张鹏去深圳拜访吴伟",
+      "scope": {
+        "issue": "explicit:2026-8-17",
+        "time_basis": "unknown",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4356"
+      ],
+      "retrieved_items": [
+        "4356",
+        "4267",
+        "4313",
+        "4349",
+        "4241",
+        "4243"
+      ],
+      "hit_items": [
+        "4356"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "03eb4ede0d6493b0e262"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 7.0
+      },
+      "channel_hist": {
+        "item_facts": 6,
+        "fts": 1
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-8-17",
+        "date_from": "2026-09-07",
+        "date_to": "2026-09-07",
+        "n_hits_raw": 7,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 6,
+          "fts": 1
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-8-17",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 26,
+      "notes": null
+    },
+    {
+      "id": "R21",
+      "category": "media",
+      "query": "The Verge 写了哪些手机或隐私相关",
+      "scope": {
+        "issue": "explicit:2026-09-08",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4711",
+        "4709"
+      ],
+      "retrieved_items": [
+        "4711",
+        "4708",
+        "4709",
+        "4710",
+        "4712",
+        "4687",
+        "4690",
+        "4691",
+        "4695",
+        "4699",
+        "4703",
+        "4704",
+        "4702",
+        "4707",
+        "4772",
+        "4835",
+        "4726",
+        "4727",
+        "4729",
+        "4731"
+      ],
+      "hit_items": [
+        "4711",
+        "4709"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "8cd1613055d069276946",
+        "32ea780a8c7955bfc2e0"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 32.0
+      },
+      "channel_hist": {
+        "item_facts": 28,
+        "fts": 4
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-09-08",
+        "date_from": "2026-09-16",
+        "date_to": "2026-09-16",
+        "n_hits_raw": 32,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 28,
+          "fts": 4
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-09-08",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 20,
+      "notes": null
+    },
+    {
+      "id": "R22",
+      "category": "media",
+      "query": "Seattle Times 起诉 OpenAI",
+      "scope": {
+        "issue": "explicit:2026-09-08",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4695"
+      ],
+      "retrieved_items": [
+        "4712",
+        "4695",
+        "4634",
+        "4697",
+        "4700",
+        "4702",
+        "4714",
+        "4864",
+        "4718",
+        "4726"
+      ],
+      "hit_items": [
+        "4695"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "0bb73dbee1404f2a35f5"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 10.0
+      },
+      "channel_hist": {
+        "item_facts": 10
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 2,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-09-08",
+        "date_from": "2026-09-16",
+        "date_to": "2026-09-16",
+        "n_hits_raw": 10,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 10
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-09-08",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 19,
+      "notes": null
+    },
+    {
+      "id": "R23",
+      "category": "cross_issue",
+      "query": "锦涛提供的建站风格参考",
+      "scope": {
+        "issue": "latest_published",
+        "time_basis": "unknown",
+        "window": "recent"
+      },
+      "relevant_items": [
+        "4251"
+      ],
+      "retrieved_items": [
+        "4251",
+        "4819",
+        "4656",
+        "4677",
+        "4706",
+        "4259",
+        "4260",
+        "4280",
+        "4137",
+        "4321",
+        "4184",
+        "4197",
+        "4222",
+        "4219"
+      ],
+      "hit_items": [
+        "4251"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "d2ad48a6d8294b74fbbc"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 16.0
+      },
+      "channel_hist": {
+        "item_facts": 14,
+        "item_entity_facts": 2
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "",
+        "date_from": "2026-06-23",
+        "date_to": null,
+        "n_hits_raw": 16,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 14,
+          "item_entity_facts": 2
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-09-08",
+        "issue_mode": "latest_published",
+        "filter_mode": "time_window",
+        "window": "recent"
+      },
+      "elapsed_ms": 40,
+      "notes": "Scope 验证样本：latest+recent 可跨已发布（非 Recall 缺陷）"
+    },
+    {
+      "id": "R24",
+      "category": "cross_issue",
+      "query": "破壳创智吴伟拜访计划",
+      "scope": {
+        "issue": "latest_published",
+        "time_basis": "unknown",
+        "window": "recent"
+      },
+      "relevant_items": [
+        "4356"
+      ],
+      "retrieved_items": [
+        "4356",
+        "32",
+        "33"
+      ],
+      "hit_items": [
+        "4356"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "03eb4ede0d6493b0e262"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 9.0
+      },
+      "channel_hist": {
+        "item_facts": 3,
+        "fts": 6
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "",
+        "date_from": "2026-06-23",
+        "date_to": null,
+        "n_hits_raw": 9,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 3,
+          "fts": 6
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-09-08",
+        "issue_mode": "latest_published",
+        "filter_mode": "time_window",
+        "window": "recent"
+      },
+      "elapsed_ms": 34,
+      "notes": "Scope 验证样本：latest+recent 可跨已发布（非 Recall 缺陷）"
+    },
+    {
+      "id": "R25",
+      "category": "explicit_ok",
+      "query": "锦涛提供的建站风格参考",
+      "scope": {
+        "issue": "explicit:2026-8-17",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4251"
+      ],
+      "retrieved_items": [
+        "4251",
+        "4260",
+        "4280",
+        "4137",
+        "4321",
+        "4259",
+        "4184",
+        "4197",
+        "4219",
+        "4222"
+      ],
+      "hit_items": [
+        "4251"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "d2ad48a6d8294b74fbbc"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 12.0
+      },
+      "channel_hist": {
+        "item_facts": 10,
+        "item_entity_facts": 2
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-8-17",
+        "date_from": "2026-09-07",
+        "date_to": "2026-09-07",
+        "n_hits_raw": 12,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 10,
+          "item_entity_facts": 2
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-8-17",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 28,
+      "notes": null
+    },
+    {
+      "id": "R26",
+      "category": "hardware",
+      "query": "灵瑙科技助眠头带",
+      "scope": {
+        "issue": "explicit:2026-8-17",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4110"
+      ],
+      "retrieved_items": [
+        "4110"
+      ],
+      "hit_items": [
+        "4110"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "92ac346bd9569a86d861"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 2.0
+      },
+      "channel_hist": {
+        "item_facts": 1,
+        "fts": 1
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-8-17",
+        "date_from": "2026-09-07",
+        "date_to": "2026-09-07",
+        "n_hits_raw": 2,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 1,
+          "fts": 1
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-8-17",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 19,
+      "notes": null
+    },
+    {
+      "id": "R27",
+      "category": "hardware",
+      "query": "BMC 瑞迈特呼吸机差异化",
+      "scope": {
+        "issue": "explicit:2026-8-17",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4135",
+        "4136"
+      ],
+      "retrieved_items": [
+        "4135",
+        "4136"
+      ],
+      "hit_items": [
+        "4135",
+        "4136"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "fe527c12e83e4382f898",
+        "8779323a08378a9658b0"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 2.0
+      },
+      "channel_hist": {
+        "item_facts": 2
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-8-17",
+        "date_from": "2026-09-07",
+        "date_to": "2026-09-07",
+        "n_hits_raw": 2,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 2
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-8-17",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 18,
+      "notes": null
+    },
+    {
+      "id": "R28",
+      "category": "hardware",
+      "query": "云迹科技酒店机器人",
+      "scope": {
+        "issue": "explicit:2026-8-17",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4140"
+      ],
+      "retrieved_items": [
+        "4140",
+        "4168",
+        "4169",
+        "4190",
+        "4244",
+        "4175"
+      ],
+      "hit_items": [
+        "4140"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "fafe1f92949977fa8d07"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 9.0
+      },
+      "channel_hist": {
+        "item_facts": 6,
+        "fts": 3
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-8-17",
+        "date_from": "2026-09-07",
+        "date_to": "2026-09-07",
+        "n_hits_raw": 9,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 6,
+          "fts": 3
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-8-17",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 19,
+      "notes": null
+    },
+    {
+      "id": "R29",
+      "category": "contact",
+      "query": "腾讯 wb 生态应用接触",
+      "scope": {
+        "issue": "explicit:2026-09-08",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4866"
+      ],
+      "retrieved_items": [
+        "4866"
+      ],
+      "hit_items": [
+        "4866"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "315c399e39f6687f82f5"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 2.0
+      },
+      "channel_hist": {
+        "item_facts": 1,
+        "item_entity_facts": 1
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-09-08",
+        "date_from": "2026-09-16",
+        "date_to": "2026-09-16",
+        "n_hits_raw": 2,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 1,
+          "item_entity_facts": 1
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-09-08",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 18,
+      "notes": null
+    },
+    {
+      "id": "R30",
+      "category": "contact",
+      "query": "floatboat 少卿接触记录",
+      "scope": {
+        "issue": "explicit:2026-09-08",
+        "time_basis": "issue_time",
+        "window": "none"
+      },
+      "relevant_items": [
+        "4643"
+      ],
+      "retrieved_items": [
+        "4643",
+        "4644",
+        "4645",
+        "4646",
+        "4647",
+        "4648",
+        "4649",
+        "4650",
+        "4651",
+        "4652",
+        "4759",
+        "4760",
+        "4766",
+        "4771",
+        "4866"
+      ],
+      "hit_items": [
+        "4643"
+      ],
+      "missed_items": [],
+      "relevant_chunks": [
+        "967da9d8a6f87203d114"
+      ],
+      "retrieved_chunks": [],
+      "metrics": {
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "recall@20": 1.0
+      },
+      "chunk_metrics": {
+        "chunk_recall@5": 0.0,
+        "chunk_recall@10": 0.0,
+        "chunk_recall@20": 0.0,
+        "chunk_in_pool": 0.0,
+        "n_ranked_slots": 18.0
+      },
+      "channel_hist": {
+        "item_facts": 15,
+        "fts": 2,
+        "item_entity_facts": 1
+      },
+      "vector_ranks": [],
+      "first_relevant_rank": 1,
+      "failure_pattern": "ok",
+      "retrieval": {
+        "mode": "hybrid",
+        "slug": "2026-09-08",
+        "date_from": "2026-09-16",
+        "date_to": "2026-09-16",
+        "n_hits_raw": 18,
+        "used_vector": false,
+        "chunk_ids": [],
+        "ranked_chunks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "channel_hist": {
+          "item_facts": 15,
+          "fts": 2,
+          "item_entity_facts": 1
+        },
+        "vector_ranks": [],
+        "context_slug": "2026-09-08",
+        "issue_mode": "explicit",
+        "filter_mode": "issue_anchor",
+        "window": "none"
+      },
+      "elapsed_ms": 23,
+      "notes": null
+    }
+  ]
+}

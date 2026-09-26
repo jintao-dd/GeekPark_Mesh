@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-
+import contextvars
 
 import datetime
+
+import os
 
 import re
 
@@ -13,8 +15,16 @@ from typing import Any
 
 
 from . import embeddings, item_facts, qa_structured, search
+from .chunk_index import expand_children_to_parents as ingest_chunk_expand
+
+from .ranking_quality import apply_ranking_v1_4
 
 from .ask_scope import AskScope
+
+# 请求内 chunk owner_team 预取缓存（按 issue_slug），避免逐条命中 N+1 查询
+_ENRICH_TEAM_CACHE: contextvars.ContextVar[dict] = contextvars.ContextVar(
+    "retriever_enrich_team", default=None
+)
 
 from .owner_guard import parse_section_team
 
@@ -89,32 +99,40 @@ def _enrich_owner_team(con, h: dict) -> dict:
         return h
 
     slug = h.get("issue_slug") or ""
-
     if slug and (sec or title):
-
         try:
-
-            row = con.execute(
-
-                """SELECT owner_team FROM chunk_index
-
-                   WHERE issue_slug=? AND section=? AND title=? AND owner_team IS NOT NULL
-
-                     AND owner_team != '' LIMIT 1""",
-
-                (slug, sec, title),
-
-            ).fetchone()
-
-            if row and row["owner_team"]:
-
-                h["owner_team"] = row["owner_team"]
-
+            row = _chunk_owner_lookup(con, slug, sec, title)
+            if row:
+                h["owner_team"] = row
         except Exception:
-
             pass
-
     return h
+
+
+def _chunk_owner_lookup(con, slug: str, sec: str, title: str) -> str:
+    """按 (slug, section, title) 查 owner_team。
+
+    一次批量预取整个 issue 的映射，避免逐条命中各查一次 DB（N+1）。
+    """
+    key = (slug, sec, title)
+    cache = _ENRICH_TEAM_CACHE.get()
+    if cache is None:
+        cache = {}
+        _ENRICH_TEAM_CACHE.set(cache)
+    if slug not in cache:
+        m: dict[tuple[str, str, str], str] = {}
+        try:
+            rows = con.execute(
+                """SELECT section, title, owner_team FROM chunk_index
+                   WHERE issue_slug=? AND owner_team IS NOT NULL AND owner_team != ''""",
+                (slug,),
+            ).fetchall()
+            for r in rows:
+                m[(str(r["section"] or ""), str(r["title"] or ""))] = str(r["owner_team"])
+        except Exception:
+            m = {}
+        cache[slug] = m
+    return cache[slug].get((sec, title), "")
 
 
 
@@ -160,9 +178,27 @@ def rerank_hits(
 
     seed_item_ids: list[str] | None = None,
 
+    scope_meta: dict | None = None,
+
+    apply_quality: bool | None = None,
+
 ) -> list[dict]:
 
-    """规则 rerank：专名命中、章节权重、来源层、时效；seed 仅在有相关性时 soft boost。"""
+    """规则 rerank：legacy 专名/来源/时效 + Quality Ranking v1.4 后置（冻结）。
+
+    评测 candidate 路径是 legacy → v1.4；合入必须同序，禁止用纯 v1.4 替换 legacy。
+    apply_quality=None 时读 MESH_RANKING_QUALITY（默认 0：RRF 上线后四层补丁关闭）。
+    """
+
+    import os
+
+    if apply_quality is None:
+
+        apply_quality = os.environ.get("MESH_RANKING_QUALITY", "0").strip() != "0"
+    # RRF 融合后 score 是 rank 倒数和（≈0.016/rank）；旧 bonus 按 BM25 量纲调的，
+    # 直接相减会淹没排序。统一按 RRF 单位缩放（legacy 融合时保持 1.0）。
+    fusion_legacy = (os.environ.get("MESH_FUSION") or "rrf").strip().lower() == "legacy"
+    u = 1.0 if fusion_legacy else search.rrf_unit()
 
     terms = set(re.findall(r"[\u4e00-\u9fff]{2,}|[A-Za-z]{3,}", q or ""))
 
@@ -190,25 +226,25 @@ def rerank_hits(
 
             if tl in title:
 
-                bonus += 0.25
+                bonus += 0.25 * u
 
             elif tl in body:
 
-                bonus += 0.08
+                bonus += 0.08 * u
 
         src = h.get("source") or ""
 
         if src == "item_entity_facts":
 
-            bonus += 0.35
+            bonus += 0.35 * u
 
         elif src == "vector":
 
-            bonus += 0.12
+            bonus += 0.12 * u
 
         elif src == "item_facts":
 
-            bonus += 0.18
+            bonus += 0.18 * u
 
         try:
 
@@ -216,7 +252,7 @@ def rerank_hits(
 
             age = max(0, (today - d).days)
 
-            bonus -= min(age, 365) * 0.002
+            bonus -= min(age, 365) * 0.002 * u
 
         except Exception:
 
@@ -226,24 +262,32 @@ def rerank_hits(
 
         if seeds and str(h.get("chunk_id") or "") in seeds and overlap >= 0.12:
 
-            bonus += 0.15
+            bonus += 0.15 * u
 
         iid = str(h.get("item_id") or "")
 
         if seed_items and iid and iid in seed_items and overlap >= 0.08:
 
-            bonus += 0.2
+            bonus += 0.2 * u
 
-        h["score"] = float(h.get("score") or 0) - bonus
+        # 量纲约定：legacy 融合「越小越好」→ 减 bonus；RRF「越大越好」→ 加 bonus
+        if fusion_legacy:
+
+            h["score"] = float(h.get("score") or 0) - bonus
+
+        else:
+
+            h["score"] = float(h.get("score") or 0) + bonus
 
         out.append(h)
 
-    out.sort(key=lambda x: float(x.get("score") or 0))
+    out.sort(key=lambda x: float(x.get("score") or 0), reverse=not fusion_legacy)
+
+    if apply_quality:
+
+        out = apply_ranking_v1_4(out, q, scope_meta=scope_meta)
 
     return out[:limit]
-
-
-
 
 
 def _chunk_hint_terms(con, chunk_ids: list[str], limit: int = 12) -> list[str]:
@@ -291,11 +335,13 @@ def _chunk_hint_terms(con, chunk_ids: list[str], limit: int = 12) -> list[str]:
 
 
 def _resolve_date_window(scope: AskScope, search_q: str) -> tuple[str | None, str | None]:
-
+    # 钉死某期时不再叠默认词法时间窗，避免与 slug 过滤语义打架
+    if (scope.slug or "").strip():
+        if scope.date_from or scope.date_to:
+            return scope.date_from, scope.date_to
+        return None, None
     if scope.date_from or scope.date_to:
-
         return scope.date_from, scope.date_to
-
     return search.lexical_date_range(search_q)
 
 
@@ -330,6 +376,11 @@ def _hybrid_recall(
 
     all_hits: list[dict] = []
 
+    # 各通道独立候选池：RRF 需要「通道内位次」，不能把多通道拼成一个列表再排序
+    fts_pool: list[dict] = []
+    items_pool: list[dict] = []
+    vec_pool: list[dict] = []
+
     used_vector = False
 
     variants = embeddings.expand_query(search_q)
@@ -352,6 +403,10 @@ def _hybrid_recall(
 
         )
 
+        fts_pool.extend(fts)
+
+        items_pool.extend(items)
+
         merged = search.merge_hits(fts, items, limit=limit)
 
         merged = _enrich_hits(con, merged)
@@ -366,7 +421,7 @@ def _hybrid_recall(
 
             break
 
-    if embeddings.is_configured():
+    if embeddings.vector_retrieval_enabled():
 
         qvec = query_vec if query_vec is not None else embeddings.embed_one(search_q)
 
@@ -380,9 +435,18 @@ def _hybrid_recall(
 
             )
 
+            vec_pool.extend(vec_hits)
+
             all_hits.extend(vec_hits)
 
-    deduped = search.merge_hits(all_hits, limit=limit * 2)
+    fusion_mode = (os.environ.get("MESH_FUSION") or "rrf").strip().lower()
+    if fusion_mode == "legacy":
+        # 旧路径：单列表按位置融合（与历史 A/B 口径一致）
+        deduped = search.merge_hits(all_hits, limit=limit * 2)
+    else:
+        if team:
+            fts_pool = [h for h in fts_pool if _hit_team_allowed(h, team)]
+        deduped = search.merge_hits(fts_pool, items_pool, vec_pool, limit=limit * 2)
 
     deduped = _enrich_hits(con, deduped)
 
@@ -392,7 +456,26 @@ def _hybrid_recall(
 
         seed_chunk_ids=seed_chunk_ids, seed_item_ids=seed_item_ids,
 
+        scope_meta={
+
+            "context_slug": slug or "",
+
+            "slug": slug or "",
+
+            "date_from": date_from or "",
+
+            "date_to": date_to or "",
+
+        },
+
     )
+
+    # small-to-big：命中小子块后展开父块完整正文供生成（检索精度用子块，生成用父块）
+    ranked = ingest_chunk_expand(con, ranked)
+
+    # 钉死 slug：融合/展开后硬过滤，防止任意通道泄漏他期
+    if slug:
+        ranked = [h for h in ranked if (h.get("issue_slug") or "") == slug]
 
     return ranked, {"date_from": date_from, "date_to": date_to, "used_vector": used_vector}
 

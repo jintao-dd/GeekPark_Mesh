@@ -11,6 +11,24 @@ from .owner_guard import _title_entities
 _SENT_SPLIT = re.compile(r"(?<=[。！？\n])|(?<=[.!?])\s+")
 _DISCLAIMER = "（注：部分表述因可用记录中缺少对应依据，已省略。）"
 
+# 归属关系 cue：只有句子出现这些模式，才把「实体 × 团队」视为归属主张
+_OWNERSHIP_CUES = [
+    re.compile(r"(.{2,30}?)的\s*([^的\s]{2,20})\s*(?:团队|部门|组)"),
+    re.compile(r"([^\s]{2,20}?)\s*(?:团队|部门|组)\s*的\s*(.{2,30})"),
+    re.compile(r"(.{2,30}?)\s*(?:来自|属于|归属于|在|加入|调入|转至|调到)\s*([^\s]{2,20})"),
+    re.compile(r"([^\s]{2,20}?)\s*(?:团队|部门|组)\s*(?:有|提到|记录|涉及|包含|负责)\s*(.{2,30})"),
+    # 团队主动与某主体发生动作（如「BD 团队与张三讨论」）
+    re.compile(r"([^\s]{2,20}?)\s*(?:团队|部门|组)?\s*(?:与|和|同|跟)\s*(.{2,30})\s*(?:讨论|沟通|交流|会面|接洽|合作|推进|协商|洽谈)"),
+]
+
+
+def _is_explicit_team_assignment(sentence: str) -> bool:
+    """判断是否出现明确的「实体归属团队」表达。"""
+    for pat in _OWNERSHIP_CUES:
+        if pat.search(sentence):
+            return True
+    return False
+
 
 def _ctx_team(ctx: dict) -> str:
     for key in ("归属团队", "团队", "owner_team"):
@@ -83,9 +101,15 @@ def _entity_in_blob(name: str, blob_l: str) -> bool:
 
 
 def _claimed_entity_team_pairs(sentence: str, known_entities: set[str]) -> list[tuple[str, str]]:
-    """句子中「实体 × 团队」共现视为归属主张。"""
+    """
+    识别句子中明确的「实体 × 团队」归属主张。
+    仅当句子出现明确归属 cue 时才判定，避免把普通共现（如列表、并列）误判为归属。
+    """
     teams = qa_structured.find_teams_in_question(sentence)
     if not teams:
+        return []
+    # 没有明确归属 cue 时，不生成需要校验的实体×团队对
+    if not _is_explicit_team_assignment(sentence):
         return []
     found: list[tuple[str, str]] = []
     sl = sentence.lower()

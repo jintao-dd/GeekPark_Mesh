@@ -342,7 +342,12 @@ def _format_kpi_n(n: int, *, use_plus: bool = False) -> str:
 
 
 def sync_kpis_from_data(data: dict) -> dict:
-    """首屏 KPI 与下方卡片数量对齐（merge/verify 后以实际数据为准）。"""
+    """首屏 KPI 与下方卡片数量对齐（merge/verify 后以实际数据为准）。
+
+    「可同步的关系」= 进草稿且完整的关系卡数（strong/parallel/watch 均计入；按强度排序展示）。
+    """
+    from .relation_display import count_reader_relations
+
     data = dict(data)
     relations = list(data.get("relations") or [])
     contacts = list(data.get("contacts") or [])
@@ -350,7 +355,7 @@ def sync_kpis_from_data(data: dict) -> dict:
     kw_items = _items_from_groups(data.get("keywords"))
     founder_n = _founder_dialogue_count(contacts)
     data["kpis"] = [
-        {"n": _format_kpi_n(len(relations)), "label": "可同步的关系"},
+        {"n": _format_kpi_n(count_reader_relations(relations)), "label": "可同步的关系"},
         {"n": _format_kpi_n(len(contact_names), use_plus=True), "label": "接触过的人"},
         {"n": _format_kpi_n(founder_n), "label": "创始人级一手对话"},
         {"n": _format_kpi_n(len(kw_items)), "label": "关注的事"},
@@ -368,7 +373,7 @@ def issue_field_inventory() -> list[dict]:
         {"field": "plans.groups[].items[].rows[].v", "path": "llm.build_issue_draft", "evidence": "issue_verify (items corpus)"},
         {"field": "views[].text", "path": "llm.build_issue_draft", "evidence": "issue_verify (items corpus)"},
         {"field": "contacts[].groups[].items[].rows (要点等)", "path": "llm.build_issue_draft", "evidence": "issue_verify (items corpus)"},
-        {"field": "kpis", "path": "sync_kpis_from_data (after merge/verify)", "evidence": "len(relations/contacts/keywords)"},
+        {"field": "kpis", "path": "sync_kpis_from_data (after merge/verify)", "evidence": "count_reader_relations + contacts/keywords"},
         {"field": "gaps", "path": "llm.build_issue_draft", "evidence": "未约束（缺口说明）"},
         {"field": "data_sources", "path": "llm.build_issue_draft", "evidence": "未约束（接入状态）"},
         {"field": "question", "path": "模板固定", "evidence": "N/A"},
@@ -383,21 +388,26 @@ def _is_verified_skeleton_body(body: str, rel: dict) -> bool:
     return f"「{title}」" in b and "本期均有与" in b
 
 
-def collect_unsupported_flags(draft: dict) -> list[str]:
-    """发布前：汇总仍可能含 unsupported narrative 的标记。"""
+def collect_unsupported_flags(draft: dict, *, hard_only: bool = False) -> list[str]:
+    """发布前：汇总仍可能含 unsupported narrative 的标记。
+
+    hard_only=True 时只返回仍可能伤害读者稿的硬问题；
+    「已删减 N 处」表示 verify 已处理，不再拦上线。
+    """
     flags: list[str] = []
     vmeta = draft.get("_verify") or {}
-    if vmeta.get("lead_ok") is False:
-        flags.append("lead 含已删减的 unsupported 表述")
-    for key, label in (
-        ("keywords_rows_trimmed", "keywords"),
-        ("plans_rows_trimmed", "plans"),
-        ("contacts_rows_trimmed", "contacts"),
-        ("views_trimmed", "views"),
-    ):
-        n = int(vmeta.get(key) or 0)
-        if n:
-            flags.append(f"{label} 已删减 {n} 处 unsupported 行")
+    if not hard_only:
+        if vmeta.get("lead_ok") is False:
+            flags.append("lead 含已删减的 unsupported 表述")
+        for key, label in (
+            ("keywords_rows_trimmed", "keywords"),
+            ("plans_rows_trimmed", "plans"),
+            ("contacts_rows_trimmed", "contacts"),
+            ("views_trimmed", "views"),
+        ):
+            n = int(vmeta.get(key) or 0)
+            if n:
+                flags.append(f"{label} 已删减 {n} 处 unsupported 行")
 
     for r in draft.get("relations") or []:
         if not isinstance(r, dict):
@@ -405,12 +415,13 @@ def collect_unsupported_flags(draft: dict) -> list[str]:
         title = (r.get("title") or "（无标题）").strip()
         if not r.get("evidence") and not r.get("weak"):
             flags.append(f"关系「{title}」无 evidence 且未标 weak")
-        if r.get("needs_review"):
-            continue
         if r.get("status") == "weak" or r.get("weak"):
             continue
+        # needs_review 不再豁免 body 论证；body 用 paraphrase 标准（与 Verify 一致）
+        from .relation_verify import body_summary_grounded
+
         body = (r.get("body") or "").strip()
-        if body and not _is_verified_skeleton_body(body, r) and not line_grounded(body, r):
+        if body and not _is_verified_skeleton_body(body, r) and not body_summary_grounded(body, r):
             flags.append(f"关系「{title}」body 无法由 evidence 证明")
         for d in r.get("details") or []:
             if d and not line_grounded(str(d), r):

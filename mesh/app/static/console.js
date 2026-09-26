@@ -30,7 +30,8 @@ async function startPreparePreview(opts) {
   const force = !!(opts && opts.force);
   const t2 = $('#to2');
   if (t2) t2.disabled = true;
-  showBusy('正在生成要点卡与草稿…', '按团队出卡后生成草稿，可刷新后续跑');
+  S.enteredPreview = false;
+  showBusy('正在准备预览…', '闸门通过后即可进页，后台继续出卡与草稿');
   try {
     const r = await fetch(`/admin/issue/${A.slug}/preview/start?force=${force ? 1 : 0}`, {
       method: 'POST',
@@ -56,16 +57,49 @@ async function pollPreview() {
       hideBusy();
       toast(st.error);
       const t2 = $('#to2'); if (t2) t2.disabled = false;
+      // 已开门仍可进页看部分结果
+      if (st.preview_ready && st.preview_url && !S.enteredPreview) {
+        S.enteredPreview = true;
+        location.href = st.preview_url;
+      }
       return;
     }
-    if (st.done && st.preview_url) {
-      showBusy(st.message || '完成，正在进入预览…', '请稍候');
+    // 渐进：骨架就绪即可进预览，任务继续在后台跑
+    if (st.preview_ready && st.preview_url && !S.enteredPreview && (st.running || st.done)) {
+      S.enteredPreview = true;
+      showBusy(st.message || '已可进入预览…', '后台继续生成，进页后可看进度');
       location.href = st.preview_url;
       return;
     }
-    const hint = (st.total > 0 && st.cur > 0)
-      ? `进度 ${st.cur}/${st.total}`
-      : '大文件可能需要几分钟，请勿关闭页面';
+    if (st.done && st.preview_url) {
+      const bits = [];
+      const dropped = st.dropped_relations || [];
+      const res = st.resilience || {};
+      const skipped = res.skipped || [];
+      if (dropped.length) bits.push('已隐藏关系卡 ' + dropped.length + ' 张');
+      if (skipped.length) bits.push('跳过 ' + skipped.length + ' 项');
+      if (res.retry_total) bits.push('自动重试 ' + res.retry_total + ' 次');
+      if (bits.length) {
+        try {
+          sessionStorage.setItem('meshPreviewDegrade:' + A.slug, JSON.stringify({
+            message: st.message || '',
+            dropped: dropped,
+            skipped: skipped,
+            retry_total: res.retry_total || 0,
+            final_status: st.final_status || 'ok',
+          }));
+        } catch (_) {}
+        toast(bits.join('；'), 5000);
+      }
+      if (!S.enteredPreview) {
+        showBusy(st.message || '完成，正在进入预览…', bits.length ? bits.join('；') : '请稍候');
+        location.href = st.preview_url;
+      }
+      return;
+    }
+    const hint = (st.cards_total > 0)
+      ? `要点卡 ${st.cards_done || 0}/${st.cards_total}` + (st.message ? ' · ' + st.message : '')
+      : ((st.total > 0 && st.cur > 0) ? `进度 ${st.cur}/${st.total}` : '闸门通过后即可进页');
     showBusy(st.message || '正在生成要点卡与草稿…', hint);
     if (st.running) setTimeout(pollPreview, 900);
     else {
@@ -119,9 +153,9 @@ function syncState() {
   el.textContent = labels[S.step] || '收集素材';
 }
 
-function toast(t) {
+function toast(t, ms) {
   const e = $('#toast'); e.textContent = t; e.classList.add('on');
-  clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove('on'), 2600);
+  clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove('on'), ms || 2600);
 }
 function renderReviewSummary() {
   const verdict = $('#verdict');
@@ -278,6 +312,68 @@ function refreshSourceCount() {
   const n = document.querySelectorAll('#frows .frow').length;
   const fc = $('#fcount'); if (fc) fc.textContent = String(n);
   const to2 = $('#to2'); if (to2) to2.disabled = n === 0;
+  const clearForm = document.querySelector('form.js-clear-sources');
+  if (clearForm) {
+    clearForm.style.display = n === 0 ? 'none' : '';
+    const btn = clearForm.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = false;
+  }
+  const fm = $('#fmeta');
+  if (fm && n === 0) fm.textContent = '条目 0 · 其中硬拦 0';
+  syncSourcesGate(n);
+}
+
+function syncSourcesGate(n) {
+  const chk = $('#chk');
+  if (!chk) return;
+  const items = [...chk.querySelectorAll('li')];
+  if (!items.length) return;
+  // 已放入材料
+  items[0].className = n > 0 ? 'ok' : 'bad';
+  const s0 = items[0].querySelector('small');
+  if (s0) s0.textContent = `${n} 个来源`;
+  // 已完成挖掘：清空来源时条目一并删掉
+  if (items[1] && n === 0) {
+    items[1].className = 'bad';
+    const s1 = items[1].querySelector('small');
+    if (s1) s1.textContent = '条目 0 · 硬拦 0';
+  }
+  // 草稿过期提示
+  if (items[3] && A.draftStale) {
+    items[3].className = 'bad';
+    const s3 = items[3].querySelector('small');
+    if (s3) s3.textContent = '挖掘/卡片已变更，请重新生成';
+  }
+  // 拆段确认
+  const reviewLi = items.find(x => (x.textContent || '').includes('内容聚合拆段'));
+  if (reviewLi && n === 0) {
+    reviewLi.className = 'ok';
+    const sm = reviewLi.querySelector('small');
+    if (sm) sm.textContent = '无待确认（仅聚合包需要）';
+  }
+}
+
+function clearSourceRowsUi(opts) {
+  const deleted = (opts && opts.deleted) || 0;
+  const box = $('#frows');
+  if (!box) return;
+  box.querySelectorAll('.frow').forEach(el => el.remove());
+  if (!box.querySelector('.note')) {
+    box.insertAdjacentHTML('beforeend', '<div class="note">还没有放入任何材料。</div>');
+  }
+  // 后端已删条目；同步前端状态，避免仍以为可挖掘/可上线
+  A.hasItems = false;
+  A.nItems = 0;
+  A.nBlocked = 0;
+  A.nNoOwner = 0;
+  A.sourcesDirty = false;
+  if (A.hasDraft) A.draftStale = true;
+  refreshSourceCount();
+  renderReviewSummary();
+  // 挖掘/拆段待确认列表（若有）
+  document.querySelectorAll('#weakBox').forEach(() => {});
+  const hintReview = [...document.querySelectorAll('.hint')].find(el => (el.textContent || '').includes('待确认拆段'));
+  if (hintReview) hintReview.remove();
 }
 
 function prependSources(list) {
@@ -367,33 +463,49 @@ if (safebar) {
 
 /* ---------- 第二步：真实管线 ---------- */
 function ruleLi(x, i) {
-  const by = x.by === 'code' ? '代码执行' : '模型内执行';
-  return `<li class="rule ${x.tier}" data-i="${i}"><span class="mk"></span><span><span class="k">${x.k}<span class="sk">${x.sk}</span><span class="sk" style="opacity:.6">${by}</span></span><span class="h">${x.h}</span></span><span class="r"></span></li>`;
+  const byMap = { code: '代码执行', model: '抽取时随模型', defer: '生成预览时' };
+  const by = byMap[x.by] || x.by || '';
+  return `<li class="rule ${x.tier}${x.by === 'defer' ? ' defer' : ''}" data-i="${i}" data-by="${x.by || ''}"><span class="mk"></span><span><span class="k">${x.k}<span class="sk">${x.sk}</span><span class="sk" style="opacity:.6">${by}</span></span><span class="h">${x.h}</span></span><span class="r"></span></li>`;
 }
 function renderRules() {
   const proc = A.steps.filter(x => x.tier === 'proc'), design = A.steps.filter(x => x.tier === 'design');
+  const deferN = design.filter(x => x.by === 'defer').length;
   $('#rules').innerHTML =
-    `<details class="proc" id="procWrap" open><summary><span class="pk">文件处理</span><span class="ph">转写 · 清洗 · 去重，共 ${proc.length} 项</span><span class="pr" id="procR"></span></summary><ul class="plist">${proc.map((x, i) => ruleLi(x, i)).join('')}</ul></details>`
-    + `<ul class="dlist">${design.map((x, i) => ruleLi(x, proc.length + i)).join('')}</ul>`;
+    `<details class="proc" id="procWrap" open><summary><span class="pk">文件处理</span><span class="ph">转写统计 · 清洗 · 去重，共 ${proc.length} 项</span><span class="pr" id="procR"></span></summary><ul class="plist">${proc.map((x, i) => ruleLi(x, i)).join('')}</ul></details>`
+    + `<ul class="dlist">${design.map((x, i) => ruleLi(x, proc.length + i)).join('')}</ul>`
+    + (deferN ? `<p class="muted" style="margin:8px 0 0;font-size:12px">灰色「生成预览时」步骤本轮挖掘不执行，不算完成。</p>` : '');
 }
 function paint(state) {
   const lis = $$('#rules .rule');
-  const total = A.steps.length;
+  const total = A.steps.filter(x => x.by !== 'defer').length || A.steps.length;
   const cur = state.cur;
+  let doneActive = 0;
   lis.forEach((li, i) => {
-    li.classList.remove('run');
-    if (i < cur) li.classList.add('done');
-    else if (i === cur) { li.classList.add(state.done ? 'done' : 'run'); }
-    const sk = A.steps[i].sk;
+    const step = A.steps[i] || {};
+    const isDefer = step.by === 'defer';
+    li.classList.remove('run', 'done', 'ok');
+    const sk = step.sk;
     const r = state.results[sk];
-    if (r) li.querySelector('.r').textContent = r;
+    const rr = li.querySelector('.r');
+    if (isDefer) {
+      li.classList.add('defer');
+      if (rr) rr.textContent = r || '生成预览时';
+      return;
+    }
+    if (i < cur) { li.classList.add('ok'); doneActive += 1; }
+    else if (i === cur) {
+      if (state.done) { li.classList.add('ok'); doneActive += 1; }
+      else li.classList.add('run');
+    }
+    if (r && rr) rr.textContent = r;
     if (i === cur && !state.done) li.scrollIntoView({ block: 'center', behavior: 'smooth' });
   });
-  const pct = Math.min(100, Math.round(((cur + 1) / total) * 100));
+  const pct = state.done ? 100 : Math.min(99, Math.round(((doneActive + (state.running ? 1 : 0)) / Math.max(1, total)) * 100));
   $('#pf').style.width = pct + '%';
   $('#ppct').textContent = pct + '%';
+  const curStep = A.steps[cur];
   $('#pnow').textContent = state.error ? ('出错：' + state.error)
-    : (state.done ? '全部完成' : (cur >= 0 ? A.steps[cur].k : '准备就绪'));
+    : (state.done ? '挖掘完成（关系/五块合成在生成预览时）' : (curStep ? curStep.k : '准备就绪'));
 }
 function showBusy(msg, hint) {
   const el = $('#busy');
@@ -446,7 +558,18 @@ async function poll() {
       const g = $('#resGrid');
       g.innerHTML = A.steps.filter(x => st.results[x.sk]).map(x =>
         `<div><b>${st.results[x.sk]}</b><span>${x.k}</span></div>`).join('');
-      toast('挖掘与脱敏完成');
+      const res = st.resilience || {};
+      const skipped = res.skipped || [];
+      if (st.final_status === 'degraded' || skipped.length) {
+        toast(
+          '挖掘完成（部分跳过）：' + skipped.slice(0, 3).join('、')
+            + (skipped.length > 3 ? '…' : '')
+            + (res.retry_total ? '；自动重试 ' + res.retry_total + ' 次' : ''),
+          6000,
+        );
+      } else {
+        toast('挖掘与脱敏完成');
+      }
       A.hasItems = true;
       A.hasDraft = false;
       A.draftStale = true;
@@ -467,10 +590,12 @@ async function poll() {
 async function runMining(opts = {}) {
   if (S.running) return;
   const force = !!opts.force;
-  if (A.hasItems && !force) {
+  // reextract：显式重抽已完成来源；默认 false，避免大聚合文档反复卡在 1/7
+  const reextract = opts.reextract !== undefined ? !!opts.reextract : !!(A.hasItems && force);
+  if (A.hasItems && reextract) {
     const ok = await MeshDialog.confirm({
       title: '重新挖掘',
-      body: '当前已经有挖掘结果，再次执行会重跑所有来源，可能很慢。确定继续吗？',
+      body: '当前已经有挖掘结果，再次执行会重跑所有来源（含大文档），可能很慢。确定继续吗？',
       okText: '重新挖掘',
       cancelText: '取消',
     });
@@ -487,10 +612,10 @@ async function runMining(opts = {}) {
   $('#pnow').textContent = '启动中…';
   if (S.autoPreviewAfterMining) showBusy('正在挖掘与脱敏…', '大文件可能需要几分钟，请勿关闭页面');
   try {
-    const r = await fetch(`/admin/issue/${A.slug}/pipeline/start?force=${force ? 1 : 0}`, {
-      method: 'POST',
-      headers: JSON_HDR,
-    });
+    const r = await fetch(
+      `/admin/issue/${A.slug}/pipeline/start?force=${force ? 1 : 0}&reextract=${reextract ? 1 : 0}`,
+      { method: 'POST', headers: JSON_HDR },
+    );
     if (!r.ok) {
       const j = await r.json().catch(() => ({}));
       throw new Error(j.detail || j.error || ('HTTP ' + r.status));
@@ -513,25 +638,29 @@ if (to2) to2.onclick = () => {
     toast('请先放入素材');
     return;
   }
-  // 忙态下再点：强制重启卡住的挖掘或预览任务
-  if (document.body.classList.contains('ai-busy')) {
-    if (S.running) runMining({ force: true });
-    else startPreparePreview({ force: true });
+  // 忙态下再点：不要强制重挖（否则大文档会再次卡死）
+  if (document.body.classList.contains('ai-busy') || S.running) {
+    toast('任务进行中，请稍候。若长时间不动：Ctrl+F5 后直接点「生成预览」。');
     return;
   }
-  // 先给即时反馈，再跑异步，避免「点了没反应」
   to2.disabled = true;
-  const needMine = !A.hasItems || !!A.sourcesDirty;
-  if (!needMine) {
-    showBusy('正在生成要点卡与草稿…', '完成后自动进入预览编辑页');
+  // 已有抽取结果且素材未变更：直接出预览，勿重跑 56 万字聚合文档
+  if (A.hasItems && !A.sourcesDirty) {
+    setAutoPreview(false);
+    showBusy('正在生成要点卡与草稿…', '闸门通过后即可进页，请勿关闭页面');
     submitPreparePreview();
     return;
   }
   setAutoPreview(true);
-  showBusy('正在挖掘与脱敏…', '大文件可能需要几分钟，请勿关闭页面');
-  runMining({ force: true });
+  showBusy('正在挖掘与脱敏…', '完成后将自动生成要点卡与草稿');
+  // force 仅用于抢占卡住任务；不重抽已 extracted 来源
+  runMining({ force: true, reextract: false });
 };
-const gen = $('#gen'); if (gen) gen.onclick = () => runMining({ force: document.body.classList.contains('ai-busy') || S.running });
+const gen = $('#gen');
+if (gen) gen.onclick = () => runMining({
+  force: document.body.classList.contains('ai-busy') || S.running,
+  reextract: true,
+});
 const to3 = $('#to3'); if (to3) to3.onclick = () => { if (guardStep(2)) go(2, { scroll: true }); };
 const to4 = $('#to4'); if (to4) to4.onclick = () => { if (guardStep(3)) go(3, { scroll: true }); };
 
@@ -603,10 +732,16 @@ function bindMeshConfirms(root) {
           });
           const data = await r.json().catch(() => ({}));
           if (!r.ok || data.ok === false) throw new Error((data && data.error) || (`HTTP ${r.status}`));
+          if (form.classList.contains('js-clear-sources')) {
+            clearSourceRowsUi({ deleted: data.deleted });
+            toast(data.deleted != null ? `已移除 ${data.deleted} 个来源` : '已全部移除');
+            return;
+          }
           const row = form.closest('.frow');
           if (row) row.remove();
           refreshSourceCount();
           A.sourcesDirty = true;
+          if (btn) btn.disabled = false;
           toast('已移除');
         } catch (err) {
           if (btn) btn.disabled = false;
@@ -693,14 +828,23 @@ if (A.canWrite) {
       go(1, { scroll: true });
       if (S.autoPreviewAfterMining) showBusy('正在挖掘与脱敏…', '大文件可能需要几分钟，请勿关闭页面');
       poll();
+    } else {
+      // 中断/失败后刷新：清掉粘性 auto-preview，避免空弹窗
+      if (st.error || st.final_status === 'interrupted') {
+        setAutoPreview(false);
+        hideBusy();
+        if (st.error) toast(String(st.error).slice(0, 160), 8000);
+      }
+      if (st.cur >= 0) paint(st);
     }
-    else if (st.cur >= 0) paint(st);
   }).catch(() => {});
   fetch(`/admin/issue/${A.slug}/preview/status`, { headers: JSON_HDR }).then(r => r.json()).then(st => {
     if (st.running) {
       go(0, { scroll: true });
-      showBusy(st.message || '正在生成要点卡与草稿…', '刷新后续跑中');
+      showBusy(st.message || '正在生成要点卡与草稿…', '刷新后续跑中；骨架就绪后可进预览');
       pollPreview();
+    } else if (st.preview_ready && st.preview_url && /preview_job=1/.test(location.search)) {
+      location.href = st.preview_url;
     } else if (st.done && st.preview_url && /preview_job=1/.test(location.search)) {
       location.href = st.preview_url;
     }

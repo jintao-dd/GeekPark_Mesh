@@ -105,8 +105,9 @@
 <div style="font-size:34px;line-height:1.25;font-weight:800;color:#14382F;border-left:4px solid #0AA79F;padding-left:10px;margin-bottom:12px;">在 Mesh 里搜问查</div>
 <div style="margin-bottom:56px;font-size:15px;line-height:1.85;color:#3F4650;">
 {% for s in hooks.search_links %}
-{% if not loop.first %}<span style="color:#D1D5DB;"> · </span>{% endif %}
+<div style="margin:0 0 8px 0;">
 <a href="{{ base_url }}/{{ issue.slug }}?ask=1&amp;q={{ s.q }}" style="color:#0AA79F;font-weight:600;text-decoration:underline;word-wrap:break-word;">{{ s.label }}</a>
+</div>
 {% endfor %}
 </div>
 

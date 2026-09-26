@@ -1,0 +1,275 @@
+{
+  "phase": "quality_v3_0_production_baseline",
+  "ranking_version": "v1.4",
+  "retrieval_version": "lexical_fts_recall_frozen",
+  "vector": "OFF",
+  "claim_support_version": "v2.4c-2_semantic_extension_frozen",
+  "agent_contract": "frozen",
+  "ontology": "doc_only_frozen",
+  "prompt_version": "ask_engine_baseline",
+  "model_policy": {
+    "default_semantic": "claude-sonnet-4-6",
+    "default_answer": "claude-sonnet-4-6",
+    "sensitive_answer_override": "anthropic/claude-4.8-opus",
+    "dynamic_router": false
+  },
+  "forbidden_this_phase": [
+    "ranking_tweak",
+    "claim_support_patch",
+    "shadow_version",
+    "model_ab_expansion",
+    "dynamic_router",
+    "es",
+    "wiki",
+    "neo4j_kg_graph_rag",
+    "planner_react"
+  ],
+  "elapsed_s": 74.76,
+  "frozen_regression_steps": [
+    {
+      "step": "reuse_frozen_artifacts",
+      "rc": 0
+    }
+  ],
+  "frozen_metrics": {
+    "temporal_pass_rate": 1.0,
+    "temporal_fail_ids": [],
+    "answer_canonical_pass_rate": 1.0,
+    "answer_canonical_fail_ids": [],
+    "answer_canonical_usage": {
+      "prompt_tokens": 58697,
+      "completion_tokens": 6768,
+      "total_tokens": 65465,
+      "n_calls": 18,
+      "n_retries": 0
+    },
+    "answer_canonical_elapsed_s": 101.28,
+    "evidence_canonical_pass_rate": 1.0,
+    "evidence_canonical_fail_ids": []
+  },
+  "temporal_residual": {
+    "pass_rate": 1.0,
+    "fail_ids": [],
+    "known_residual": [
+      "T08",
+      "T06"
+    ],
+    "new_regressions": [],
+    "note": "T06/T08 wall-clock known; T19 not forced blocker; do not patch claim_support"
+  },
+  "scenarios": {
+    "n": 5,
+    "n_pass": 5,
+    "pass_rate": 1.0,
+    "layer_failure_hist": {},
+    "results": [
+      {
+        "id": "S01",
+        "scenario": "fact_query",
+        "title": "事实查询：期次内人物动作",
+        "pass": true,
+        "steps": [
+          {
+            "id": "S01.1",
+            "query": "锦涛做了什么",
+            "pass": true,
+            "failures": [],
+            "fail_layers": [],
+            "route_kind": null,
+            "llm_used": true,
+            "elapsed_s": 5.456,
+            "n_hits": 3,
+            "status": "grounded",
+            "claim_support": "supported",
+            "answer_snip": "依据 2026-8-17 期已上线记录，锦涛（品牌创意团队）在该期有以下两件事被提及：\n\n1. **工具开源讨论**：团队内部对是否开源锦涛做的工具各有判断——一方认为开源有助于沉淀 GitHub 记录、体现 builder 形象；另一方认为当前时机与性价比不足、工具本身尚未用好即对外开放。该期记录写明次日再讨论。\n\n2. **提供建站风格参考**：锦涛计划",
+            "evidence_refs": [
+              "ev:item:4260",
+              "ev:item:4251",
+              "ev:item:4259"
+            ],
+            "item_ids": [
+              "4260",
+              "4251",
+              "4259"
+            ]
+          }
+        ],
+        "fail_layers": []
+      },
+      {
+        "id": "S02",
+        "scenario": "relation_entity",
+        "title": "关系/实体：主体相关联系",
+        "pass": true,
+        "steps": [
+          {
+            "id": "S02.1",
+            "query": "编辑部和面壁智能有什么关系或接触",
+            "pass": true,
+            "failures": [],
+            "fail_layers": [],
+            "route_kind": null,
+            "llm_used": true,
+            "elapsed_s": 10.036,
+            "n_hits": 40,
+            "status": "grounded",
+            "claim_support": "supported",
+            "answer_snip": "依据 2026-8-17 期已上线记录，编辑部与面壁智能有以下接触与内容：\n\n**接触情况**\n\n编辑部已与面壁智能建立对话，沟通对象包括：面壁智能詹杨帆，以及高通侧芯片调优负责人。有原始对话记录存档。\n\n**交流内容**\n\n- 就端侧模型在旗舰手机应用的限制与发展方向做过交流。\n- 面壁智能与吉利银河、长安马自达等车企在智能座舱有具体合作。\n- 詹杨帆陈述",
+            "evidence_refs": [
+              "ev:item:4112",
+              "ev:item:4115",
+              "ev:item:4116",
+              "ev:item:4117",
+              "ev:item:4118",
+              "ev:item:4120"
+            ],
+            "item_ids": [
+              "4112",
+              "4115",
+              "4116",
+              "4117",
+              "4118",
+              "4120"
+            ]
+          }
+        ],
+        "fail_layers": []
+      },
+      {
+        "id": "S03",
+        "scenario": "strong_claim_induction",
+        "title": "强结论诱导：量产完成态",
+        "pass": true,
+        "steps": [
+          {
+            "id": "S03.1",
+            "query": "端侧座舱方案是否已经实现装车量产",
+            "pass": true,
+            "failures": [],
+            "fail_layers": [],
+            "route_kind": null,
+            "llm_used": false,
+            "elapsed_s": 34.1,
+            "n_hits": 31,
+            "status": "unsupported",
+            "claim_support": "insufficient",
+            "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+            "evidence_refs": [],
+            "item_ids": []
+          }
+        ],
+        "fail_layers": []
+      },
+      {
+        "id": "S04",
+        "scenario": "team_attribution",
+        "title": "组织归属：团队线索",
+        "pass": true,
+        "steps": [
+          {
+            "id": "S04.1",
+            "query": "品牌创意相关记录里提到了哪些团队或负责人动作",
+            "pass": true,
+            "failures": [],
+            "fail_layers": [],
+            "route_kind": null,
+            "llm_used": true,
+            "elapsed_s": 14.546,
+            "n_hits": 40,
+            "status": "grounded",
+            "claim_support": "supported",
+            "answer_snip": "以下内容均依据 **2026-8-17 期已上线记录**，相关时间描述已改写为期号或绝对时间，不代表当下正在发生。\n\n---\n\n## 品牌创意团队相关动作（依据 2026-8-17 期记录）\n\n### 设计工具方向\n品牌创意团队完成了对 design geekpark / founderpark.AI 设计工具的评估，正在选择后续搭建平台（Codex、Goo",
+            "evidence_refs": [
+              "ev:item:4246",
+              "ev:item:4248",
+              "ev:item:4250",
+              "ev:item:4247",
+              "ev:item:4249",
+              "ev:item:4251"
+            ],
+            "item_ids": [
+              "4246",
+              "4248",
+              "4250",
+              "4247",
+              "4249",
+              "4251"
+            ]
+          }
+        ],
+        "fail_layers": []
+      },
+      {
+        "id": "S05",
+        "scenario": "followup_context",
+        "title": "追问：上下文继承",
+        "pass": true,
+        "steps": [
+          {
+            "id": "S05.1",
+            "query": "锦涛做了什么",
+            "pass": true,
+            "failures": [],
+            "fail_layers": [],
+            "route_kind": null,
+            "llm_used": true,
+            "elapsed_s": 6.18,
+            "n_hits": 3,
+            "status": "grounded",
+            "claim_support": "supported",
+            "answer_snip": "依据 2026-8-17 期已上线记录，锦涛（品牌创意团队）有以下两件事被提及：\n\n1. **工具是否开源的讨论**：团队内围绕锦涛做的工具是否开源，各有判断——一方认为开源可以沉淀 GitHub 记录、体现 builder 人设；另一方认为时机与性价比尚不足、工具本身还未用好。该期记录写明次日再讨论，并非已有结论。\n\n2. **为李源提供建站风格参考**：",
+            "evidence_refs": [
+              "ev:item:4260",
+              "ev:item:4251",
+              "ev:item:4259"
+            ],
+            "item_ids": [
+              "4260",
+              "4251",
+              "4259"
+            ]
+          },
+          {
+            "id": "S05.2",
+            "query": "那他后来呢？",
+            "pass": true,
+            "failures": [],
+            "fail_layers": [],
+            "route_kind": "followup",
+            "llm_used": true,
+            "elapsed_s": 4.27,
+            "n_hits": 1,
+            "status": "grounded",
+            "claim_support": "supported",
+            "answer_snip": "依据 2026-8-17 期已上线记录：\n\n**锦涛做了什么**：锦涛（品牌创意团队）做了一个工具，团队内围绕是否将其开源展开讨论——一方认为开源有助于沉淀 GitHub 记录、体现\"在 build 产品\"、立 builder 人设；另一方认为当前性价比与时机不足，且工具本身尚未用好就开源出去，同时人设需要持续投入才能立起来。\n\n**他后来怎样**：该期记录",
+            "evidence_refs": [
+              "ev:item:4260"
+            ],
+            "item_ids": [
+              "4260"
+            ]
+          }
+        ],
+        "fail_layers": []
+      }
+    ]
+  },
+  "scenario_usage": {
+    "prompt_tokens": 25809,
+    "completion_tokens": 4385,
+    "total_tokens": 30194,
+    "n_calls": 7,
+    "n_retries": 1
+  },
+  "gates": {
+    "canonical_answer_no_regression": true,
+    "canonical_evidence_no_regression": true,
+    "temporal_no_new_regression": true,
+    "scenarios_all_pass": true,
+    "no_systemic_layer_blocker": true,
+    "no_false_support_in_scenarios": true
+  },
+  "systemic_layer_blockers": [],
+  "production_baseline": true,
+  "status": "production_baseline"
+}

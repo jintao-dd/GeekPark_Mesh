@@ -1,0 +1,107 @@
+{
+  "slug": "2026-8-17",
+  "old_slug": "2026-09-08",
+  "started_at": "2026-09-08 16:20:35",
+  "checks": {
+    "ok_gate": true,
+    "ok_before": true,
+    "ok_after": true,
+    "ok_issue_ref": true,
+    "ok_no_cross_issue": true,
+    "ok_no_draft_leak": true,
+    "ok_no_blockers": true,
+    "ok_relations": true
+  },
+  "issue_id": 9,
+  "status_before": "published",
+  "counts_before": {
+    "sources": 7,
+    "extracted": 7,
+    "items": 283,
+    "cards": 9
+  },
+  "reset_publish": true,
+  "pipeline": {
+    "skipped": true
+  },
+  "counts_after_pipeline": {
+    "sources": 7,
+    "extracted": 7,
+    "items": 283,
+    "cards": 9
+  },
+  "preview": {
+    "skipped": true
+  },
+  "gate": {
+    "ok": true,
+    "stale": false,
+    "building": false,
+    "n_rel": 10,
+    "n_kw_groups": 3
+  },
+  "publish_blockers": [],
+  "marker": "FinalE2E钉-ba8b8809",
+  "marker_injected": true,
+  "before_publish": {
+    "fts": 0,
+    "seen_marker": false,
+    "intent": "ask_published",
+    "issue_mode": "none",
+    "issue_slug": "",
+    "deny_reason": null,
+    "text_head": "当前没有可引用的已上线期次。",
+    "evidence": [],
+    "data_tools": [
+      "ask.published"
+    ]
+  },
+  "status_after": "published",
+  "fts_after": 78,
+  "after_publish": {
+    "seen_marker": true,
+    "intent": "ask_published",
+    "issue_mode": "explicit",
+    "issue_slug": "2026-8-17",
+    "text_head": "找到 1 条与标记「FinalE2E钉-ba8b8809」相关的记录：编辑部在该期关注的领域摘要为「Final Preview E2E 唯一钉记 FinalE2E钉-ba8b8809」。\n\n该记录来自 2026-8-17 那期已上线内容，并非今日新发生。除此摘要外，本轮检索未命中更多关于该标记的细节。\n\n来源：\n- 2026-8-17 · 关注了什么 · FinalE2E钉-ba8b8809",
+    "evidence": [
+      "ev:ctx:2026-8-17:1"
+    ],
+    "fingerprint": "a56d02334bc12ba2ed1d178f",
+    "data_tools": [
+      "ask.published"
+    ]
+  },
+  "cross_issue": {
+    "skipped": false,
+    "old_slug": "2026-09-08",
+    "seen_marker": false,
+    "issue_slug": "2026-09-08",
+    "text_head": "未在已上线周报中找到与问题直接相关的记录。请尝试换关键词、缩小或扩大时间范围，或确认相关内容是否已上线。\n（本次检索时间范围：2026-09-08 至 2026-09-08）"
+  },
+  "draft_probe": {
+    "intent": "refuse",
+    "data_tools": [],
+    "text_has_marker": false,
+    "text_head": "只能查询已上线（Published）内容，不能读取草稿、原文或未上线素材。"
+  },
+  "relations": {
+    "skipped": false,
+    "title": "Founder Park 传播与下半年规划：两队各知一半",
+    "intent": "ask_relations",
+    "seen_title": false,
+    "evidence": [
+      "ev:item:4348",
+      "ev:item:4232",
+      "ev:item:4305",
+      "ev:item:4307",
+      "ev:item:4372"
+    ],
+    "text_head": "期次 2026-8-17 已上线关系（8）：\n- [同一公司，不同触点] 豆包（字节跳动）：三个团队各自触点\n- [同一赛道，各自在做] Agent 治理与 AI 伦理：编辑部与视频号各自覆盖\n- [同一赛道，各自在做] WAIC：社群办活动、编辑部记录受访判断\n- [采访对象也是客户] 刘靖康（影石 Insta360）：编辑部接触、视频号出镜\n- [同一公司，不同触点] xAI：编辑部建联技术成",
+    "data_tools": [
+      "ask.relations_summary"
+    ]
+  },
+  "ok": true,
+  "finished_at": "2026-09-08 16:20:40"
+}

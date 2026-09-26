@@ -288,7 +288,7 @@ main._run_ask / api_ask_stream
 
 **结论：固定 pipeline + 若干次 LLM 调用。不是 LLM workflow 引擎，更不是 Agent。**
 
-`pipeline.py` 自称「25 步唯一事实源」，但真正在 `_run` 里干活的只有：
+`mesh/app/pipeline.py` 自称「25 步唯一事实源」，但真正在 `_run` 里干活的只有可验收步；`by=defer` 在挖掘阶段**不执行**，控制台不得显示为已完成（见 P2-7 修复）。
 
 | 实际执行 | 函数/动作 |
 |----------|-----------|

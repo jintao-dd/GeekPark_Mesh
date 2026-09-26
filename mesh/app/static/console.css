@@ -104,9 +104,12 @@ h1 .thin{font-weight:300;color:var(--ink2)}
 
 /* file list */
 .files{margin-top:34px}
-.files .fh{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px}
+.files .fh{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px;gap:12px}
 .files .fh h4{font-size:15px;font-weight:600;margin:0}
+.files .fh .fh-right{display:flex;align-items:center;gap:12px;flex-shrink:0}
 .files .fh .meta{font-size:13px;color:var(--ink3)}
+.files .fh .src-clear-all{color:var(--ink4);font-size:13px;padding:4px 6px;border:none;background:transparent;cursor:pointer}
+.files .fh .src-clear-all:hover{color:var(--red)}
 .frow{display:grid;grid-template-columns:1fr auto auto;gap:18px;align-items:center;padding:16px 4px;border-top:1px solid var(--line)}
 .frow:last-child{border-bottom:1px solid var(--line)}
 .frow .nm{min-width:0}
@@ -170,6 +173,8 @@ h1 .thin{font-weight:300;color:var(--ink2)}
 
 .rule:first-child{border-top:0}
 .rule.run,.rule.ok{opacity:1}
+.rule.defer{opacity:.35}
+.rule.defer .r{color:var(--ink4);font-size:11px}
 .rule .mk{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--line);margin-top:5px;transition:.3s}
 .rule.run .mk{border-color:var(--mesh);border-top-color:transparent;animation:spin .7s linear infinite;width:14px;height:14px}
 .rule.ok .mk{background:var(--mesh);border-color:var(--mesh)}

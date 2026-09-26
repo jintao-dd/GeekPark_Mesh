@@ -1,0 +1,502 @@
+{
+  "old_slug": "2026-09-08",
+  "current_chunk_n": 218,
+  "old_fingerprints_available": [
+    "4408",
+    "4409",
+    "4410",
+    "4411",
+    "4412"
+  ],
+  "cases": {
+    "R07": {
+      "query": "OdyssLife 众筹节奏",
+      "note": "众筹节奏",
+      "old_relevant_items": [
+        "4429"
+      ],
+      "want": 1,
+      "found": 1,
+      "downgraded": false,
+      "candidates_found": 1,
+      "picked": [
+        {
+          "item_id": 4649,
+          "chunk_id": "93e4016f053383aa7f3a",
+          "title": "OdyssLife",
+          "team": "编辑部",
+          "stype": "T1",
+          "ent_hit": [
+            "OdyssLife"
+          ],
+          "old_snip_overlap": 0.0,
+          "query_cov": 0.833,
+          "note_cov": 0.667,
+          "team_ok": true,
+          "score": 5.517,
+          "body": "OdyssLife · JACK（CMO）：潘宇扬创业项目，在ShowStoppers环节受关注；新版硬件优化摄像头向下角度以拍餐盘、处理发热；市场策略首波锁定男性用户，走KS众筹；下一节奏为CES"
+        }
+      ],
+      "alternates": [],
+      "confidence": "high"
+    },
+    "R08": {
+      "query": "FREELANDER 神行者怎么定义产品",
+      "note": "怎么定义产品",
+      "old_relevant_items": [
+        "4423",
+        "4424",
+        "4425"
+      ],
+      "want": 3,
+      "found": 3,
+      "downgraded": false,
+      "candidates_found": 4,
+      "picked": [
+        {
+          "item_id": 4646,
+          "chunk_id": "adee9fb5f5fab83a74e9",
+          "title": "FREELANDER神行者",
+          "team": "编辑部",
+          "stype": "T1",
+          "ent_hit": [
+            "FREELANDER",
+            "神行者"
+          ],
+          "old_snip_overlap": 0.0,
+          "query_cov": 0.778,
+          "note_cov": 0.4,
+          "team_ok": true,
+          "score": 8.167,
+          "body": "神行者产品与营销经验（受访陈述）：面向一年约300天城市通勤、65天自驾的家庭用户做产品定义；以后轮转向、空悬、NVH、华为泊车解日常，三把锁与900mm涉水做安全备份；采用收敛克制的豪华审美；冷启动阶段自费请1000位"
+        },
+        {
+          "item_id": 4644,
+          "chunk_id": "3f1e3c84a1df5cfe6609",
+          "title": "FREELANDER神行者",
+          "team": "编辑部",
+          "stype": "T1",
+          "ent_hit": [
+            "FREELANDER",
+            "神行者"
+          ],
+          "old_snip_overlap": 0.0,
+          "query_cov": 0.667,
+          "note_cov": 0.0,
+          "team_ok": true,
+          "score": 7.6,
+          "body": "FREELANDER神行者 · 文飞（全球CEO，奇瑞捷豹路虎董事、常务副总裁）：受访者陈述（非核实事实）——认为高阶智驾随法规落地与供应链成熟会趋于同质化；座舱核心竞争力在品牌审美与交互，而非复刻手机逻辑；真正壁垒是传"
+        },
+        {
+          "item_id": 4645,
+          "chunk_id": "536b6cc0b38b1bf16ad1",
+          "title": "FREELANDER神行者",
+          "team": "编辑部",
+          "stype": "T1",
+          "ent_hit": [
+            "FREELANDER",
+            "神行者"
+          ],
+          "old_snip_overlap": 0.0,
+          "query_cov": 0.667,
+          "note_cov": 0.0,
+          "team_ok": true,
+          "score": 7.6,
+          "body": "硬派新能源SUV结构预测（文飞受访陈述，非核实事实）：50%~60%为增程/插混的全地形多功能SUV，兼顾城市通勤与脱困能力；30%为中小型纯电方盒子，纯城市取向；20%为硬派非承载式大梁越野，以插混为主"
+        }
+      ],
+      "alternates": [
+        {
+          "item_id": 4756,
+          "chunk_id": "ddcceaa3c0f75cb91973",
+          "title": "奇瑞捷豹路虎",
+          "team": "编辑部",
+          "stype": "T6",
+          "ent_hit": [
+            "FREELANDER"
+          ],
+          "old_snip_overlap": 0.0,
+          "query_cov": 0.5,
+          "note_cov": 0.0,
+          "team_ok": true,
+          "score": 4.35,
+          "body": "奇瑞捷豹路虎成立新能源新品牌Freelander，负责人文飞，首款车定价约28.99万，主打国内供应商方案加自研智能座舱、传统美学与全地形底盘，年目标销量30万台，后续规划五六款车并走全球市场（受访者陈述，非核实事实）"
+        }
+      ],
+      "confidence": "high"
+    },
+    "R09": {
+      "query": "未来脑律 ZenoWell 是什么",
+      "note": "是什么",
+      "old_relevant_items": [
+        "4428"
+      ],
+      "want": 1,
+      "found": 1,
+      "downgraded": false,
+      "candidates_found": 1,
+      "picked": [
+        {
+          "item_id": 4648,
+          "chunk_id": "f71a56f20a635d71070f",
+          "title": "未来脑律",
+          "team": "编辑部",
+          "stype": "T1",
+          "ent_hit": [
+            "ZenoWell",
+            "未来脑律"
+          ],
+          "old_snip_overlap": 0.0,
+          "query_cov": 0.786,
+          "note_cov": 0.0,
+          "team_ok": true,
+          "score": 7.779,
+          "body": "未来脑律（ZenoWell）· 薛耀（创始人）：脑科学背景（海德堡大学，4年植入式脑机接口量产经历），2024年转型可穿戴；产品为可穿戴睡眠硬件，形态类随身听，刺激耳部迷走神经，兼顾检测与改善；定价约400美金，已在欧美"
+        }
+      ],
+      "alternates": [],
+      "confidence": "high"
+    },
+    "R10": {
+      "query": "程天科技外骨骼",
+      "note": "外骨骼",
+      "old_relevant_items": [
+        "4431"
+      ],
+      "want": 1,
+      "found": 1,
+      "downgraded": false,
+      "candidates_found": 1,
+      "picked": [
+        {
+          "item_id": 4651,
+          "chunk_id": "fffe2c2ac2ab36f74689",
+          "title": "程天科技",
+          "team": "编辑部",
+          "stype": "T1",
+          "ent_hit": [
+            "程天"
+          ],
+          "old_snip_overlap": 0.0,
+          "query_cov": 0.833,
+          "note_cov": 1.0,
+          "team_ok": true,
+          "score": 5.85,
+          "body": "程天科技 · 颜海（合伙人，外骨骼业务线技术合伙人）：程天为国内消费级外骨骼出货量前三，医疗背景，另两家为极壳、肯綮；产品目前主要面向行业，形态含下肢（髋双电机）与上肢（模块化）；不同场景对应不同步态算法与电机传感匹配，"
+        }
+      ],
+      "alternates": [],
+      "confidence": "high"
+    },
+    "R14": {
+      "query": "视频号本周播放较好的片子",
+      "note": "本周播放较好",
+      "old_relevant_items": [
+        "4408",
+        "4409",
+        "4410",
+        "4411",
+        "4412"
+      ],
+      "want": 5,
+      "found": 3,
+      "downgraded": true,
+      "candidates_found": 3,
+      "picked": [
+        {
+          "item_id": 4632,
+          "chunk_id": "868d5349faa2d39fa649",
+          "title": "硅谷",
+          "team": "视频号团队",
+          "stype": "T11",
+          "ent_hit": [
+            "播放"
+          ],
+          "old_snip_overlap": 0.936,
+          "query_cov": 0.364,
+          "note_cov": 0.6,
+          "team_ok": true,
+          "score": 6.618,
+          "body": "《这款Harness震撼硅谷》：本周播放 6429、喜欢 77、分享 203、完播率 15.89%（相对本周其余视频处于前列）。"
+        },
+        {
+          "item_id": 4864,
+          "chunk_id": "42294932fc2ad7890893",
+          "title": "OpenAI",
+          "team": "视频号团队",
+          "stype": "T11",
+          "ent_hit": [
+            "播放"
+          ],
+          "old_snip_overlap": 0.897,
+          "query_cov": 0.364,
+          "note_cov": 0.6,
+          "team_ok": true,
+          "score": 6.54,
+          "body": "《AI巨头开始抢苹果饭碗》：本周播放 3673、喜欢 35、分享 30、完播率 9.88%（相对本周其余视频处于前列）。"
+        },
+        {
+          "item_id": 4633,
+          "chunk_id": "e1f7d159e222637742af",
+          "title": "影石Insta360",
+          "team": "视频号团队",
+          "stype": "T11",
+          "ent_hit": [
+            "播放"
+          ],
+          "old_snip_overlap": 0.781,
+          "query_cov": 0.364,
+          "note_cov": 0.6,
+          "team_ok": true,
+          "score": 6.308,
+          "body": "《传统相机太难用！》：本周播放 4270、喜欢 26、分享 34、完播率 7.03%（相对本周其余视频处于前列）。"
+        }
+      ],
+      "alternates": [],
+      "confidence": "low"
+    },
+    "R15": {
+      "query": "编辑部选题里 IFA 相关",
+      "note": "选题",
+      "old_relevant_items": [
+        "4416",
+        "4417"
+      ],
+      "want": 2,
+      "found": 2,
+      "downgraded": false,
+      "candidates_found": 2,
+      "picked": [
+        {
+          "item_id": 4639,
+          "chunk_id": "c542de2900a0b2a44783",
+          "title": "IFA",
+          "team": "编辑部",
+          "stype": "T2",
+          "ent_hit": [
+            "IFA"
+          ],
+          "old_snip_overlap": 0.0,
+          "query_cov": 0.2,
+          "note_cov": 0.0,
+          "team_ok": true,
+          "score": 3.9,
+          "body": "IFA 探展总览（ODM 白牌小厂）：进行中，Hardwire文章（提报 8/31）"
+        },
+        {
+          "item_id": 4640,
+          "chunk_id": "125ec66086dc65c9b004",
+          "title": "IFA 2026",
+          "team": "编辑部",
+          "stype": "T2",
+          "ent_hit": [
+            "IFA"
+          ],
+          "old_snip_overlap": 0.0,
+          "query_cov": 0.2,
+          "note_cov": 0.0,
+          "team_ok": true,
+          "score": 3.9,
+          "body": "IFA 2026 逛展稿件：进行中，现场稿（提报 8/31）"
+        }
+      ],
+      "alternates": [],
+      "confidence": "medium"
+    },
+    "R17": {
+      "query": "滴滴战投牛一鸣怎么看智能硬件",
+      "note": "智能硬件",
+      "old_relevant_items": [
+        "4426",
+        "4427"
+      ],
+      "want": 2,
+      "found": 1,
+      "downgraded": true,
+      "candidates_found": 1,
+      "picked": [
+        {
+          "item_id": 4647,
+          "chunk_id": "115830562a984a7e076f",
+          "title": "滴滴战投",
+          "team": "编辑部",
+          "stype": "T1",
+          "ent_hit": [
+            "牛一鸣",
+            "滴滴"
+          ],
+          "old_snip_overlap": 0.0,
+          "query_cov": 0.692,
+          "note_cov": 1.0,
+          "team_ok": true,
+          "score": 8.638,
+          "body": "滴滴战投 · 牛一鸣（投资人）：受访陈述（非核实事实）——智能硬件去年热在退出通畅、拓竹大疆示范效应、产品定义权向国内团队转移；今年遇冷因高估值项目落地不及预期、资金分流向AI与机器人应用端；关注AI memory方向，"
+        }
+      ],
+      "alternates": [],
+      "confidence": "low"
+    },
+    "R21": {
+      "query": "The Verge 写了哪些手机或隐私相关",
+      "note": "手机或隐私",
+      "old_relevant_items": [
+        "4402",
+        "4404"
+      ],
+      "want": 2,
+      "found": 2,
+      "downgraded": false,
+      "candidates_found": 2,
+      "picked": [
+        {
+          "item_id": 4711,
+          "chunk_id": "8cd1613055d069276946",
+          "title": "Huawei",
+          "team": "外部媒体",
+          "stype": "T7",
+          "ent_hit": [
+            "The Verge",
+            "Verge"
+          ],
+          "old_snip_overlap": 0.0,
+          "query_cov": 0.444,
+          "note_cov": 0.25,
+          "team_ok": true,
+          "score": 7.517,
+          "body": "《Huawei copies Samsung's privacy display in its latest trifold》 The Verge 9/7 Dominic Preston https://www.thev"
+        },
+        {
+          "item_id": 4709,
+          "chunk_id": "32ea780a8c7955bfc2e0",
+          "title": "Apple",
+          "team": "外部媒体",
+          "stype": "T7",
+          "ent_hit": [
+            "The Verge",
+            "Verge"
+          ],
+          "old_snip_overlap": 0.0,
+          "query_cov": 0.389,
+          "note_cov": 0.0,
+          "team_ok": true,
+          "score": 7.183,
+          "body": "《The real reason your phone is getting more expensive》 The Verge 9/7 Rani Molla https://www.theverge.com/tech/"
+        }
+      ],
+      "alternates": [],
+      "confidence": "high"
+    },
+    "R22": {
+      "query": "Seattle Times 起诉 OpenAI",
+      "note": "起诉 OpenAI",
+      "old_relevant_items": [
+        "4405"
+      ],
+      "want": 1,
+      "found": 1,
+      "downgraded": false,
+      "candidates_found": 2,
+      "picked": [
+        {
+          "item_id": 4695,
+          "chunk_id": "0bb73dbee1404f2a35f5",
+          "title": "OpenAI",
+          "team": "外部媒体",
+          "stype": "T7",
+          "ent_hit": [
+            "Seattle Times",
+            "Seattle"
+          ],
+          "old_snip_overlap": 0.0,
+          "query_cov": 0.842,
+          "note_cov": 0.714,
+          "team_ok": true,
+          "score": 8.577,
+          "body": "《Seattle Times and Newsday are the latest publications to sue OpenAI and Microsoft》TechCrunch 9/6 Anthony Ha h"
+        }
+      ],
+      "alternates": [
+        {
+          "item_id": 4712,
+          "chunk_id": "a7863d2e46b75999083c",
+          "title": "Seattle Times",
+          "team": "外部媒体",
+          "stype": "T7",
+          "ent_hit": [
+            "Seattle Times",
+            "Seattle"
+          ],
+          "old_snip_overlap": 0.0,
+          "query_cov": 0.842,
+          "note_cov": 0.714,
+          "team_ok": true,
+          "score": 8.577,
+          "body": "《Seattle Times and Newsday sue OpenAI and Microsoft for infringement》 The Verge 9/7 Terrence O'Brien https://w"
+        }
+      ],
+      "confidence": "high"
+    },
+    "R29": {
+      "query": "腾讯 wb 生态应用接触",
+      "note": "wb 生态应用接触",
+      "old_relevant_items": [
+        "4421"
+      ],
+      "want": 1,
+      "found": 1,
+      "downgraded": false,
+      "candidates_found": 1,
+      "picked": [
+        {
+          "item_id": 4866,
+          "chunk_id": "315c399e39f6687f82f5",
+          "title": "腾讯",
+          "team": "编辑部",
+          "stype": "T1",
+          "ent_hit": [
+            "腾讯"
+          ],
+          "old_snip_overlap": 0.0,
+          "query_cov": 0.889,
+          "note_cov": 0.857,
+          "team_ok": true,
+          "score": 5.79,
+          "body": "腾讯 · wb软件、应用生态伙伴：已接触，围绕wb生态-应用和软件场（有原始记录）"
+        }
+      ],
+      "alternates": [],
+      "confidence": "high"
+    },
+    "R30": {
+      "query": "floatboat 少卿接触记录",
+      "note": "少卿接触记录",
+      "old_relevant_items": [
+        "4420"
+      ],
+      "want": 1,
+      "found": 1,
+      "downgraded": false,
+      "candidates_found": 1,
+      "picked": [
+        {
+          "item_id": 4643,
+          "chunk_id": "967da9d8a6f87203d114",
+          "title": "floatboat",
+          "team": "编辑部",
+          "stype": "T1",
+          "ent_hit": [
+            "floatboat"
+          ],
+          "old_snip_overlap": 0.0,
+          "query_cov": 0.833,
+          "note_cov": 0.6,
+          "team_ok": true,
+          "score": 5.45,
+          "body": "floatboat · 少卿（创始人&CEO）：已接触，本条无展开要点记录，礼节性/初步接触"
+        }
+      ],
+      "alternates": [],
+      "confidence": "high"
+    }
+  }
+}

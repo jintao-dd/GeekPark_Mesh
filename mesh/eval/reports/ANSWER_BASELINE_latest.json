@@ -1,0 +1,254 @@
+{
+  "phase": "answer",
+  "tag": "baseline",
+  "n": 15,
+  "pass_rate": 0.9333,
+  "macro_accuracy": 0.7333,
+  "macro_completeness": 0.9067,
+  "macro_faithfulness": 0.9133,
+  "macro_citation_correctness": 1.0,
+  "macro_abstention_correctness": 0.9333,
+  "elapsed_s": 0.35,
+  "results": [
+    {
+      "id": "A01",
+      "category": "entity",
+      "answer_snip": "时间过滤；李源；Snowball；锦涛",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "pass": true
+      },
+      "n_hits": 3,
+      "status": "grounded",
+      "error": null
+    },
+    {
+      "id": "A02",
+      "category": "company",
+      "answer_snip": "时间过滤；面壁智能；面壁智能；面壁智能；面壁智能",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "pass": true
+      },
+      "n_hits": 40,
+      "status": "grounded",
+      "error": null
+    },
+    {
+      "id": "A03",
+      "category": "multi_evidence",
+      "answer_snip": "时间过滤；面壁智能；安谋科技；面壁智能；面壁智能",
+      "metrics": {
+        "accuracy": 0.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "pass": true
+      },
+      "n_hits": 40,
+      "status": "grounded",
+      "error": null
+    },
+    {
+      "id": "A04",
+      "category": "topic",
+      "answer_snip": "时间过滤；Joshua X.；OpenAI 与 GPT-6 Astra；AI；OpenAI",
+      "metrics": {
+        "accuracy": 0.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "pass": true
+      },
+      "n_hits": 11,
+      "status": "grounded",
+      "error": null
+    },
+    {
+      "id": "A05",
+      "category": "community",
+      "answer_snip": "时间过滤；Founder Show；Anita Wang；AGI 2026；视频号",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "pass": true
+      },
+      "n_hits": 32,
+      "status": "grounded",
+      "error": null
+    },
+    {
+      "id": "A06",
+      "category": "relation",
+      "answer_snip": "时间过滤；AGI 2026；MiniMax",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "pass": true
+      },
+      "n_hits": 2,
+      "status": "grounded",
+      "error": null
+    },
+    {
+      "id": "A07",
+      "category": "empty",
+      "answer_snip": "时间过滤；Agent 与多智能体；FREELANDER 神行者；滴滴战投；Eigent AI",
+      "metrics": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "faithfulness": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 0.0,
+        "pass": false
+      },
+      "n_hits": 18,
+      "status": "grounded",
+      "error": null
+    },
+    {
+      "id": "A08",
+      "category": "topic",
+      "answer_snip": "时间过滤；源策；艾欧智能；乐享科技；灵初",
+      "metrics": {
+        "accuracy": 0.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "pass": true
+      },
+      "n_hits": 20,
+      "status": "grounded",
+      "error": null
+    },
+    {
+      "id": "A09",
+      "category": "temporal",
+      "answer_snip": "时间过滤；李源；Snowball；锦涛；锦涛",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "pass": true
+      },
+      "n_hits": 5,
+      "status": "grounded",
+      "error": null
+    },
+    {
+      "id": "A10",
+      "category": "abstention",
+      "answer_snip": "未在已上线周报中找到与问题直接相关的记录。请尝试换关键词、缩小或扩大时间范围，或确认相关内容是否已上线。\n（本次检索时间范围：2026-09-08 至 2026-09-08）",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "pass": true
+      },
+      "n_hits": 0,
+      "status": "unsupported",
+      "error": null
+    },
+    {
+      "id": "A11",
+      "category": "team",
+      "answer_snip": "时间过滤；IFA 2026；IFA；IFA 2026；IFA 探展总览与 IFA 2026 现场稿",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "pass": true
+      },
+      "n_hits": 40,
+      "status": "grounded",
+      "error": null
+    },
+    {
+      "id": "A12",
+      "category": "temporal_hard",
+      "answer_snip": "上线最新期次（latest published）不等于事件发生时刻。若没有可核对的事件时间，只能说明资料所属期次或材料时间，不能把旧材料说成当下新发生。\n\n未在已上线周报中找到与问题直接相关的记录。请尝试换关键词、缩小或扩大时间范围，或确认相关内容是否已上线。\n（本次检索时间范围：2026-09-07 至 2026-09-08）",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 0.7,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "pass": true
+      },
+      "n_hits": 0,
+      "status": "unsupported",
+      "error": null
+    },
+    {
+      "id": "A13",
+      "category": "company",
+      "answer_snip": "时间过滤；OpenAI；百度；豆包；张江AI创新小镇",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "pass": true
+      },
+      "n_hits": 5,
+      "status": "grounded",
+      "error": null
+    },
+    {
+      "id": "A14",
+      "category": "caveat",
+      "answer_snip": "时间过滤；英伟达",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 0.6,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "pass": true
+      },
+      "n_hits": 1,
+      "status": "grounded",
+      "error": null
+    },
+    {
+      "id": "A15",
+      "category": "help",
+      "answer_snip": "我是 Mesh Agent，可查询已上线周报与关系摘要。",
+      "metrics": {
+        "accuracy": 1.0,
+        "completeness": 1.0,
+        "faithfulness": 1.0,
+        "citation_correctness": 1.0,
+        "abstention_correctness": 1.0,
+        "pass": true
+      },
+      "n_hits": 0,
+      "status": "grounded",
+      "error": null
+    }
+  ]
+}

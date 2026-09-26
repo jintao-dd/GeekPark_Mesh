@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 BASE = Path(__file__).resolve().parent
 load_dotenv(BASE.parent / ".env")
-from . import db, ingest, llm, auth, edm, edm_job, merge, pipeline, preview_job, qa_structured, search, tokenize
+from . import db, ingest, llm, auth, edm, edm_job, embed_job, merge, pipeline, preview_job, qa_structured, search, tokenize
 from . import ask_engine, ask_scope, conversation, presets, chunk_index, embeddings, retriever, ask_turn, ask_query, ask_concurrency, ask_rate, job_store, ask_analysis
 import time
 
@@ -241,7 +241,21 @@ def _startup():
                     n_chunk = con.execute("SELECT COUNT(*) c FROM chunk_index").fetchone()["c"]
                 except Exception:
                     n_chunk = 0
-                if n_pub and n_if and (not n_chunk or n_chunk < n_if):
+                # 切分方案升级：显式版本触发全量重建（数量判断察觉不到新增子块）
+                scheme_rebuilt = False
+                try:
+                    scheme_rebuilt = chunk_index.maybe_rebuild_for_scheme(con)
+                    if scheme_rebuilt:
+                        db.commit_retry(con)
+                        # 结构变了，旧向量对不上，全部置 pending 重跑
+                        for _r in con.execute("SELECT id FROM issues WHERE status='published'"):
+                            db.refresh_issue_embedding_status(con, _r["id"], status="pending")
+                        db.commit_retry(con)
+                        n_chunk = con.execute("SELECT COUNT(*) c FROM chunk_index").fetchone()["c"]
+                        _cache_bust()
+                except Exception as _e:
+                    print(f"[mesh] chunk scheme rebuild failed: {_e}", flush=True)
+                if not scheme_rebuilt and n_pub and n_if and (not n_chunk or n_chunk < n_if):
                     print("[mesh] backfilling chunk_index…", flush=True)
                     chunk_index.rebuild_all(con)
                     db.commit_retry(con)
@@ -252,15 +266,20 @@ def _startup():
                 except Exception:
                     n_emb = 0
 
-            # embedding 调外部 API，不占用 write_lock，避免阻塞 Ask 落库
+            # embedding 异步入队，不阻塞启动与 Ask 落库
             if n_pub and n_chunk and n_emb < n_chunk and embeddings.is_configured():
-                print(f"[mesh] backfilling chunk embeddings ({n_emb}/{n_chunk})…", flush=True)
-                added = chunk_index.embed_all_missing(con)
-                with db.write_lock():
-                    db.commit_retry(con)
-                _cache_bust()
-                if added <= 0 and n_emb < n_chunk and embeddings.last_error():
-                    print(f"[mesh] embed backfill stalled: {embeddings.last_error()}", flush=True)
+                try:
+                    pending = db.issues_needing_embedding(con)
+                    with db.write_lock():
+                        db.commit_retry(con)
+                    for slug in pending:
+                        embed_job.ensure_for_slug(slug, by="startup")
+                    print(
+                        f"[mesh] queued embed jobs for {len(pending)} issue(s) ({n_emb}/{n_chunk})",
+                        flush=True,
+                    )
+                except Exception as e:
+                    print(f"[mesh] embed queue failed: {e}", flush=True)
             elif n_pub and n_chunk and n_emb < n_chunk:
                 print(
                     f"[mesh] warn: chunk_embeddings={n_emb}/{n_chunk} — configure MESH_EMBED_* for vector search",
@@ -292,12 +311,89 @@ def _startup():
     import threading
     threading.Thread(target=_bg_maintenance, daemon=True, name="mesh-maint").start()
 
+    # Environment hard gate：启动自检（REPRO_STATUS）；不阻塞监听，但 FAIL 时 healthz 非 ok
+    def _bg_repro_selfcheck():
+        try:
+            from . import repro_selfcheck
+
+            repro_selfcheck.run_selfcheck(probe_embed=True)
+        except Exception as e:
+            print(f"[mesh] REPRO_STATUS=FAIL selfcheck_error:{e}", flush=True)
+
+    threading.Thread(target=_bg_repro_selfcheck, daemon=True, name="mesh-repro").start()
+
+    # 通讯录后台预热：避免首个飞书请求在请求路径上同步跑全量部门 walk
+    try:
+        from .agent.feishu_hands import org_directory
+
+        org_directory.start_refresh_thread()
+    except Exception as e:
+        print(f"[mesh] org directory prewarm skipped: {e}", flush=True)
+
+    # PG 全文检索 trigram 索引（后台建，避免阻塞启动；无权限则跳过）
+    def _bg_pg_trgm():
+        try:
+            from . import db as _db
+
+            con = _db.connect()
+            try:
+                _db.ensure_pg_trgm_indexes(con)
+            finally:
+                con.close()
+        except Exception as e:
+            print(f"[mesh] pg_trgm index skipped: {e}", flush=True)
+
+    threading.Thread(target=_bg_pg_trgm, daemon=True, name="mesh-pg-trgm").start()
+
+    # KV 表过期回收（session_kv.purge_expired 此前无调用点，表只增不减）
+    def _bg_kv_purge():
+        from .agent import session_kv, session_state
+
+        while True:
+            try:
+                session_kv.purge_expired("session", int(session_state._TTL_SEC))
+                session_kv.purge_expired("pending", int(session_state._PENDING_TTL_SEC))
+            except Exception as e:
+                print(f"[mesh] kv purge failed: {e}", flush=True)
+            time.sleep(6 * 3600)
+
+    threading.Thread(target=_bg_kv_purge, daemon=True, name="mesh-kv-purge").start()
+
+
+@app.get("/api/repro/status")
+def repro_status(request: Request):
+    """发布硬门：REPRO_STATUS + Environment Manifest。仅 admin/owner 或内部 token。"""
+    from . import auth, repro_selfcheck
+
+    tok = (os.environ.get("MESH_REPRO_TOKEN") or "").strip()
+    hdr = (request.headers.get("X-Mesh-Repro-Token") or "").strip()
+    allowed = bool(tok and hdr and hdr == tok)
+    if not allowed:
+        try:
+            auth.require(request, "admin")
+            allowed = True
+        except HTTPException:
+            allowed = False
+    if not allowed:
+        raise HTTPException(status_code=401, detail="repro status is admin/internal only")
+
+    st = repro_selfcheck.last_status()
+    if not st:
+        st = repro_selfcheck.run_selfcheck(probe_embed=False)
+    code = 200 if st.get("REPRO_STATUS") == "PASS" else 503
+    return JSONResponse(st, status_code=code)
+
 
 @app.get("/healthz")
 def healthz():
     """运维探活 + 关键模块是否齐（不碰业务数据）。"""
+    from . import repro_selfcheck
+
+    repro = repro_selfcheck.last_status()
+    repro_ok = True if repro is None else (repro.get("REPRO_STATUS") == "PASS")
     info = {
-        "ok": True,
+        "ok": repro_ok,
+        "REPRO_STATUS": (repro or {}).get("REPRO_STATUS") or "PENDING",
         "schema_version": db.SCHEMA_VERSION,
         "vector_enabled": embeddings.enabled(),
         "embeddings_configured": embeddings.is_configured(),
@@ -311,6 +407,7 @@ def healthz():
         "zone_hard": True,
         "job_inline": os.environ.get("MESH_JOB_INLINE", "1"),
         "ask_analysis": ask_analysis.analysis_enabled(),
+        "agent_v1": True,
     }
     try:
         con = db.connect()
@@ -362,6 +459,31 @@ def healthz():
             else:
                 info["embeddings_hint"] = "configure MESH_EMBED_API_KEY / MESH_EMBED_BASE_URL / MESH_EMBED_MODEL"
         try:
+            rows = con.execute(
+                """SELECT slug, embedding_status, embedding_done, embedding_total, embedding_model
+                   FROM issues WHERE status='published'
+                   AND embedding_status IN ('pending', 'running', 'partial', 'failed')
+                   ORDER BY date_end DESC LIMIT 20"""
+            ).fetchall()
+            partial = []
+            for r in rows:
+                total = int(r["embedding_total"] or 0)
+                done = int(r["embedding_done"] or 0)
+                if total <= 0 and r["embedding_status"] not in ("failed",):
+                    continue
+                partial.append({
+                    "slug": r["slug"],
+                    "status": r["embedding_status"],
+                    "done": done,
+                    "total": total,
+                    "model": r["embedding_model"] or "",
+                    "label": f"{done}/{total}",
+                })
+            if partial:
+                info["embedding_issues_partial"] = partial
+        except Exception:
+            pass
+        try:
             info["search_fts_rows"] = con.execute(
                 "SELECT COUNT(*) c FROM search_fts"
             ).fetchone()["c"]
@@ -377,14 +499,19 @@ def healthz():
     )):
         info["ok"] = False
         return JSONResponse(info, status_code=503)
+    if not repro_ok:
+        info["ok"] = False
+        return JSONResponse(info, status_code=503)
     return info
 
-def ensure_draft_for_edit(con, issue_row, *, sync_from_published: bool = False) -> str:
-    """编辑只写草稿。无可用草稿时用线上稿铺底；已有可渲染草稿时不因 sync 覆盖，避免丢改。"""
+def ensure_draft_for_edit(
+    con, issue_row, *, sync_from_published: bool = False, force: bool = False
+) -> str:
+    """编辑只写草稿。无可用草稿时用线上稿铺底；force 时用线上稿覆盖草稿。"""
     pub = issue_row["published_json"] or ""
     draft = issue_row["draft_json"] or ""
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    if sync_from_published and pub.strip() and not db.issue_json_renderable(draft):
+    if sync_from_published and pub.strip() and (force or not db.issue_json_renderable(draft)):
         con.execute(
             "UPDATE issues SET draft_json=?, updated_at=? WHERE id=?",
             (pub, now, issue_row["id"]),
@@ -412,6 +539,7 @@ def ctx(request: Request, **kw):
         "user": u,
         "perms": auth.perms(u),
         "feishu_enabled": auth.feishu_enabled(),
+        "password_login_enabled": auth.password_login_enabled(),
         "base_url": BASE_URL,
         "flag_colors": FLAG_COLORS,
         "team_order": TEAM_ORDER,
@@ -424,6 +552,9 @@ def load_issue(con, slug: str, published_only=True):
     if not r: return None, None
     if published_only and r["status"] != "published": return r, None
     data = json.loads((r["published_json"] if published_only else (r["draft_json"] or r["published_json"])) or "{}")
+    # 已发布页：信任 published_json 原样（与已发 EDM 一致）。
+    # strong 切片只在 Publish 时由 build_published_projection 写入，这里不再二次过滤，
+    # 否则无 decision_tier 的旧稿会被全部抹掉。
     return r, data
 
 
@@ -444,6 +575,7 @@ def load_issue_for_edm(con, slug: str):
     except json.JSONDecodeError:
         data = {}
         source = "invalid"
+    # 同上：已上线稿不做 is_reader_tier 二次过滤
     return row, data, source
 
 
@@ -455,6 +587,16 @@ def edm_draft_out_of_sync(row: dict) -> bool:
     if not d or not p:
         return False
     return d != p
+
+def _clear_preview_gate(data: dict) -> dict:
+    from .preview_gate_state import clear_preview_gate
+    return clear_preview_gate(data)
+
+
+def _edit_invalidates_preview_gate(path: str) -> bool:
+    from .preview_gate_state import edit_invalidates_preview_gate
+    return edit_invalidates_preview_gate(path)
+
 
 def publish_blockers(con, issue_id: int, draft_json: str) -> list[str]:
     """与后台第四步检查清单一致的服务端拦截项。"""
@@ -479,10 +621,21 @@ def publish_blockers(con, issue_id: int, draft_json: str) -> list[str]:
         errs.append(f"还有 {n_bad} 条条目归属无效（不能为「内容中心·数据聚合」或「其他」）")
     if not db.draft_is_ready(draft_json):
         errs.append("请先重新生成周报草稿（挖掘或卡片变更后旧草稿已失效）")
-    # 拆段低置信：须人工确认来源归属
+    # 仅内容聚合包：拆段低置信须人工确认（单团队来源选了谁就是谁，不拦）
     try:
+        from .ingest import is_aggregation_source
+
         n_review = 0
-        for row in con.execute("SELECT meta FROM sources WHERE issue_id=?", (issue_id,)):
+        for row in con.execute(
+            "SELECT stype, team, channel, meta FROM sources WHERE issue_id=?",
+            (issue_id,),
+        ):
+            if not is_aggregation_source(
+                stype=row["stype"] or "",
+                team=row["team"] or "",
+                channel=row["channel"] or "",
+            ):
+                continue
             try:
                 m = json.loads(row["meta"] or "{}")
             except (json.JSONDecodeError, TypeError):
@@ -491,19 +644,19 @@ def publish_blockers(con, issue_id: int, draft_json: str) -> list[str]:
                 n_review += 1
         if n_review:
             errs.append(
-                f"有 {n_review} 个来源拆段置信度低，请到来源页点「确认拆段归属」或拆成单部门文件重传"
+                f"有 {n_review} 个内容聚合来源拆段置信度低，请到来源页点「确认拆段归属」"
+                "或拆成单部门文件重传"
             )
     except Exception:
         pass
     try:
-        from . import relation_gate
-        items = relation_gate.items_for_issue(con, issue_id)
-        weak_errs = relation_gate.issue_publish_blockers(draft_json, items)
-        errs.extend(weak_errs)
-        from .attribution_verify import attribution_publish_blockers
-        attr_errs = attribution_publish_blockers(con, issue_id, draft_json)
-        errs.extend(attr_errs)
-        # 附带弱关系标题，方便控制台展示
+        # 关系论证不足：生成预览时会滤掉该卡，不作为整期硬拦
+        from .attribution_verify import scan_issue
+
+        for b in scan_issue(con, issue_id, draft_json).blockers:
+            if isinstance(b, str) and b.startswith("关系「"):
+                continue
+            errs.append(b)
         draft_obj = {}
         try:
             draft_obj = json.loads(draft_json) if draft_json else {}
@@ -515,7 +668,8 @@ def publish_blockers(con, issue_id: int, draft_json: str) -> list[str]:
             if isinstance(r, dict) and r.get("needs_review")
         ]
         if review_titles and not any("叙事待核对" in e for e in errs):
-            errs.append("关系叙事待核对：" + "、".join(review_titles[:5]))
+            # 有 evidence 的卡已人工看过稿面，不再因 needs_review 硬拦
+            pass
     except Exception as e:
         errs.append(f"关系闸门检查失败：{e}")
     return errs
@@ -524,7 +678,10 @@ def publish_blockers(con, issue_id: int, draft_json: str) -> list[str]:
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     con = db.connect()
-    r = con.execute("SELECT slug FROM issues WHERE status='published' ORDER BY date_end DESC LIMIT 1").fetchone()
+    from .issue_period import sql_order_published_desc
+    r = con.execute(
+        f"SELECT slug FROM issues WHERE status='published' ORDER BY {sql_order_published_desc()} LIMIT 1"
+    ).fetchone()
     con.close()
     if not r: return RedirectResponse("/admin")
     return RedirectResponse(f"/{r['slug']}")
@@ -564,14 +721,18 @@ async def login_debug_preset(request: Request):
 
 @app.post("/login")
 def login_post(request: Request, username: str = Form(...), password: str = Form(...), next: str = Form("/")):
-    """密码登录已关闭；保留接口供紧急运维（需 MESH_ALLOW_PASSWORD_LOGIN=1）。"""
-    if os.environ.get("MESH_ALLOW_PASSWORD_LOGIN", "").strip() not in ("1", "true", "yes"):
-        raise HTTPException(403, "请使用飞书登录")
+    """密码登录：需 MESH_ALLOW_PASSWORD_LOGIN=1，且非生产（见 auth.password_login_enabled）。"""
     target = auth.normalize_next(next)
+    if not auth.password_login_enabled():
+        raise HTTPException(403, "请使用飞书登录")
     if auth.current_user(request):
         return RedirectResponse(target, status_code=302)
     u = auth.local_login(username, password)
-    if not u: return templates.TemplateResponse("login.html", ctx(request, next=target, error="账号或密码不对"))
+    if not u:
+        return templates.TemplateResponse(
+            "login.html",
+            ctx(request, next=target, error="账号或密码不对", debug_panel=False, debug_preset=""),
+        )
     resp = RedirectResponse(target, status_code=302)
     resp.set_cookie(auth.COOKIE, auth.make_session(u), httponly=True, samesite="lax",
                     secure=_cookie_secure(request), max_age=auth.SESSION_MAX_AGE)
@@ -598,6 +759,20 @@ def feishu_cb(request: Request, code: str = "", state: str = ""):
     try:
         target = auth.read_feishu_state(state)
         info = auth.feishu_exchange(code); u = auth.upsert_feishu_user(info); u["avatar_url"] = info.get("avatar_url", "")
+        # 网页登录也缓存 UAT，供后续 Hands 个人能力复用
+        try:
+            from .agent import feishu_user_auth as uauth
+
+            if info.get("access_token") and info.get("open_id"):
+                uauth.save_user_token(
+                    str(info["open_id"]),
+                    access_token=str(info.get("access_token") or ""),
+                    refresh_token=str(info.get("refresh_token") or ""),
+                    expires_in=int(info.get("expires_in") or 0),
+                    scopes=str(info.get("scope") or ""),
+                )
+        except Exception:
+            pass
         preset = (request.cookies.get(auth.DEBUG_PRESET_COOKIE) or "").strip()
         debug_role = preset if auth.is_debug_user(u.get("display") or info.get("name") or "", u.get("username") or "") else ""
     except auth.FeishuLoginError as e:
@@ -609,6 +784,58 @@ def feishu_cb(request: Request, code: str = "", state: str = ""):
                     secure=_cookie_secure(request), max_age=auth.SESSION_MAX_AGE)
     resp.delete_cookie(auth.DEBUG_PRESET_COOKIE, path="/", samesite="lax", secure=_cookie_secure(request))
     return resp
+
+
+@app.get("/auth/feishu/agent")
+def feishu_agent_auth_start(request: Request, open_id: str = ""):
+    """飞书同事 Agent：个人授权入口（日历/个人文档等）。"""
+    if not auth.feishu_enabled():
+        raise HTTPException(400, "未配置飞书应用")
+    from .agent import feishu_user_auth as uauth
+
+    return RedirectResponse(uauth.agent_authorize_url(open_id=open_id or ""), status_code=302)
+
+
+@app.get("/auth/feishu/agent/callback")
+def feishu_agent_auth_cb(request: Request, code: str = "", state: str = ""):
+    from .agent import feishu_user_auth as uauth
+
+    try:
+        st = uauth.read_agent_state(state)
+        info = auth.feishu_exchange(code)
+        oid = str(info.get("open_id") or "").strip()
+        expected = str(st.get("open_id") or "").strip()
+        if expected and oid and expected != oid:
+            return HTMLResponse(
+                "<h3>授权账号与当前飞书用户不一致</h3><p>请用对话里的同一飞书账号打开授权链接。</p>",
+                status_code=400,
+            )
+        uauth.save_user_token(
+            oid,
+            access_token=str(info.get("access_token") or ""),
+            refresh_token=str(info.get("refresh_token") or ""),
+            expires_in=int(info.get("expires_in") or 0),
+            scopes=str(info.get("scope") or ""),
+        )
+        # 顺带确保 Mesh users 有绑定
+        try:
+            auth.upsert_feishu_user(info)
+        except Exception:
+            pass
+        return HTMLResponse(
+            "<h3>个人飞书授权成功</h3>"
+            "<p>可以回到飞书对话，对我说「继续」。</p>"
+            "<p>已开通：个人日历/文档只读、消息只读、通讯录搜索等（以授权页勾选为准）。</p>"
+        )
+    except auth.FeishuLoginError as e:
+        return HTMLResponse(f"<h3>授权失败</h3><p>{e.user_message}</p>", status_code=400)
+    except Exception:
+        return HTMLResponse("<h3>授权失败</h3><p>请稍后在飞书里重新点授权链接。</p>", status_code=500)
+
+
+@app.get("/auth/feishu/agent/done")
+def feishu_agent_auth_done():
+    return HTMLResponse("<h3>可以关闭本页，回到飞书继续对话。</h3>")
 
 @app.post("/api/debug/role")
 async def api_debug_role(request: Request):
@@ -658,7 +885,11 @@ async def api_debug_role(request: Request):
 def archive(request: Request):
     auth.require(request, "viewer")
     con = db.connect()
-    rows = con.execute("SELECT slug, period_label, date_start, date_end, published_at FROM issues WHERE status='published' ORDER BY date_end DESC").fetchall()
+    from .issue_period import sql_order_published_desc
+    rows = con.execute(
+        f"SELECT slug, period_label, date_start, date_end, published_at, updated_at "
+        f"FROM issues WHERE status='published' ORDER BY {sql_order_published_desc()}"
+    ).fetchall()
     con.close()
     return templates.TemplateResponse("archive.html", ctx(request, issues=[_enrich_issue(r) for r in rows]))
 
@@ -778,6 +1009,65 @@ def _run_ask(request: Request, payload: dict):
 @app.post("/api/ask")
 def api_ask(request: Request, payload: dict):
     return _run_ask(request, payload)
+
+
+@app.post("/api/agent/v1/message")
+def api_agent_v1_message(request: Request, payload: dict):
+    """Agent v1 Harness：不依赖飞书事件；契约与飞书接线共用同一 handle_message。
+
+    需登录 viewer+。正式飞书 Bot 走 /api/feishu/bot/event。
+    """
+    auth.require(request, "viewer")
+    from .agent.harness import run_harness
+
+    con = db.connect()
+    try:
+        return run_harness(con, payload or {})
+    finally:
+        con.close()
+
+
+@app.post("/api/feishu/bot/event")
+async def api_feishu_bot_event(request: Request):
+    """⑧ 飞书 Bot 事件入口：只接线，不扩大脑。
+
+    - url_verification：回 challenge（支持 Encrypt Key）
+    - im.message：立刻 accepted，后台发「思考中」卡片 → Agent → Patch 最终回答
+    """
+    try:
+        raw_bytes = await request.body()
+        body = json.loads(raw_bytes.decode("utf-8")) if raw_bytes else {}
+    except Exception:
+        raise HTTPException(400, "invalid json")
+    from .agent.feishu_bot import handle_feishu_event
+    import logging
+
+    raw = body or {}
+    logging.getLogger("uvicorn.error").info(
+        "[feishu_bot] inbound keys=%s encrypt=%s type=%s",
+        list(raw.keys())[:12],
+        bool(raw.get("encrypt")),
+        raw.get("type") or (raw.get("header") or {}).get("event_type"),
+    )
+    out = handle_feishu_event(None, raw, headers=request.headers, raw_body=raw_bytes)
+    logging.getLogger("uvicorn.error").info(
+        "[feishu_bot] outbound ok=%s challenge=%s accepted=%s skipped=%s reason=%s error=%s",
+        out.get("ok"),
+        bool(out.get("challenge")),
+        out.get("accepted"),
+        out.get("skipped"),
+        out.get("reason"),
+        out.get("error"),
+    )
+    if out.get("error") == "bad_verification_token":
+        raise HTTPException(403, "bad_verification_token")
+    if out.get("error") == "bad_signature":
+        raise HTTPException(403, "bad_signature")
+    if out.get("error") == "decrypt_failed":
+        raise HTTPException(400, "decrypt_failed")
+    if "challenge" in out:
+        return {"challenge": out["challenge"]}
+    return out
 
 
 @app.post("/api/ask/new_session")
@@ -1144,6 +1434,212 @@ def api_ask_stream(request: Request, payload: dict):
     )
 
 
+@app.get("/admin/crm/notion/status")
+def admin_crm_notion_status(request: Request):
+    """Notion CRM 底库同步状态（admin+）。"""
+    auth.require(request, "admin")
+    from . import notion_crm
+
+    return notion_crm.sync_status()
+
+
+@app.post("/admin/crm/notion/sync")
+def admin_crm_notion_sync(request: Request, full: int = 0, blocks: int = 1, blocks_full: int = 0):
+    """Notion CRM 全量/增量同步进底库。full=1 忽略游标。
+
+    blocks=1（默认）同时抓 Take 页面正文（详细沟通记录）进 crm_page_blocks；
+    blocks_full=1 强制重抓所有页面正文。不进本期周报。
+
+    注意：这里只动 crm_sync_state 同步游标，**不会**影响各期 CRM 交叉的消费锚点
+    （crm_cross_anchor），所以随便同步都不会吃掉某一期的增量。
+    """
+    auth.require(request, "admin")
+    from . import notion_crm
+
+    try:
+        return notion_crm.sync_all(
+            full=bool(full), with_blocks=bool(blocks), blocks_full=bool(blocks_full)
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)[:500]) from e
+
+
+@app.get("/admin/crm/notion/anchors")
+def admin_crm_anchors(request: Request, slug: str = ""):
+    """各期 CRM 交叉消费锚点 + 本期窗口预算。只读。"""
+    auth.require(request, "admin")
+    from . import crm_ingest
+
+    con = db.connect()
+    try:
+        crm_ingest.ensure_anchor_schema(con)
+        out: dict = {"anchors": []}
+        try:
+            out["anchors"] = [
+                dict(r)
+                for r in con.execute(
+                    "SELECT a.issue_id, i.slug, a.kind, a.anchor_edited, a.updated_at "
+                    "FROM crm_cross_anchor a LEFT JOIN issues i ON i.id=a.issue_id "
+                    "ORDER BY a.issue_id DESC, a.kind"
+                )
+            ]
+        except Exception as e:
+            out["anchors_error"] = str(e)[:200]
+        if slug:
+            row = con.execute(
+                "SELECT id, slug, date_start, date_end, period_label, status FROM issues WHERE slug=?",
+                (slug,),
+            ).fetchone()
+            if row:
+                issue = dict(row)
+                out["issue"] = issue
+                out["window"] = crm_ingest.resolve_window(con, issue)
+                d = crm_ingest.build_digest(con, since_map=out["window"])
+                out["would_ingest"] = bool((d.get("text") or "").strip())
+                out["counts"] = d.get("counts") or {}
+                out["truncated"] = d.get("truncated") or {}
+                out["chunks"] = len(crm_ingest.split_digest_chunks(d.get("text") or ""))
+            else:
+                out["issue"] = None
+        return out
+    finally:
+        con.close()
+
+
+@app.post("/admin/crm/notion/anchor/reset")
+def admin_crm_anchor_reset(request: Request, slug: str, since: str = ""):
+    """把某期 CRM 交叉锚点重置到指定时间（不传则删除锚点，回落到 date_start）。
+
+    用来让某一期重新消费一段窗口。只影响该期，不碰同步游标。
+    """
+    auth.require(request, "admin")
+    from . import crm_ingest
+
+    con = db.connect()
+    try:
+        crm_ingest.ensure_anchor_schema(con)
+        row = con.execute("SELECT id, date_start FROM issues WHERE slug=?", (slug,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="没有这一期")
+        issue_id = int(row["id"])
+        if (since or "").strip():
+            for kind in crm_ingest._CONSUME_KINDS:
+                con.execute(
+                    "INSERT INTO crm_cross_anchor(issue_id,kind,anchor_edited,updated_at) "
+                    "VALUES(?,?,?,?) ON CONFLICT(issue_id,kind) DO UPDATE SET "
+                    "anchor_edited=excluded.anchor_edited, updated_at=excluded.updated_at",
+                    (issue_id, kind, since.strip(), crm_ingest._now_iso()),
+                )
+            action = f"set:{since.strip()}"
+        else:
+            con.execute("DELETE FROM crm_cross_anchor WHERE issue_id=?", (issue_id,))
+            action = "cleared->date_start"
+        db.commit_retry(con)
+        issue = {"id": issue_id, "date_start": row["date_start"] or ""}
+        return {
+            "ok": True,
+            "slug": slug,
+            "action": action,
+            "window": crm_ingest.resolve_window(con, issue),
+        }
+    finally:
+        con.close()
+
+
+@app.get("/admin/qa", response_class=HTMLResponse)
+def admin_qa_log(
+    request: Request,
+    q: str = "",
+    channel: str = "",
+    source: str = "feishu",
+    status: str = "",
+    only_bad: int = 0,
+    limit: int = 50,
+    offset: int = 0,
+):
+    """AI 问答质量记录（只读 + 人工标注）。不触发 Preview/Ask/Embed/Publish。
+
+    默认只看真实飞书样本（source=feishu）；评测/HTTP 需显式选 source 才能看到。
+    """
+    auth.require(request, "editor")
+    from . import qa_log
+
+    con = db.connect()
+    try:
+        # DDL 失败不得让页面 500（历史上 source 补列失败就是这样挂的）；
+        # 单条 DDL 已在 qa_log 内用 SAVEPOINT 隔离，这里再兜一层。
+        try:
+            qa_log.ensure_schema(con)
+        except Exception:
+            con.rollback()
+        page = qa_log.list_turns(
+            con,
+            channel=channel,
+            source=source,
+            answer_status=status,
+            only_bad=bool(only_bad),
+            q=q,
+            limit=max(1, min(int(limit or 50), 200)),
+            offset=max(0, int(offset or 0)),
+        )
+        stats = qa_log.stats(con, days=7, source=source)
+    except Exception as e:
+        # 兜底：任何查询异常也渲染空页 + 错误提示，不抛 500。
+        try:
+            con.rollback()
+        except Exception:
+            pass
+        page = {"turns": [], "total": 0, "limit": 50, "offset": 0}
+        stats = {"days": 7, "source": source, "total": 0, "by_status": {},
+                 "by_channel": {}, "by_source": {}, "error": str(e)[:300]}
+    finally:
+        con.close()
+    return templates.TemplateResponse(
+        "qa_log.html",
+        ctx(
+            request,
+            nav="qa",
+            turns=page["turns"],
+            total=page["total"],
+            limit=page["limit"],
+            offset=page["offset"],
+            stats=stats,
+            filters={
+                "q": q,
+                "channel": channel,
+                "source": source,
+                "status": status,
+                "only_bad": bool(only_bad),
+            },
+        ),
+    )
+
+
+@app.post("/admin/qa/{turn_id}/feedback")
+def admin_qa_feedback(
+    request: Request,
+    turn_id: int,
+    feedback: str = Form(""),
+    note: str = Form(""),
+):
+    """人工标注某轮问答好/差（用于后续归因失败分类）。"""
+    u = auth.require(request, "editor")
+    from . import qa_log
+
+    con = db.connect()
+    try:
+        qa_log.ensure_schema(con)
+        ok = qa_log.set_feedback(
+            con, turn_id, feedback=feedback, note=note, by=(u.get("u") or "")
+        )
+        con.commit()
+    finally:
+        con.close()
+    if not ok:
+        return _flash_redirect("/admin/qa", "反馈值不合法")
+    return RedirectResponse("/admin/qa", status_code=302)
+
+
 @app.post("/admin/reindex_facts")
 def admin_reindex_facts(request: Request):
     """回填/重建全部已发布期的主体×团队事实表 + 搜索/chunk 索引。"""
@@ -1153,19 +1649,25 @@ def admin_reindex_facts(request: Request):
     db.reindex_all_search(con)
     c = con.execute("SELECT COUNT(*) c FROM entity_team_facts").fetchone()["c"]
     chunks = con.execute("SELECT COUNT(*) c FROM chunk_index").fetchone()["c"]
-    added_emb = 0
     if embeddings.is_configured():
-        added_emb = chunk_index.embed_all_missing(con)
+        for r in con.execute("SELECT id FROM issues WHERE status='published'"):
+            db.refresh_issue_embedding_status(con, r["id"], status="pending")
+    con.commit()
+    queued = 0
+    if embeddings.is_configured():
+        try:
+            embed_job.start(force=False)
+            queued = 1
+        except Exception:
+            pass
     try:
         embs = con.execute("SELECT COUNT(*) c FROM chunk_embeddings").fetchone()["c"]
     except Exception:
         embs = -1
-    con.commit(); con.close()
+    con.close()
     _ASK_CACHE.clear()
     out = {"ok": True, "issues": n, "facts": c, "chunks": chunks, "embeddings": embs,
-            "embed_configured": embeddings.is_configured(), "embeddings_added": added_emb}
-    if added_emb <= 0 and embeddings.is_configured() and embeddings.last_error():
-        out["embeddings_warn"] = embeddings.last_error()
+            "embed_configured": embeddings.is_configured(), "embed_queued": queued}
     return out
 
 
@@ -1205,9 +1707,12 @@ def admin_reindex_published(request: Request, slug: str):
         return _flash_redirect(f"/admin/issue/{slug}?step=4", "仅已上线期可重建搜索索引。")
     db.snapshot_published_items(con, r["id"])
     db.reindex_issue(con, r["id"])
-    con.commit(); con.close()
+    con.commit()
+    con.close()
     _ASK_CACHE.clear()
-    return _flash_redirect(f"/admin/issue/{slug}?step=4", "已重建搜索/问答索引（含条目与实体）。")
+    if embeddings.is_configured():
+        embed_job.ensure_for_slug(slug, by="reindex")
+    return _flash_redirect(f"/admin/issue/{slug}?step=4", "已重建搜索/问答索引（含条目与实体）；向量在后台补齐。")
 
 @app.post("/admin/embed_backfill")
 def admin_embed_backfill(request: Request):
@@ -1333,11 +1838,17 @@ def issue_weak_relations_resolve(request: Request, slug: str, payload: dict):
     from .issue_verify import sync_kpis_from_data
     draft = sync_kpis_from_data(draft)
     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    payload = json.dumps(draft, ensure_ascii=False)
-    con.execute(
-        "UPDATE issues SET draft_json=?, published_json=?, updated_at=? WHERE id=?",
-        (payload, payload, stamp, r["id"]),
+    from .relation_display import attach_reader_flags, split_relations_for_publish
+    draft["relations"] = attach_reader_flags(
+        [r for r in (draft.get("relations") or []) if isinstance(r, dict)]
     )
+    reader, backlog = split_relations_for_publish(draft["relations"])
+    draft["_relations_reader"] = reader
+    draft["_relations_backlog"] = backlog
+    draft_payload = json.dumps(draft, ensure_ascii=False)
+    # 只写草稿；published_json / Ask 仅由 Publish 更新（publish_lane 硬边界）
+    from .publish_lane import write_draft_json
+    write_draft_json(con, r["id"], draft_payload, stamp)
     con.execute(
         "INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)",
         (r["id"], u.get("u") or "", "weak_relations", action, f"{changed} cards"),
@@ -1360,25 +1871,46 @@ def _parse_iso_date(s: str | None) -> datetime.date | None:
 
 def format_display_date(d: datetime.date) -> str:
     """读者页单日期：2026.8.27"""
-    return f"{d.year}.{d.month}.{d.day}"
+    from .issue_period import format_period_label
+
+    return format_period_label(d)
 
 
 def issue_display_date(issue: dict) -> str:
-    """已上线用 published_at；草稿用 date_end（创建默认当天）。"""
-    if issue.get("published_at"):
-        d = _parse_iso_date(str(issue["published_at"])[:10])
-        if d:
-            return format_display_date(d)
-    d = _parse_iso_date(issue.get("date_end"))
-    if d:
-        return format_display_date(d)
-    return (issue.get("period_label") or issue.get("slug") or "").strip()
+    """已上线按上线日；上线后若有更新且更晚则按最新更新日期；草稿按 date_end。"""
+    from .issue_period import issue_display_date as _period_display
+
+    return _period_display(issue)
 
 
 def _enrich_issue(row) -> dict:
     d = dict(row)
     d["display_date"] = issue_display_date(d)
+    d["embedding_label"] = _embedding_progress_label(d)
     return d
+
+
+def _embedding_progress_label(issue: dict) -> str:
+    if issue.get("status") != "published":
+        return ""
+    st = (issue.get("embedding_status") or "").strip()
+    total = int(issue.get("embedding_total") or 0)
+    done = int(issue.get("embedding_done") or 0)
+    if st == "skipped":
+        return "未配置"
+    if st == "completed" or (total > 0 and done >= total):
+        return f"{done}/{total}" if total else "完成"
+    if st == "running":
+        return f"补齐中 {done}/{total}"
+    if st == "pending":
+        return f"待补齐 {done}/{total}" if total else "待补齐"
+    if st == "partial":
+        return f"部分 {done}/{total}"
+    if st == "failed":
+        return f"失败 {done}/{total}"
+    if total:
+        return f"{done}/{total}"
+    return ""
 
 
 def _period_label(start: datetime.date, end: datetime.date) -> str:
@@ -1388,6 +1920,7 @@ def _period_label(start: datetime.date, end: datetime.date) -> str:
 
 def suggest_next_issue(con) -> dict:
     """新建下一期：默认发布日期为今天，无需手填区间。"""
+    from .issue_period import normalize_issue_slug
     row = con.execute(
         "SELECT version FROM issues ORDER BY date_end DESC, id DESC LIMIT 1"
     ).fetchone()
@@ -1395,9 +1928,9 @@ def suggest_next_issue(con) -> dict:
     today = datetime.date.today()
     ds = today.isoformat()
     return {
-        "slug": ds,
-        "date_start": ds,
-        "date_end": ds,
+        "slug": normalize_issue_slug(ds),
+        "date_start": normalize_issue_slug(ds),
+        "date_end": normalize_issue_slug(ds),
         "period_label": format_display_date(today),
         "version": version,
     }
@@ -1409,12 +1942,33 @@ def admin_home(request: Request):
     auth.require(request, "editor")
     return RedirectResponse("/admin/issues", status_code=302)
 
+
+@app.get("/admin/eval", response_class=HTMLResponse)
+def admin_eval_dashboard(request: Request, current: str = "", baseline: str = "", role: str = ""):
+    """Eval Dashboard V1 — 只读 eval/reports，不触发 Preview/Ask/Embed/Publish。"""
+    auth.require(request, "editor")
+    from .eval_dashboard import build_view
+
+    view = build_view(
+        current_name=current or None,
+        baseline_name=baseline or None,
+        role=role or None,
+    )
+    return templates.TemplateResponse(
+        "eval_dashboard.html",
+        ctx(request, nav="eval", view=view),
+    )
+
 @app.get("/admin/issues", response_class=HTMLResponse)
 def admin_issue_list(request: Request, err: str = ""):
     u = auth.require(request, "editor")
     con = db.connect()
+    from .issue_period import sql_order_published_desc
     issues = [_enrich_issue(r) for r in con.execute(
-        "SELECT id, slug, period_label, status, updated_at, published_at, date_end, draft_json FROM issues ORDER BY date_end DESC"
+        f"""SELECT id, slug, period_label, status, updated_at, published_at, date_end, draft_json,
+                  embedding_status, embedding_total, embedding_done, embedding_model
+           FROM issues ORDER BY CASE WHEN status='published' THEN 0 ELSE 1 END,
+                {sql_order_published_desc()}, date_end DESC, id DESC"""
     )]
     for i in issues:
         draft = i.pop("draft_json", None)
@@ -1436,13 +1990,17 @@ def admin_issue_list(request: Request, err: str = ""):
 @app.post("/admin/issue/new")
 def issue_new(request: Request, slug: str = Form(...), date_start: str = Form(""), date_end: str = Form(""), period_label: str = Form(""), version: str = Form("v1.4")):
     auth.require(request, "editor")
-    slug = (slug or "").strip()
+    from .issue_period import normalize_issue_slug
+    slug = normalize_issue_slug(slug or "").strip()
     version = (version or "v1.4").strip() or "v1.4"
     today = datetime.date.today()
     if not date_end:
         date_end = today.isoformat()
     if not date_start:
         date_start = date_end
+    # 同时规范化 date_start / date_end
+    date_start = normalize_issue_slug(date_start) or date_start
+    date_end = normalize_issue_slug(date_end) or date_end
     if not period_label:
         period_label = format_display_date(_parse_iso_date(date_end) or today)
     if not slug:
@@ -1453,8 +2011,12 @@ def issue_new(request: Request, slug: str = Form(...), date_start: str = Form(""
     exists = con.execute("SELECT 1 FROM issues WHERE slug=?", (slug,)).fetchone()
     if exists:
         suggest = suggest_next_issue(con)
+        from .issue_period import sql_order_published_desc
         issues = [_enrich_issue(r) for r in con.execute(
-            "SELECT id, slug, period_label, status, updated_at, published_at, date_end, draft_json FROM issues ORDER BY date_end DESC"
+            f"""SELECT id, slug, period_label, status, updated_at, published_at, date_end, draft_json,
+                      embedding_status, embedding_total, embedding_done, embedding_model
+               FROM issues ORDER BY CASE WHEN status='published' THEN 0 ELSE 1 END,
+                    {sql_order_published_desc()}, date_end DESC, id DESC"""
         )]
         for i in issues:
             draft = i.pop("draft_json", None)
@@ -1550,6 +2112,12 @@ def issue_admin(request: Request, slug: str, step: int | None = None, err: str =
     blockers = publish_blockers(con, r["id"], r["draft_json"] or "")
     sources_need_review = []
     for s in sources:
+        if not ingest.is_aggregation_source(
+            stype=s.get("stype") or "",
+            team=s.get("team") or "",
+            channel=s.get("channel") or "",
+        ):
+            continue
         try:
             m = json.loads(s.get("meta") or "{}")
         except (json.JSONDecodeError, TypeError):
@@ -1592,9 +2160,9 @@ def issue_admin(request: Request, slug: str, step: int | None = None, err: str =
 
 
 @app.post("/admin/issue/{slug}/pipeline/start")
-def pipeline_start(request: Request, slug: str, force: int = 0):
+def pipeline_start(request: Request, slug: str, force: int = 0, reextract: int = 0):
     auth.require(request, "editor")
-    pipeline.start(slug, force=bool(force))
+    pipeline.start(slug, force=bool(force), reextract=bool(reextract))
     return {"ok": True}
 
 
@@ -1654,7 +2222,7 @@ async def upload(
         use_channel = (channel or "").strip() or guessed["channel"]
         use_title = (title or "").strip() or guessed["title"] or filename
         meta["inferred"] = guessed
-        from .aggregator import is_mixed_source, split_bundle_ex, sources_from_split
+        from .aggregator import is_mixed_source, should_pre_explode, split_bundle_ex, sources_from_split
         rows = [{
             "stype": use_stype,
             "team": use_team,
@@ -1667,7 +2235,7 @@ async def upload(
         }]
         if is_mixed_source(stype=use_stype, team=use_team, channel=use_channel, title=use_title, text=text):
             split = split_bundle_ex(text, source_title=use_title)
-            if split.mode == "multi" and len(split.segments) > 1:
+            if should_pre_explode(split):
                 rows = sources_from_split(
                     split,
                     parent_title=use_title,
@@ -1676,6 +2244,14 @@ async def upload(
                     base_meta={"inferred": guessed},
                     upload_team=use_team,
                 )
+            else:
+                # 置信不足：整包入库，抽取时再拆；低置信才 needs_review
+                keep_meta = dict(meta)
+                keep_meta["split"] = {**split.to_meta(), "pre_explode": False}
+                rows[0]["meta"] = keep_meta
+                rows[0]["stype"] = "T13"
+                rows[0]["team"] = "内容中心·数据聚合"
+                rows[0]["channel"] = "aggregator"
         for row in rows:
             sid = db.insert_id(
                 con,
@@ -1714,7 +2290,7 @@ def paste(request: Request, slug: str, title: str = Form(""), text: str = Form(.
     use_team = ingest.canonical_team((team or "").strip() or guessed["team"])
     use_channel = (channel or "").strip() or guessed["channel"]
     use_title = (title or "").strip() or "粘贴文本"
-    from .aggregator import is_mixed_source, split_bundle_ex, sources_from_split
+    from .aggregator import is_mixed_source, should_pre_explode, split_bundle_ex, sources_from_split
     rows = [{
         "stype": use_stype,
         "team": use_team,
@@ -1727,7 +2303,7 @@ def paste(request: Request, slug: str, title: str = Form(""), text: str = Form(.
     }]
     if is_mixed_source(stype=use_stype, team=use_team, channel=use_channel, title=use_title, text=text):
         split = split_bundle_ex(text, source_title=use_title)
-        if split.mode == "multi" and len(split.segments) > 1:
+        if should_pre_explode(split):
             rows = sources_from_split(
                 split,
                 parent_title=use_title,
@@ -1735,6 +2311,12 @@ def paste(request: Request, slug: str, title: str = Form(""), text: str = Form(.
                 base_meta={"inferred": guessed},
                 upload_team=use_team,
             )
+        else:
+            keep_meta = {"inferred": guessed, "split": {**split.to_meta(), "pre_explode": False}}
+            rows[0]["meta"] = keep_meta
+            rows[0]["stype"] = "T13"
+            rows[0]["team"] = "内容中心·数据聚合"
+            rows[0]["channel"] = "aggregator"
     for row in rows:
         con.execute(
             "INSERT INTO sources(issue_id,stype,team,title,filename,text,meta,channel) VALUES(?,?,?,?,?,?,?,?)",
@@ -1784,6 +2366,31 @@ def source_delete(request: Request, sid: int):
     con.commit(); con.close()
     if wants_json:
         return JSONResponse({"ok": True, "id": sid, "slug": slug})
+    return RedirectResponse(f"/admin/issue/{slug}", status_code=302)
+
+
+@app.post("/admin/issue/{slug}/sources/delete_all")
+def sources_delete_all(request: Request, slug: str):
+    """一期全部来源 + 其条目一并删除（重传聚合包前常用）。"""
+    auth.require(request, "editor")
+    wants_json = "application/json" in (request.headers.get("accept") or "")
+    con = db.connect()
+    issue = con.execute("SELECT id FROM issues WHERE slug=?", (slug,)).fetchone()
+    if not issue:
+        con.close()
+        raise HTTPException(404)
+    iid = issue["id"]
+    n_src = con.execute("SELECT COUNT(*) c FROM sources WHERE issue_id=?", (iid,)).fetchone()["c"]
+    con.execute(
+        "DELETE FROM items WHERE source_id IN (SELECT id FROM sources WHERE issue_id=?)",
+        (iid,),
+    )
+    con.execute("DELETE FROM sources WHERE issue_id=?", (iid,))
+    db.mark_draft_stale(con, iid)
+    con.commit()
+    con.close()
+    if wants_json:
+        return JSONResponse({"ok": True, "slug": slug, "deleted": int(n_src)})
     return RedirectResponse(f"/admin/issue/{slug}", status_code=302)
 
 
@@ -1884,7 +2491,6 @@ def api_item_owner(request: Request, payload: dict):
     con.close()
     return {"ok": True, "owner_team": owner}
 
-
 @app.get("/admin/source/{sid}", response_class=HTMLResponse)
 def source_view(request: Request, sid: int, err: str = ""):
     # 条目：编辑可见；原文全文：仅 admin/owner（与脱敏说明一致）
@@ -1914,6 +2520,14 @@ def source_view(request: Request, sid: int, err: str = ""):
         split_info = (json.loads(sdict.get("meta") or "{}") or {}).get("split") or {}
     except (json.JSONDecodeError, TypeError):
         split_info = {}
+    # 单团队来源：不展示「确认拆段」按钮（选了谁就是谁）
+    if not ingest.is_aggregation_source(
+        stype=sdict.get("stype") or "",
+        team=sdict.get("team") or "",
+        channel=sdict.get("channel") or "",
+    ):
+        split_info = dict(split_info or {})
+        split_info["needs_review"] = False
     return templates.TemplateResponse(
         "source.html",
         ctx(
@@ -1970,9 +2584,10 @@ def source_extract(request: Request, sid: int):
         )
         owner = attr.owner_team
         blocked = int(it.get("blocked") or 0)
-        con.execute("""INSERT INTO items(issue_id,source_id,team,stype,zone,level,kind,text,entities,roles,signals,source_label,pointer,blocked,owner_team,channel,source_labels,owner_provenance,llm_owner_team_hint)
-                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (s["issue_id"], sid, owner or it.get("team"), item_stype, it["zone"], it["level"], it["kind"], it["text"], json.dumps(it["entities"], ensure_ascii=False),
+        con.execute("""INSERT INTO items(issue_id,source_id,team,stype,zone,level,kind,text,raw_snippet,entities,roles,signals,source_label,pointer,blocked,owner_team,channel,source_labels,owner_provenance,llm_owner_team_hint)
+                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (s["issue_id"], sid, owner or it.get("team"), item_stype, it["zone"], it["level"], it["kind"], it["text"], it.get("raw_snippet") or it["text"],
+                     json.dumps(it["entities"], ensure_ascii=False),
                      json.dumps(it["roles"], ensure_ascii=False), json.dumps(it["signals"], ensure_ascii=False), it["source_label"], it["pointer"], blocked,
                      owner, s["channel"] or "manual",
                      json.dumps([it["source_label"]] if it.get("source_label") else [], ensure_ascii=False),
@@ -1984,11 +2599,29 @@ def source_extract(request: Request, sid: int):
         meta_obj = json.loads(meta) if isinstance(meta, str) else dict(meta or {})
     except (json.JSONDecodeError, TypeError):
         meta_obj = {}
-    if llm.split_needs_review(split_meta) or (meta_obj.get("split") or {}).get("mode") == "fallback":
+    if llm.split_needs_review(
+        split_meta,
+        stype=s.get("stype") or "",
+        team=s.get("team") or "",
+        channel=s.get("channel") or "",
+    ) or (
+        ingest.is_aggregation_source(
+            stype=s.get("stype") or "",
+            team=s.get("team") or "",
+            channel=s.get("channel") or "",
+        )
+        and (meta_obj.get("split") or {}).get("mode") == "fallback"
+    ):
         sp = dict(meta_obj.get("split") or {})
         sp["needs_review"] = True
         meta_obj["split"] = sp
         meta = json.dumps(meta_obj, ensure_ascii=False)
+    else:
+        sp = dict(meta_obj.get("split") or {})
+        if sp.get("needs_review"):
+            sp["needs_review"] = False
+            meta_obj["split"] = sp
+            meta = json.dumps(meta_obj, ensure_ascii=False)
     con.execute("UPDATE sources SET extracted=1, meta=? WHERE id=?", (meta, sid))
     issue_id = s["issue_id"]
     st = con.execute("SELECT status FROM issues WHERE id=?", (issue_id,)).fetchone()
@@ -2053,7 +2686,7 @@ def _build_cards_for_issue(con, r) -> None:
     for team in teams:
         if team in ("外部媒体",):
             continue
-        items = [dict(x) for x in con.execute("SELECT zone, level, kind, text, entities, roles, signals, source_label, source_labels, channel FROM items WHERE issue_id=? AND owner_team=? AND blocked=0 AND merged_into IS NULL", (r["id"], team))]
+        items = [dict(x) for x in con.execute("SELECT zone, level, kind, text, raw_snippet, entities, roles, signals, source_label, source_labels, channel FROM items WHERE issue_id=? AND owner_team=? AND blocked=0 AND merged_into IS NULL", (r["id"], team))]
         card = llm.build_team_card(team, items, r["period_label"])
         _upsert_team_card(con, r["id"], team, card)
     db.mark_draft_stale(con, r["id"])
@@ -2097,7 +2730,10 @@ def _build_draft_for_issue(con, r, slug: str) -> dict:
         prev_summary,
     )
     data = merge_relations_from_candidates(
-        data, bundle["relation_candidates"], bundle["item_rows"],
+        data,
+        bundle["relation_candidates"],
+        bundle["item_rows"],
+        team_cards=bundle["team_cards"],
     )
     data["slug"] = slug
     data["period_label"] = r["period_label"]
@@ -2173,6 +2809,49 @@ def preview_status(request: Request, slug: str):
     return preview_job.get_state(slug)
 
 
+@app.post("/admin/issue/{slug}/create_revision")
+def create_revision(request: Request, slug: str):
+    """已上线期：用线上稿重新铺底草稿。保持 published，不清 Ask。
+
+    读者/Ask 仍看 published_json；改完 Preview 后由 Owner 确认上线才替换。
+    """
+    u = auth.require(request, "editor")
+    wants_json = "application/json" in (request.headers.get("accept") or "")
+    con = db.connect()
+    r = con.execute("SELECT * FROM issues WHERE slug=?", (slug,)).fetchone()
+    if not r:
+        con.close()
+        raise HTTPException(404, "没有这一期")
+    if (r["status"] or "") != "published":
+        con.close()
+        msg = "仅已上线期需要从线上稿铺底；当前已是草稿，可直接生成预览。"
+        if wants_json:
+            return JSONResponse({"ok": False, "error": msg, "status": r["status"]}, status_code=400)
+        return _flash_redirect(f"/admin/issue/{slug}", msg)
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    ensure_draft_for_edit(con, r, sync_from_published=True, force=True)
+    from .issue_period import period_fields_for_stamp
+    period = period_fields_for_stamp(now)
+    con.execute(
+        "UPDATE issues SET updated_at=?, period_label=?, date_start=?, date_end=? WHERE id=?",
+        (now, period["period_label"], period["date_start"], period["date_end"], r["id"]),
+    )
+    con.execute(
+        "INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)",
+        (r["id"], u["u"], "create_revision", "published", "draft reset from published (still live)"),
+    )
+    con.commit()
+    con.close()
+    if wants_json:
+        return JSONResponse({
+            "ok": True,
+            "slug": slug,
+            "status": "published",
+            "message": "已用线上稿铺底草稿。读者与 Ask 仍看线上版；改完后生成预览，再由 Owner 确认上线。",
+        })
+    return RedirectResponse(f"/admin/issue/{slug}?revision=1", status_code=302)
+
+
 @app.post("/admin/issue/{slug}/prepare_preview")
 def prepare_preview(request: Request, slug: str):
     """兼容旧表单：改为启动后台任务并回到控制台轮询（前端应走 /preview/start）。"""
@@ -2194,6 +2873,7 @@ def save_draft(request: Request, slug: str, draft: str = Form(...)):
     except Exception as e:
         return _flash_redirect(f"/admin/issue/{slug}?step=2", f"JSON 格式有误：{e}")
     data.pop("_stale", None)
+    data = _clear_preview_gate(data)
     con = db.connect()
     r = con.execute("SELECT id, draft_json FROM issues WHERE slug=?", (slug,)).fetchone()
     if not r:
@@ -2227,16 +2907,42 @@ def api_edit(request: Request, payload: dict):
             else: ref[last] = value
     except Exception as e:
         con.close(); raise HTTPException(400, f"路径无效：{e}")
+    # 增删/改关系卡后重算 KPI，避免「可同步的关系」与读者卡脱节
+    if keys and keys[0] == "relations":
+        try:
+            from .issue_verify import sync_kpis_from_data
+            data = sync_kpis_from_data(data)
+        except Exception:
+            from .relation_display import count_reader_relations
+            rels = [x for x in (data.get("relations") or []) if isinstance(x, dict)]
+            n_reader = count_reader_relations(rels)
+            kpis = list(data.get("kpis") or [])
+            found = False
+            for k in kpis:
+                if k.get("label") == "可同步的关系":
+                    k["n"] = str(n_reader)
+                    found = True
+            if not found:
+                kpis.insert(0, {"n": str(n_reader), "label": "可同步的关系"})
+            data["kpis"] = kpis
+        from .relation_display import attach_reader_flags, split_relations_for_publish
+        rels = attach_reader_flags([r for r in (data.get("relations") or []) if isinstance(r, dict)])
+        reader, backlog = split_relations_for_publish(rels)
+        data["relations"] = rels
+        data["_relations_reader"] = reader
+        data["_relations_backlog"] = backlog
+    if _edit_invalidates_preview_gate(path):
+        data = _clear_preview_gate(data)
     con.execute(f"UPDATE issues SET {col}=?, updated_at=? WHERE id=?", (json.dumps(data, ensure_ascii=False), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), r["id"]))
     con.execute("INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)", (r["id"], u["u"], f"{col}:{path}", json.dumps(before, ensure_ascii=False)[:5000] if before is not None else "", json.dumps(value, ensure_ascii=False)[:5000]))
     con.commit(); con.close()
-    return {"ok": True}
+    return {"ok": True, "preview_gate_stale": bool(data.get("_preview_gate_stale"))}
 
 @app.post("/api/add_card")
 def api_add_card(request: Request, payload: dict):
     u = auth.require(request, "editor")
     slug = payload.get("slug")
-    target = payload.get("target", "published")
+    # target 已废弃：编辑永远写 draft_json（publish_lane）
     section = (payload.get("section") or "relations").strip()
     con = db.connect()
     r = con.execute("SELECT * FROM issues WHERE slug=?", (slug,)).fetchone()
@@ -2275,15 +2981,24 @@ def api_add_card(request: Request, payload: dict):
         card = {
             "label": "已联动",
             "weak": False,
+            "decision_tier": "strong",
             "title": "新卡片（双击编辑）",
             "body": "只写事实与来源，不写建议。",
             "details": [],
             "sources": ["双击填写来源"],
             "teams": ["团队"],
+            "evidence": [{"source": "manual_edit"}],
+            "reader_visible": True,
         }
         data.setdefault("relations", []).append(card)
         section = "relations"
         idx = len(data["relations"]) - 1
+        try:
+            from .issue_verify import sync_kpis_from_data
+            data = sync_kpis_from_data(data)
+        except Exception:
+            pass
+    data = _clear_preview_gate(data)
     con.execute(
         f"UPDATE issues SET {col}=?, updated_at=? WHERE id=?",
         (json.dumps(data, ensure_ascii=False), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), r["id"]),
@@ -2294,7 +3009,13 @@ def api_add_card(request: Request, payload: dict):
     )
     con.commit()
     con.close()
-    return {"ok": True, "index": idx, "section": section, "card": card}
+    return {
+        "ok": True,
+        "index": idx,
+        "section": section,
+        "card": card,
+        "preview_gate_stale": bool(data.get("_preview_gate_stale")),
+    }
 
 @app.post("/api/add_item")
 def api_add_item(request: Request, payload: dict):
@@ -2302,7 +3023,7 @@ def api_add_item(request: Request, payload: dict):
     u = auth.require(request, "editor")
     slug = payload.get("slug")
     path = payload.get("path") or ""
-    target = payload.get("target", "published")
+    # target 已废弃：编辑永远写 draft_json（publish_lane）
     kind = payload.get("kind") or "tag"
     con = db.connect()
     r = con.execute("SELECT * FROM issues WHERE slug=?", (slug,)).fetchone()
@@ -2347,6 +3068,8 @@ def api_add_item(request: Request, payload: dict):
         if kind == "plan":
             item["cert"] = "计划中"
     ref.append(item)
+    if _edit_invalidates_preview_gate(path):
+        data = _clear_preview_gate(data)
     con.execute(
         f"UPDATE issues SET {col}=?, updated_at=? WHERE id=?",
         (json.dumps(data, ensure_ascii=False), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), r["id"]),
@@ -2357,7 +3080,14 @@ def api_add_item(request: Request, payload: dict):
     )
     con.commit()
     con.close()
-    return {"ok": True, "index": len(ref) - 1, "path": path, "kind": kind, "item": item}
+    return {
+        "ok": True,
+        "index": len(ref) - 1,
+        "path": path,
+        "kind": kind,
+        "item": item,
+        "preview_gate_stale": bool(data.get("_preview_gate_stale")),
+    }
 
 @app.post("/admin/issue/{slug}/merge")
 def merge_issue(request: Request, slug: str):
@@ -2402,38 +3132,123 @@ def publish(request: Request, slug: str, confirm: str = Form("")):
     if not r or not r["draft_json"]:
         con.close()
         return fail("没有草稿可发布")
-    blockers = publish_blockers(con, r["id"], r["draft_json"] or "")
-    if blockers:
-        msg = "上线前检查未通过：\n" + "\n".join(f"· {x}" for x in blockers)
+    # 进预览检查通过后可上线；若改过稿（gate 已作废）必须重新生成预览。
+    draft_obj = {}
+    try:
+        draft_obj = json.loads(r["draft_json"] or "{}")
+    except (json.JSONDecodeError, TypeError):
+        draft_obj = {}
+    if draft_obj.get("_preview_building"):
         con.close()
-        return fail(msg)
-    data = json.loads(r["draft_json"])
+        return fail("预览仍在后台生成中（要点卡/草稿/关系未齐），请等待完成后再上线")
+    if not draft_obj.get("_preview_gate_ok"):
+        blockers = publish_blockers(con, r["id"], r["draft_json"] or "")
+        hint = (
+            "稿面已改动或尚未通过进预览检查，请重新点「生成预览」后再上线"
+            if draft_obj.get("_preview_gate_stale")
+            else "上线前检查未通过（请重新点「生成预览」通过检查后再上线）"
+        )
+        if blockers:
+            msg = hint + "：\n" + "\n".join(f"· {x}" for x in blockers)
+            con.close()
+            return fail(msg)
+        # 无结构性 blockers 但仍无 gate：也要求重跑预览，避免改稿绕过论证
+        con.close()
+        return fail(hint)
+    data = draft_obj
     data.pop("_stale", None)
-    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    pub_day = datetime.date.today()
-    pub_label = format_display_date(pub_day)
-    pub_iso = pub_day.isoformat()
-    payload = json.dumps(data, ensure_ascii=False)
-    con.execute(
-        "UPDATE issues SET published_json=?, draft_json=?, status='published', published_at=?, "
-        "updated_at=?, period_label=?, date_end=?, date_start=? WHERE id=?",
-        (payload, payload, now, now, pub_label, pub_iso, pub_iso, r["id"]),
+    data.pop("_preview_gate_ok", None)
+    data.pop("_preview_gate_at", None)
+    data.pop("_preview_gate_stale", None)
+    from .relation_display import attach_reader_flags, build_published_projection, split_relations_for_publish
+    data["relations"] = attach_reader_flags(
+        [x for x in (data.get("relations") or []) if isinstance(x, dict)]
     )
-    db.register_entities(con, data, slug)
+    reader, backlog = split_relations_for_publish(data["relations"])
+    data["_relations_reader"] = reader
+    data["_relations_backlog"] = backlog
+    published = build_published_projection(data)
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    from .issue_period import period_fields_for_stamp
+    period = period_fields_for_stamp(now)
+    draft_payload = json.dumps(data, ensure_ascii=False)
+    pub_payload = json.dumps(published, ensure_ascii=False)
+    from .publish_lane import allow_published_write, write_publish_projection
+    with allow_published_write("publish"):
+        write_publish_projection(
+            con,
+            r["id"],
+            pub_payload=pub_payload,
+            draft_payload=draft_payload,
+            published_at=now,
+            updated_at=now,
+            period_label=period["period_label"],
+            date_end=period["date_end"],
+            date_start=period["date_start"],
+        )
+    db.register_entities(con, published, slug)
     db.snapshot_published_items(con, r["id"])
-    db.reindex_issue(con, r["id"])
+    # FTS + item_facts 同步（Ask 立即可用）；chunk 索引异步重建（P2）
+    db.reindex_issue(con, r["id"], items=True, rebuild_chunks=False)
     _ASK_CACHE.clear()
     seq = con.execute("SELECT COUNT(*) c FROM versions WHERE issue_id=?", (r["id"],)).fetchone()["c"] + 1
-    cards_out = len(data.get("relations", [])) + sum(len(g.get("items", [])) for c in data.get("contacts", []) for g in c.get("groups", []))
-    edited = con.execute("SELECT COUNT(*) c FROM edits WHERE issue_id=? AND target LIKE '%.%'", (r["id"],)).fetchone()["c"]
-    con.execute("INSERT INTO versions(issue_id,version,at,by_user,cards_out,edited_count,url,snapshot_json) VALUES(?,?,?,?,?,?,?,?)",
-                (r["id"], f"v{seq}", now, u.get("d") or u["u"], cards_out, edited,
-                 f"{os.environ.get('MESH_BASE_URL','').rstrip('/')}/{slug}", json.dumps(data, ensure_ascii=False)))
-    con.execute("INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)", (r["id"], u["u"], "publish", "", f"v{seq}"))
-    con.commit(); con.close()
+    cards_out = len(published.get("relations", [])) + sum(
+        len(g.get("items", [])) for c in published.get("contacts", []) for g in c.get("groups", [])
+    )
+    edited = con.execute("SELECT COUNT(*) c FROM edits WHERE issue_id=? AND target LIKE '%%.%%'", (r["id"],)).fetchone()["c"]
+    con.execute(
+        "INSERT INTO versions(issue_id,version,at,by_user,cards_out,edited_count,url,snapshot_json) VALUES(?,?,?,?,?,?,?,?)",
+        (r["id"], f"v{seq}", now, u.get("d") or u["u"], cards_out, edited,
+         f"{os.environ.get('MESH_BASE_URL','').rstrip('/')}/{slug}", pub_payload),
+    )
+    con.execute(
+        "INSERT INTO edits(issue_id,user,target,before,after) VALUES(?,?,?,?,?)",
+        (r["id"], u["u"], "publish", "", f"v{seq} reader_relations={len(published.get('relations') or [])}"),
+    )
+    con.commit()
+    issue_id_pub = r["id"]
+    con.close()
+
+    def _async_chunks():
+        try:
+            with db.write_lock():
+                c2 = db.connect()
+                try:
+                    from . import chunk_index
+                    chunk_index.rebuild_issue(c2, issue_id_pub, items=True)
+                    db.refresh_issue_embedding_status(c2, issue_id_pub)
+                    c2.commit()
+                finally:
+                    c2.close()
+        except Exception as e:
+            print(f"[mesh] async chunk reindex failed for {slug}: {e}", flush=True)
+
+    import threading
+    threading.Thread(target=_async_chunks, name=f"chunk-reindex-{slug}", daemon=True).start()
+
+    embed_info: dict = {"persisted": True, "queued": False, "skipped": True}
+    if embeddings.is_configured():
+        try:
+            embed_info = embed_job.ensure_for_slug(slug, by="publish")
+        except Exception as e:
+            print(f"[mesh] embed ensure failed for {slug}: {e}", flush=True)
+            embed_info = {
+                "ok": False,
+                "persisted": True,
+                "queued": False,
+                "error": str(e)[:200],
+                "hint": "issues.embedding_status=pending 已落库，启动 maintenance 会重试",
+            }
+    _ASK_CACHE.clear()
     edm_job.enqueue_auto_send(slug, by=u.get("u") or "publish")
     if wants_json:
-        return JSONResponse({"ok": True, "slug": slug, "status": "published", "published_at": now})
+        return JSONResponse({
+            "ok": True,
+            "slug": slug,
+            "status": "published",
+            "published_at": now,
+            "embed": embed_info,
+        })
     return RedirectResponse(f"/{slug}?published=1", status_code=302)
 
 @app.post("/admin/issue/{slug}/unpublish")
@@ -2471,8 +3286,11 @@ def edm_admin(request: Request, saved: int = 0, err: str = ""):
     auth.require(request, "owner")
     con = db.connect()
     issues = []
+    from .issue_period import sql_order_published_desc
     for row in con.execute(
-        "SELECT id, slug, period_label, status, published_at, updated_at, version, draft_json, published_json, date_end FROM issues ORDER BY date_end DESC"
+        f"SELECT id, slug, period_label, status, published_at, updated_at, version, draft_json, published_json, date_end "
+        f"FROM issues ORDER BY CASE WHEN status='published' THEN 0 ELSE 1 END, "
+        f"{sql_order_published_desc()}, date_end DESC, id DESC"
     ):
         row_d = dict(row)
         data = _edm_json_from_row(row_d)
@@ -2760,6 +3578,88 @@ def users_delete(request: Request, uid: int):
     con.commit(); con.close()
     return RedirectResponse("/admin/users", status_code=302)
 
+def _models_page(request: Request, *, ok: str = "", err: str = ""):
+    from . import model_settings
+
+    auth.require(request, "owner")
+    con = db.connect()
+    try:
+        model_settings.ensure_catalog(con)
+        db.commit_retry(con)
+        rows = model_settings.task_rows(con)
+        models = model_settings.list_models(con)
+    finally:
+        con.close()
+    return templates.TemplateResponse(
+        "models.html",
+        ctx(request, models=models, rows=rows, flash_ok=ok or None, flash_err=err or None),
+    )
+
+
+def _models_redirect(ok: str = "", err: str = ""):
+    from urllib.parse import quote
+
+    if err:
+        return RedirectResponse("/admin/models?err=" + quote(err[:400]), status_code=302)
+    return RedirectResponse("/admin/models?ok=" + quote(ok[:200]), status_code=302)
+
+
+@app.get("/admin/models", response_class=HTMLResponse)
+def models_page(request: Request, ok: str = "", err: str = ""):
+    return _models_page(request, ok=ok, err=err)
+
+
+@app.post("/admin/models/add")
+def models_add(request: Request, model: str = Form(...)):
+    from . import model_settings
+
+    auth.require(request, "owner")
+    con = db.connect()
+    try:
+        ok, msg = model_settings.add_model(con, model)
+        if ok:
+            db.commit_retry(con)
+            llm.model_settings_cache_bust()
+    finally:
+        con.close()
+    return _models_redirect(ok=f"已添加 {model.strip()}" if ok else "", err="" if ok else msg)
+
+
+@app.post("/admin/models/delete")
+def models_delete(request: Request, model: str = Form(...)):
+    from . import model_settings
+
+    auth.require(request, "owner")
+    con = db.connect()
+    try:
+        ok, msg = model_settings.delete_model(con, model)
+        if ok:
+            db.commit_retry(con)
+            llm.model_settings_cache_bust()
+    finally:
+        con.close()
+    return _models_redirect(ok=f"已移除 {model.strip()}" if ok else "", err="" if ok else msg)
+
+
+@app.post("/admin/models/task")
+def models_set_task(request: Request, task: str = Form(...), model: str = Form("")):
+    from . import model_settings
+
+    auth.require(request, "owner")
+    con = db.connect()
+    try:
+        ok, msg = model_settings.set_task_choice(con, task, model)
+        if ok:
+            db.commit_retry(con)
+            llm.model_settings_cache_bust()
+    finally:
+        con.close()
+    label = dict(model_settings.TASK_LABELS).get((task or "").strip().lower(), task)
+    if not ok:
+        return _models_redirect(err=msg)
+    return _models_redirect(ok=f"{label} → {model.strip() or '跟随 .env 兜底'}")
+
+
 def _prompt_path(name: str) -> Path:
     """仅允许 prompts 目录下的 *.md，防路径穿越。"""
     raw = (name or "").strip()
@@ -2933,6 +3833,26 @@ def issue_page(request: Request, slug: str, preview: int = 0, edit: int = 0, syn
             f"/admin/issue/{slug}?err=" + quote("尚未生成预览，请先在素材页点「生成预览」"),
             status_code=302,
         )
+    from .preview_progressive import allows_preview_entry, is_building
+
+    gate_ok = bool(isinstance(data, dict) and data.get("_preview_gate_ok"))
+    gate_stale = bool(isinstance(data, dict) and data.get("_preview_gate_stale"))
+    preview_building = preview and is_building(data if isinstance(data, dict) else None)
+    if preview and not allows_preview_entry(data if isinstance(data, dict) else None):
+        from urllib.parse import quote
+        return RedirectResponse(
+            f"/admin/issue/{slug}?err="
+            + quote("草稿尚未通过进预览检查，请重新点「生成预览」（检查通过后才会进入预览页）"),
+            status_code=302,
+        )
+    preview_gate_stale = preview and gate_stale and not gate_ok and not preview_building
+    dup_rel_warnings = 0
+    if isinstance(data, dict):
+        dup_rel_warnings = sum(
+            1
+            for r in (data.get("relations") or [])
+            if isinstance(r, dict) and r.get("_draft_warning") == "suspected_duplicate"
+        )
     # 模板依赖 keywords/plans 等对象；缺省时给空结构，避免半成品草稿炸页
     data.setdefault("kpis", [])
     data.setdefault("relations", [])
@@ -2946,8 +3866,46 @@ def issue_page(request: Request, slug: str, preview: int = 0, edit: int = 0, syn
     data.setdefault("plans", {})
     data["plans"].setdefault("groups", [])
     data["plans"].setdefault("sources", [])
+    # 进草稿即读者可见：展示按强度排序（保留原下标）；KPI 对齐卡数
+    relations_view = []
+    try:
+        from .relation_display import indexed_relations_for_display, _sync_relation_kpi
+        from .issue_verify import sync_kpis_from_data
+        relations_view = indexed_relations_for_display(data.get("relations") or [])
+        if preview:
+            data = sync_kpis_from_data(data)
+        else:
+            n_pub = sum(
+                1
+                for x in (data.get("relations") or [])
+                if isinstance(x, dict) and (x.get("decision_tier") or "").strip().lower() != "skip"
+            )
+            _sync_relation_kpi(data, n_pub)
+    except Exception:
+        relations_view = [
+            {"index": i, "rel": r}
+            for i, r in enumerate(data.get("relations") or [])
+            if isinstance(r, dict)
+        ]
     con = db.connect()
-    arch = [_enrich_issue(x) for x in con.execute("SELECT slug, period_label, date_end, published_at FROM issues WHERE status='published' ORDER BY date_end DESC LIMIT 12")]
+    from .issue_period import sql_order_published_desc
+    arch = [_enrich_issue(x) for x in con.execute(
+        f"SELECT slug, period_label, date_end, published_at, updated_at FROM issues "
+        f"WHERE status='published' ORDER BY {sql_order_published_desc()} LIMIT 12"
+    )]
     con.close()
-    return templates.TemplateResponse("issue.html", ctx(request, issue=_enrich_issue(r), d=data, preview=bool(preview), archive_list=arch))
+    return templates.TemplateResponse(
+        "issue.html",
+        ctx(
+            request,
+            issue=_enrich_issue(r),
+            d=data,
+            preview=bool(preview),
+            archive_list=arch,
+            relations_view=relations_view,
+            preview_gate_stale=bool(preview_gate_stale),
+            preview_building=bool(preview_building),
+            dup_rel_warnings=int(dup_rel_warnings),
+        ),
+    )
 

@@ -1,0 +1,36 @@
+{
+  "arms": {
+    "A": {
+      "macro_mrr": 0.6167,
+      "macro_ndcg@10": 0.564,
+      "macro_precision@5": 0.2333,
+      "macro_recall@5": 0.5256,
+      "macro_recall@10": 0.5667,
+      "macro_recall@20": 0.5917
+    },
+    "B": {
+      "macro_mrr": 0.5944,
+      "macro_ndcg@10": 0.5479,
+      "macro_precision@5": 0.2333,
+      "macro_recall@5": 0.5256,
+      "macro_recall@10": 0.5517,
+      "macro_recall@20": 0.5917
+    },
+    "C": {
+      "macro_mrr": 0.5944,
+      "macro_ndcg@10": 0.5462,
+      "macro_precision@5": 0.2267,
+      "macro_recall@5": 0.5189,
+      "macro_recall@10": 0.575,
+      "macro_recall@20": 0.575
+    }
+  },
+  "gate": {
+    "p5_ok": true,
+    "r5_ok": true,
+    "mrr_delta": -0.0223,
+    "ndcg_delta": -0.0161,
+    "mrr_not_worse_than_lexical": true,
+    "pass": true
+  }
+}

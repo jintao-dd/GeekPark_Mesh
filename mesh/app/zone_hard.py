@@ -47,7 +47,7 @@ def apply_hard_blocks(items: list[dict]) -> list[dict]:
     for it in items:
         row = dict(it)
         reason = hard_block_reason(
-            row.get("text") or "",
+            " ".join([row.get("text") or "", row.get("raw_snippet") or ""]),
             zone=int(row.get("zone") or 0) or None,
             level=row.get("level"),
         )

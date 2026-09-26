@@ -1,0 +1,1005 @@
+{
+  "cases": [
+    {
+      "id": "R11",
+      "query": "Agent 治理与合规 7 月 15 日",
+      "slug": "2026-8-17",
+      "date_from": "2026-09-07",
+      "date_to": "2026-09-07",
+      "expected": [
+        "4105",
+        "4106"
+      ],
+      "focus": [
+        "4106"
+      ],
+      "focus_items": {
+        "4106": {
+          "exists": true,
+          "slug": "2026-8-17",
+          "stype": "T6",
+          "team": "编辑部",
+          "snip": "市场测算：到2030年AI智能体安全赛道年市场规模约5万亿人民币（受访者陈述/公开测算，非核实事实）。"
+        }
+      },
+      "original": {
+        "match_q": "\"agent\" AND 7 AND \"15\"",
+        "terms": [
+          "agent",
+          "治理",
+          "合规",
+          "15"
+        ],
+        "fts_ids": [],
+        "fts_n": 3,
+        "item_facts_ids": [
+          "4105",
+          "4371",
+          "4382",
+          "4228",
+          "4131",
+          "4122",
+          "4340",
+          "4146",
+          "4149",
+          "4344",
+          "4167",
+          "4357",
+          "4128",
+          "4130",
+          "4201",
+          "4200",
+          "4205",
+          "4206",
+          "4214",
+          "4220",
+          "4221",
+          "4232",
+          "4241",
+          "4242"
+        ],
+        "item_facts_n": 24,
+        "merge_ids": [
+          "4105",
+          "4371",
+          "4382",
+          "4228",
+          "4131",
+          "4122",
+          "4340",
+          "4146",
+          "4149",
+          "4344",
+          "4167",
+          "4357",
+          "4128",
+          "4130",
+          "4201",
+          "4200",
+          "4205",
+          "4206",
+          "4214",
+          "4220",
+          "4221",
+          "4232",
+          "4241",
+          "4242"
+        ],
+        "retriever_ids": [
+          "4105",
+          "4340",
+          "4371",
+          "4382",
+          "4228",
+          "4131",
+          "4122",
+          "4146",
+          "4344",
+          "4167",
+          "4128",
+          "4130",
+          "4200",
+          "4205",
+          "4206",
+          "4214",
+          "4220",
+          "4221",
+          "4232",
+          "4241"
+        ],
+        "retriever_mode": "hybrid",
+        "retriever_n": 27,
+        "hit_expected_retriever": [
+          "4105"
+        ],
+        "miss_expected_retriever": [
+          "4106"
+        ],
+        "hit_focus_item_facts": [],
+        "hit_focus_merge": []
+      },
+      "probes": [
+        {
+          "probe": "治理",
+          "match_q": "治理",
+          "item_facts_hit_focus": [],
+          "merge_hit_focus": [],
+          "retriever_hit_focus": [],
+          "item_facts_ids_top10": [
+            "4105"
+          ]
+        },
+        {
+          "probe": "合规",
+          "match_q": "合规",
+          "item_facts_hit_focus": [],
+          "merge_hit_focus": [],
+          "retriever_hit_focus": [],
+          "item_facts_ids_top10": [
+            "4105",
+            "4201"
+          ]
+        },
+        {
+          "probe": "7月15",
+          "match_q": "7 AND \"15\"",
+          "item_facts_hit_focus": [],
+          "merge_hit_focus": [],
+          "retriever_hit_focus": [],
+          "item_facts_ids_top10": [
+            "4105",
+            "4149",
+            "4357"
+          ]
+        },
+        {
+          "probe": "Agent 治理",
+          "match_q": "\"agent\"",
+          "item_facts_hit_focus": [],
+          "merge_hit_focus": [],
+          "retriever_hit_focus": [],
+          "item_facts_ids_top10": [
+            "4371",
+            "4105",
+            "4382",
+            "4228",
+            "4131",
+            "4122",
+            "4340",
+            "4146",
+            "4344",
+            "4167"
+          ]
+        },
+        {
+          "probe": "4106",
+          "match_q": "\"4106\"",
+          "item_facts_hit_focus": [],
+          "merge_hit_focus": [],
+          "retriever_hit_focus": [],
+          "item_facts_ids_top10": []
+        }
+      ],
+      "likely_layer": "token_or_index_mismatch"
+    },
+    {
+      "id": "R12",
+      "query": "端侧模型与智能座舱",
+      "slug": "2026-8-17",
+      "date_from": "2026-09-07",
+      "date_to": "2026-09-07",
+      "expected": [
+        "4116",
+        "4120",
+        "4125",
+        "4128"
+      ],
+      "focus": [
+        "4125"
+      ],
+      "focus_items": {
+        "4125": {
+          "exists": true,
+          "slug": "2026-8-17",
+          "stype": "T1",
+          "team": "编辑部",
+          "snip": "詹杨帆认为：端侧与云端各有场景，端侧优势是响应速度、数据本地化、断网可用，云端优势是复杂语义理解、多轮推理和个性化查询（受访者陈述，非核实事实）"
+        }
+      },
+      "original": {
+        "match_q": "(端侧 OR 侧模 OR 模型) AND (智能 OR 能座 OR 座舱)",
+        "terms": [
+          "端侧模型",
+          "智能座舱"
+        ],
+        "fts_ids": [],
+        "fts_n": 14,
+        "item_facts_ids": [
+          "4123",
+          "4116",
+          "4167",
+          "4383",
+          "4114",
+          "4120",
+          "4176",
+          "4127",
+          "4128",
+          "4129",
+          "4130",
+          "4237",
+          "4105",
+          "4106",
+          "4110",
+          "4111",
+          "4189",
+          "4190",
+          "4191",
+          "4192",
+          "4201",
+          "4200",
+          "4371",
+          "4115",
+          "4117"
+        ],
+        "item_facts_n": 28,
+        "merge_ids": [
+          "4123",
+          "4116",
+          "4167",
+          "4383",
+          "4114",
+          "4120",
+          "4176",
+          "4127",
+          "4128",
+          "4129",
+          "4130",
+          "4237",
+          "4105",
+          "4106",
+          "4110",
+          "4111",
+          "4189",
+          "4190",
+          "4191",
+          "4192",
+          "4201",
+          "4200",
+          "4371"
+        ],
+        "retriever_ids": [
+          "4123",
+          "4116",
+          "4167",
+          "4383",
+          "4114",
+          "4120",
+          "4176",
+          "4127",
+          "4128",
+          "4129",
+          "4130",
+          "4237",
+          "4105",
+          "4106",
+          "4110",
+          "4111",
+          "4189",
+          "4190",
+          "4191",
+          "4192"
+        ],
+        "retriever_mode": "hybrid",
+        "retriever_n": 40,
+        "hit_expected_retriever": [
+          "4116",
+          "4120",
+          "4128"
+        ],
+        "miss_expected_retriever": [
+          "4125"
+        ],
+        "hit_focus_item_facts": [],
+        "hit_focus_merge": []
+      },
+      "probes": [
+        {
+          "probe": "端侧",
+          "match_q": "端侧",
+          "item_facts_hit_focus": [
+            "4125"
+          ],
+          "merge_hit_focus": [
+            "4125"
+          ],
+          "retriever_hit_focus": [
+            "4125"
+          ],
+          "item_facts_ids_top10": [
+            "4112",
+            "4114",
+            "4116",
+            "4118",
+            "4120",
+            "4383",
+            "4123",
+            "4125",
+            "4127",
+            "4149"
+          ]
+        },
+        {
+          "probe": "座舱",
+          "match_q": "座舱",
+          "item_facts_hit_focus": [],
+          "merge_hit_focus": [],
+          "retriever_hit_focus": [],
+          "item_facts_ids_top10": [
+            "4115",
+            "4116",
+            "4117",
+            "4131",
+            "4167",
+            "4128",
+            "4129",
+            "4130"
+          ]
+        },
+        {
+          "probe": "端侧模型",
+          "match_q": "(端侧 OR 侧模 OR 模型)",
+          "item_facts_hit_focus": [
+            "4125"
+          ],
+          "merge_hit_focus": [
+            "4125"
+          ],
+          "retriever_hit_focus": [
+            "4125"
+          ],
+          "item_facts_ids_top10": [
+            "4114",
+            "4116",
+            "4118",
+            "4120",
+            "4149",
+            "4383",
+            "4345",
+            "4184",
+            "4124",
+            "4123"
+          ]
+        },
+        {
+          "probe": "智能座舱",
+          "match_q": "(智能 OR 能座 OR 座舱)",
+          "item_facts_hit_focus": [],
+          "merge_hit_focus": [],
+          "retriever_hit_focus": [],
+          "item_facts_ids_top10": [
+            "4371",
+            "4105",
+            "4106",
+            "4110",
+            "4111",
+            "4112",
+            "4114",
+            "4115",
+            "4116",
+            "4117"
+          ]
+        }
+      ],
+      "likely_layer": "query_formulation"
+    },
+    {
+      "id": "R13",
+      "query": "具身智能数据圆桌讨论了什么",
+      "slug": "2026-8-17",
+      "date_from": "2026-09-07",
+      "date_to": "2026-09-07",
+      "expected": [
+        "4154",
+        "4155",
+        "4156"
+      ],
+      "focus": [
+        "4154",
+        "4155",
+        "4156"
+      ],
+      "focus_items": {
+        "4154": {
+          "exists": true,
+          "slug": "2026-8-17",
+          "stype": "T6",
+          "team": "编辑部",
+          "snip": "具身智能数据圆桌讨论：当前数据热点为 Ego、手、全身、触觉，UMI 数据在工业界已有一定验证但不再是热门；预训练要求动作与任务多样、后训练要求场景物料多样且动作精准（受访者陈述，非核实事实）"
+        },
+        "4155": {
+          "exists": true,
+          "slug": "2026-8-17",
+          "stype": "T6",
+          "team": "编辑部",
+          "snip": "新加坡具身智能活动待办：与李源共同梳理仿真方向数据公司合作可能性并确认 ROPIDIA 圆桌形式；在群内与确认参与 8 月 4 日上午板块的嘉宾沟通活动邀请与内容细节"
+        },
+        "4156": {
+          "exists": true,
+          "slug": "2026-8-17",
+          "stype": "T6",
+          "team": "编辑部",
+          "snip": "艾欧智能（IO-AI Tech，沟通对象 Simon）已接触，行业为具身智能"
+        }
+      },
+      "original": {
+        "match_q": "(具身 OR 身智 OR 智能 OR 能数 OR 数据 OR 据圆 OR 圆桌 OR 桌讨 OR 讨论)",
+        "terms": [
+          "具身智能数据圆桌讨论"
+        ],
+        "fts_ids": [],
+        "fts_n": 30,
+        "item_facts_ids": [
+          "4212",
+          "4225",
+          "4204",
+          "4211",
+          "4220",
+          "4224",
+          "4197",
+          "4203",
+          "4206",
+          "4210",
+          "4216",
+          "4219",
+          "4222",
+          "4223",
+          "4194",
+          "4196",
+          "4198",
+          "4199",
+          "4228",
+          "4205",
+          "4208",
+          "4209",
+          "4213",
+          "4215",
+          "4217",
+          "4218",
+          "4221",
+          "4292"
+        ],
+        "item_facts_n": 28,
+        "merge_ids": [
+          "4212",
+          "4225",
+          "4204",
+          "4211",
+          "4220",
+          "4224",
+          "4197",
+          "4203",
+          "4206",
+          "4210",
+          "4216",
+          "4219",
+          "4222",
+          "4223"
+        ],
+        "retriever_ids": [
+          "4212",
+          "4225",
+          "4204",
+          "4211",
+          "4220",
+          "4224",
+          "4197",
+          "4203",
+          "4206",
+          "4210",
+          "4216",
+          "4219",
+          "4222",
+          "4223"
+        ],
+        "retriever_mode": "hybrid",
+        "retriever_n": 40,
+        "hit_expected_retriever": [],
+        "miss_expected_retriever": [
+          "4154",
+          "4155",
+          "4156"
+        ],
+        "hit_focus_item_facts": [],
+        "hit_focus_merge": []
+      },
+      "probes": [
+        {
+          "probe": "具身智能",
+          "match_q": "(具身 OR 身智 OR 智能)",
+          "item_facts_hit_focus": [
+            "4154",
+            "4155",
+            "4156"
+          ],
+          "merge_hit_focus": [
+            "4154",
+            "4155",
+            "4156"
+          ],
+          "retriever_hit_focus": [
+            "4154",
+            "4155",
+            "4156"
+          ],
+          "item_facts_ids_top10": [
+            "4379",
+            "4380",
+            "4168",
+            "4174",
+            "4153",
+            "4250",
+            "4154",
+            "4155",
+            "4156",
+            "4169"
+          ]
+        },
+        {
+          "probe": "数据圆桌",
+          "match_q": "(数据 OR 据圆 OR 圆桌)",
+          "item_facts_hit_focus": [
+            "4154",
+            "4155"
+          ],
+          "merge_hit_focus": [],
+          "retriever_hit_focus": [],
+          "item_facts_ids_top10": [
+            "4380",
+            "4382",
+            "4228",
+            "4257",
+            "4262",
+            "4268",
+            "4292",
+            "4277",
+            "4227",
+            "4122"
+          ]
+        },
+        {
+          "probe": "圆桌",
+          "match_q": "圆桌",
+          "item_facts_hit_focus": [
+            "4154",
+            "4155"
+          ],
+          "merge_hit_focus": [
+            "4154",
+            "4155"
+          ],
+          "retriever_hit_focus": [
+            "4154",
+            "4155"
+          ],
+          "item_facts_ids_top10": [
+            "4334",
+            "4154",
+            "4155"
+          ]
+        },
+        {
+          "probe": "具身",
+          "match_q": "具身",
+          "item_facts_hit_focus": [
+            "4154",
+            "4155",
+            "4156"
+          ],
+          "merge_hit_focus": [
+            "4154",
+            "4155",
+            "4156"
+          ],
+          "retriever_hit_focus": [
+            "4154",
+            "4155",
+            "4156"
+          ],
+          "item_facts_ids_top10": [
+            "4379",
+            "4380",
+            "4250",
+            "4153",
+            "4154",
+            "4155",
+            "4156",
+            "4158",
+            "4160",
+            "4168"
+          ]
+        }
+      ],
+      "likely_layer": "query_formulation"
+    },
+    {
+      "id": "R18",
+      "query": "Founder Park 下半年规划",
+      "slug": "2026-8-17",
+      "date_from": "2026-09-07",
+      "date_to": "2026-09-07",
+      "expected": [
+        "4358",
+        "4271"
+      ],
+      "focus": [
+        "4271"
+      ],
+      "focus_items": {
+        "4271": {
+          "exists": true,
+          "slug": "2026-8-17",
+          "stype": "T6",
+          "team": "品牌创意团队",
+          "snip": "AGI 传播复盘：X 账号活动期间未直接明显涨粉，Founder Park 账号涨了一些但自然关注量约二三十个，扫码转关注约 20 多个；LinkedIn 涨约 100 多粉主要来自嘉宾线上主动分享；周圆资源包增约 200 粉但多为营销号/Web3 相关，涨到 1000 粉；主办方品牌 Geek Park 与 Founder Park 元素让用户 confu"
+        }
+      },
+      "original": {
+        "match_q": "\"founder\" AND \"park\" AND (下半 OR 半年 OR 年规 OR 规划)",
+        "terms": [
+          "founder",
+          "下半年规划",
+          "park"
+        ],
+        "fts_ids": [],
+        "fts_n": 4,
+        "item_facts_ids": [
+          "4358",
+          "4246",
+          "4247",
+          "4303",
+          "4243",
+          "4319",
+          "4183"
+        ],
+        "item_facts_n": 7,
+        "merge_ids": [
+          "4358",
+          "4246",
+          "4247",
+          "4303",
+          "4243",
+          "4319",
+          "4183"
+        ],
+        "retriever_ids": [
+          "4358",
+          "4246",
+          "4247",
+          "4303",
+          "4243",
+          "4319",
+          "4183"
+        ],
+        "retriever_mode": "hybrid",
+        "retriever_n": 11,
+        "hit_expected_retriever": [
+          "4358"
+        ],
+        "miss_expected_retriever": [
+          "4271"
+        ],
+        "hit_focus_item_facts": [],
+        "hit_focus_merge": []
+      },
+      "probes": [
+        {
+          "probe": "Founder Park",
+          "match_q": "\"founder\" AND \"park\"",
+          "item_facts_hit_focus": [
+            "4271"
+          ],
+          "merge_hit_focus": [
+            "4271"
+          ],
+          "retriever_hit_focus": [
+            "4271"
+          ],
+          "item_facts_ids_top10": [
+            "4370",
+            "4378",
+            "4385",
+            "4386",
+            "4371",
+            "4246",
+            "4247",
+            "4271",
+            "4241",
+            "4387"
+          ]
+        },
+        {
+          "probe": "下半年",
+          "match_q": "(下半 OR 半年)",
+          "item_facts_hit_focus": [],
+          "merge_hit_focus": [],
+          "retriever_hit_focus": [],
+          "item_facts_ids_top10": [
+            "4358",
+            "4319",
+            "4183",
+            "4343"
+          ]
+        },
+        {
+          "probe": "涨粉",
+          "match_q": "涨粉",
+          "item_facts_hit_focus": [
+            "4271"
+          ],
+          "merge_hit_focus": [
+            "4271"
+          ],
+          "retriever_hit_focus": [
+            "4271"
+          ],
+          "item_facts_ids_top10": [
+            "4271"
+          ]
+        },
+        {
+          "probe": "传播复盘",
+          "match_q": "(传播 OR 播复 OR 复盘)",
+          "item_facts_hit_focus": [
+            "4271"
+          ],
+          "merge_hit_focus": [
+            "4271"
+          ],
+          "retriever_hit_focus": [
+            "4271"
+          ],
+          "item_facts_ids_top10": [
+            "4318",
+            "4271",
+            "4272",
+            "4338",
+            "4274",
+            "4233",
+            "4281",
+            "4288",
+            "4293",
+            "4253"
+          ]
+        },
+        {
+          "probe": "AGI",
+          "match_q": "\"agi\"",
+          "item_facts_hit_focus": [
+            "4271"
+          ],
+          "merge_hit_focus": [
+            "4271"
+          ],
+          "retriever_hit_focus": [
+            "4271"
+          ],
+          "item_facts_ids_top10": [
+            "4253",
+            "4265",
+            "4266",
+            "4267",
+            "4268",
+            "4269",
+            "4270",
+            "4271",
+            "4272",
+            "4273"
+          ]
+        }
+      ],
+      "likely_layer": "query_formulation"
+    },
+    {
+      "id": "R14",
+      "query": "视频号本周播放较好的片子",
+      "slug": "2026-09-08",
+      "date_from": "2026-09-08",
+      "date_to": "2026-09-08",
+      "expected": [
+        "4408",
+        "4409",
+        "4410",
+        "4411",
+        "4412"
+      ],
+      "focus": [
+        "4408",
+        "4409",
+        "4410",
+        "4411",
+        "4412"
+      ],
+      "focus_items": {
+        "4408": {
+          "exists": true,
+          "slug": "2026-09-08",
+          "stype": "T11",
+          "team": "视频号团队",
+          "snip": "《AGI时代来了？》：本周播放 7618、点赞 47、分享 65（相对本周其余视频处于前列）"
+        },
+        "4409": {
+          "exists": true,
+          "slug": "2026-09-08",
+          "stype": "T11",
+          "team": "视频号团队",
+          "snip": "《这款Harness震撼硅谷》：本周播放 6429、点赞 77、分享 203、完播率 15.89%（相对本周其余视频处于前列）"
+        },
+        "4410": {
+          "exists": true,
+          "slug": "2026-09-08",
+          "stype": "T11",
+          "team": "视频号团队",
+          "snip": "《AI巨头开始抢苹果饭碗》：本周播放 3673、点赞 35、完播率 9.88%（相对本周其余视频处于前列）"
+        },
+        "4411": {
+          "exists": true,
+          "slug": "2026-09-08",
+          "stype": "T11",
+          "team": "视频号团队",
+          "snip": "《传统相机太难用！》：本周播放 4270、点赞 26、评论 2（相对本周其余视频处于前列）"
+        },
+        "4412": {
+          "exists": true,
+          "slug": "2026-09-08",
+          "stype": "T11",
+          "team": "视频号团队",
+          "snip": "本周观众明显更关注 OpenAI/GPT6/AGI 相关的 AI 大模型话题，以及硅谷 AI 编程工具方向（数据判断，非核实事实）"
+        }
+      },
+      "original": {
+        "match_q": "(视频 OR 频号) AND (播放 OR 放较 OR 较好) AND 片子",
+        "terms": [
+          "播放较好",
+          "视频号",
+          "片子"
+        ],
+        "fts_ids": [],
+        "fts_n": 5,
+        "item_facts_ids": [
+          "4445"
+        ],
+        "item_facts_n": 2,
+        "merge_ids": [
+          "4445"
+        ],
+        "retriever_ids": [
+          "4445"
+        ],
+        "retriever_mode": "hybrid",
+        "retriever_n": 7,
+        "hit_expected_retriever": [],
+        "miss_expected_retriever": [
+          "4408",
+          "4409",
+          "4410",
+          "4411",
+          "4412"
+        ],
+        "hit_focus_item_facts": [],
+        "hit_focus_merge": []
+      },
+      "probes": [
+        {
+          "probe": "视频号 播放",
+          "match_q": "(视频 OR 频号) AND 播放",
+          "item_facts_hit_focus": [
+            "4408",
+            "4409",
+            "4410",
+            "4411"
+          ],
+          "merge_hit_focus": [
+            "4408",
+            "4409",
+            "4410",
+            "4411"
+          ],
+          "retriever_hit_focus": [
+            "4408",
+            "4409",
+            "4410",
+            "4411"
+          ],
+          "item_facts_ids_top10": [
+            "4409",
+            "4408",
+            "4410",
+            "4411",
+            "4445"
+          ]
+        },
+        {
+          "probe": "播放",
+          "match_q": "播放",
+          "item_facts_hit_focus": [
+            "4408",
+            "4409",
+            "4410",
+            "4411"
+          ],
+          "merge_hit_focus": [
+            "4408",
+            "4409",
+            "4410",
+            "4411"
+          ],
+          "retriever_hit_focus": [
+            "4408",
+            "4409",
+            "4410",
+            "4411"
+          ],
+          "item_facts_ids_top10": [
+            "4409",
+            "4408",
+            "4410",
+            "4411"
+          ]
+        },
+        {
+          "probe": "视频号",
+          "match_q": "(视频 OR 频号)",
+          "item_facts_hit_focus": [
+            "4408",
+            "4409",
+            "4410",
+            "4411",
+            "4412"
+          ],
+          "merge_hit_focus": [
+            "4408",
+            "4409",
+            "4410",
+            "4411",
+            "4412"
+          ],
+          "retriever_hit_focus": [
+            "4408",
+            "4409",
+            "4410",
+            "4411",
+            "4412"
+          ],
+          "item_facts_ids_top10": [
+            "4409",
+            "4407",
+            "4408",
+            "4410",
+            "4411",
+            "4412",
+            "4433",
+            "4445",
+            "4514"
+          ]
+        },
+        {
+          "probe": "片子",
+          "match_q": "片子",
+          "item_facts_hit_focus": [],
+          "merge_hit_focus": [],
+          "retriever_hit_focus": [],
+          "item_facts_ids_top10": []
+        },
+        {
+          "probe": "较好",
+          "match_q": "较好",
+          "item_facts_hit_focus": [],
+          "merge_hit_focus": [],
+          "retriever_hit_focus": [],
+          "item_facts_ids_top10": []
+        }
+      ],
+      "likely_layer": "query_formulation"
+    }
+  ]
+}

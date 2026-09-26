@@ -1,0 +1,805 @@
+"""公司通讯录（应用身份 / tenant_access_token）。
+
+飞书 bot 可以用通讯录 OpenAPI 按部门树拉人；不是「做不到」，
+此前误把 CLI `contact +search-user`（仅 user）当成唯一入口。
+
+可见范围 = 应用在飞书后台的「通讯录权限范围」；本租户实测可覆盖部门树下全员。
+短时进程内缓存，避免每次聊天都全量 walk。
+
+查询支持：
+- 人名 / 工号 / 邮箱
+- 飞书部门名（含父部门 → 子组成员 rollup）
+- Mesh 业务队名（如「品牌创意」→ 品牌创意团队下全部飞书子部门）
+"""
+from __future__ import annotations
+
+import logging
+import threading
+import time
+from typing import Any
+
+from .normalize import envelope_fail, envelope_ok, normalize_docs
+from ..tool_contract import ToolResultEnvelope
+
+log = logging.getLogger("mesh.feishu_hands.org")
+
+_LOCK = threading.Lock()
+_CACHE: dict[str, Any] = {"at": 0.0, "people": [], "departments": []}
+_TTL_SEC = 15 * 60
+_REFRESHING = False  # singleflight 标记
+_REFRESH_WAIT_S = 20.0  # 等待他人刷新 walk 的最长时间
+_REFRESH_THREAD_STARTED = False
+
+
+def _children(native_mod: Any, dept_id: str) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    page_token = ""
+    while True:
+        params: dict[str, Any] = {
+            "department_id_type": "open_department_id" if dept_id != "0" else "department_id",
+            "page_size": 50,
+            "fetch_child": "false",
+        }
+        if page_token:
+            params["page_token"] = page_token
+        data = native_mod._api(
+            "GET",
+            f"/open-apis/contact/v3/departments/{dept_id}/children",
+            params=params,
+        )
+        body = data.get("data") or {}
+        items = body.get("items") or []
+        out.extend([x for x in items if isinstance(x, dict)])
+        if not body.get("has_more"):
+            break
+        page_token = str(body.get("page_token") or "")
+        if not page_token:
+            break
+    return out
+
+
+def _users_of(native_mod: Any, dept_open_id: str) -> list[dict[str, Any]]:
+    """列部门直属成员。根部门（"0"）须用 department_id 口径，否则接口不返回。"""
+    is_root = str(dept_open_id).strip() == "0"
+    out: list[dict[str, Any]] = []
+    page_token = ""
+    while True:
+        params: dict[str, Any] = {
+            "department_id": dept_open_id,
+            "department_id_type": "department_id" if is_root else "open_department_id",
+            "page_size": 50,
+            "user_id_type": "open_id",
+        }
+        if page_token:
+            params["page_token"] = page_token
+        data = native_mod._api(
+            "GET",
+            "/open-apis/contact/v3/users/find_by_department",
+            params=params,
+        )
+        body = data.get("data") or {}
+        items = body.get("items") or []
+        out.extend([x for x in items if isinstance(x, dict)])
+        if not body.get("has_more"):
+            break
+        page_token = str(body.get("page_token") or "")
+        if not page_token:
+            break
+    return out
+
+
+def _walk(native_mod: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    queue = ["0"]
+    seen: set[str] = set()
+    departments: list[dict[str, Any]] = []
+    people_by_id: dict[str, dict[str, Any]] = {}
+    while queue:
+        did = queue.pop(0)
+        if did in seen:
+            continue
+        seen.add(did)
+        try:
+            kids = _children(native_mod, did)
+        except Exception as e:
+            log.warning("org children fail dept=%s err=%s", did, e)
+            continue
+        for d in kids:
+            oid = str(d.get("open_department_id") or d.get("department_id") or "").strip()
+            if not oid:
+                continue
+            departments.append(
+                {
+                    "name": str(d.get("name") or "").strip(),
+                    "open_department_id": oid,
+                    "member_count": int(d.get("member_count") or 0),
+                    "parent_department_id": str(d.get("parent_department_id") or ""),
+                }
+            )
+            queue.append(oid)
+        if did == "0":
+            # 根部门直属（不挂任何子部门）的人也要采，否则永远漏。
+            try:
+                root_us = _users_of(native_mod, did)
+            except Exception as e:
+                log.warning("org users fail dept=%s err=%s", did, e)
+                root_us = []
+            for u in root_us:
+                oid = str(u.get("open_id") or "").strip()
+                if not oid:
+                    continue
+                people_by_id[oid] = {
+                    "name": str(u.get("name") or "").strip(),
+                    "open_id": oid,
+                    "employee_no": str(u.get("employee_no") or "").strip(),
+                    "enterprise_email": str(u.get("enterprise_email") or "").strip(),
+                    "job_title": str(u.get("job_title") or "").strip(),
+                    "department_ids": list(u.get("department_ids") or []),
+                }
+            continue
+        try:
+            us = _users_of(native_mod, did)
+        except Exception as e:
+            log.warning("org users fail dept=%s err=%s", did, e)
+            continue
+        for u in us:
+            oid = str(u.get("open_id") or "").strip()
+            if not oid:
+                continue
+            # 不缓存手机号
+            people_by_id[oid] = {
+                "name": str(u.get("name") or "").strip(),
+                "open_id": oid,
+                "employee_no": str(u.get("employee_no") or "").strip(),
+                "enterprise_email": str(u.get("enterprise_email") or "").strip(),
+                "job_title": str(u.get("job_title") or "").strip(),
+                "department_ids": list(u.get("department_ids") or []),
+            }
+    return departments, list(people_by_id.values())
+
+
+def directory_signature() -> str:
+    """返回当前缓存的签名，供 person_resolve 判断是否要刷新人员池。"""
+    with _LOCK:
+        at = float(_CACHE.get("at") or 0.0)
+        people_count = len(_CACHE.get("people") or [])
+    return f"{at:.6f}:{people_count}"
+
+
+def load_directory(*, force: bool = False) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """读通讯录全量（15min 进程内缓存）。
+
+    并发保护：缓存过期时若多个 job worker 同时命中，历史实现会各自跑一次
+    全量 BFS walk（惊群）。这里用 singleflight：同一时刻只允许一次 walk，
+    其余线程等待复用同一份结果。
+    """
+    now = time.time()
+    with _LOCK:
+        if (
+            not force
+            and _CACHE["people"]
+            and _CACHE["at"]
+            and now - float(_CACHE["at"]) < _TTL_SEC
+        ):
+            return list(_CACHE["departments"]), list(_CACHE["people"])
+
+    # singleflight：只让第一个进入的线程真正 walk，其余等待复用结果
+    global _REFRESHING
+    with _LOCK:
+        if _REFRESHING:
+            is_owner = False
+        else:
+            _REFRESHING = True
+            is_owner = True
+    if not is_owner:
+        # 等待进行中的刷新（有上限）；期间若缓存已刷新则直接返回
+        deadline = time.time() + _REFRESH_WAIT_S
+        while time.time() < deadline:
+            time.sleep(0.05)
+            with _LOCK:
+                fresh = (
+                    _CACHE["people"]
+                    and _CACHE["at"]
+                    and time.time() - float(_CACHE["at"]) < _TTL_SEC
+                )
+                if fresh:
+                    return list(_CACHE["departments"]), list(_CACHE["people"])
+                if not _REFRESHING:
+                    break
+        with _LOCK:
+            if _REFRESHING:
+                # 他人仍在刷新：先用旧缓存降级，避免重复全量 walk
+                return list(_CACHE["departments"]), list(_CACHE["people"])
+            _REFRESHING = True
+
+    try:
+        from . import native as native_mod
+
+        departments, people = _walk(native_mod)
+        with _LOCK:
+            # 失败/空结果不覆盖已有好数据（避免坏数据被缓存 15min）
+            if people:
+                _CACHE["at"] = time.time()
+                _CACHE["departments"] = list(departments)
+                _CACHE["people"] = list(people)
+            elif not _CACHE["people"]:
+                _CACHE["at"] = time.time()
+                _CACHE["departments"] = list(departments)
+                _CACHE["people"] = list(people)
+            else:
+                log.warning("org directory walk empty; keep previous cache")
+            departments = list(_CACHE["departments"])
+            people = list(_CACHE["people"])
+        log.info("org directory loaded depts=%s people=%s", len(departments), len(people))
+        return departments, people
+    finally:
+        with _LOCK:
+            _REFRESHING = False
+
+
+def start_refresh_thread() -> None:
+    """后台预热通讯录（避免首个请求在请求路径上同步跑全量 walk）。"""
+    global _REFRESH_THREAD_STARTED
+    with _LOCK:
+        if _REFRESH_THREAD_STARTED:
+            return
+        _REFRESH_THREAD_STARTED = True
+
+    def _loop() -> None:
+        while True:
+            try:
+                load_directory()
+            except Exception as e:
+                log.warning("org directory refresh failed: %s", e)
+            time.sleep(max(60.0, _TTL_SEC * 0.6))
+
+    threading.Thread(target=_loop, name="mesh-org-refresh", daemon=True).start()
+
+
+def _descendants(
+    root_ids: set[str],
+    departments: list[dict[str, Any]],
+) -> set[str]:
+    """root ∪ 全部子孙 open_department_id。"""
+    kids: dict[str, list[str]] = {}
+    for d in departments:
+        pid = str(d.get("parent_department_id") or "").strip()
+        oid = str(d.get("open_department_id") or "").strip()
+        if pid and oid:
+            kids.setdefault(pid, []).append(oid)
+    out = set(root_ids)
+    stack = list(root_ids)
+    while stack:
+        cur = stack.pop()
+        for c in kids.get(cur) or []:
+            if c not in out:
+                out.add(c)
+                stack.append(c)
+    return out
+
+
+def _known_org_labels() -> list[tuple[str, str]]:
+    """已知部门名/业务队名/别名 → canonical。最长命中优先。"""
+    pairs: list[tuple[str, str]] = []
+    try:
+        from ... import db, ingest
+
+        for k, v in (db.team_alias_map() or {}).items():
+            ks, vs = str(k or "").strip(), str(v or "").strip()
+            if len(ks) >= 2 and vs:
+                pairs.append((ks, vs))
+        for t in ingest.TEAMS:
+            ts = str(t or "").strip()
+            if len(ts) >= 2:
+                pairs.append((ts, ts))
+    except Exception:
+        pass
+    try:
+        from ..dept_team_map import load_dept_team_map
+
+        for row in load_dept_team_map().get("departments") or []:
+            if not isinstance(row, dict):
+                continue
+            name = str(row.get("name") or "").strip()
+            team = str(row.get("canonical_team") or "").strip()
+            if len(name) >= 2:
+                pairs.append((name, team or name))
+            if len(team) >= 2:
+                pairs.append((team, team))
+    except Exception:
+        pass
+    seen: set[str] = set()
+    out: list[tuple[str, str]] = []
+    for lab, canon in sorted(pairs, key=lambda x: len(x[0]), reverse=True):
+        if lab in seen:
+            continue
+        seen.add(lab)
+        out.append((lab, canon))
+    return out
+
+
+def _mesh_team_for_query(q: str) -> str | None:
+    raw = (q or "").strip()
+    if not raw:
+        return None
+    try:
+        from ... import db
+
+        n = db.normalize_team(raw)
+        if n:
+            return n
+    except Exception:
+        pass
+    for lab, canon in _known_org_labels():
+        if lab in raw:
+            try:
+                from ... import db
+
+                return db.normalize_team(canon) or db.normalize_team(lab) or canon
+            except Exception:
+                return canon
+    try:
+        from ..dept_team_map import map_department_name
+
+        return map_department_name(raw)
+    except Exception:
+        return None
+
+
+def _dept_ids_for_mesh_team(team: str) -> set[str]:
+    out: set[str] = set()
+    try:
+        from ..dept_team_map import load_dept_team_map
+
+        for row in load_dept_team_map().get("departments") or []:
+            canon = str(row.get("canonical_team") or "").strip()
+            parent_team = str(row.get("parent_team") or "").strip()
+            # 命中：自身 canonical，或作为子队 parent_team（如品牌创意团队含海外拓展）
+            if canon != team and parent_team != team:
+                continue
+            oid = str(row.get("feishu_department_id") or "").strip()
+            if oid:
+                out.add(oid)
+    except Exception:
+        pass
+    return out
+
+
+def resolve_org_scope(
+    query: str,
+    departments: list[dict[str, Any]],
+) -> tuple[set[str] | None, str]:
+    """把队名/部门名解析成要列出的飞书部门 id 集合。
+
+    返回 (dept_ids|None, label)。None 表示不是组织范围查询，应走人名检索。
+    """
+    q = (query or "").strip()
+    if not q:
+        return None, ""
+    ql = q.lower()
+
+    # 1) 命中飞书部门名（精确或互相包含）→ 该部门 + 子孙
+    hit_roots: set[str] = set()
+    hit_names: list[str] = []
+    for d in departments:
+        name = str(d.get("name") or "").strip()
+        oid = str(d.get("open_department_id") or "").strip()
+        if not name or not oid:
+            continue
+        nl = name.lower()
+        if ql == nl or ql in nl or nl in ql:
+            hit_roots.add(oid)
+            hit_names.append(name)
+    if hit_roots:
+        ids = _descendants(hit_roots, departments)
+        label = "、".join(hit_names[:4])
+        if len(hit_names) > 4:
+            label += "…"
+        return ids, label
+
+    # 2) Mesh 业务队（品牌创意 / 品牌创意团队 / 社群…）→ 映射表内全部飞书部门
+    team = _mesh_team_for_query(q)
+    if team:
+        ids = _dept_ids_for_mesh_team(team)
+        try:
+            from ..dept_team_map import map_department_id, map_department_name
+
+            parent_lookup = {
+                str(d.get("open_department_id") or ""): str(d.get("parent_department_id") or "")
+                for d in departments
+            }
+            for d in departments:
+                oid = str(d.get("open_department_id") or "").strip()
+                name = str(d.get("name") or "").strip()
+                mapped = (
+                    map_department_id(oid, parent_lookup=parent_lookup)
+                    or map_department_name(name)
+                )
+                if mapped == team and oid:
+                    ids.add(oid)
+        except Exception:
+            pass
+        if ids:
+            return ids, team
+    return None, ""
+
+
+def _people_in_depts(
+    people: list[dict[str, Any]],
+    dept_ids: set[str],
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for u in people:
+        u_depts = {str(x).strip() for x in (u.get("department_ids") or []) if str(x).strip()}
+        if not (u_depts & dept_ids):
+            continue
+        oid = str(u.get("open_id") or "").strip()
+        key = oid or str(u.get("name") or "")
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(u)
+    out.sort(key=lambda x: str(x.get("name") or ""))
+    return out
+
+
+def _roster_people_for_team(team: str) -> list[dict[str, Any]]:
+    """飞书 walk 空结果时，用手填花名册按 Mesh 队兜底。"""
+    try:
+        from ..person_resolve import load_roster
+        from ..dept_team_map import load_dept_team_map, map_department_name
+        from ... import db
+
+        people = []
+        for row in load_roster(force=False).get("people") or []:
+            if not isinstance(row, dict):
+                continue
+            name = str(row.get("name") or "").strip()
+            if not name:
+                continue
+            hit = False
+            for t in row.get("teams") or []:
+                ts = str(t or "").strip()
+                mapped = map_department_name(ts) or db.normalize_team(ts)
+                if mapped == team or ts == team:
+                    hit = True
+                    break
+                # 子队并入父业务队：品牌创意团队 应含 海外拓展 花名册成员
+                prow = (load_dept_team_map().get("by_name") or {}).get(ts)
+                if isinstance(prow, dict) and str(prow.get("parent_team") or "").strip() == team:
+                    hit = True
+                    break
+            if not hit:
+                continue
+            people.append(
+                {
+                    "name": name,
+                    "open_id": str(row.get("open_id") or "").strip(),
+                    "employee_no": str(row.get("employee_no") or "").strip(),
+                    "enterprise_email": "",
+                    "job_title": str(row.get("job_title") or "").strip(),
+                    "department_ids": [],
+                    "teams": list(row.get("teams") or []),
+                    "source": "roster",
+                }
+            )
+        people.sort(key=lambda x: x["name"])
+        return people
+    except Exception as e:
+        log.info("roster team fallback fail: %s", e)
+        return []
+
+
+def _parent_map(departments: list[dict[str, Any]]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for d in departments:
+        oid = str(d.get("open_department_id") or "").strip()
+        if oid:
+            out[oid] = str(d.get("parent_department_id") or "").strip()
+    return out
+
+
+def _is_ancestor(ancestor: str, node: str, parent_of: dict[str, str]) -> bool:
+    cur = parent_of.get(node) or ""
+    seen: set[str] = set()
+    while cur and cur not in seen and cur != "0":
+        if cur == ancestor:
+            return True
+        seen.add(cur)
+        cur = parent_of.get(cur) or ""
+    return False
+
+
+def _specific_dept_ids(dept_ids: list[str], departments: list[dict[str, Any]]) -> list[str]:
+    """去掉同时出现的上级部门，只留更具体的直属部门。"""
+    parent_of = _parent_map(departments)
+    raw = [str(x).strip() for x in dept_ids if str(x).strip()]
+    pool = set(raw)
+    out: list[str] = []
+    for did in raw:
+        if any(other != did and _is_ancestor(did, other, parent_of) for other in pool):
+            continue
+        if did not in out:
+            out.append(did)
+    return out
+
+
+def _dept_names(dept_ids: list[str], departments: list[dict[str, Any]]) -> list[str]:
+    wanted = set(dept_ids)
+    names: list[str] = []
+    for d in departments:
+        oid = str(d.get("open_department_id") or "").strip()
+        name = str(d.get("name") or "").strip()
+        if oid in wanted and name and name not in names:
+            names.append(name)
+    return names
+
+
+def _ids_for_exact_dept_names(
+    labels: list[str],
+    departments: list[dict[str, Any]],
+) -> tuple[set[str], str]:
+    """花名册团队名只按部门名精确匹配，不走 canonical_team 并级。"""
+    by_name = {
+        str(d.get("name") or "").strip(): str(d.get("open_department_id") or "").strip()
+        for d in departments
+        if str(d.get("name") or "").strip() and str(d.get("open_department_id") or "").strip()
+    }
+    roots: set[str] = set()
+    hit: list[str] = []
+    for label in labels:
+        oid = by_name.get(label)
+        if oid:
+            roots.add(oid)
+            hit.append(label)
+    if not roots:
+        return set(), ""
+    return _descendants(roots, departments), "、".join(hit)
+
+
+def _roster_team_labels(open_id: str) -> list[str]:
+    try:
+        from ..person_resolve import lookup_by_open_id
+
+        hit = lookup_by_open_id(open_id) or {}
+    except Exception:
+        return []
+    raw = str(hit.get("teams") or "")
+    out: list[str] = []
+    for part in raw.split(","):
+        name = part.strip()
+        if name and name not in out:
+            out.append(name)
+    return out
+
+
+def asker_teammates(open_id: str, *, limit: int = 24) -> tuple[list[str], str]:
+    """提问者飞书直属部门（含子部门）的同事。
+
+    仅用于「显式问某叶子部门有谁」。小公司「我们团队」请用 our_team_members，
+    按 Mesh 业务队（primary_team）统一口径，不再按叶子切。
+    """
+    oid = (open_id or "").strip()
+    if not oid:
+        return [], ""
+    try:
+        departments, people = load_directory()
+    except Exception as e:
+        log.info("asker_teammates load fail: %s", e)
+        return [], ""
+    person = next(
+        (u for u in people if str(u.get("open_id") or "").strip() == oid),
+        None,
+    )
+    dept_ids = _specific_dept_ids(
+        list((person or {}).get("department_ids") or []),
+        departments,
+    )
+    if dept_ids:
+        scope_ids = _descendants(set(dept_ids), departments)
+        label = "、".join(_dept_names(dept_ids, departments)) or ""
+    else:
+        scope_ids, label = _ids_for_exact_dept_names(_roster_team_labels(oid), departments)
+    if not scope_ids:
+        return [], ""
+    names: list[str] = []
+    for u in _people_in_depts(people, scope_ids):
+        n = str(u.get("name") or "").strip()
+        if n and n not in names:
+            names.append(n)
+        if len(names) >= int(limit):
+            break
+    return names, label
+
+
+def our_team_members(team: str, *, limit: int = 24) -> tuple[list[str], str]:
+    """「我们团队」成员：只认 Mesh 业务队（identity.primary_team）。
+
+    全局统一：品牌创意 / 编辑部 / 商业化 / 海外拓展… 同一规则。
+    不按飞书叶子（创新技术 vs 创意视频）再切一层。
+    返回 (人名, 队标签)。
+    """
+    t = (team or "").strip()
+    if not t:
+        return [], ""
+    names = member_names_for_scope(t, limit=limit)
+    return names, t
+
+
+def _place_label(person: dict[str, Any], departments: list[dict[str, Any]]) -> str:
+    """查人结果里的部门。直属部门优先，没有则用花名册团队名。"""
+    specific = _specific_dept_ids(list(person.get("department_ids") or []), departments)
+    names = _dept_names(specific, departments)
+    if names:
+        return "部门:" + "、".join(names[:3])
+    oid = str(person.get("open_id") or "").strip()
+    roster = _roster_team_labels(oid)
+    if roster:
+        return "部门:" + "、".join(roster[:3])
+    return ""
+
+
+def member_names_for_scope(query: str, *, limit: int = 24) -> list[str]:
+    """飞书部门/Mesh 队子树里的人名（显式问某队时用，会包含同级并入的粗团队）。"""
+    q = (query or "").strip()
+    if not q:
+        return []
+    try:
+        departments, people = load_directory()
+    except Exception as e:
+        log.info("member_names_for_scope load fail: %s", e)
+        departments, people = [], []
+    scope_ids, label = resolve_org_scope(q, departments)
+    matched: list[dict[str, Any]] = []
+    if scope_ids:
+        matched = _people_in_depts(people, scope_ids)
+    if not matched:
+        team = _mesh_team_for_query(q) or label
+        if team:
+            matched = _roster_people_for_team(team)
+    names: list[str] = []
+    for u in matched:
+        n = str(u.get("name") or "").strip()
+        if n and n not in names:
+            names.append(n)
+        if len(names) >= int(limit):
+            break
+    return names
+
+
+def search_directory(
+    query: str = "",
+    *,
+    max_results: int = 20,
+    list_departments: bool = False,
+    include_subdepartments: bool = True,
+) -> ToolResultEnvelope:
+    """按姓名/工号/邮箱查人；或按部门名/Mesh 业务队列成员。"""
+    try:
+        departments, people = load_directory()
+    except Exception as e:
+        return envelope_fail(f"org_directory_error:{e}"[:180], tool="feishu.search")
+
+    q = (query or "").strip()
+    ql = q.lower()
+    limit = max(1, int(max_results))
+
+    if list_departments or (not q and not people):
+        items = []
+        for d in departments:
+            name = str(d.get("name") or "").strip()
+            if ql and ql not in name.lower() and ql not in str(d.get("open_department_id") or "").lower():
+                continue
+            items.append(
+                {
+                    "title": name or d.get("open_department_id"),
+                    "snippet": f"部门 · {d.get('member_count') or 0}人 · {d.get('open_department_id')}",
+                    "docs_type": "department",
+                    "id": d.get("open_department_id"),
+                    "url": "",
+                }
+            )
+            if len(items) >= limit:
+                break
+        return envelope_ok(
+            normalize_docs(items, kind="department"),
+            tool="feishu.search",
+            max_results=limit,
+        )
+
+    # 部门 / 业务队范围 → 列成员（「品牌创意有谁」）
+    scope_ids, scope_label = resolve_org_scope(q, departments)
+    if scope_ids is not None:
+        matched = _people_in_depts(people, scope_ids)
+        source = "feishu_org"
+        if not matched:
+            team = _mesh_team_for_query(q) or scope_label
+            matched = _roster_people_for_team(team) if team else []
+            source = "roster" if matched else source
+        team_limit = max(limit, 50)
+        items = []
+        if include_subdepartments or list_departments:
+            child_depts = [
+                d
+                for d in departments
+                if str(d.get("open_department_id") or "") in scope_ids
+            ]
+            child_depts.sort(key=lambda d: str(d.get("name") or ""))
+            for d in child_depts[:40]:
+                did = str(d.get("open_department_id") or "")
+                n_here = sum(
+                    1
+                    for u in people
+                    if did in {str(x) for x in (u.get("department_ids") or [])}
+                )
+                items.append(
+                    {
+                        "title": str(d.get("name") or did),
+                        "snippet": f"子部门 · {n_here}人 · {did}",
+                        "docs_type": "department",
+                        "id": did,
+                        "url": "",
+                    }
+                )
+        for u in matched[:team_limit]:
+            name = str(u.get("name") or "")
+            job = str(u.get("job_title") or "")
+            emp = str(u.get("employee_no") or "")
+            oid = str(u.get("open_id") or "")
+            teams = u.get("teams") or []
+            u_depts = {str(x).strip() for x in (u.get("department_ids") or []) if str(x).strip()}
+            dept_names = [
+                str(d.get("name") or "")
+                for d in departments
+                if str(d.get("open_department_id") or "") in u_depts
+            ]
+            bits = [p for p in (scope_label, (dept_names[0] if dept_names else ""), job, emp) if p]
+            if teams:
+                bits.append("/".join(str(t) for t in teams[:3]))
+            items.append(
+                {
+                    "title": name or oid or "同事",
+                    "snippet": " · ".join(bits) or source,
+                    "docs_type": "user",
+                    "id": oid,
+                    "url": "",
+                }
+            )
+        return envelope_ok(
+            normalize_docs(items, kind="user"),
+            tool="feishu.search",
+            max_results=team_limit,
+        )
+
+    items = []
+    for u in people:
+        name = str(u.get("name") or "")
+        emp = str(u.get("employee_no") or "")
+        email = str(u.get("enterprise_email") or "")
+        oid = str(u.get("open_id") or "")
+        job = str(u.get("job_title") or "")
+        if ql and not (
+            ql in name.lower()
+            or ql in emp.lower()
+            or ql in email.lower()
+            or ql in oid.lower()
+            or ql in job.lower()
+        ):
+            continue
+        parts = [p for p in (_place_label(u, departments), job, emp, email) if p]
+        items.append(
+            {
+                "title": name or oid or "同事",
+                "snippet": " · ".join(parts),
+                "docs_type": "user",
+                "id": oid,
+                "url": "",
+            }
+        )
+        if len(items) >= limit:
+            break
+    return envelope_ok(
+        normalize_docs(items, kind="user"),
+        tool="feishu.search",
+        max_results=limit,
+    )

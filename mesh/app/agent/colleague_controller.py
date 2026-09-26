@@ -1,0 +1,558 @@
+"""Colleague Controller · Semantic Decision Layer (legacy rollback only).
+
+主产品路径已切换到 MeshSupervisor（MESH_SUPERVISOR=1）。
+本模块仅在 MESH_COLLEAGUE_V3=0 的旧 runtime 分支保留，禁止继续加业务。
+"""
+from __future__ import annotations
+
+import logging
+import os
+import re
+import time
+from dataclasses import asdict, dataclass, field
+from typing import Any
+
+from . import conversation as conv
+from .session_state import SessionContextState
+
+log = logging.getLogger("uvicorn.error")
+
+MODES = frozenset(
+    {"conversation", "enterprise", "followup", "clarify", "meta", "system"}
+)
+RESPONSE_MODES = frozenset(
+    {
+        "conversational",
+        "direct",
+        "clarify",
+        "opinion",
+        "rewrite",
+        "explain",
+        "abstain",
+        "followup",
+    }
+)
+
+# 极低风险协议闭集（禁止继续扩张）
+_PROTOCOL_ACK = re.compile(
+    r"^("
+    r"谢谢(?:你|啦|了)?|感谢|thanks|thank\s*you|"
+    r"好的|收到|明白了?|了解|知道了|ok|okay"
+    r")[!！。.?？\s]*$",
+    re.I,
+)
+
+_SYSTEM_CTRL = """你是 GeekPark Mesh 的 Colleague Controller（语义决策层）。
+只理解用户当前在做什么，并选择执行路径。
+禁止：回答用户、编造公司事实、调用检索、把上轮答案当 Truth、输出 JSON 以外的内容。
+
+结合「会话上下文」与「当前用户话」，输出唯一 JSON：
+{
+  "mode": "conversation|enterprise|followup|clarify|meta|system",
+  "intent": "short_snake",
+  "entities": ["..."],
+  "topic": "short_or_empty",
+  "needs_grounding": true/false,
+  "needs_clarification": true/false,
+  "response_mode": "conversational|direct|clarify|opinion|rewrite|explain|abstain|followup",
+  "rewritten_query": "followup/enterprise 需要检索时的改写问句，否则空",
+  "clarify_hint": "需要澄清时的一句问法，否则空",
+  "confidence": "high|medium|low",
+  "notes": "≤40字"
+}
+
+mode 判定（按优先级理解，不要死抠字面）：
+1) system：改权限/发布/草稿原文/查库等越权
+2) meta：你是谁/能干什么
+3) followup：明显承接当前会话话题的续问或回切（那X呢/还有吗/他后来/换成Y继续看/回头再说X那边）。若 active_entities 或 topic_stack 能定位对象 → needs_grounding=true，必须写 rewritten_query
+4) enterprise：要查已上线周报事实——人名/公司/团队之间的接触、沟通、关系、进展。例如「张三最近跟谁聊过」「编辑部和商务有哪些关系」。needs_grounding=true
+5) clarify：有人名/公司，但问法多解、缺维度（如「张三最近怎么样」——沟通还是进展？）；或「靠谱吗」缺主体。needs_clarification=true，needs_grounding=false。注意：有名字的「怎么样」优先 clarify，不要直接 enterprise 瞎查
+6) conversation：闲聊/吐槽/情绪/观点/润色改写/内容讨论，不查周报。例如「哈哈」「今天忙死了」「我有点纠结这个事」「这个怎么说更自然」「你怎么看行业」。needs_grounding=false；润色类 response_mode=rewrite；观点类=opinion
+
+硬约束：
+- conversation/meta/clarify/system → needs_grounding 必须 false
+- enterprise/followup → needs_grounding 必须 true
+- 不确定是查周报还是闲聊时：若完全没有可检索对象 → conversation 或 clarify；若有对象但维度不清 → clarify；不要默认 Retrieval
+- 不要因为「纠结/怎么样/自然」就 clarify，除非缺主体或企业事实维度不清
+
+只输出 JSON。"""
+
+
+@dataclass
+class ControllerDecision:
+    mode: str = "clarify"
+    intent: str = "clarify"
+    entities: list[str] = field(default_factory=list)
+    topic: str = ""
+    needs_grounding: bool = False
+    needs_clarification: bool = False
+    response_mode: str = "clarify"
+    context_refs: list[str] = field(default_factory=list)
+    rewritten_query: str = ""
+    clarify_text: str = ""
+    casual_text: str = ""
+    topic_frame: str = ""
+    resolved_entity: str = ""
+    notes: str = ""
+    source: str = "hard"  # hard|llm|fallback
+    router_llm_used: bool = False
+    router_model: str | None = None
+    confidence: str = "high"
+    controller_latency_ms: float = 0.0
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    def to_route_decision(self) -> conv.RouteDecision:
+        route = _mode_to_route(self.mode, self.intent)
+        intent = _mode_to_runtime_intent(self.mode, self.intent)
+        return conv.RouteDecision(
+            route=route,
+            intent=intent,
+            rewritten_query=self.rewritten_query or "",
+            clarify_text=self.clarify_text or "",
+            casual_text=self.casual_text or "",
+            topic_frame=self.topic_frame or _topic_frame(self.topic),
+            resolved_entity=self.resolved_entity
+            or (self.entities[0] if self.entities else ""),
+            notes=f"ctrl:{self.source}:{self.notes or self.mode}",
+        )
+
+
+def _mode_to_route(mode: str, intent: str) -> str:
+    m = (mode or "").strip().lower()
+    i = (intent or "").strip().lower()
+    if m == "conversation":
+        return "general_conversation"
+    if m == "meta":
+        return "meta"
+    if m == "clarify":
+        return "clarify"
+    if m == "followup":
+        return "followup"
+    if m == "enterprise":
+        if i in ("ask_relations", "relationship_query", "relations"):
+            return "relations"
+        if i in ("list_issues", "list"):
+            return "list"
+        return "ask"
+    if m == "system":
+        return "refuse"
+    return "clarify"
+
+
+def _mode_to_runtime_intent(mode: str, intent: str) -> str:
+    m = (mode or "").strip().lower()
+    i = (intent or "").strip().lower()
+    if m == "meta":
+        return "whoami" if i == "whoami" else "help"
+    if m == "conversation":
+        return "casual"
+    if m == "clarify":
+        return "clarify"
+    if m == "system":
+        return "refuse"
+    if m == "followup":
+        if i in ("ask_relations", "relationship_query", "relations"):
+            return "ask_relations"
+        return "ask_published"
+    if m == "enterprise":
+        if i in ("list_issues", "list"):
+            return "list_issues"
+        if i in ("ask_relations", "relationship_query", "relations"):
+            return "ask_relations"
+        return "ask_published"
+    return "clarify"
+
+
+def _topic_frame(topic: str) -> str:
+    t = (topic or "").strip().lower()
+    if "contact" in t or "关系" in t or t == "business_contact" or "relationship" in t:
+        return "contact"
+    if "progress" in t or "进展" in t:
+        return "progress"
+    if "relation" in t:
+        return "relations"
+    return "about"
+
+
+def _controller_llm_enabled() -> bool:
+    v = (os.environ.get("MESH_COLLEAGUE_CONTROLLER_LLM") or "1").strip().lower()
+    return v not in ("0", "false", "off", "no")
+
+
+def will_retrieve(decision: ControllerDecision) -> bool:
+    return bool(decision.needs_grounding) and decision.mode in ("enterprise", "followup")
+
+
+def _context_refs(st: SessionContextState) -> list[str]:
+    refs: list[str] = []
+    if st.active_entities:
+        refs.append("active_entities")
+    if st.active_topic:
+        refs.append("active_topic")
+    if st.last_intent:
+        refs.append("last_intent")
+    if st.last_query:
+        refs.append("last_query")
+    if st.active_issue:
+        refs.append("active_issue")
+    if st.topic_stack:
+        refs.append("topic_stack")
+    if st.recent_turns:
+        refs.append("recent_turns")
+    if st.unresolved_references:
+        refs.append("unresolved_references")
+    return refs
+
+
+def _session_block(st: SessionContextState) -> str:
+    turns = st.recent_turns or []
+    turn_lines = []
+    for t in turns[-6:]:
+        role = "用户" if t.get("role") == "user" else "Mesh"
+        turn_lines.append(f"{role}: {(t.get('text') or '')[:160]}")
+    stack = st.topic_stack or []
+    stack_hint = ""
+    if stack:
+        last = stack[-1] if isinstance(stack[-1], dict) else {}
+        stack_hint = (
+            f"topic_stack_top entities={last.get('entities')} "
+            f"topic={last.get('topic')} frame={last.get('frame')}"
+        )
+    return (
+        f"active_entities={st.active_entities or []}\n"
+        f"active_team={st.active_team or ''}\n"
+        f"active_issue={st.active_issue or ''}\n"
+        f"active_topic={st.active_topic or ''}\n"
+        f"active_period={st.active_period or ''}\n"
+        f"last_intent={st.last_intent or ''}\n"
+        f"last_topic_frame={st.last_topic_frame or ''}\n"
+        f"last_query={st.last_query or ''}\n"
+        f"conversation_mode={st.conversation_mode or ''}\n"
+        f"unresolved_references={st.unresolved_references or []}\n"
+        f"{stack_hint}\n"
+        f"recent_turns:\n" + ("\n".join(turn_lines) if turn_lines else "(none)")
+    )
+
+
+def from_route_decision(
+    route: conv.RouteDecision,
+    text: str,
+    state: SessionContextState | None = None,
+    *,
+    source: str = "hard",
+    confidence: str = "high",
+) -> ControllerDecision:
+    """硬边界 Route → 统一 schema（兼容 runtime）。"""
+    st = state or SessionContextState()
+    q = conv.normalize_query(text)
+    ents = list(
+        dict.fromkeys(
+            ([route.resolved_entity] if route.resolved_entity else [])
+            + conv.extract_entities_from_text(q)
+            + list(st.active_entities or [])[:3]
+        )
+    )
+    ents = [e for e in ents if e][:6]
+
+    mode, needs_g, needs_c, resp = "clarify", False, True, "clarify"
+    intent = route.intent or "clarify"
+    topic = route.topic_frame or ""
+
+    if route.route == "meta" or route.intent in ("help", "whoami"):
+        mode, resp, intent, needs_c = "meta", "conversational", route.intent, False
+    elif route.route == "general_conversation" or route.intent == "casual":
+        mode, resp, intent, needs_c = "conversation", "conversational", "casual", False
+    elif route.route == "clarify" or route.intent == "clarify":
+        mode, needs_c, resp, intent = "clarify", True, "clarify", "clarify"
+    elif route.route == "followup":
+        mode, needs_g, resp = "followup", True, "followup"
+        intent = route.intent or "ask_published"
+        topic = topic or "business_contact"
+        needs_c = False
+    elif route.route in ("ask", "relations", "list"):
+        mode, needs_g, resp = "enterprise", True, "direct"
+        intent = route.intent or "ask_published"
+        needs_c = False
+        if route.route == "relations":
+            topic = "relations"
+        elif route.route == "list":
+            topic = "issue_list"
+        else:
+            topic = topic or "business"
+    elif route.route == "refuse" or route.intent == "refuse":
+        mode, resp, intent, needs_c = "system", "abstain", "refuse", False
+
+    return ControllerDecision(
+        mode=mode,
+        intent=intent,
+        entities=ents,
+        topic=topic,
+        needs_grounding=needs_g,
+        needs_clarification=needs_c,
+        response_mode=resp,
+        context_refs=_context_refs(st),
+        rewritten_query=route.rewritten_query or "",
+        clarify_text=route.clarify_text or "",
+        casual_text=route.casual_text or "",
+        topic_frame=route.topic_frame or "",
+        resolved_entity=route.resolved_entity or "",
+        notes=route.notes or "",
+        source=source,
+        router_llm_used=False,
+        confidence=confidence,
+    )
+
+
+def try_hard_path(
+    text: str, state: SessionContextState | None = None
+) -> ControllerDecision | None:
+    """仅安全且确定的硬边界。自然语言一律不在这里判。"""
+    st = state or SessionContextState()
+    q = conv.normalize_query(text)
+    if not q:
+        return from_route_decision(
+            conv.RouteDecision(route="refuse", intent="refuse", notes="empty"),
+            q,
+            st,
+            source="hard",
+        )
+
+    # system / draft / capability
+    if conv._DRAFT_RAW.search(q) and not conv._META.search(q):
+        if re.search(r"(看|读|查|打开|给我|导出).*(草稿|draft|原文|raw|未上线)", q, re.I) or re.search(
+            r"(草稿|draft|原文|raw|未上线).*(内容|全文|json)", q, re.I
+        ) or re.search(r"直接查库|查\s*sources", q, re.I):
+            return from_route_decision(
+                conv.RouteDecision(route="refuse", intent="refuse", notes="draft_raw"),
+                q,
+                st,
+            )
+    if conv._CAPABILITY_REFUSE.search(q):
+        return from_route_decision(
+            conv.RouteDecision(route="refuse", intent="refuse", notes="capability_boundary"),
+            q,
+            st,
+        )
+
+    # meta / capability identity
+    if conv._META.search(q) or conv._META_SHORT.match(q):
+        return from_route_decision(
+            conv.RouteDecision(
+                route="meta",
+                intent="help",
+                casual_text=conv._meta_reply(q),
+                notes="meta",
+            ),
+            q,
+            st,
+        )
+    if conv._WHOAMI.search(q):
+        return from_route_decision(
+            conv.RouteDecision(route="meta", intent="whoami", notes="whoami"),
+            q,
+            st,
+        )
+
+    # 极低风险协议闭集（谢谢/好的…）——不加「哈哈」等口语
+    if _PROTOCOL_ACK.match(q):
+        return from_route_decision(
+            conv.RouteDecision(
+                route="general_conversation",
+                intent="casual",
+                casual_text=conv._casual_reply(q),
+                notes="protocol_ack",
+            ),
+            q,
+            st,
+        )
+
+    # Session 已明确 + 结构完整的 follow-up → 0 Controller LLM
+    # （无上下文的指代澄清交给 Controller，不算 hard）
+    m_res = conv._RESUME.match(q)
+    if m_res:
+        rest = (m_res.group("rest") or "").strip()
+        if rest:
+            if not st.active_entities:
+                st.restore_topic()
+            fu = conv._try_followup(rest, st)
+            if (
+                fu is not None
+                and fu.route == "followup"
+                and fu.rewritten_query
+                and (st.active_entities or fu.resolved_entity)
+            ):
+                fu.notes = "resume_" + (fu.notes or "followup")
+                return from_route_decision(fu, q, st)
+            return None
+
+    if st.active_entities or st.last_topic_frame or st.topic_stack:
+        fu = conv._try_followup(q, st)
+        if fu is not None and fu.route == "followup" and fu.rewritten_query:
+            return from_route_decision(fu, q, st)
+
+    return None
+
+
+def decide(
+    text: str,
+    state: SessionContextState | None = None,
+    *,
+    allow_llm: bool | None = None,
+) -> ControllerDecision:
+    """统一入口：hard boundary → 否则 1× Semantic Controller。"""
+    st = state or SessionContextState()
+    q = conv.normalize_query(text)
+    use_llm = _controller_llm_enabled() if allow_llm is None else bool(allow_llm)
+
+    hard = try_hard_path(q, st)
+    if hard is not None:
+        hard.context_refs = _context_refs(st) or hard.context_refs
+        return hard
+
+    if use_llm:
+        llm_dec = _llm_decide(q, st)
+        if llm_dec is not None:
+            return llm_dec
+
+    return _safe_fallback(q, st)
+
+
+def _safe_fallback(q: str, st: SessionContextState) -> ControllerDecision:
+    """Controller 失败：不堆 regex；按安全策略。"""
+    # 有活跃企业话题且像续问残片 → clarify（避免瞎查）
+    if st.active_entities and len(q) <= 12:
+        return ControllerDecision(
+            mode="clarify",
+            intent="clarify",
+            entities=list(st.active_entities[:3]),
+            needs_grounding=False,
+            needs_clarification=True,
+            response_mode="clarify",
+            context_refs=_context_refs(st),
+            clarify_text=conv._clarify_bare(q, st),
+            notes="fallback_clarify_with_session",
+            source="fallback",
+            confidence="low",
+        )
+    # 默认：当对话，不 Retrieval
+    return ControllerDecision(
+        mode="conversation",
+        intent="casual",
+        needs_grounding=False,
+        needs_clarification=False,
+        response_mode="conversational",
+        context_refs=_context_refs(st),
+        notes="fallback_conversation",
+        source="fallback",
+        confidence="low",
+    )
+
+
+def _llm_decide(q: str, st: SessionContextState) -> ControllerDecision | None:
+    t0 = time.perf_counter()
+    try:
+        from .. import llm
+
+        user = (
+            "会话上下文：\n"
+            + _session_block(st)
+            + "\n\n当前用户说：\n"
+            + q
+            + "\n\n只输出 JSON。"
+        )
+        data = llm.call(
+            _SYSTEM_CTRL, user, max_tokens=400, json_mode=True, task="controller"
+        )
+        latency = (time.perf_counter() - t0) * 1000.0
+        if not isinstance(data, dict):
+            return None
+        d = _parse_llm_payload(data, q, st, model=llm.model_for_task("controller"))
+        d.controller_latency_ms = round(latency, 1)
+        return d
+    except Exception as e:
+        log.warning("colleague_controller semantic llm failed: %s", e)
+        return None
+
+
+def _parse_llm_payload(
+    data: dict[str, Any],
+    q: str,
+    st: SessionContextState,
+    *,
+    model: str | None = None,
+) -> ControllerDecision:
+    mode = str(data.get("mode") or "clarify").strip().lower()
+    if mode == "content":
+        mode = "conversation"  # Stage1：content 并入 conversation
+    if mode not in MODES:
+        mode = "clarify"
+
+    resp = str(data.get("response_mode") or "clarify").strip().lower()
+    if resp not in RESPONSE_MODES:
+        resp = {
+            "conversation": "conversational",
+            "enterprise": "direct",
+            "followup": "followup",
+            "clarify": "clarify",
+            "meta": "conversational",
+            "system": "abstain",
+        }.get(mode, "clarify")
+
+    ents_raw = data.get("entities") or []
+    entities: list[str] = []
+    if isinstance(ents_raw, list):
+        for e in ents_raw:
+            s = str(e or "").strip()
+            if s and s not in entities:
+                entities.append(s)
+    entities = entities[:6]
+
+    needs_g = bool(data.get("needs_grounding"))
+    needs_c = bool(data.get("needs_clarification"))
+    if mode in ("conversation", "meta", "clarify", "system"):
+        needs_g = False
+    if mode == "clarify":
+        needs_c = True
+    if mode in ("enterprise", "followup"):
+        needs_g = True
+        needs_c = False
+
+    rewritten = str(data.get("rewritten_query") or "").strip()
+    if mode == "followup" and not rewritten:
+        ent = entities[0] if entities else (st.active_entities[0] if st.active_entities else "")
+        if ent:
+            rewritten = conv._rewrite_for_entity(
+                ent, st.last_topic_frame or "about", st.last_query or ""
+            )
+        else:
+            mode, needs_g, needs_c, resp = "clarify", False, True, "clarify"
+
+    clarify_hint = str(data.get("clarify_hint") or data.get("clarify_text") or "").strip()
+    if needs_c and not clarify_hint:
+        clarify_hint = conv._clarify_bare(q, st)
+
+    conf = str(data.get("confidence") or "medium").strip().lower()
+    if conf not in ("high", "medium", "low"):
+        conf = "medium"
+
+    return ControllerDecision(
+        mode=mode,
+        intent=str(data.get("intent") or mode).strip() or mode,
+        entities=entities,
+        topic=str(data.get("topic") or "").strip(),
+        needs_grounding=needs_g,
+        needs_clarification=needs_c,
+        response_mode=resp,
+        context_refs=_context_refs(st) + ["user_utterance"],
+        rewritten_query=rewritten,
+        clarify_text=clarify_hint,
+        topic_frame=_topic_frame(str(data.get("topic") or "")),
+        resolved_entity=entities[0] if entities else "",
+        notes=str(data.get("notes") or "semantic").strip()[:80],
+        source="llm",
+        router_llm_used=True,
+        router_model=model,
+        confidence=conf,
+    )

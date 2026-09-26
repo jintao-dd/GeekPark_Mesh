@@ -1,0 +1,42 @@
+{
+  "ok": true,
+  "marker": "验收钉记_64e2592b",
+  "fts_draft": 0,
+  "fts_published": 2,
+  "before": {
+    "seen_marker": false,
+    "issue_mode": "none",
+    "intent": "ask_published",
+    "text_head": "当前没有可引用的已上线期次。"
+  },
+  "after": {
+    "seen_marker": true,
+    "evidence_n": 2,
+    "evidence_sample": [
+      "ev:ctx:agent-e2e-pub-boundary:1",
+      "ev:ctx:agent-e2e-pub-boundary:2"
+    ],
+    "intent": "ask_published",
+    "text_head": "根据已上线语料（与「请查找标记 验收钉记_64e2592b 相关进展」相关）：\n- [agent-e2e-pub-boundary] 验收钉记_64e2592b\n- [agent-e2e-pub-boundary] 关系卡含 验收钉记_64e2592b",
+    "fingerprint": "a28ccc47e5198176a521a7aa",
+    "trace": {
+      "intent": "ask_published",
+      "tool": "ask.published",
+      "issue": "agent-e2e-pub-boundary",
+      "issue_mode": "explicit",
+      "issue_locked": true,
+      "view": "harness/编辑部",
+      "scope_key": "feishu:dm:ou_agent_e2e:issueagent-e2e-pub-boundary",
+      "identity_status": "bound",
+      "query_scope": {
+        "mode": "primary",
+        "team_focus": "编辑部"
+      }
+    }
+  },
+  "checks": {
+    "ok_before": true,
+    "ok_after": true
+  },
+  "latency_ms": 789
+}

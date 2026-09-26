@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}GeekPark Mesh{% endblock %}</title>
 <link rel="icon" href="/static/assets/mesh_logo.png">
-<link rel="stylesheet" href="/static/style.css?v=ask-think-1">
+<link rel="stylesheet" href="/static/style.css?v=rel-v2-6">
 <style>
 /* 后台通用小样式（不影响周报页） */
 .adm{max-width:1040px;margin:0 auto;padding:36px 28px 80px}
@@ -126,8 +126,8 @@
   </form>
 </div>
 {% endif %}
-<script src="/static/dialog.js?v=mesh-dlg-2"></script>
-<script>window.MESH={slug:"{{ issue.slug if issue else '' }}",target:"draft",canEdit:{{ 'true' if perms.write else 'false' }},canPublish:{{ 'true' if preview and perms.publish else 'false' }},isPreview:{{ 'true' if preview else 'false' }},askStream:true,flagColors:{{ flag_colors|tojson }},teamOrder:{{ team_order|tojson }}};</script>
-<script src="/static/app.js?v=ask-think-1"></script>
+<script src="/static/dialog.js?v=mesh-dlg-3"></script>
+<script>window.MESH={slug:"{{ issue.slug if issue else '' }}",target:"draft",canEdit:{{ 'true' if perms.write else 'false' }},canPublish:{{ 'true' if preview and perms.publish else 'false' }},isPreview:{{ 'true' if preview else 'false' }},previewBuilding:{{ 'true' if preview and preview_building|default(false) else 'false' }},askStream:true,flagColors:{{ flag_colors|tojson }},teamOrder:{{ team_order|tojson }}};</script>
+<script src="/static/app.js?v=rel-v2-6"></script>
 </body>
 </html>

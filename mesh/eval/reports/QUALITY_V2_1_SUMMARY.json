@@ -1,0 +1,122 @@
+{
+  "phase": "Agent Quality v2.1",
+  "generated_at": "2026-09-08 22:04:02",
+  "elapsed_s": 4.0,
+  "steps": [
+    {
+      "step": "recall_fts",
+      "rc": 0
+    },
+    {
+      "step": "ranking_baseline",
+      "rc": 0
+    },
+    {
+      "step": "ranking_v1_1",
+      "rc": 0
+    },
+    {
+      "step": "evidence_v2",
+      "rc": 0
+    },
+    {
+      "step": "answer_v2",
+      "rc": 0
+    }
+  ],
+  "metrics_policy": {
+    "retrieval": "R@5 / R@10 / R@20",
+    "ranking": "MRR / nDCG@10 / P@5 (+ optional post_rank_R@k)",
+    "vector": "OFF"
+  },
+  "Temporal": {
+    "n_pass": 24,
+    "n": 24,
+    "pass_rate": 1.0,
+    "note": "T19 evaluator CAVEAT aligned; full rerun 24/24; product unchanged"
+  },
+  "Retrieval_Recall": {
+    "baseline": {
+      "R@5": 0.8261,
+      "R@10": 0.8961,
+      "R@20": 0.9433
+    },
+    "current": {
+      "R@5": 0.8261,
+      "R@10": 0.8961,
+      "R@20": 0.9433
+    }
+  },
+  "Ranking": {
+    "production": "KEEP current production ranking",
+    "baseline": {
+      "mrr": 0.8071,
+      "ndcg@10": 0.825,
+      "precision@5": 0.5106,
+      "post_rank_R@5": 0.8261,
+      "post_rank_R@10": 0.8961,
+      "post_rank_R@20": 0.9433
+    },
+    "experiment_v1_1": {
+      "mrr": 0.8554,
+      "ndcg@10": 0.8446,
+      "precision@5": 0.5172,
+      "post_rank_R@5": 0.8344,
+      "post_rank_R@10": 0.8878,
+      "post_rank_R@20": 0.9433
+    },
+    "delta_v1_1_minus_baseline": {
+      "mrr": 0.0483,
+      "ndcg@10": 0.0196,
+      "precision@5": 0.0066
+    },
+    "focus_R06_R13_R18": {
+      "regressions": [
+        {
+          "id": "R18",
+          "from": "top5_miss:4271,4358",
+          "to": "top5_miss:4271,4358",
+          "ndcg_delta": -0.011
+        }
+      ],
+      "improvements": [
+        {
+          "id": "R06",
+          "from": "ok",
+          "to": "ok",
+          "ndcg_delta": 0.0
+        },
+        {
+          "id": "R13",
+          "from": "top5_miss:4154,4155",
+          "to": "top5_miss:4154,4155",
+          "ndcg_delta": 0.0
+        }
+      ]
+    },
+    "decision": "KEEP current production ranking; ranking_v1_1 remains experiment-only"
+  },
+  "Evidence_v2": {
+    "pass_rate": 0.8,
+    "coverage": 1.0,
+    "correctness": 0.8,
+    "unsupported_rate": 0.2,
+    "citation": 1.0,
+    "gold": "evidence_gold_v2.jsonl",
+    "note": "includes adversarial unsupported-claim items; not an external quality claim"
+  },
+  "Answer_v2": {
+    "pass_rate": 0.7059,
+    "accuracy": 0.7059,
+    "completeness": 0.8529,
+    "faithfulness": 0.8824,
+    "citation": 1.0,
+    "abstention": 0.8824,
+    "nonempty": 1.0,
+    "note": "hard-gate scoring; pass_rate not for external brag"
+  },
+  "Vector": {
+    "status": "OFF"
+  },
+  "report": "eval/reports/AGENT_QUALITY_V2_1.md"
+}

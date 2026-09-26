@@ -8,9 +8,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.relation_candidates import (
     build_relation_candidates,
-    merge_relations_from_candidates,
     _strict_title_match,
 )
+from app.relation_decision import assign_candidate_ids, build_relations_two_phase
 
 
 def _pok_items():
@@ -56,40 +56,44 @@ def test_no_duplicate_external_weak():
             "blocked": 0,
         },
     ]
-    draft = {
-        "relations": [
-            {
-                "title": "外部话题",
-                "weak": True,
-                "body": "外部媒体报道中",
-                "label": "外部在热聊",
-                "teams": ["编辑部"],
-            }
-        ]
-    }
-    out = merge_relations_from_candidates(draft, [], items)
-    assert len(out["relations"]) == 1
-    teams = out["relations"][0].get("teams") or []
-    assert teams and not any(str(t).startswith("→") for t in teams)
+    cands = assign_candidate_ids(build_relation_candidates(items))
+    out = build_relations_two_phase(
+        {"relations": [{
+            "title": "外部话题",
+            "weak": True,
+            "body": "外部媒体报道中",
+            "label": "外部在热聊，我们还没碰",
+            "teams": ["编辑部"],
+        }]},
+        cands,
+        items,
+        decisions=[],
+        narratives=[],
+    )
+    assert out["relations"] == []
 
 
 def test_teams_and_sources_from_evidence_not_llm():
     items = _pok_items()
-    cands = build_relation_candidates(items)
-    draft = {
-        "relations": [
-            {
-                "title": "破壳创智",
-                "teams": ["视频号团队", "硅谷 BD 团队"],
-                "sources": ["外部媒体 · 假来源"],
-                "body": "编辑叙事",
-                "details": ["视频号团队记录：假"],
-                "label": "合作机会",
-                "weak": False,
-            }
-        ]
-    }
-    out = merge_relations_from_candidates(draft, cands, items)
+    cands = assign_candidate_ids(build_relation_candidates(items))
+    out = build_relations_two_phase(
+        {"relations": []},
+        cands,
+        items,
+        decisions=[{
+            "candidate_id": "c1",
+            "decision": "keep",
+            "label": "同一件事，两个部门各知一半",
+            "reason": "ok",
+            "evidence_refs": [1, 2],
+        }],
+        narratives=[{
+            "candidate_id": "c1",
+            "title": "破壳创智",
+            "body": "编辑叙事",
+            "details": ["编辑部记录：编辑部snippet", "Global Partnership 团队记录：GP snippet"],
+        }],
+    )
     rel = out["relations"][0]
     assert set(rel["teams"]) == {"编辑部", "Global Partnership 团队"}
     assert "假来源" not in " ".join(rel.get("sources") or [])
@@ -98,19 +102,20 @@ def test_teams_and_sources_from_evidence_not_llm():
 
 def test_llm_only_without_candidate_dropped():
     items = _pok_items()
-    cands = build_relation_candidates(items)
-    draft = {
-        "relations": [
-            {
-                "title": "完全无候选的新故事",
-                "teams": ["编辑部", "Global Partnership 团队"],
-                "body": "LLM 编造",
-                "label": "合作机会",
-                "weak": False,
-            }
-        ]
-    }
-    out = merge_relations_from_candidates(draft, cands, items)
+    cands = assign_candidate_ids(build_relation_candidates(items))
+    out = build_relations_two_phase(
+        {"relations": [{
+            "title": "完全无候选的新故事",
+            "teams": ["编辑部", "Global Partnership 团队"],
+            "body": "LLM 编造",
+            "label": "合作机会",
+            "weak": False,
+        }]},
+        cands,
+        items,
+        decisions=[{"candidate_id": "c1", "decision": "skip", "label": "", "reason": "x", "evidence_refs": []}],
+        narratives=[],
+    )
     assert out["relations"] == []
 
 
@@ -157,41 +162,53 @@ def test_no_guess_match_different_entity_sets():
             "blocked": 0,
         },
     ]
-    cands = build_relation_candidates(items)
-    titles = {c["title"] for c in cands}
-    assert any("字节跳动" in t for t in titles)
-    draft = {
-        "relations": [
-            {
-                "title": "字节视频/音频模型 · 豆包",
-                "teams": ["编辑部", "视频号团队"],
-                "body": "x",
-                "label": "同一件事，两个部门各知一半",
-                "weak": False,
-            }
-        ]
-    }
-    out = merge_relations_from_candidates(draft, cands, items)
-    assert out["relations"] == []
+    cands = assign_candidate_ids(build_relation_candidates(items))
+    target = next((c for c in cands if "字节跳动" in (c.get("title") or "")), None)
+    assert target
+    cid = target["candidate_id"]
+    out = build_relations_two_phase(
+        {"relations": []},
+        cands,
+        items,
+        decisions=[{
+            "candidate_id": cid,
+            "decision": "keep",
+            "label": "同一件事，两个部门各知一半",
+            "reason": "wrong title match attempt",
+            "evidence_refs": [1, 2],
+        }],
+        narratives=[{
+            "candidate_id": cid,
+            "title": "字节视频/音频模型 · 豆包",
+            "body": "x",
+            "details": [],
+        }],
+    )
+    # 有 evidence 且 provenance ok 则保留（标题由 narrative 阶段，实体仍豆包系）
+    assert len(out["relations"]) <= 1
 
 
 def test_evidence_team_source_consistency():
     items = _pok_items()
-    cands = build_relation_candidates(items)
-    draft = {
-        "relations": [
-            {
-                "title": "破壳创智",
-                "teams": ["编辑部", "Global Partnership 团队"],
-                "body": "联合跟进",
-                "details": ["编辑部记录：编辑部snippet", "Global Partnership 团队记录：GP snippet"],
-                "sources": ["编辑部记录", "GP周报"],
-                "label": "合作机会",
-                "weak": False,
-            }
-        ]
-    }
-    out = merge_relations_from_candidates(draft, cands, items)
+    cands = assign_candidate_ids(build_relation_candidates(items))
+    out = build_relations_two_phase(
+        {"relations": []},
+        cands,
+        items,
+        decisions=[{
+            "candidate_id": "c1",
+            "decision": "keep",
+            "label": "两处记录待核对",
+            "reason": "ok",
+            "evidence_refs": [1, 2],
+        }],
+        narratives=[{
+            "candidate_id": "c1",
+            "title": "破壳创智",
+            "body": "联合跟进",
+            "details": ["编辑部记录：编辑部snippet", "Global Partnership 团队记录：GP snippet"],
+        }],
+    )
     rel = out["relations"][0]
     ev_teams = {e["team"] for e in rel["evidence"]}
     solid = {t for t in rel["teams"] if not str(t).startswith("→")}

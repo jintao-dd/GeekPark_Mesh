@@ -199,6 +199,17 @@ def local_login(username: str, password: str):
 def feishu_enabled() -> bool:
     return bool(os.environ.get("FEISHU_APP_ID") and os.environ.get("FEISHU_APP_SECRET"))
 
+
+def password_login_enabled() -> bool:
+    """账号密码登录：仅当显式打开，且非生产环境。"""
+    flag = (os.environ.get("MESH_ALLOW_PASSWORD_LOGIN") or "").strip().lower()
+    if flag not in ("1", "true", "yes"):
+        return False
+    env = (os.environ.get("MESH_ENV") or "").strip().lower()
+    if env in ("prod", "production"):
+        return False
+    return True
+
 class FeishuLoginError(RuntimeError):
     def __init__(self, user_message: str, detail: str = ""):
         super().__init__(detail or user_message)
@@ -265,7 +276,7 @@ def _request_json(method: str, url: str, *, user_message: str, retries: int = 2,
     raise FeishuLoginError(user_message, last_detail or "unknown error")
 
 def feishu_exchange(code: str) -> dict:
-    """code → 用户信息（open_id, name）。失败抛异常。"""
+    """code → 用户信息 + token（open_id, name, access_token…）。失败抛异常。"""
     if not code:
         raise FeishuLoginError("登录信息已失效，请重新点击飞书登录。", "missing code")
     app_id, app_secret = os.environ["FEISHU_APP_ID"], os.environ["FEISHU_APP_SECRET"]
@@ -279,7 +290,8 @@ def feishu_exchange(code: str) -> dict:
                        headers={"Authorization": f"Bearer {app_token}", "Content-Type": "application/json"},
                        json={"grant_type": "authorization_code", "code": code},
                        user_message="飞书登录暂时不可用，请稍后重试。")
-    utoken = (r2.get("data") or {}).get("access_token")
+    data2 = r2.get("data") or {}
+    utoken = data2.get("access_token")
     if not utoken:
         msg = str(r2.get("msg") or "")
         if "code" in msg.lower() or "grant" in msg.lower():
@@ -295,7 +307,11 @@ def feishu_exchange(code: str) -> dict:
         "open_id": d["open_id"],
         "name": d.get("name") or d.get("en_name") or "飞书用户",
         "email": d.get("enterprise_email") or d.get("email") or "",
-        "avatar_url": d.get("avatar_url") or d.get("avatar_thumb") or d.get("avatar_middle") or d.get("avatar_big") or ""
+        "avatar_url": d.get("avatar_url") or d.get("avatar_thumb") or d.get("avatar_middle") or d.get("avatar_big") or "",
+        "access_token": str(utoken or ""),
+        "refresh_token": str(data2.get("refresh_token") or ""),
+        "expires_in": int(data2.get("expires_in") or 0),
+        "scope": str(data2.get("scope") or ""),
     }
 
 def feishu_auto_role(info: dict) -> str | None:
@@ -309,18 +325,32 @@ def feishu_auto_role(info: dict) -> str | None:
         return "admin"
     return None
 
+def _sanitize_feishu_display(name: str) -> str:
+    """清理飞书显示名：去掉「中文名+长串数字」这类脏后缀（如 杜锦涛54564545）。"""
+    import re
+
+    n = (name or "").strip()
+    if not n:
+        return n
+    m = re.fullmatch(r"([\u4e00-\u9fff]{2,8})\d{5,}", n)
+    if m:
+        return m.group(1)
+    return n
+
+
 def upsert_feishu_user(info: dict) -> dict:
     """飞书用户首次登录默认 viewer；命中 open_id 白名单时自动提权。
-    已有显示名不会被飞书昵称覆盖；已有更高/自定义角色不会被 open_id 白名单降权，
+    已有显示名不会被飞书昵称覆盖（除非已有名是脏后缀）；已有更高/自定义角色不会被 open_id 白名单降权，
     仅允许提权到 admin/owner。"""
     auto_role = feishu_auto_role(info)
     default_role = auto_role or "viewer"
+    clean_name = _sanitize_feishu_display(info.get("name") or "飞书用户")
     con = db.connect()
     r = con.execute("SELECT * FROM users WHERE feishu_open_id=?", (info["open_id"],)).fetchone()
     if not r:
         uname = "fs_" + info["open_id"][-10:]
         con.execute("INSERT INTO users(username,display,role,feishu_open_id) VALUES(?,?,?,?)",
-                    (uname, info["name"], default_role, info["open_id"]))
+                    (uname, clean_name, default_role, info["open_id"]))
         con.commit()
         r = con.execute("SELECT * FROM users WHERE feishu_open_id=?", (info["open_id"],)).fetchone()
     else:
@@ -328,8 +358,10 @@ def upsert_feishu_user(info: dict) -> dict:
             con.execute("UPDATE users SET role=? WHERE id=?", (auto_role, r["id"]))
             con.commit()
             r = con.execute("SELECT * FROM users WHERE feishu_open_id=?", (info["open_id"],)).fetchone()
-        elif not (r["display"] or "").strip():
-            con.execute("UPDATE users SET display=? WHERE id=?", (info["name"], r["id"]))
+        cur_disp = (r["display"] or "").strip()
+        # 空名，或脏后缀名：用飞书干净名覆盖
+        if not cur_disp or _sanitize_feishu_display(cur_disp) != cur_disp:
+            con.execute("UPDATE users SET display=? WHERE id=?", (clean_name, r["id"]))
             con.commit()
             r = con.execute("SELECT * FROM users WHERE feishu_open_id=?", (info["open_id"],)).fetchone()
     con.close()

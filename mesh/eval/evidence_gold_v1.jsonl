@@ -1,0 +1,12 @@
+{"id": "E01", "query": "锦涛做了什么", "scope": {"issue": "explicit:2026-8-17"}, "expect_min_evidence": 1, "must_cite_items": ["4251"], "forbid_unsupported": true, "category": "entity"}
+{"id": "E02", "query": "面壁智能接触了什么", "scope": {"issue": "explicit:2026-8-17"}, "expect_min_evidence": 1, "must_cite_items": ["4112"], "forbid_unsupported": true, "category": "company"}
+{"id": "E03", "query": "端侧模型与智能座舱", "scope": {"issue": "explicit:2026-8-17"}, "expect_min_evidence": 1, "must_cite_items": ["4116", "4125"], "forbid_unsupported": true, "category": "topic"}
+{"id": "E04", "query": "视频号本周播放较好的片子", "scope": {"issue": "explicit:2026-09-08"}, "expect_min_evidence": 1, "must_cite_items": ["4408", "4409"], "forbid_unsupported": true, "category": "topic"}
+{"id": "E05", "query": "Founder Park 下半年规划", "scope": {"issue": "explicit:2026-8-17"}, "expect_min_evidence": 1, "must_cite_items": ["4358"], "forbid_unsupported": true, "category": "community"}
+{"id": "E06", "query": "两边有没有可同步的关系", "scope": {"issue": "explicit:2026-8-17"}, "expect_min_evidence": 0, "tool": "ask.relations_summary", "forbid_unsupported": true, "category": "relation"}
+{"id": "E07", "query": "AGENT_QUALITY_EMPTY_ZZZ_NO_HIT", "scope": {"issue": "explicit:2026-09-08"}, "expect_min_evidence": 0, "allow_empty": true, "forbid_unsupported": true, "category": "empty"}
+{"id": "E08", "query": "具身智能数据圆桌讨论了什么", "scope": {"issue": "explicit:2026-8-17"}, "expect_min_evidence": 1, "must_cite_items": ["4154"], "forbid_unsupported": true, "category": "topic"}
+{"id": "E09", "query": "编辑部选题里 IFA 相关", "scope": {"issue": "explicit:2026-09-08"}, "expect_min_evidence": 1, "forbid_unsupported": true, "category": "team"}
+{"id": "E10", "query": "商业化团队跟进了哪些客户", "scope": {"issue": "explicit:2026-09-08"}, "expect_min_evidence": 0, "forbid_unsupported": true, "category": "team"}
+{"id": "E11", "query": "资料里有没有写明天会发布 GPT-99", "scope": {"issue": "explicit:2026-09-08"}, "expect_min_evidence": 0, "allow_empty": true, "must_abstain_or_caveat": true, "forbid_unsupported": true, "category": "abstention"}
+{"id": "E12", "query": "锦涛最近做了什么", "scope": {"issue": "latest_published"}, "expect_min_evidence": 0, "forbid_unsupported": true, "category": "temporal"}

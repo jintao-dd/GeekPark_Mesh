@@ -35,8 +35,19 @@
   <div class="lg">
     {% if feishu_enabled %}
     <a class="btn" href="/auth/feishu?next={{ next|urlencode }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12c4-7 12-9 16-8-1 4-3 8-8 11-2 1-4 1-6 0"/><path d="M4 12l6 3"/></svg>飞书登录</a>
-    {% else %}
+    {% elif not password_login_enabled %}
     <p class="hint">飞书登录未配置，请联系管理员。</p>
+    {% endif %}
+    {% if password_login_enabled %}
+    {% if feishu_enabled %}<div class="hint" style="margin-top:4px">或使用测试账号</div>{% endif %}
+    <form method="post" action="/login" style="display:flex;flex-direction:column;gap:10px;width:100%;margin-top:4px">
+      <input type="hidden" name="next" value="{{ next }}">
+      <input name="username" autocomplete="username" placeholder="账号" required
+             style="font:inherit;font-size:15px;height:42px;padding:0 12px;border:1px solid var(--line);border-radius:var(--r-pill);background:#fff">
+      <input name="password" type="password" autocomplete="current-password" placeholder="密码" required
+             style="font:inherit;font-size:15px;height:42px;padding:0 12px;border:1px solid var(--line);border-radius:var(--r-pill);background:#fff">
+      <button type="submit" class="btn" style="width:100%;justify-content:center;border:1.5px solid var(--deep);background:var(--deep);color:#fff;cursor:pointer">登录</button>
+    </form>
     {% endif %}
     {% if error %}<div class="err">{{ error }}</div>{% elif next and next.startswith('/admin') %}<div class="err" style="color:var(--ink3)">请先登录后再进入后台</div>{% endif %}
     {% if debug_panel %}
@@ -52,7 +63,7 @@
     </div>
     {% endif %}
   </div>
-  <div class="gate-note">仅限极客公园内部 · 请使用飞书账号登录 · {{ base_url.replace('https://','').replace('http://','') }}</div>
+  <div class="gate-note">仅限极客公园内部 · {% if password_login_enabled and not feishu_enabled %}测试环境账号登录{% else %}请使用飞书账号登录{% endif %} · {{ base_url.replace('https://','').replace('http://','') }}</div>
   <div class="gate-upd">数据最近更新：{{ issue.updated_at if issue else '—' }}</div>
 </div>
 <script>

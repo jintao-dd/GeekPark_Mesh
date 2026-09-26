@@ -34,10 +34,12 @@ def prepare(
     *,
     search_q: str | None = None,
     context_refs: dict | None = None,
+    use_vector: bool = True,
 ) -> dict:
     """检索并组装 LLM 上下文（不调模型）。
 
     history 参数保留兼容，但不再用于成文；追问检索靠 search_q / context_refs。
+    use_vector=False 时强制 lexical（人名批量扩召回用，避免重复 embed + 全量 cosine）。
     """
     t0 = time.time()
     q = (q or "").strip()
@@ -86,7 +88,13 @@ def prepare(
             "confidence": plan.confidence,
         }
     query_vec = None
-    if not structured_candidate and embeddings.is_configured():
+    exec_mode = embeddings.retrieval_execution_mode(
+        structured_candidate=structured_candidate
+    )
+    if not use_vector and exec_mode == "hybrid":
+        exec_mode = "lexical"
+    # Vector OFF → 不进入 embedding（含 denial 二次 prepare）；禁止「打 API 失败再 fallback」
+    if exec_mode == "hybrid":
         query_vec = embeddings.embed_one(sq)
     if intent and intent.get("type") == "error":
         return {
@@ -94,6 +102,7 @@ def prepare(
             "direct_answer": intent.get("message") or "无法解析该交叉问题",
             "scope": scope.scope_key, "latency_ms": 0, "n_hits": 0,
             "retrieval_plan": _plan_meta(),
+            "retrieval_execution_mode": exec_mode,
         }
 
     mode, hits, meta = retriever.retrieve(
@@ -101,6 +110,11 @@ def prepare(
         seed_chunk_ids=seed_ids or None, seed_item_ids=seed_items or None,
     )
     latency = int((time.time() - t0) * 1000)
+    meta = dict(meta or {})
+    meta["retrieval_execution_mode"] = exec_mode
+    # 若 Runtime 判定 lexical，强制 used_vector=False（防止旧调用方误传 query_vec）
+    if exec_mode == "lexical":
+        meta["used_vector"] = False
 
     if mode == "structured":
         st = meta.get("structured") or {}
@@ -110,6 +124,7 @@ def prepare(
                 "direct_answer": st.get("message") or "结构化检索失败",
                 "scope": scope.scope_key, "latency_ms": latency, "n_hits": 0,
                 "retrieval_plan": _plan_meta(),
+                "retrieval_execution_mode": exec_mode,
             }
         ctxs = st["contexts"]
         intent_out = st.get("intent") or {}
@@ -130,6 +145,7 @@ def prepare(
                 "latency_ms": latency,
                 "search_q": sq,
                 "retrieval_plan": _plan_meta(),
+                "retrieval_execution_mode": exec_mode,
             }
         return {
             "mode": "structured",
@@ -146,6 +162,7 @@ def prepare(
             "latency_ms": latency,
             "search_q": sq,
             "retrieval_plan": _plan_meta(),
+            "retrieval_execution_mode": exec_mode,
         }
 
     ctxs = retriever.hits_to_contexts(hits, sq)
@@ -178,6 +195,7 @@ def prepare(
             "search_q": sq,
             "retrieval_plan": _plan_meta(),
             "planner_fallback": planner_fallback,
+            "retrieval_execution_mode": exec_mode,
         }
     return {
         "mode": report_mode,
@@ -193,6 +211,7 @@ def prepare(
         "search_q": sq,
         "retrieval_plan": _plan_meta(),
         "planner_fallback": planner_fallback,
+        "retrieval_execution_mode": exec_mode,
     }
 
 

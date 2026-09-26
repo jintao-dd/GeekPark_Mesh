@@ -1,0 +1,230 @@
+{
+  "gold_file": "relation_gold_v2.jsonl",
+  "n_claim_cases": 10,
+  "cases": [
+    {
+      "id": "g06",
+      "title": "Founder Park：传播复盘与下半年规划各知一半",
+      "expect": "claim_valid",
+      "gold_claim_valid": true,
+      "gold_claim_invalid": false,
+      "current_line_grounded": true,
+      "current_gate_result": {
+        "fails_grounding": [
+          "关系「Founder Park 账号运营：传播涨粉与下半年规划两侧各知一半」证据仅为点名/身份介绍，无真实沟通或对接动作"
+        ],
+        "gate_kept": false,
+        "dropped_titles": [
+          "Founder Park 账号运营：传播涨粉与下半年规划两侧各知一半"
+        ]
+      },
+      "current_claim_check": {
+        "claim_verdict": "valid",
+        "claim_reason_code": "ok",
+        "claim_strength": 2,
+        "evidence_strength": 2,
+        "model": "rule_v1.2"
+      },
+      "note": "line_grounded≠claim_verdict; claim_check=rule_v1"
+    },
+    {
+      "id": "g07",
+      "title": "Insta360 刘靖康：接触与出镜两侧联动",
+      "expect": "claim_valid",
+      "gold_claim_valid": true,
+      "gold_claim_invalid": false,
+      "current_line_grounded": false,
+      "current_gate_result": {
+        "fails_grounding": [
+          "关系「刘靖康（影石 Insta360）：编辑部已接触，视频号用其出镜内容」body 无法由 evidence 证明"
+        ],
+        "gate_kept": true,
+        "dropped_titles": []
+      },
+      "current_claim_check": {
+        "claim_verdict": "valid",
+        "claim_reason_code": "ok",
+        "claim_strength": 3,
+        "evidence_strength": 3,
+        "model": "rule_v1.2"
+      },
+      "note": "line_grounded≠claim_verdict; claim_check=rule_v1"
+    },
+    {
+      "id": "g08",
+      "title": "Helloboss 单侧接触观察",
+      "expect": "claim_valid",
+      "gold_claim_valid": true,
+      "gold_claim_invalid": false,
+      "current_line_grounded": false,
+      "current_gate_result": {
+        "fails_grounding": [],
+        "gate_kept": true,
+        "dropped_titles": []
+      },
+      "current_claim_check": {
+        "claim_verdict": "valid",
+        "claim_reason_code": "ok",
+        "claim_strength": 3,
+        "evidence_strength": 3,
+        "model": "rule_v1.2"
+      },
+      "note": "line_grounded≠claim_verdict; claim_check=rule_v1"
+    },
+    {
+      "id": "g09",
+      "title": "有 evidence 但宣称已统一执行 Founder Park",
+      "expect": "claim_invalid",
+      "gold_claim_valid": false,
+      "gold_claim_invalid": true,
+      "current_line_grounded": true,
+      "current_gate_result": {
+        "fails_grounding": [],
+        "gate_kept": true,
+        "dropped_titles": []
+      },
+      "current_claim_check": {
+        "claim_verdict": "invalid",
+        "claim_reason_code": "cooccurrence_not_relation",
+        "claim_strength": 7,
+        "evidence_strength": 2,
+        "model": "rule_v1.2"
+      },
+      "note": "line_grounded≠claim_verdict; claim_check=rule_v1"
+    },
+    {
+      "id": "g10",
+      "title": "AGI 分栏：商量中却写成已上线",
+      "expect": "claim_invalid",
+      "gold_claim_valid": false,
+      "gold_claim_invalid": true,
+      "current_line_grounded": false,
+      "current_gate_result": {
+        "fails_grounding": [
+          "关系「AGI 2026 现场内容分栏已上线」body 无法由 evidence 证明"
+        ],
+        "gate_kept": true,
+        "dropped_titles": []
+      },
+      "current_claim_check": {
+        "claim_verdict": "invalid",
+        "claim_reason_code": "cooccurrence_not_relation",
+        "claim_strength": 8,
+        "evidence_strength": 5,
+        "model": "rule_v1.2"
+      },
+      "note": "line_grounded≠claim_verdict; claim_check=rule_v1"
+    },
+    {
+      "id": "g11",
+      "title": "秒动科技：尚无反馈却写成联合合作完成",
+      "expect": "claim_invalid",
+      "gold_claim_valid": false,
+      "gold_claim_invalid": true,
+      "current_line_grounded": false,
+      "current_gate_result": {
+        "fails_grounding": [
+          "关系「秒动科技杨硕：两侧触点与选题计划」body 无法由 evidence 证明"
+        ],
+        "gate_kept": true,
+        "dropped_titles": []
+      },
+      "current_claim_check": {
+        "claim_verdict": "invalid",
+        "claim_reason_code": "evidence_blocker",
+        "claim_strength": 7,
+        "evidence_strength": 5,
+        "model": "rule_v1.2"
+      },
+      "note": "line_grounded≠claim_verdict; claim_check=rule_v1"
+    },
+    {
+      "id": "g12",
+      "title": "豆包平行触点却写成统一商务合作",
+      "expect": "claim_invalid",
+      "gold_claim_valid": false,
+      "gold_claim_invalid": true,
+      "current_line_grounded": true,
+      "current_gate_result": {
+        "fails_grounding": [],
+        "gate_kept": true,
+        "dropped_titles": []
+      },
+      "current_claim_check": {
+        "claim_verdict": "invalid",
+        "claim_reason_code": "status_upgrade",
+        "claim_strength": 7,
+        "evidence_strength": 2,
+        "model": "rule_v1.2"
+      },
+      "note": "line_grounded≠claim_verdict; claim_check=rule_v1"
+    },
+    {
+      "id": "g13",
+      "title": "百度共现：Workshop 与选题不是联合活动",
+      "expect": "claim_invalid",
+      "gold_claim_valid": false,
+      "gold_claim_invalid": true,
+      "current_line_grounded": true,
+      "current_gate_result": {
+        "fails_grounding": [],
+        "gate_kept": true,
+        "dropped_titles": []
+      },
+      "current_claim_check": {
+        "claim_verdict": "invalid",
+        "claim_reason_code": "status_upgrade",
+        "claim_strength": 8,
+        "evidence_strength": 2,
+        "model": "rule_v1.2"
+      },
+      "note": "line_grounded≠claim_verdict; claim_check=rule_v1"
+    },
+    {
+      "id": "g14",
+      "title": "讨论了接触却写成已达成协议",
+      "expect": "claim_invalid",
+      "gold_claim_valid": false,
+      "gold_claim_invalid": true,
+      "current_line_grounded": true,
+      "current_gate_result": {
+        "fails_grounding": [],
+        "gate_kept": true,
+        "dropped_titles": []
+      },
+      "current_claim_check": {
+        "claim_verdict": "invalid",
+        "claim_reason_code": "evidence_blocker",
+        "claim_strength": 8,
+        "evidence_strength": 5,
+        "model": "rule_v1.2"
+      },
+      "note": "line_grounded≠claim_verdict; claim_check=rule_v1"
+    },
+    {
+      "id": "g15",
+      "title": "豆包平行触点（正确平行表述）",
+      "expect": "claim_valid",
+      "gold_claim_valid": true,
+      "gold_claim_invalid": false,
+      "current_line_grounded": true,
+      "current_gate_result": {
+        "fails_grounding": [
+          "关系「豆包：商业化、编辑部、视频号各自碰到的三个触点」证据仅为点名/身份介绍，无真实沟通或对接动作"
+        ],
+        "gate_kept": false,
+        "dropped_titles": [
+          "豆包：商业化、编辑部、视频号各自碰到的三个触点"
+        ]
+      },
+      "current_claim_check": {
+        "claim_verdict": "valid",
+        "claim_reason_code": "ok",
+        "claim_strength": 2,
+        "evidence_strength": 2,
+        "model": "rule_v1.2"
+      },
+      "note": "line_grounded≠claim_verdict; claim_check=rule_v1"
+    }
+  ]
+}

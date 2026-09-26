@@ -1,0 +1,814 @@
+{
+  "_doc": "公司人员别名表（手填）。\n- aliases: 字符串数组，一人可多个简称/花名/英文名（如 [\"锦涛\",\"小杜\"]）\n- teams / job_title / employee_no / open_id: 来自飞书通讯录，一般不用改\n- notes: 可选备注\n- 重名简称不要填到两个人身上\n- 改完保存即可；person_resolve 启动时加载本文件",
+  "people": [
+    {
+      "name": "张鹏",
+      "open_id": "ou_f50030f7ce0b67599a942d63ed824a7d",
+      "employee_no": "G-001",
+      "job_title": "CEO",
+      "teams": [
+        "CEO",
+        "变量资本"
+      ],
+      "aliases": ["老板","鹏总"],
+      "notes": ""
+    },
+    {
+      "name": "史蒙苏",
+      "open_id": "ou_af5c9e32070547b6088d8c9825b6f8ec",
+      "employee_no": "",
+      "job_title": "内容助理",
+      "teams": [
+        "CEO"
+      ],
+      "aliases": ["蒙苏"],
+      "notes": ""
+    },
+    {
+      "name": "周永亮",
+      "open_id": "ou_3730ed4aca435e76628757a4e12d6b58",
+      "employee_no": "",
+      "job_title": "主笔",
+      "teams": [
+        "GeekPark 媒体业务"
+      ],
+      "aliases": ["永亮"],
+      "notes": ""
+    },
+    {
+      "name": "于程程",
+      "open_id": "ou_b3d3e9a8565dafa69440977148cc8a8b",
+      "employee_no": "",
+      "job_title": "内容运营",
+      "teams": [
+        "GeekPark 媒体业务"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "郑玄",
+      "open_id": "ou_f99b397b953c6ad9ce7a3641c195021f",
+      "employee_no": "",
+      "job_title": "副主编",
+      "teams": [
+        "GeekPark 媒体业务"
+      ],
+      "aliases": ["玄编"],
+      "notes": ""
+    },
+    {
+      "name": "靖宇",
+      "open_id": "ou_12148da19442775d3020292ffffab8e9",
+      "employee_no": "",
+      "job_title": "副主编",
+      "teams": [
+        "GeekPark 媒体业务"
+      ],
+      "aliases": [
+        "靖宇"
+      ],
+      "notes": ""
+    },
+    {
+      "name": "向涵姝",
+      "open_id": "ou_69ec8d27afad2551edeb2786057f24fa",
+      "employee_no": "",
+      "job_title": "融媒体编辑",
+      "teams": [
+        "GeekPark 媒体业务"
+      ],
+      "aliases": ["xuxu"],
+      "notes": ""
+    },
+    {
+      "name": "严嘉南",
+      "open_id": "ou_88f5625cb31431c5b18c4d9050ce947e",
+      "employee_no": "",
+      "job_title": "融媒体运营",
+      "teams": [
+        "GeekPark 媒体业务"
+      ],
+      "aliases": ["蒜蒜"],
+      "notes": ""
+    },
+    {
+      "name": "傅若岚",
+      "open_id": "ou_646693421012a30534360078bfdf48f3",
+      "employee_no": "",
+      "job_title": "融媒体运营",
+      "teams": [
+        "GeekPark 媒体业务"
+      ],
+      "aliases": ["若岚"],
+      "notes": ""
+    },
+    {
+      "name": "赵雨倩",
+      "open_id": "ou_eeec311ace7f913c06c56ecaffeb1f2e",
+      "employee_no": "",
+      "job_title": "融媒体运营",
+      "teams": [
+        "GeekPark 媒体业务"
+      ],
+      "aliases": ["雨倩"],
+      "notes": ""
+    },
+    {
+      "name": "张勇毅",
+      "open_id": "ou_88a56ce1cf74ec145555227661c79f27",
+      "employee_no": "",
+      "job_title": "记者",
+      "teams": [
+        "GeekPark 媒体业务"
+      ],
+      "aliases": ["Alan"],
+      "notes": ""
+    },
+    {
+      "name": "徐珊",
+      "open_id": "ou_02696b6bc10dc6e8c5deae7e77cf13f0",
+      "employee_no": "",
+      "job_title": "记者",
+      "teams": [
+        "GeekPark 媒体业务"
+      ],
+      "aliases": ["徐珊"],
+      "notes": ""
+    },
+    {
+      "name": "赵维鹏",
+      "open_id": "ou_7ee4e4746d60bd7b28215d8163cb3908",
+      "employee_no": "",
+      "job_title": "记者",
+      "teams": [
+        "GeekPark 媒体业务"
+      ],
+      "aliases": ["维鹏"],
+      "notes": ""
+    },
+    {
+      "name": "连冉",
+      "open_id": "ou_91fdf3b5d1aada84d2fce92da50893c1",
+      "employee_no": "",
+      "job_title": "资深记者",
+      "teams": [
+        "GeekPark 媒体业务"
+      ],
+      "aliases": ["连冉"],
+      "notes": ""
+    },
+    {
+      "name": "曹思颀",
+      "open_id": "ou_e63b9a75f3f8d69cc759714067eead2c",
+      "employee_no": "",
+      "job_title": "高级记者",
+      "teams": [
+        "GeekPark 媒体业务"
+      ],
+      "aliases": ["思颀"],
+      "notes": ""
+    },
+    {
+      "name": "李源",
+      "open_id": "ou_e73ed1f4676cd4ece027386053ab1b79",
+      "employee_no": "",
+      "job_title": "高级记者",
+      "teams": [
+        "GeekPark 媒体业务"
+      ],
+      "aliases": [ "李源" ],
+      "notes": ""
+    },
+    {
+      "name": "方圆",
+      "open_id": "ou_e6a6cd4f76e63e70e0cc2689b6409462",
+      "employee_no": "G-021",
+      "job_title": "Global Partnership VP",
+      "teams": [
+        "Global Partnership"
+      ],
+      "aliases": ["Mandy"],
+      "notes": ""
+    },
+    {
+      "name": "郑明明",
+      "open_id": "ou_8309115a6aecc34c7a4ec7fe5f565217",
+      "employee_no": "",
+      "job_title": "项目执行",
+      "teams": [
+        "Global Partnership"
+      ],
+      "aliases": [
+        "明明"
+      ],
+      "notes": ""
+    },
+    {
+      "name": "杜书惠",
+      "open_id": "ou_be9661d2dad663f6ca0df25ac21b365f",
+      "employee_no": "",
+      "job_title": "人力专员",
+      "teams": [
+        "人力行政组"
+      ],
+      "aliases": ["程程"],
+      "notes": ""
+    },
+    {
+      "name": "李玉凤",
+      "open_id": "ou_c2eb9a38e0a0ce030cb9bbb2bc80e69b",
+      "employee_no": "",
+      "job_title": "人力行政专员",
+      "teams": [
+        "人力行政组"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "李名扬",
+      "open_id": "ou_fe0914081ed343f800cd83a39f602a99",
+      "employee_no": "G-197",
+      "job_title": "培训经理",
+      "teams": [
+        "人力行政组"
+      ],
+      "aliases": ["名扬"],
+      "notes": ""
+    },
+    {
+      "name": "常宇娜",
+      "open_id": "ou_985c63b750f8432ddbaa1b05cb97bf3d",
+      "employee_no": "",
+      "job_title": "",
+      "teams": [
+        "创意视频"
+      ],
+      "aliases": ["娜娜"],
+      "notes": ""
+    },
+    {
+      "name": "李文哲",
+      "open_id": "ou_262fc00f3124a2bf04ae0a00134d80d4",
+      "employee_no": "",
+      "job_title": "",
+      "teams": [
+        "创意视频"
+      ],
+      "aliases": ["文哲"],
+      "notes": ""
+    },
+    {
+      "name": "闫晓龙",
+      "open_id": "ou_48cb87054b5d8be8cac5e0bc9a283d52",
+      "employee_no": "",
+      "job_title": "创意内容视频编辑",
+      "teams": [
+        "创意视频"
+      ],
+      "aliases": [
+        "小龙"
+      ],
+      "notes": ""
+    },
+    {
+      "name": "郭宇祺",
+      "open_id": "ou_81d3a9a0bc9c2ee91d1768c58b658ab4",
+      "employee_no": "",
+      "job_title": "社媒数据运营实习生",
+      "teams": [
+        "创意视频"
+      ],
+      "aliases": ["宇祺","燕子"],
+      "notes": ""
+    },
+    {
+      "name": "杜锦涛",
+      "open_id": "ou_fd65363b8ed1e5ddb93dd56e86a35b9b",
+      "employee_no": "G-356",
+      "job_title": "",
+      "teams": [
+        "创新技术"
+      ],
+      "aliases": [
+        "锦涛"
+      ],
+      "notes": ""
+    },
+    {
+      "name": "苏逸航",
+      "open_id": "ou_64389e11ccbd73dd2d8b0c8aebe786ea",
+      "employee_no": "",
+      "job_title": "基金法务经理",
+      "teams": [
+        "变量资本-投后"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "王柯丹",
+      "open_id": "ou_f44919a0788834b78d325e35dc8fdd87",
+      "employee_no": "",
+      "job_title": "投后专员",
+      "teams": [
+        "变量资本-投后"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "王鑫",
+      "open_id": "ou_2b589808d4578cbdb1c85722e94cdc30",
+      "employee_no": "",
+      "job_title": "投后负责人",
+      "teams": [
+        "变量资本-投后"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "艾之",
+      "open_id": "ou_7feed55392b7344d72c38ca7172a2704",
+      "employee_no": "G-032",
+      "job_title": "",
+      "teams": [
+        "变量资本-投资"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "吴江",
+      "open_id": "ou_95ec08461805fd71c17aa4d5cfaa7a55",
+      "employee_no": "G-004",
+      "job_title": "副总裁",
+      "teams": [
+        "变量资本-投资"
+      ],
+      "aliases": ["江叔"],
+      "notes": ""
+    },
+    {
+      "name": "王君辉",
+      "open_id": "ou_12985afaf8abcda2fb990c4aecce1399",
+      "employee_no": "",
+      "job_title": "投资经理",
+      "teams": [
+        "变量资本-投资"
+      ],
+      "aliases": ["君辉"],
+      "notes": ""
+    },
+    {
+      "name": "张山山",
+      "open_id": "ou_0e89e4e73e19850f34fa47fb815d26d6",
+      "employee_no": "G-007",
+      "job_title": "内容中心VP",
+      "teams": [
+        "品牌创意部"
+      ],
+      "aliases": [
+        "山山","山总"
+      ],
+      "notes": ""
+    },
+    {
+      "name": "彭康林",
+      "open_id": "ou_df89e60f03c67efff4a6b3998294f070",
+      "employee_no": "",
+      "job_title": "",
+      "teams": [
+        "品牌设计"
+      ],
+      "aliases": [
+        "49",
+        "康林"
+      ],
+      "notes": ""
+    },
+    {
+      "name": "段卉",
+      "open_id": "ou_b2b06d75d62d70f5036d4f1d5e87921f",
+      "employee_no": "",
+      "job_title": "",
+      "teams": [
+        "品牌设计"
+      ],
+      "aliases": ["耳塞"],
+      "notes": ""
+    },
+    {
+      "name": "胡任菁",
+      "open_id": "ou_49cc0fa81dce9366731c972535bb0b56",
+      "employee_no": "",
+      "job_title": "资深设计师",
+      "teams": [
+        "品牌设计"
+      ],
+      "aliases": ["Raven"],
+      "notes": ""
+    },
+    {
+      "name": "周圆",
+      "open_id": "ou_83cb9302a6683a0e588a16bba64002af",
+      "employee_no": "",
+      "job_title": "",
+      "teams": [
+        "商业化"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "赵丁慧",
+      "open_id": "ou_603749a883b96aff9679c3f915667f24",
+      "employee_no": "",
+      "job_title": "",
+      "teams": [
+        "商业化"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "姜丽萍",
+      "open_id": "ou_c6a430540f6993a94626f6a8e44f2064",
+      "employee_no": "G-037",
+      "job_title": "商业化支持",
+      "teams": [
+        "商业化"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "郭冀昂",
+      "open_id": "ou_deb3f52df64546a32ffa494e13908485",
+      "employee_no": "",
+      "job_title": "商业化负责人",
+      "teams": [
+        "商业化"
+      ],
+      "aliases": ["小郭","郭老师"],
+      "notes": ""
+    },
+    {
+      "name": "张锐",
+      "open_id": "ou_0244c3270e9efdf8f4a70d13a6962e62",
+      "employee_no": "G-350",
+      "job_title": "客户经理",
+      "teams": [
+        "商业化"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "王彤",
+      "open_id": "ou_16ebfb23efb9fc423f207a963580a39d",
+      "employee_no": "",
+      "job_title": "客户经理",
+      "teams": [
+        "商业化"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "田琦琦",
+      "open_id": "ou_ac3a4a43036a8ec3f95c26beb21ce916",
+      "employee_no": "",
+      "job_title": "客户经理",
+      "teams": [
+        "商业化"
+      ],
+      "aliases": ["琦琦"],
+      "notes": ""
+    },
+    {
+      "name": "刘可欣",
+      "open_id": "ou_2352727809832d8482816d03d02c6c12",
+      "employee_no": "",
+      "job_title": "项目策划经理",
+      "teams": [
+        "商业化"
+      ],
+      "aliases": ["可欣"],
+      "notes": ""
+    },
+    {
+      "name": "江丽雅",
+      "open_id": "ou_5c7502ccbafc5f2295ee98888d3a486e",
+      "employee_no": "G-384",
+      "job_title": "项目经理",
+      "teams": [
+        "商业化"
+      ],
+      "aliases": ["丽雅"],
+      "notes": ""
+    },
+    {
+      "name": "徐凡乔",
+      "open_id": "ou_7d34f7e2fb8f4f310951da1c7b012e61",
+      "employee_no": "",
+      "job_title": "高级项目经理",
+      "teams": [
+        "商业化"
+      ],
+      "aliases": ["小乔"],
+      "notes": ""
+    },
+    {
+      "name": "王俊霖",
+      "open_id": "ou_34a9cd5b2e4c31ae70f58a285954925c",
+      "employee_no": "",
+      "job_title": "高级项目经理",
+      "teams": [
+        "商业化"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "任泓玲",
+      "open_id": "ou_47627750037e69e53c5d1f0fc5304aff",
+      "employee_no": "",
+      "job_title": "",
+      "teams": [
+        "实习&兼职"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "吴则勋",
+      "open_id": "ou_303219bb77f2c6761d9e15178a288652",
+      "employee_no": "",
+      "job_title": "",
+      "teams": [
+        "实习&兼职"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "杨文欣",
+      "open_id": "ou_147f18d3c40baa6da3cdeca37bb976fa",
+      "employee_no": "",
+      "job_title": "",
+      "teams": [
+        "实习&兼职"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "苏倩",
+      "open_id": "ou_d7b22d8444c4772bb54ecc6a6a3b5305",
+      "employee_no": "",
+      "job_title": "",
+      "teams": [
+        "实习&兼职"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "陈昵妮",
+      "open_id": "ou_a328ff3568bf1766fcb548aa5f87fdc0",
+      "employee_no": "",
+      "job_title": "",
+      "teams": [
+        "实习&兼职"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "刘敬玉",
+      "open_id": "ou_97b2582b4e7e340f8b06e31c614cc27a",
+      "employee_no": "G-198",
+      "job_title": "人力资源总监",
+      "teams": [
+        "总裁办"
+      ],
+      "aliases": ["敬玉","敬玉姐"],
+      "notes": ""
+    },
+    {
+      "name": "Sean Shen",
+      "open_id": "ou_d4aea45a5fa9897eb621b1183f219e3b",
+      "employee_no": "",
+      "job_title": "",
+      "teams": [
+        "海外拓展"
+      ],
+      "aliases": ["Sean"],
+      "notes": ""
+    },
+    {
+      "name": "胡清远",
+      "open_id": "ou_fccaa1b9a8c38cb0b05cb50eb57f50f8",
+      "employee_no": "",
+      "job_title": "",
+      "teams": [
+        "海外拓展"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "赵思琪",
+      "open_id": "ou_98bd3b0520cfb6a112fce9f55d948606",
+      "employee_no": "",
+      "job_title": "海外运营负责人",
+      "teams": [
+        "海外拓展"
+      ],
+      "aliases": [
+        "思琪",
+        "Lilyann",
+        "lilyann",
+        "lilyanna"
+      ],
+      "notes": "Notion CRM Our side/Owner=Lilyann，即赵思琪硅谷沟通底盘"
+    },
+    {
+      "name": "李翱",
+      "open_id": "ou_71cfde54022d185bafb1885319506f20",
+      "employee_no": "",
+      "job_title": "AI内容运营",
+      "teams": [
+        "社区内容"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "朱俊熹",
+      "open_id": "ou_7d5ccd5300ac98924eb68c23953839da",
+      "employee_no": "",
+      "job_title": "内容编辑",
+      "teams": [
+        "社区内容"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "宋德胜",
+      "open_id": "ou_c8a2aa81d5711afdd54d8f797507c84f",
+      "employee_no": "G-183",
+      "job_title": "内容运营（内容负责人）",
+      "teams": [
+        "社区内容"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "万东峰",
+      "open_id": "ou_4cb547c06ea9002cee798bf218310da8",
+      "employee_no": "G-345",
+      "job_title": "内容运营（内容运营负责人）",
+      "teams": [
+        "社区内容"
+      ],
+      "aliases": ["万老师"],
+      "notes": ""
+    },
+    {
+      "name": "马旸",
+      "open_id": "ou_abdec6bd230bd760b7ef3c3a29250265",
+      "employee_no": "G-169",
+      "job_title": "",
+      "teams": [
+        "社区运营"
+      ],
+      "aliases": ["马老师"],
+      "notes": ""
+    },
+    {
+      "name": "王馨梓",
+      "open_id": "ou_501add694db5513f702ebcc5e2d89395",
+      "employee_no": "",
+      "job_title": "内容运营",
+      "teams": [
+        "社区运营"
+      ],
+      "aliases": ["馨梓"],
+      "notes": ""
+    },
+    {
+      "name": "董慧",
+      "open_id": "ou_786f9f85fc4dbe19f8a82110dc13ad0f",
+      "employee_no": "",
+      "job_title": "内容运营",
+      "teams": [
+        "社区运营"
+      ],
+      "aliases": ["夏天"],
+      "notes": ""
+    },
+    {
+      "name": "胡晓普",
+      "open_id": "ou_2a7d700d27df3e145cbf03e9fb478bc0",
+      "employee_no": "G-351",
+      "job_title": "创新业务负责人",
+      "teams": [
+        "社区运营"
+      ],
+      "aliases": ["晓普"],
+      "notes": ""
+    },
+    {
+      "name": "王子艺",
+      "open_id": "ou_ca86244f663583ca63c4c18e4bd04b8b",
+      "employee_no": "G-214",
+      "job_title": "活动运营",
+      "teams": [
+        "社区运营"
+      ],
+      "aliases": ["王子艺"],
+      "notes": ""
+    },
+    {
+      "name": "孙晨薇",
+      "open_id": "ou_26cfaea7e3e9586048ac5fb3017b99c3",
+      "employee_no": "",
+      "job_title": "用户运营",
+      "teams": [
+        "社区运营"
+      ],
+      "aliases": ["晨薇","Vivi"],
+      "notes": ""
+    },
+    {
+      "name": "孙文嘉",
+      "open_id": "ou_9b5d60f69f9b290f10f1002dd71d9573",
+      "employee_no": "",
+      "job_title": "管理培训生",
+      "teams": [
+        "社区运营"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "王姝婷",
+      "open_id": "ou_74af1be7a29d00d386a1b8a5b0963906",
+      "employee_no": "",
+      "job_title": "财务助理",
+      "teams": [
+        "财务"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "李真",
+      "open_id": "ou_78ae74d6c345a6e9b627faffab1ad13d",
+      "employee_no": "",
+      "job_title": "财务经理",
+      "teams": [
+        "财务"
+      ],
+      "aliases": [],
+      "notes": ""
+    },
+    {
+      "name": "李秋里",
+      "open_id": "ou_7a3a97e481f3f1979145a00dd1cd70d5",
+      "employee_no": "G-304",
+      "job_title": "法务经理",
+      "teams": [
+        "顾问"
+      ],
+      "aliases": ["秋里"],
+      "notes": ""
+    }
+  ],
+  "by_team_count": {
+    "GeekPark 媒体业务": 14,
+    "商业化": 11,
+    "社区运营": 7,
+    "实习&兼职": 5,
+    "创意视频": 4,
+    "社区内容": 4,
+    "人力行政组": 3,
+    "变量资本-投后": 3,
+    "变量资本-投资": 3,
+    "品牌设计": 3,
+    "海外拓展": 3,
+    "CEO": 2,
+    "Global Partnership": 2,
+    "财务": 2,
+    "创新技术": 1,
+    "品牌创意部": 1,
+    "总裁办": 1,
+    "顾问": 1
+  }
+}

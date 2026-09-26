@@ -81,5 +81,32 @@ def test_job_store_try_claim_exclusive():
 
 
 def test_split_needs_review_fallback():
-    assert llm.split_needs_review({"mode": "fallback", "warnings": ["x"]})
-    assert not llm.split_needs_review({"mode": "multi", "segments": 3})
+    # low → 拦；healthy multi → 不拦
+    assert llm.split_needs_review(
+        {"mode": "fallback", "segments": 1, "confidence": "low"},
+        stype="T13",
+        team="内容中心·数据聚合",
+    )
+    assert not llm.split_needs_review(
+        {"mode": "multi", "segments": 8, "toc_count": 8, "boundaries": 10, "confidence": "high"},
+        stype="T13",
+    )
+    # medium 不拦（少打扰）
+    assert not llm.split_needs_review(
+        {"mode": "multi", "segments": 3, "toc_count": 8, "confidence": "medium"},
+        stype="T13",
+        team="内容中心·数据聚合",
+    )
+    # 目录远多于段落 → low → 拦
+    assert llm.split_needs_review(
+        {"mode": "multi", "segments": 2, "toc_count": 12, "confidence": "low"},
+        stype="T13",
+        team="内容中心·数据聚合",
+    )
+    # 单团队来源不拦
+    assert not llm.split_needs_review(
+        {"mode": "single", "boundaries": 0, "warnings": ["长文仅拆出 1 段"], "confidence": "low"},
+        stype="T6",
+        team="品牌创意团队",
+        channel="aggregator",
+    )

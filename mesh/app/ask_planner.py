@@ -1,21 +1,33 @@
-"""Planner-lite：纯规则检索规划（无 LLM / ReAct）。
+"""Planner-lite：检索规划（LLM 语义意图 + 规则兜底）。
 
 输出 RetrievalPlan，供 ask_engine.prepare 选择 structured 或 hybrid。
+
+意图判断优先用 LLM（语义理解，适配千变万化问法），失败/关闭时回落纯正则。
+不管走哪条路，最终「算」的部分仍由确定性 SQL（qa_structured.run_structured）完成，
+LLM 只填「要不要做集合运算 / 哪两个队 / 交集还是差集」这张固定表，不参与计算。
 """
 from __future__ import annotations
 
+import json
+import logging
+import os
 import re
 from dataclasses import dataclass, field
 from typing import Literal
 
 from . import qa_structured
 
+log = logging.getLogger("uvicorn.error")
+
 CONFIDENCE_THRESHOLD = 0.7
 
 Path = Literal["structured", "hybrid"]
-SetOp = Literal["diff", "intersect", "by_team", "overseas_gap", "none"]
+SetOp = Literal[
+    "diff", "intersect", "by_team", "overseas_gap", "cooccur", "bridge",
+    "count", "multi_team", "none",
+]
 
-_POS_DIFF = r"(接触过|跟进过|跟进了|在跟进|跟进中|采访过|关注过|有记录)"
+_POS_DIFF = r"(接触过|接触了|跟进过|跟进了|在跟进|跟进中|采访过|采访了|关注过|关注了|有记录)"
 _NEG_DIFF = r"(还没|没有|尚未|没接触|未接触|未跟进)"
 
 
@@ -37,6 +49,10 @@ def hybrid_fallback_note(plan: RetrievalPlan) -> str:
         "intersect": "交集",
         "by_team": "按团队聚合",
         "overseas_gap": "海外与国内缺口",
+        "cooccur": "二跳共现",
+        "bridge": "二跳桥接",
+        "count": "精确计数",
+        "multi_team": "跨团队主体",
     }
     op = labels.get(plan.set_op, plan.set_op)
     return (
@@ -201,9 +217,125 @@ def _plan_overseas_gap(q: str, win: dict) -> tuple[dict, float] | None:
     }, 0.95
 
 
+def _plan_multi_team(q: str, win: dict) -> tuple[dict, float] | None:
+    """「多个团队同时出现/跨团队出现」的主体（计数或名单）。
+
+    只在「多团队」语义明确时才走，且不能是两两比较（那是 intersect/diff）——
+    后者交给前面的规则/LLM，避免抢走「A 和 B 都接触」这类问句。
+    """
+    if not re.search(r"多个团队|跨团队|各团队都|同时出现|多队|跨部门|多个部门", q):
+        return None
+    # 两个明确队名的「比较」不是本意图（intersect/diff 的领地）
+    if re.search(r"都|共同|交集|重叠|同时", q) and len(qa_structured.find_teams_in_question(q)) >= 2:
+        return None
+    section = qa_structured._infer_section(q)
+    hardware = bool(re.search(r"硬件|" + "|".join(map(re.escape, qa_structured.HARDWARE_HINTS)), q))
+    # 「几家/多少家」→ 公司口径；否则不限（名单问句）
+    kind = qa_structured._parse_count_kind(q)
+    intent = {
+        "type": "multi_team",
+        "section": section if section in ("接触", "关注", "关系", "看法") else "",
+        "kind": kind or "any",
+        "hardware": hardware,
+        **win,
+    }
+    return intent, 0.9
+
+
+def _plan_count(q: str, win: dict) -> tuple[dict, float] | None:
+    """计数问句：单团队 + 计数词 + 明确对象（人/公司）。
+
+    只在「有且仅有一个团队」且出现计数词时才走，避免把「各团队分别多少」误路由。
+    CRM/硅谷语境的计数走 crm.stats，不走周报 entity_team_facts。
+    """
+    try:
+        from .agent import crm_search as cs
+
+        if cs.is_crm_count_question(q):
+            return None
+    except Exception:
+        pass
+    kind = qa_structured._parse_count_kind(q)
+    if not kind:
+        return None
+    if re.search(r"各团队|分别|每个团队|各自", q):
+        return None
+    teams = qa_structured.find_teams_in_question(q)
+    if len(teams) != 1:
+        return None
+    # 「多少人」是对象词；只说「多少」需另有接触/关注等动作词，避免「多少人算多」这类泛问
+    if kind == "any" and not re.search(r"接触|触达|关注|跟进|合作|关系|认识|聊过|见过|对接|拜访", q):
+        return None
+    return {
+        "type": "count",
+        "team": teams[0],
+        "section": qa_structured._parse_section_explicit(q),
+        "kind": kind,
+        **win,
+    }, 0.92
+
+
+# ---- 2 跳规则兜底（LLM 关闭/失败时）----
+
+_COOCCUR_RE = re.compile(
+    r"(还(接触过|认识|见过|聊过|跟过|碰过)谁|都(和|跟)谁|一起(出现|提到)|"
+    r"(还|另外)有(哪些|谁)|围绕.{1,20}(还有|还涉及)|关联到(哪些|谁)|"
+    r"和.{1,16}(一起|同时).{0,8}(出现|提到|相关))"
+)
+_BRIDGE_RE = re.compile(
+    r"(谁(把|将).{1,20}(和|与|、).{1,20}(连|串|连接|联系)起来|"
+    r"(共同|都).{0,4}(联系|认识|接触|关联)的(人|公司|主体)|"
+    r"同时(关联|连接|涉及).{1,20}(和|与))"
+)
+
+
+_SEED_STOP_RE = re.compile(r"(还有|有哪些|以及|相关|等|都|谁|哪些|什么|的人|的公司|的事|$)")
+
+
+def _strip_seed(q: str) -> str:
+    """从问句里抽出种子主体：优先引号内专名，否则取问句前段专名。"""
+    m = re.search(r"[「\"']([^」\"']{2,30})[」\"']", q)
+    if m:
+        return m.group(1).strip()
+    # 「跟/和 X 聊过的人还…」：取「跟/和」与「聊过/接触/跟过」之间
+    m = re.search(r"[跟和与]\s*([^\s，,。？?]{2,30}?)\s*(?:聊过|接触|跟过|碰过|有关|相关)", q)
+    if m:
+        return m.group(1).strip()
+    m = re.search(r"(?:围绕|关于|针对)\s*([^\s，,。？?]{2,30})", q)
+    if m:
+        # 在停止词处截断，避免把「还有哪些相关的人和公司」一起吃进来
+        return _SEED_STOP_RE.split(m.group(1).strip())[0].strip(" ，,。的")
+    return ""
+
+
+def _plan_cooccur(q: str, win: dict) -> tuple[dict, float] | None:
+    if not _COOCCUR_RE.search(q):
+        return None
+    seed = _strip_seed(q)
+    if len(seed) < 2:
+        return None
+    return {"type": "cooccur", "seed": seed, **win}, 0.85
+
+
+def _plan_bridge(q: str, win: dict) -> tuple[dict, float] | None:
+    if not _BRIDGE_RE.search(q):
+        return None
+    names = re.findall(r"[「\"']([^」\"']{2,30})[」\"']", q)
+    if len(names) < 2:
+        # 退而求其次：抓「把 A 和 B 连起来」的两个专名
+        m = re.search(r"把\s*([^\s，,。？?]{2,30}?)\s*(?:和|与|、)\s*([^\s，,。？?]{2,30}?)\s*(?:连|串)", q)
+        if m:
+            names = [m.group(1), m.group(2)]
+    if len(names) < 2 or names[0] == names[1]:
+        return None
+    return {"type": "bridge", "seed": names[0], "seed_b": names[1], **win}, 0.85
+
+
 def _intent_to_plan(intent: dict, confidence: float) -> RetrievalPlan:
     t = intent.get("type") or "none"
-    set_op: SetOp = t if t in ("diff", "intersect", "by_team", "overseas_gap") else "none"
+    set_op: SetOp = t if t in (
+        "diff", "intersect", "by_team", "overseas_gap", "cooccur", "bridge", "count", "multi_team"
+    ) else "none"
     teams = []
     if intent.get("team_a"):
         teams.append(intent["team_a"])
@@ -222,7 +354,11 @@ def _intent_to_plan(intent: dict, confidence: float) -> RetrievalPlan:
 
 
 def plan_retrieval(q: str, refs: dict | None = None) -> RetrievalPlan:
-    """纯规则规划：原始问句 → structured/hybrid + set_op + confidence。"""
+    """问句 → structured/hybrid + set_op + confidence。
+
+    顺序：LLM 语义意图（优先）→ 规则模式 → legacy parse_intent → 纯 hybrid。
+    LLM 结果必须通过校验（type 合法 + 队名可归一）才采用，否则回落规则。
+    """
     q = (q or "").strip()
     if not q:
         return RetrievalPlan()
@@ -232,13 +368,20 @@ def plan_retrieval(q: str, refs: dict | None = None) -> RetrievalPlan:
 
     win = _win(q)
 
-    for fn in (_plan_overseas_gap, _plan_by_team, _plan_diff, _plan_intersect):
+    # 1) LLM 语义意图（可用则优先；校验通过才采用）
+    llm_plan = _llm_intent_plan(q, win)
+    if llm_plan is not None:
+        return llm_plan
+
+    # 2) 规则模式（无 LLM / LLM 失败时的确定性兜底）
+    for fn in (_plan_overseas_gap, _plan_by_team, _plan_diff, _plan_intersect,
+               _plan_bridge, _plan_cooccur, _plan_multi_team, _plan_count):
         hit = fn(q, win)
         if hit:
             intent, conf = hit
             return _intent_to_plan(intent, conf)
 
-    # 兼容已有 parse_intent 覆盖（e01/e09 等）
+    # 3) 兼容已有 parse_intent 覆盖（e01/e09 等）
     legacy = qa_structured.parse_intent(q)
     if legacy and legacy.get("type") != "error":
         t = legacy["type"]
@@ -246,3 +389,189 @@ def plan_retrieval(q: str, refs: dict | None = None) -> RetrievalPlan:
         return _intent_to_plan(legacy, conf)
 
     return RetrievalPlan(path="hybrid", set_op="none", confidence=0.0)
+
+
+def _llm_intent_enabled() -> bool:
+    """默认开启；MESH_ASK_LLM_INTENT=0 可回退纯规则。"""
+    v = (os.environ.get("MESH_ASK_LLM_INTENT") or "1").strip().lower()
+    return v not in ("0", "false", "off", "no")
+
+
+_LLM_INTENT_SYSTEM = """你是检索意图分类器。判断用户问句需要哪种「结构化检索」，只输出 JSON，不解释。
+
+结构化类型：
+- intersect：两个团队都接触/关注/讨论过的「同一批」公司或人（重合、交集、都碰过、同时在跟）。
+- diff：团队 A 接触过、团队 B 没接触过（差集、A 有 B 无、A 跟过但 B 还没）。
+- by_team：某个话题/领域，各团队分别知道/关注了什么（按团队聚合同一主题）。
+- overseas_gap：海外团队接触过、国内团队还没接触的缺口。
+- cooccur：某个主体（公司/人/话题）「还跟谁一起出现」——从它出发找相关的其他主体。
+    触发词：还接触过谁、都和谁有关、一起出现过、关联到谁、围绕 X 还有谁。
+- bridge：哪个人/公司/话题「同时连接」两个主体——找中间桥梁。
+    触发词：谁把 X 和 Y 连起来、X 和 Y 的共同联系人、同时关联 X 和 Y 的是谁。
+- count：问某个团队在时间范围内「接触/关注了多少人 / 多少家公司 / 多少个主体」这类**计数**问题。
+    触发词：X 团队接触了多少人、X 团队一共跟多少家公司合作过、X 团队关注了多少个主体。
+    注意：只有**单一团队**的计数才给 count；「各团队分别多少」不给 count（给 none）。
+- multi_team：问「有多少 / 哪些主体出现在多个团队（跨团队、跨部门、同时被多个队碰到）」——
+    不是两两比较，而是全局统计「覆盖了 ≥2 个团队的主体」。
+    触发词：多少家公司在多个团队同时出现过、跨团队出现的公司有哪些、哪些主体被多个部门碰到、
+    被两个以上团队接触过的公司。
+    注意：问「A 团队和 B 团队都接触的公司」是 intersect，不是 multi_team。
+- none：以上都不是（普通检索、单团队、进展、看法、寒暄等）。
+
+规则：
+1) 只有语义上确实要「比较两个团队的名单」才给 intersect/diff；模糊问「关注什么」不是。
+2) team_a/team_b 用问句里出现的团队原词（如「编辑部」「商业化团队」「硅谷」），系统会自己归一。
+3) diff 里 team_a = 有记录的一方，team_b = 没记录的一方。
+4) topic 仅 by_team 用，填被比较的话题词（如「AI 助听器」「硬件」）。
+5) cooccur 用 seed 填那个起点主体；bridge 用 seed / seed_b 填两个主体（用问句里的原词）。
+6) count 用 team 填那个团队原词；计数对象是「人」时 team 之外不用填（系统自己按人/公司判断）。
+   若问句是硅谷/CRM/人脉库计数（如「硅谷近一年接触了多少人」「CRM一共多少人」），给 none——那走 CRM 统计，不是周报 count。
+7) 拿不准就给 none，宁可漏判也不要误判。
+
+输出：{"type": "...", "team_a": "", "team_b": "", "team": "", "topic": "", "seed": "", "seed_b": "", "confidence": 0.0-1.0}"""
+
+
+def _llm_intent_plan(q: str, win: dict) -> RetrievalPlan | None:
+    if not _llm_intent_enabled():
+        return None
+    try:
+        from . import llm
+
+        raw = llm.call(
+            _LLM_INTENT_SYSTEM,
+            f"问句：{q}\n只输出 JSON：",
+            max_tokens=200,
+            json_mode=True,
+            task="semantic",
+        )
+        data = raw if isinstance(raw, dict) else json.loads(str(raw or "").strip())
+    except Exception as e:
+        log.info("ask llm-intent failed, fallback rules: %s", e)
+        return None
+
+    if not isinstance(data, dict):
+        return None
+    t = str(data.get("type") or "none").strip().lower()
+    if t not in ("diff", "intersect", "by_team", "overseas_gap", "cooccur", "bridge", "count", "multi_team"):
+        # LLM 判定普通检索 → 不短路，让规则兜底再决定（避免 LLM 漏掉 legacy 覆盖）
+        return None
+
+    conf = data.get("confidence")
+    try:
+        conf = float(conf)
+    except Exception:
+        conf = 0.8
+    conf = max(0.0, min(1.0, conf))
+    section = qa_structured._infer_section(q)
+    hardware = bool(
+        re.search(r"硬件|" + "|".join(map(re.escape, qa_structured.HARDWARE_HINTS)), q)
+    )
+
+    if t == "overseas_gap":
+        intent = {
+            "type": "overseas_gap",
+            "section": section if section in ("接触", "关注") else "接触",
+            "hardware": hardware,
+            **win,
+        }
+        return _validate_and_plan(intent, max(conf, 0.9), q)
+
+    if t == "by_team":
+        topic = str(data.get("topic") or "").strip(" ，,。的？?")
+        if not topic and hardware:
+            topic = "硬件"
+        if not topic or len(topic) < 2 or topic in qa_structured._BAD_BY_TEAM_TOPICS:
+            return None
+        intent = {
+            "type": "by_team",
+            "topic": topic,
+            "hardware": hardware,
+            "section": section,
+            **win,
+        }
+        return _validate_and_plan(intent, max(conf, 0.85), q)
+
+    # cooccur / bridge：种子主体必须非空（不强制归一，实体名允许自由文本）
+    if t == "cooccur":
+        seed = str(data.get("seed") or "").strip(" ，,。的？?\"'「」")
+        if len(seed) < 2:
+            return None
+        intent = {"type": "cooccur", "seed": seed, "section": section, **win}
+        return _validate_and_plan(intent, max(conf, 0.85), q)
+
+    if t == "bridge":
+        seed = str(data.get("seed") or "").strip(" ，,。的？?\"'「」")
+        seed_b = str(data.get("seed_b") or "").strip(" ，,。的？?\"'「」")
+        if len(seed) < 2 or len(seed_b) < 2 or seed == seed_b:
+            return None
+        intent = {"type": "bridge", "seed": seed, "seed_b": seed_b, "section": section, **win}
+        return _validate_and_plan(intent, max(conf, 0.85), q)
+
+    if t == "multi_team":
+        section = qa_structured._infer_section(q)
+        kind = qa_structured._parse_count_kind(q)
+        intent = {
+            "type": "multi_team",
+            "section": section if section in ("接触", "关注", "关系", "看法") else "",
+            "kind": kind or "any",
+            "hardware": hardware,
+            **win,
+        }
+        return _validate_and_plan(intent, max(conf, 0.85), q)
+
+    if t == "count":
+        try:
+            from .agent import crm_search as cs
+
+            if cs.is_crm_count_question(q):
+                log.info("ask llm-intent count dropped: CRM stats context q=%r", q[:60])
+                return None
+        except Exception:
+            pass
+        team = qa_structured._normalize_team(str(data.get("team") or ""))
+        if not team:
+            log.info("ask llm-intent count dropped: team=%r not resolvable", data.get("team"))
+            return None
+        kind = qa_structured._parse_count_kind(q) or "any"
+        intent = {
+            "type": "count",
+            "team": team,
+            "section": qa_structured._parse_section_explicit(q),
+            "kind": kind,
+            **win,
+        }
+        return _validate_and_plan(intent, max(conf, 0.9), q)
+
+    # diff / intersect：两个队都必须能归一
+    ta = qa_structured._normalize_team(str(data.get("team_a") or ""))
+    tb = qa_structured._normalize_team(str(data.get("team_b") or ""))
+    if not ta or not tb or ta == tb:
+        log.info("ask llm-intent %s dropped: teams=%r/%r not resolvable", t, data.get("team_a"), data.get("team_b"))
+        return None
+    intent = {
+        "type": t,
+        "team_a": ta,
+        "team_b": tb,
+        "section": section if section in ("接触", "关注", "关系", "看法") else "接触",
+        "hardware": hardware,
+        **win,
+    }
+    return _validate_and_plan(intent, max(conf, 0.85), q)
+
+
+def _validate_and_plan(intent: dict, conf: float, q: str) -> RetrievalPlan | None:
+    """LLM 意图入 structured 前的确定性校验；不通过返回 None 回落规则。"""
+    t = intent.get("type")
+    if t not in ("diff", "intersect", "by_team", "overseas_gap", "cooccur", "bridge", "count", "multi_team"):
+        return None
+    plan = _intent_to_plan(intent, conf)
+    plan.intent = intent
+    log.info(
+        "ask llm-intent accepted type=%s conf=%.2f teams=%s topic=%s seed=%s",
+        t,
+        conf,
+        plan.teams,
+        intent.get("topic") or "-",
+        intent.get("seed") or "-",
+    )
+    return plan

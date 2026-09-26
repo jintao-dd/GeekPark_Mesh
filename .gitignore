@@ -18,10 +18,14 @@ __pycache__/
 
 # --- runtime data ---
 mesh/data/
+data/
 *.db
 *.db-journal
 *.sqlite
 *.sqlite3
+
+# --- eval runtime artifacts (local self-check output; not release baselines) ---
+mesh/eval/reports/REPRO_STATUS.json
 
 # --- logs / temp ---
 *.log

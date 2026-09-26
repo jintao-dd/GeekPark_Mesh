@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import re
@@ -116,8 +117,14 @@ def _run_with_timeout(fn, timeout: float, fallback):
 
 
 def _analyze_one_source(q: str, group: dict) -> dict:
+    today = datetime.date.today().isoformat()
     system = (
         "你是极客公园 Mesh 的单源素材抽取器。只根据【本源】证据抽取，禁止跨源推断。\n"
+        "facts/events 的 text 必须是一条完整的事实陈述（主谓/主谓宾结构），包含：谁、做了什么/处于什么状态、时间或期号锚点。"
+        "禁止只列实体名或关键词（如「影目科技」「源见」），禁止把多个事实合并成一句话。\n"
+        "把原文「本周/明天/昨天」改写成"
+        f"「该期（{group.get('issue') or '未知期'}）记录中…」或具体日期；禁止保留相对今天的相对时间。\n"
+        f"今天是 {today}。\n"
         "输出 JSON：{\"facts\":[{\"text\":\"...\",\"evidence_refs\":[\"e1\"]}],"
         "\"entities\":[\"...\"],\"events\":[{\"text\":\"...\",\"evidence_refs\":[\"e1\"]}],"
         "\"evidence\":[{\"ref\":\"e1\",\"quote\":\"...\"}]}\n"
@@ -195,36 +202,68 @@ def _analyze_one_source(q: str, group: dict) -> dict:
     }
 
 
-def _reports_from_structured_contexts(contexts: list[dict]) -> list[dict]:
+def _structured_fact_text(title: str, body: str) -> str:
+    """结构化物化：保留正文，禁止只留标题导致成文空心。"""
+    title = (title or "").strip()
+    body = (body or "").strip()
+    if title and body:
+        if body.startswith(title) or title in body[: max(40, len(title) + 8)]:
+            return body
+        return f"{title}：{body}"
+    return title or body
+
+
+def _reports_from_structured_contexts(
+    contexts: list[dict],
+    *,
+    intent: dict | None = None,
+) -> list[dict]:
+    """把结构化 contexts 收成 source_reports。
+
+    by_team：按团队聚合（多期合并到同一团队桶），避免同队两期被当成「多源交叉」。
+    其它类型：仍按 (团队, 期号) 分桶，便于出处；交叉由上层跳过。
+    """
+    intent = intent if isinstance(intent, dict) else {}
+    intent_type = str(intent.get("type") or "").strip()
+    by_team = intent_type == "by_team"
+
     buckets: dict[tuple[str, str], list[dict]] = defaultdict(list)
     for ctx in contexts or []:
         if not isinstance(ctx, dict) or _is_meta_ctx(ctx):
             continue
         team = (ctx.get("归属团队") or ctx.get("团队") or "未标注来源").strip()
         issue = (ctx.get("期号") or "未知期").strip()
-        buckets[(team, issue)].append(ctx)
+        key = (team, "" if by_team else issue)
+        buckets[key].append(ctx)
+
     reports = []
-    for i, ((team, issue), items) in enumerate(list(buckets.items())[:_MAX_GROUPS]):
+    for i, ((team, issue_key), items) in enumerate(list(buckets.items())[:_MAX_GROUPS]):
         gid = f"g{i+1}"
         facts, entities, evidence = [], [], []
+        issues_seen: list[str] = []
         for j, it in enumerate(items[:_MAX_PER_GROUP], 1):
             title = (it.get("标题") or "").strip()
             body = (it.get("内容") or "").strip()
-            text = title or body[:80]
+            iss = (it.get("期号") or "").strip()
+            if iss and iss not in issues_seen:
+                issues_seen.append(iss)
+            text = _structured_fact_text(title, body)
             if text:
                 facts.append({"text": text, "evidence_refs": [f"e{j}"]})
             if title:
                 entities.append(title.split("·")[0].strip() or title)
-            if body:
+            if body or title:
                 evidence.append({
-                    "ref": f"e{j}", "quote": body[:160],
+                    "ref": f"e{j}",
+                    "quote": (body or title)[:240],
                     "item_id": it.get("条目ID") or it.get("item_id"),
                     "chunk_id": it.get("chunk_id") or it.get("chunkId"),
                 })
+        issue_label = "、".join(issues_seen[:4]) if by_team and issues_seen else (issue_key or "未知期")
         reports.append({
             "group_id": gid,
             "source": team,
-            "issue": issue,
+            "issue": issue_label,
             "n_evidence": len(items),
             "facts": facts,
             "entities": entities[:20],
@@ -232,8 +271,58 @@ def _reports_from_structured_contexts(contexts: list[dict]) -> list[dict]:
             "evidence": evidence,
             "items": items[:_MAX_PER_GROUP],
             "_from_structured": True,
+            "_intent_type": intent_type,
         })
     return reports
+
+
+def _structured_passthrough_cross(source_reports: list[dict], intent: dict | None = None) -> dict:
+    """结构化：不做印证叙事，逐条事实直通成文。"""
+    intent = intent if isinstance(intent, dict) else {}
+    intent_type = str(intent.get("type") or "").strip()
+    claims = []
+    entities: list[str] = []
+    for r in source_reports or []:
+        if not isinstance(r, dict):
+            continue
+        gid = r.get("group_id")
+        for f in r.get("facts") or []:
+            if not isinstance(f, dict):
+                continue
+            text = (f.get("text") or "").strip()
+            if not text:
+                continue
+            claims.append({
+                "text": text,
+                "support": [gid] if gid else [],
+                "kind": "single",
+                "evidence_refs": list(f.get("evidence_refs") or []),
+            })
+        for e in r.get("entities") or []:
+            s = str(e).strip()
+            if s and s not in entities:
+                entities.append(s)
+    teams = [str(r.get("source") or "").strip() for r in (source_reports or []) if isinstance(r, dict)]
+    teams = [t for t in teams if t]
+    summary_bits = []
+    if intent_type == "by_team":
+        summary_bits.append(
+            f"按团队投影：已有记录的团队={('、'.join(teams) if teams else '无')}。"
+            "成文须按团队分块写清要点；未出现的团队写「已上线周报无记录」，禁止因只有一队有料就宣称整题无法回答。"
+        )
+    elif intent_type in ("diff", "intersect", "overseas_gap", "cooccur", "bridge", "count"):
+        summary_bits.append(f"结构化类型={intent_type}：按查询结果列表如实陈述，禁止改写成「多源印证/提及实体」。")
+    else:
+        summary_bits.append("结构化结果直通：逐条陈述事实要点，禁止空心「提及/印证」话术。")
+    return {
+        "summary": " ".join(summary_bits),
+        "same_entities": entities[:30],
+        "claims": claims,
+        "conflicts": [],
+        "corroborations": [],
+        "changes": [],
+        "_structured_passthrough": True,
+    }
 
 
 def _heuristic_cross(q: str, source_reports: list[dict]) -> dict:
@@ -288,6 +377,8 @@ def _cross_analyze(q: str, source_reports: list[dict]) -> dict:
         "你是极客公园 Mesh 的多源交叉分析员。输入是各来源已抽取结果。\n"
         "找出：相同实体、相同事件、时间关系、因果/关联、多源印证、信息冲突、新增变化。\n"
         "禁止编造分源中没有的事实。\n"
+        "claims.text 禁止使用「本周/明天/昨天/最近正在」等相对今天的说法；"
+        "须写清期号或绝对日期（例如「2026-8-17 期记录」）。\n"
         "输出 JSON：{\"summary\":\"...\",\"same_entities\":[],\"same_events\":[],"
         "\"time_links\":[],\"causal_links\":[],"
         "\"corroborations\":[{\"text\":\"...\",\"sources\":[\"g1\",\"g2\"]}],"
@@ -397,6 +488,32 @@ def _text_supported_by_blob(text: str, blob: str) -> bool:
     return overlap >= 0.22
 
 
+# 常用中文动作/状态动词，用于判断一个 fact 是否为完整事实陈述
+_VERB_PATTERNS = re.compile(
+    r"(?:讨论|关注|跟踪|推进|完成|发布|推出|上线|启动|落地|签约|达成|合作|"
+    r"接触|拜访|参会|投资|融资|收购|并购|布局|涉足|涉及|包含|记录|提到|"
+    r"是|在|有|将|计划|准备|考虑|认为|预计|开展|举办|组织|参加|进入|来自|"
+    r"与.*合作|与.*沟通|向.*介绍|对.*感兴趣|与.*接触|由.*组成)"
+)
+
+
+def _is_substantive_fact(text: str) -> bool:
+    """判断一条 fact 是否为有信息量的完整事实陈述。"""
+    t = (text or "").strip()
+    if not t or len(t) < 12:
+        return False
+    # 过滤章节标题/目录式短语
+    if re.search(r"概览|目录|总结|提要|目录|索引|本周汇总", t) and not _VERB_PATTERNS.search(t):
+        return False
+    # 至少包含一个动词或状态词
+    if _VERB_PATTERNS.search(t):
+        return True
+    # 包含时间/数字/具体状态描述，也视为有信息量
+    if re.search(r"\d{4}|\d{1,2}[月日]|第[一二三四五六七八九十]|完成|状态|进展", t):
+        return True
+    return False
+
+
 def _claim_supported(
     text: str,
     claim: dict,
@@ -406,6 +523,9 @@ def _claim_supported(
     t = (text or "").strip()
     if not t or len(t) < 4:
         return "reject"
+    # 短实体/关键词提及：无法构成完整事实主张，降级保留，避免 eval 因碎片化表述大量 reject
+    if len(t) <= 10 and re.match(r"^[\u4e00-\u9fffA-Za-z0-9·\s]+$", t):
+        return "downgrade"
     ev_idx = _evidence_index(source_reports)
     by_item, by_chunk = _context_id_index(contexts)
     refs = claim.get("evidence_refs") if isinstance(claim.get("evidence_refs"), list) else []
@@ -434,7 +554,19 @@ def _claim_supported(
                 bound += 1
         if bound >= max(1, len(refs) // 2):
             return "keep"
+        # evidence_refs 匹配不足：尝试用所有 evidence quote 做 fallback 文本匹配
         if bound == 0:
+            fallback_matched = False
+            for ref in refs:
+                meta = ev_idx.get(str(ref)) or ev_idx.get(str(ref).split(":")[-1]) or {}
+                rq = str(meta.get("quote") or "")
+                if not rq:
+                    continue
+                if _text_supported_by_blob(t, rq):
+                    fallback_matched = True
+                    break
+            if fallback_matched:
+                return "downgrade"
             return "reject"
         return "downgrade"
     blob_parts = []
@@ -483,22 +615,70 @@ def _scrub_user_answer(text: str) -> str:
     return t.strip()
 
 
+def _structured_compose_contract(intent: dict | None) -> str:
+    """由 planner 的 intent.type 驱动成文契约（禁止对用户问句做正则特判）。"""
+    intent = intent if isinstance(intent, dict) else {}
+    t = str(intent.get("type") or "").strip()
+    topic = str(intent.get("topic") or intent.get("seed") or "").strip()
+    lines = [
+        "【结构化投影模式】下列要点已由事实表算出，你的任务是按用户问题如实写成通顺中文，禁止编造。",
+        "禁止空心话术：不要只写「提及了某实体」「多源印证」「互相印证」「有记录」而不写具体要点。",
+        "须写入要点中的具体信息（人/公司/动作/产品/判断）；没有的团队或集合侧明确说「已上线周报无记录」。",
+    ]
+    if t == "by_team":
+        lines.append(
+            f"查询类型=按团队聚合"
+            + (f"（主题「{topic}」）" if topic else "")
+            + "：必须按团队分块；有记录的团队写清知道什么；未出现的团队写无记录。"
+            "禁止因为只有一个团队有材料就说「无法回答各团队分别知道什么」。"
+        )
+    elif t == "diff":
+        lines.append(
+            f"查询类型=差集：只陈述 A「{intent.get('team_a') or ''}」有、B「{intent.get('team_b') or ''}」无的主体及要点；点明时间窗口径。"
+        )
+    elif t == "intersect":
+        lines.append(
+            f"查询类型=交集：只陈述同时出现在「{intent.get('team_a') or ''}」与「{intent.get('team_b') or ''}」的主体及要点。"
+        )
+    elif t == "overseas_gap":
+        lines.append("查询类型=海外缺口：列出海外有接触、国内团队窗口内无跟进的主体及要点。")
+    elif t == "count":
+        lines.append("查询类型=计数：回答以数字与口径说明为主，可附代表主体，勿改写成无关叙事。")
+    elif t == "cooccur":
+        lines.append(
+            f"查询类型=共现：列出与种子「{intent.get('seed') or topic}」同条共现的主体，按关联强弱陈述。"
+        )
+    elif t == "bridge":
+        lines.append("查询类型=桥接：陈述两主体之间的中间连接与要点。")
+    elif t:
+        lines.append(f"查询类型={t}：按结果列表忠实陈述。")
+    return "\n".join(lines)
+
+
 def _verify_and_compose(
     q: str,
     cross: dict,
     source_reports: list[dict],
     contexts: list[dict],
+    *,
+    structured_intent: dict | None = None,
 ) -> tuple[str, dict]:
     claims_in = cross.get("claims") if isinstance(cross.get("claims"), list) else []
     if not claims_in:
         for r in source_reports:
             for f in r.get("facts") or []:
-                if isinstance(f, dict) and f.get("text"):
-                    claims_in.append({
-                        "text": f["text"],
-                        "support": [r.get("group_id")],
-                        "kind": "single",
-                    })
+                if not isinstance(f, dict):
+                    continue
+                text = (f.get("text") or "").strip()
+                # 只把完整事实陈述当作 claim；短/无动词的片段降级为 entity mention
+                if not text or not _is_substantive_fact(text):
+                    continue
+                claims_in.append({
+                    "text": text,
+                    "support": [r.get("group_id")],
+                    "kind": "single",
+                    "evidence_refs": list(f.get("evidence_refs") or []),
+                })
 
     verified_claims, downgraded, rejected = [], [], []
     for c in claims_in:
@@ -506,6 +686,15 @@ def _verify_and_compose(
             continue
         text = (c.get("text") or "").strip()
         if not text:
+            continue
+        # Ask 场景：没有 evidence_refs 的 claim 不做严格校验，降级保留即可。
+        # 严格 reject 只留给有明确证据但仍无法支撑的 claim，避免口头化表述被大量误杀。
+        refs = c.get("evidence_refs") if isinstance(c.get("evidence_refs"), list) else []
+        if not refs:
+            row = dict(c)
+            row["decision"] = "downgrade"
+            row["text"] = f"（待核对）{text}"
+            downgraded.append(row)
             continue
         decision = _claim_supported(text, c, contexts, source_reports)
         row = dict(c)
@@ -543,15 +732,46 @@ def _verify_and_compose(
         "禁止新增事实；来源冲突时并列说明；文末保留「来源：」行。"
         "禁止使用 Markdown 标题（不要用 # ## ###）；用自然段落即可。"
         "禁止使用内部术语：不要写「断言」「已校验」「根据已校验断言」「交叉摘要」等字样，直接陈述事实。"
+        "时间锚定：禁止把要点里的「本周/明天/昨天」写成相对今天；须改写为期号或绝对日期。"
+        "用户问「最近」时，若材料来自较早期号，开头点明依据哪一期，勿写成仿佛正在发生。"
     )
+    if structured_intent:
+        system = system + "\n" + _structured_compose_contract(structured_intent)
+
     points = []
-    for c in verified_claims + downgraded[:3]:
+    for c in verified_claims + downgraded[:8]:
         if isinstance(c, dict) and c.get("text"):
             points.append({"text": c["text"]})
+    # 结构化：额外带上证据摘录，防止成文只剩短标题
+    if structured_intent:
+        for r in source_reports or []:
+            if not isinstance(r, dict):
+                continue
+            team = r.get("source") or ""
+            issue = r.get("issue") or ""
+            for ev in (r.get("evidence") or [])[:8]:
+                if not isinstance(ev, dict):
+                    continue
+                quote = (ev.get("quote") or "").strip()
+                if quote and len(quote) > 12:
+                    points.append({"text": f"[{team}·{issue}] {quote}"})
+    # 去重保序
+    seen_pt: set[str] = set()
+    uniq_points = []
+    for p in points:
+        t = str(p.get("text") or "").strip()
+        if not t or t in seen_pt:
+            continue
+        seen_pt.add(t)
+        uniq_points.append({"text": t})
+    points = uniq_points[:40]
+
+    today = datetime.date.today().isoformat()
     user = (
-        f"问题：{q}\n\n"
-        f"可用要点：\n{json.dumps(points, ensure_ascii=False)[:3500]}\n\n"
-        f"补充说明：{(cross.get('summary') or '')[:400]}\n"
+        f"问题：{q}\n"
+        f"今天：{today}\n\n"
+        f"可用要点：\n{json.dumps(points, ensure_ascii=False)[:5500]}\n\n"
+        f"补充说明：{(cross.get('summary') or '')[:500]}\n"
         f"来源行：{src_line}\n"
     )
 
@@ -571,6 +791,7 @@ def _verify_and_compose(
         "rejected": len(rejected) + len(cite_removed),
         "downgraded": len(downgraded),
         "flags": grounded.get("flags") or [],
+        "rejected_texts": [str(r.get("text") or "") for r in rejected[:20]],
     }
     return ans, stats
 
@@ -643,6 +864,8 @@ def run_analysis(
         user_id=persist_ctx.get("user_id"),
     )
     usage = {"llm_calls": 0, "source_groups": 0, "elapsed_ms": 0, "path": "analysis", "cross": False}
+    from app import llm as _llm_mod
+    _llm_mod.reset_usage_accum()
 
     ctx_route = prepared.get("context_route")
     if not isinstance(ctx_route, dict):
@@ -668,10 +891,13 @@ def run_analysis(
         n_context=len(contexts),
     )
 
-    # 结构化查询：跳过 LLM 分源，直接物化
+    # 结构化查询：跳过 LLM 分源，直接物化；禁止再跑 hybrid 交叉抽干
     structured = (prepared.get("mode") or "") == "structured"
+    structured_intent = prepared.get("query") if isinstance(prepared.get("query"), dict) else None
     if structured:
-        source_reports = _reports_from_structured_contexts(contexts)
+        source_reports = _reports_from_structured_contexts(
+            contexts, intent=structured_intent,
+        )
         groups = [
             {
                 "group_id": r["group_id"],
@@ -723,6 +949,8 @@ def run_analysis(
                 verified=0, rejected=0, downgraded=0,
             )
             usage["elapsed_ms"] = int((time.time() - t0) * 1000)
+            for k, v in _llm_mod.take_usage_accum().items():
+                usage[k] = v
             early = {
                 "answer": ans, "analysis_id": analysis_id, "report_id": report_id, "usage": usage,
                 "verify": {"verified": 0, "rejected": 0, "downgraded": 0},
@@ -794,6 +1022,8 @@ def run_analysis(
             verified=0, rejected=0, downgraded=0,
         )
         usage["elapsed_ms"] = int((time.time() - t0) * 1000)
+        for k, v in _llm_mod.take_usage_accum().items():
+            usage[k] = v
         early = {
             "answer": ans, "analysis_id": analysis_id, "report_id": report_id, "usage": usage,
             "verify": {"verified": 0, "rejected": 0, "downgraded": 0},
@@ -829,6 +1059,15 @@ def run_analysis(
             changes=cross.get("changes") or [],
             claims_n=len(cross.get("claims") or []),
         )
+    elif structured:
+        cross = _structured_passthrough_cross(source_reports, structured_intent)
+        usage["cross"] = False
+        yield ask_protocol.step_event(
+            "cross", "skipped",
+            analysis_id=analysis_id,
+            message="结构化直通（跳过交叉）",
+            claims_n=len(cross.get("claims") or []),
+        )
     else:
         cross = _heuristic_cross(q, source_reports)
         yield ask_protocol.step_event(
@@ -841,7 +1080,10 @@ def run_analysis(
     yield ask_protocol.step_event(
         "verify", "running", analysis_id=analysis_id, message="校验中",
     )
-    ans, vstats = _verify_and_compose(q, cross, source_reports, contexts)
+    ans, vstats = _verify_and_compose(
+        q, cross, source_reports, contexts,
+        structured_intent=structured_intent if structured else None,
+    )
     usage["llm_calls"] += 1
     yield ask_protocol.step_event(
         "verify", "completed",
@@ -854,6 +1096,12 @@ def run_analysis(
     )
 
     usage["elapsed_ms"] = int((time.time() - t0) * 1000)
+    tok = _llm_mod.take_usage_accum()
+    for k, v in tok.items():
+        usage[k] = v
+    if tok.get("n_calls") is not None:
+        # prefer measured call count from provider path
+        usage["llm_calls"] = max(int(usage.get("llm_calls") or 0), int(tok["n_calls"]))
     sources_out = [
         {
             "group_id": r.get("group_id"),

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ issue.display_date }} · 周报后台</title>
 <link rel="icon" href="/static/assets/mesh_logo.png">
-<link rel="stylesheet" href="/static/console.css?v=team-stype-3">
+<link rel="stylesheet" href="/static/console.css?v=team-stype-9">
 </head>
 <body>
 
@@ -109,7 +109,17 @@
   {% endif %}
 
   <div class="files" id="files" style="margin-top:20px">
-    <div class="fh"><h4>已放入 <span id="fcount">{{ sources|length }}</span> 个来源</h4><span class="meta" id="fmeta">条目 {{ n_items }} · 其中硬拦 {{ n_blocked }}</span></div>
+    <div class="fh">
+      <h4>已放入 <span id="fcount">{{ sources|length }}</span> 个来源</h4>
+      <div class="fh-right">
+        <span class="meta" id="fmeta">条目 {{ n_items }} · 其中硬拦 {{ n_blocked }}</span>
+        {% if perms.write %}
+        <form method="post" action="/admin/issue/{{ issue.slug }}/sources/delete_all" class="js-confirm js-ajax js-clear-sources" data-title="全部移除来源" data-body="将删除本期全部来源及其条目，不可恢复。确认？" data-ok="全部移除" style="margin:0{% if not sources %};display:none{% endif %}">
+          <button class="x src-clear-all" type="submit" id="clearAllSources">全部移除</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
     <div id="frows">
       {% for s in sources %}
       <div class="frow" data-source-id="{{ s.id }}">
@@ -145,7 +155,14 @@
   <div class="actions pushed">
     {% if perms.write %}
     <button class="cta" id="to2" {% if not sources %}disabled{% endif %}>生成预览 <span class="arw">→</span></button>
-    <span class="hint" style="font-size:13px;color:var(--ink3);margin-left:12px">将自动生成要点卡与草稿，并进入预览编辑页</span>
+    {% if issue.status == 'published' %}
+    <form method="post" action="/admin/issue/{{ issue.slug }}/create_revision" id="createRevision" style="display:inline;margin-left:10px">
+      <button class="ghost" type="submit" id="to2rev">用线上稿铺底草稿</button>
+    </form>
+    <span class="hint" style="font-size:13px;color:var(--ink3);margin-left:12px">已上线也可预览改稿；读者与 Ask 仍看线上版，确认上线后才替换</span>
+    {% else %}
+    <span class="hint" style="font-size:13px;color:var(--ink3);margin-left:12px">有挖掘结果时直接出预览；素材变更后会先补挖再出卡</span>
+    {% endif %}
     {% else %}
     <button class="cta" data-go="2" disabled title="需要编辑权限">生成预览 <span class="arw">→</span></button>
     {% endif %}
@@ -250,7 +267,7 @@
         <li class="{% if cards %}ok{% else %}bad{% endif %}"><span class="m"></span><span>已生成团队要点卡<small>{% if not cards %}请点「生成预览」{% else %}{{ cards|length }} 张{% endif %}</small></span></li>
         <li class="{% if has_draft and not draft_stale %}ok{% else %}bad{% endif %}"><span class="m"></span><span>已生成周报草稿<small>{% if draft_stale %}挖掘/卡片已变更，请重新生成{% elif has_draft %}可预览{% else %}尚未生成{% endif %}</small></span></li>
         <li class="{% if n_noowner==0 %}ok{% else %}bad{% endif %}"><span class="m"></span><span>条目归属团队均已判定<small>{% if n_noowner %}{{ n_noowner }} 条待指定{% else %}无遗留{% endif %}</small></span></li>
-        <li class="{% if not sources_need_review %}ok{% else %}bad{% endif %}"><span class="m"></span><span>拆段归属已确认<small>{% if sources_need_review %}{{ sources_need_review|length }} 条待确认{% else %}无待确认{% endif %}</small></span></li>
+        <li class="{% if not sources_need_review %}ok{% else %}bad{% endif %}"><span class="m"></span><span>内容聚合拆段已确认<small>{% if sources_need_review %}{{ sources_need_review|length }} 条待确认{% else %}无待确认（仅聚合包需要）{% endif %}</small></span></li>
         <li class="{% if not weak_relations %}ok{% else %}bad{% endif %}"><span class="m"></span><span>弱关系已处理<small>{% if weak_relations %}{{ weak_relations|length }} 条待确认/删除{% else %}无弱关系{% endif %}</small></span></li>
       </ul>
       {% if sources_need_review %}
@@ -372,6 +389,6 @@ window.MESHADMIN = {
 };
 </script>
 <script src="/static/dialog.js?v=mesh-dlg-2"></script>
-<script src="/static/console.js?v=team-stype-3"></script>
+<script src="/static/console.js?v=clear-all-2"></script>
 </body>
 </html>

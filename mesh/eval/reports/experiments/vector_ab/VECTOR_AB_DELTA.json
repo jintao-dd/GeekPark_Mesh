@@ -1,0 +1,62 @@
+{
+  "status": "ok",
+  "fts_only": {
+    "macro_recall@5": 0.8261,
+    "macro_recall@10": 0.8961,
+    "macro_recall@20": 0.9433
+  },
+  "fts_plus_vector": {
+    "macro_recall@5": 0.7594,
+    "macro_recall@10": 0.8294,
+    "macro_recall@20": 0.8767
+  },
+  "delta": {
+    "macro_recall@5": -0.0667,
+    "macro_recall@10": -0.0667,
+    "macro_recall@20": -0.0666
+  },
+  "recommendation": "keep FTS-only mainline",
+  "new_relevant": [],
+  "noise_increase": [
+    {
+      "id": "R01",
+      "top5_noise_delta": 2
+    },
+    {
+      "id": "R03",
+      "top5_noise_delta": 4
+    },
+    {
+      "id": "R07",
+      "top5_noise_delta": 4
+    },
+    {
+      "id": "R08",
+      "top5_noise_delta": 1
+    },
+    {
+      "id": "R09",
+      "top5_noise_delta": 2
+    },
+    {
+      "id": "R17",
+      "top5_noise_delta": 3
+    },
+    {
+      "id": "R24",
+      "top5_noise_delta": 2
+    },
+    {
+      "id": "R26",
+      "top5_noise_delta": 4
+    },
+    {
+      "id": "R27",
+      "top5_noise_delta": 3
+    },
+    {
+      "id": "R29",
+      "top5_noise_delta": 3
+    }
+  ]
+}

@@ -1,0 +1,651 @@
+{
+  "summary": {
+    "n_queries": 30,
+    "total_neg50_hits": 62,
+    "queries_with_neg50": [
+      "R04",
+      "R05",
+      "R07",
+      "R12",
+      "R13",
+      "R15",
+      "R18",
+      "R29"
+    ],
+    "queries_fts_all_zero_score": [
+      "R07",
+      "R20",
+      "R28"
+    ],
+    "queries_zero_fts_hits": [
+      "R01",
+      "R02",
+      "R05",
+      "R14",
+      "R19",
+      "R22",
+      "R23",
+      "R25",
+      "R27"
+    ],
+    "queries_zero_fts_and_items": [
+      "R14",
+      "R19"
+    ],
+    "note": "PG 上 fts/item_facts 分数=命中词计数(<=0 小整数)；vector=-cosine。尺度不可比。"
+  },
+  "rows": [
+    {
+      "id": "R01",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 0,
+      "n_items": 3,
+      "fts_scores": [],
+      "items_scores": [
+        -2.0
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 0,
+      "n_neg05": 0,
+      "neg50_sections": []
+    },
+    {
+      "id": "R02",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 0,
+      "n_items": 5,
+      "fts_scores": [],
+      "items_scores": [
+        -1.0,
+        -0.3
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 0,
+      "n_neg05": 0,
+      "neg50_sections": []
+    },
+    {
+      "id": "R03",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 6,
+      "n_items": 3,
+      "fts_scores": [
+        -3.0
+      ],
+      "items_scores": [
+        -3.0
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 0,
+      "n_neg05": 0,
+      "neg50_sections": []
+    },
+    {
+      "id": "R04",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 39,
+      "n_items": 28,
+      "fts_scores": [
+        -3.0,
+        0.0
+      ],
+      "items_scores": [
+        -50.0,
+        -0.3,
+        0.0
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 1,
+      "n_neg05": 0,
+      "neg50_sections": [
+        "抽取条目"
+      ]
+    },
+    {
+      "id": "R05",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 0,
+      "n_items": 6,
+      "fts_scores": [],
+      "items_scores": [
+        -50.0,
+        -3.0
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 1,
+      "n_neg05": 0,
+      "neg50_sections": [
+        "抽取条目"
+      ]
+    },
+    {
+      "id": "R06",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 4,
+      "n_items": 16,
+      "fts_scores": [
+        5.0
+      ],
+      "items_scores": [
+        -5.0,
+        -0.5,
+        -0.3
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 0,
+      "n_neg05": 10,
+      "neg50_sections": []
+    },
+    {
+      "id": "R07",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 6,
+      "n_items": 15,
+      "fts_scores": [
+        0.0
+      ],
+      "items_scores": [
+        -50.0,
+        -4.0,
+        0.0
+      ],
+      "fts_all_zero": true,
+      "n_neg50": 6,
+      "n_neg05": 0,
+      "neg50_sections": [
+        "抽取条目"
+      ]
+    },
+    {
+      "id": "R08",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 2,
+      "n_items": 6,
+      "fts_scores": [
+        -6.0,
+        5.0
+      ],
+      "items_scores": [
+        -6.0,
+        -0.5
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 0,
+      "n_neg05": 5,
+      "neg50_sections": []
+    },
+    {
+      "id": "R09",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 2,
+      "n_items": 15,
+      "fts_scores": [
+        -4.0,
+        0.0
+      ],
+      "items_scores": [
+        -4.0,
+        -0.3,
+        0.0
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 0,
+      "n_neg05": 0,
+      "neg50_sections": []
+    },
+    {
+      "id": "R10",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 17,
+      "n_items": 28,
+      "fts_scores": [
+        -6.0,
+        0.0
+      ],
+      "items_scores": [
+        -6.0,
+        0.0
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 0,
+      "n_neg05": 0,
+      "neg50_sections": []
+    },
+    {
+      "id": "R11",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 4,
+      "n_items": 28,
+      "fts_scores": [
+        -7.0,
+        -4.0
+      ],
+      "items_scores": [
+        -7.0,
+        -3.0,
+        -0.5
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 0,
+      "n_neg05": 26,
+      "neg50_sections": []
+    },
+    {
+      "id": "R12",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 40,
+      "n_items": 28,
+      "fts_scores": [
+        -4.0,
+        0.0
+      ],
+      "items_scores": [
+        -50.0,
+        -0.3,
+        0.0
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 9,
+      "n_neg05": 0,
+      "neg50_sections": [
+        "抽取条目"
+      ]
+    },
+    {
+      "id": "R13",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 12,
+      "n_items": 28,
+      "fts_scores": [
+        5.0
+      ],
+      "items_scores": [
+        -50.0,
+        -6.0
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 26,
+      "n_neg05": 0,
+      "neg50_sections": [
+        "抽取条目"
+      ]
+    },
+    {
+      "id": "R14",
+      "window": [
+        "2026-09-21",
+        "2026-09-21"
+      ],
+      "n_fts": 0,
+      "n_items": 0,
+      "fts_scores": [],
+      "items_scores": [],
+      "fts_all_zero": false,
+      "n_neg50": 0,
+      "n_neg05": 0,
+      "neg50_sections": []
+    },
+    {
+      "id": "R15",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 40,
+      "n_items": 28,
+      "fts_scores": [
+        -6.0,
+        -2.0
+      ],
+      "items_scores": [
+        -50.0,
+        -2.0
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 1,
+      "n_neg05": 0,
+      "neg50_sections": [
+        "抽取条目"
+      ]
+    },
+    {
+      "id": "R16",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 4,
+      "n_items": 27,
+      "fts_scores": [
+        -3.0,
+        0.0
+      ],
+      "items_scores": [
+        -3.0,
+        -0.3,
+        0.0
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 0,
+      "n_neg05": 0,
+      "neg50_sections": []
+    },
+    {
+      "id": "R17",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 3,
+      "n_items": 2,
+      "fts_scores": [
+        -2.0,
+        5.0
+      ],
+      "items_scores": [
+        -10.0,
+        -2.0
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 0,
+      "n_neg05": 0,
+      "neg50_sections": []
+    },
+    {
+      "id": "R18",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 4,
+      "n_items": 28,
+      "fts_scores": [
+        -2.0
+      ],
+      "items_scores": [
+        -50.0,
+        -2.0,
+        0.0
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 7,
+      "n_neg05": 0,
+      "neg50_sections": [
+        "抽取条目"
+      ]
+    },
+    {
+      "id": "R19",
+      "window": [
+        "2026-09-21",
+        "2026-09-21"
+      ],
+      "n_fts": 0,
+      "n_items": 0,
+      "fts_scores": [],
+      "items_scores": [],
+      "fts_all_zero": false,
+      "n_neg50": 0,
+      "n_neg05": 0,
+      "neg50_sections": []
+    },
+    {
+      "id": "R20",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 1,
+      "n_items": 10,
+      "fts_scores": [
+        0.0
+      ],
+      "items_scores": [
+        -4.0,
+        -0.5
+      ],
+      "fts_all_zero": true,
+      "n_neg50": 0,
+      "n_neg05": 9,
+      "neg50_sections": []
+    },
+    {
+      "id": "R21",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 8,
+      "n_items": 28,
+      "fts_scores": [
+        5.0
+      ],
+      "items_scores": [
+        -0.5
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 0,
+      "n_neg05": 28,
+      "neg50_sections": []
+    },
+    {
+      "id": "R22",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 0,
+      "n_items": 15,
+      "fts_scores": [],
+      "items_scores": [
+        -4.0,
+        -0.5
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 0,
+      "n_neg05": 13,
+      "neg50_sections": []
+    },
+    {
+      "id": "R23",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 0,
+      "n_items": 16,
+      "fts_scores": [],
+      "items_scores": [
+        -4.0,
+        -0.5,
+        -0.3
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 0,
+      "n_neg05": 13,
+      "neg50_sections": []
+    },
+    {
+      "id": "R24",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 6,
+      "n_items": 3,
+      "fts_scores": [
+        -6.0,
+        5.0
+      ],
+      "items_scores": [
+        -6.0,
+        -0.5
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 0,
+      "n_neg05": 1,
+      "neg50_sections": []
+    },
+    {
+      "id": "R25",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 0,
+      "n_items": 16,
+      "fts_scores": [],
+      "items_scores": [
+        -4.0,
+        -0.5,
+        -0.3
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 0,
+      "n_neg05": 13,
+      "neg50_sections": []
+    },
+    {
+      "id": "R26",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 1,
+      "n_items": 1,
+      "fts_scores": [
+        5.0
+      ],
+      "items_scores": [
+        -6.0
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 0,
+      "n_neg05": 0,
+      "neg50_sections": []
+    },
+    {
+      "id": "R27",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 0,
+      "n_items": 2,
+      "fts_scores": [],
+      "items_scores": [
+        -7.0,
+        -0.5
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 0,
+      "n_neg05": 1,
+      "neg50_sections": []
+    },
+    {
+      "id": "R28",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 8,
+      "n_items": 9,
+      "fts_scores": [
+        0.0
+      ],
+      "items_scores": [
+        -6.0,
+        0.0
+      ],
+      "fts_all_zero": true,
+      "n_neg50": 0,
+      "n_neg05": 0,
+      "neg50_sections": []
+    },
+    {
+      "id": "R29",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 4,
+      "n_items": 20,
+      "fts_scores": [
+        0.0,
+        5.0
+      ],
+      "items_scores": [
+        -50.0,
+        -7.0,
+        -0.3,
+        0.0
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 11,
+      "n_neg05": 0,
+      "neg50_sections": [
+        "抽取条目"
+      ]
+    },
+    {
+      "id": "R30",
+      "window": [
+        "2026-06-23",
+        null
+      ],
+      "n_fts": 2,
+      "n_items": 28,
+      "fts_scores": [
+        -6.0,
+        5.0
+      ],
+      "items_scores": [
+        -6.0,
+        -0.5
+      ],
+      "fts_all_zero": false,
+      "n_neg50": 0,
+      "n_neg05": 27,
+      "neg50_sections": []
+    }
+  ]
+}

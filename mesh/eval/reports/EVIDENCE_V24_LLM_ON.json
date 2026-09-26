@@ -1,0 +1,715 @@
+{
+  "phase": "evidence",
+  "tag": "evidence_llm_v24",
+  "n": 20,
+  "pass_rate": 1.0,
+  "macro_evidence_coverage": 1.0,
+  "macro_evidence_correctness": 1.0,
+  "macro_unsupported_claim_rate": 0.0,
+  "macro_citation_correctness": 1.0,
+  "gold": "evidence_gold_v2.jsonl",
+  "elapsed_s": 111.24,
+  "results": [
+    {
+      "id": "E01",
+      "category": "entity",
+      "out": {
+        "status": "grounded",
+        "n_hits": 3,
+        "evidence_refs": [
+          "ev:item:4260",
+          "ev:item:4251",
+          "ev:item:4259"
+        ],
+        "item_ids": [
+          "4260",
+          "4251",
+          "4259"
+        ],
+        "answer_snip": "依据 2026-8-17 那期已上线记录，锦涛（品牌创意团队）相关的事项如下：\n\n- 锦涛做了一个工具，团队内部就是否将其开源各有判断，该期记录写明次日再讨论。\n- 锦涛会为李源的账号内容提供 Web Coding Blog 建站风格参考。\n- 就 Snowball 相关小工具的开源事宜，锦涛在那期所述的「本周」准备代",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E02",
+      "category": "company",
+      "out": {
+        "status": "grounded",
+        "n_hits": 40,
+        "evidence_refs": [
+          "ev:item:4120",
+          "ev:item:4123",
+          "ev:item:4112",
+          "ev:item:4124",
+          "ev:item:4115",
+          "ev:item:4116",
+          "ev:item:4117",
+          "ev:ctx:2026-8-17:8"
+        ],
+        "item_ids": [
+          "4120",
+          "4123",
+          "4112",
+          "4124",
+          "4115",
+          "4116",
+          "4117",
+          "4118",
+          "4122",
+          "4121",
+          "4167",
+          "4128",
+          "4129",
+          "4130",
+          "4106",
+          "4237",
+          "4105",
+          "4110",
+          "4111",
+          "4189",
+          "4190",
+          "4182"
+        ],
+        "answer_snip": "依据的是 2026-8-17 那期已上线记录（并非今日新发生的接触），编辑部与面壁智能詹杨帆有对话记录，接触内容如下。\n\n**接触对象与身份**\n面壁智能是端侧模型公司，沟通对象为詹杨帆，围绕 Agent 上车与智能座舱展开；此外也与高通侧芯片调优负责人就端侧模型在旗舰手机应用的限制与发展方向做过交流（均为已接触）。\n",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E03",
+      "category": "topic",
+      "out": {
+        "status": "grounded",
+        "n_hits": 40,
+        "evidence_refs": [
+          "ev:item:4112",
+          "ev:item:4116",
+          "ev:item:4114",
+          "ev:item:4118",
+          "ev:item:4125",
+          "ev:item:4127",
+          "ev:item:4120",
+          "ev:item:4123"
+        ],
+        "item_ids": [
+          "4112",
+          "4116",
+          "4114",
+          "4118",
+          "4125",
+          "4127",
+          "4120",
+          "4123",
+          "4149",
+          "4383",
+          "4162",
+          "4345",
+          "4348",
+          "4128",
+          "4129",
+          "4130",
+          "4106",
+          "4242",
+          "4105",
+          "4110"
+        ],
+        "answer_snip": "依据的是 2026-8-17 期已上线记录，并非今日新发生；以下按端侧模型与智能座舱两条线整理。\n\n**端侧模型（受访者陈述，非核实事实）**\n- 面壁智能詹杨帆认为端侧与云端各有场景：端侧优势是响应速度、数据本地化、断网可用，云端优势是复杂语义理解、多轮推理和个性化查询。\n- 詹杨帆认为 MCP 当前最大障碍不是技术",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E04",
+      "category": "topic",
+      "out": {
+        "status": "grounded",
+        "n_hits": 11,
+        "evidence_refs": [
+          "ev:item:4445",
+          "ev:item:4409",
+          "ev:item:4411",
+          "ev:item:4408",
+          "ev:item:4410",
+          "ev:ctx:2026-09-08:6",
+          "ev:ctx:2026-09-08:8",
+          "ev:ctx:2026-09-08:9"
+        ],
+        "item_ids": [
+          "4445",
+          "4409",
+          "4411",
+          "4408",
+          "4410"
+        ],
+        "answer_snip": "依据 2026-09-08 那期已上线的视频号周数据，该期\"本周\"播放处于前列的片子如下（按播放量排列）：\n\n- 《AGI时代来了？》（OpenAI）：播放 7618、点赞 47、分享 65。\n- 《这款Harness震撼硅谷》（AI）：播放 6429、点赞 77、分享 203、完播率 15.89%。\n- 《传统相机太",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E05",
+      "category": "community",
+      "out": {
+        "status": "grounded",
+        "n_hits": 32,
+        "evidence_refs": [
+          "ev:item:4368",
+          "ev:item:4274",
+          "ev:item:4221",
+          "ev:item:4286",
+          "ev:item:4183",
+          "ev:item:4319",
+          "ev:item:4358",
+          "ev:item:4246"
+        ],
+        "item_ids": [
+          "4368",
+          "4274",
+          "4221",
+          "4286",
+          "4183",
+          "4319",
+          "4358",
+          "4246",
+          "4247",
+          "4378",
+          "4385",
+          "4386",
+          "4387",
+          "4376",
+          "4377",
+          "4369",
+          "4241",
+          "4271",
+          "4370",
+          "4371",
+          "4372",
+          "4364",
+          "4303",
+          "4230",
+          "4231",
+          "4232",
+          "4233",
+          "4235"
+        ],
+        "answer_snip": "依据 2026-8-17 那期已上线记录（并非今日新发生），Founder Park 下半年规划相关信息如下：\n\n- 下半年整体方向：从内容驱动转向聚焦创业者核心需求的社区基础设施。\n- 团队判断（会议判断，非核实事实）：创业者当前最焦虑的是赛道选择和生存空间，而非技术；活动可帮助回答哪些赛道大厂已进场、哪些仍有先发优",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E06",
+      "category": "relation",
+      "out": {
+        "status": "grounded",
+        "n_hits": 2,
+        "evidence_refs": [
+          "ev:item:4277",
+          "ev:item:4242"
+        ],
+        "item_ids": [
+          "4277",
+          "4242"
+        ],
+        "answer_snip": "依据 2026-8-17 期已上线记录，两条记录分属不同团队、内容主题也不同，暂时看不到可直接同步的共同关系点：\n\n- 一条是品牌创意团队的 AGI 复盘，讲的是活动现场场地与主舞台点位数据的经验（椅子、屏幕层高遮挡等），属活动执行经验。\n- 另一条是编辑部经由外部媒体渠道产出的英文报道，内容是 MiniMax 的 V",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E07",
+      "category": "empty",
+      "out": {
+        "status": "unsupported",
+        "n_hits": 0,
+        "evidence_refs": [],
+        "item_ids": [],
+        "answer_snip": "未找到与问题直接相关的已上线记录，资料未提供可核对依据，不能下结论。",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "insufficient",
+        "claim_support_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E08",
+      "category": "topic",
+      "out": {
+        "status": "grounded",
+        "n_hits": 20,
+        "evidence_refs": [
+          "ev:item:4153",
+          "ev:item:4156",
+          "ev:item:4158",
+          "ev:item:4160",
+          "ev:item:4168",
+          "ev:item:4169",
+          "ev:item:4174",
+          "ev:item:4175"
+        ],
+        "item_ids": [
+          "4153",
+          "4156",
+          "4158",
+          "4160",
+          "4168",
+          "4169",
+          "4174",
+          "4175",
+          "4182",
+          "4237",
+          "4379",
+          "4250",
+          "4380",
+          "4190",
+          "4154",
+          "4155",
+          "4334"
+        ],
+        "answer_snip": "检索到的记录里没有标注为「具身智能数据圆桌」的会议或活动记录，无法直接回答该圆桌讨论了哪些内容。以下依据 2026-8-17 那期已上线记录，列出与具身智能数据相关、可能对应你所问方向的条目，供对照：\n\n- 擎羽科技（深圳擎羽科技/晴雨科技）做纯绳驱柔性具身机械臂，定位跨本体适配，可兼容刚性臂、机器狗数据经转换生成柔性",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E09",
+      "category": "team",
+      "out": {
+        "status": "grounded",
+        "n_hits": 40,
+        "evidence_refs": [
+          "ev:item:4502",
+          "ev:item:4416",
+          "ev:item:4417",
+          "ev:ctx:2026-09-08:4",
+          "ev:ctx:2026-09-08:5",
+          "ev:ctx:2026-09-08:6",
+          "ev:ctx:2026-09-08:7",
+          "ev:ctx:2026-09-08:8"
+        ],
+        "item_ids": [
+          "4502",
+          "4416",
+          "4417",
+          "4514",
+          "4414",
+          "4415",
+          "4511",
+          "4413",
+          "4418",
+          "4419",
+          "4428",
+          "4438",
+          "4420",
+          "4423",
+          "4426",
+          "4421",
+          "4429",
+          "4430",
+          "4431",
+          "4432",
+          "4424",
+          "4425",
+          "4427"
+        ],
+        "answer_snip": "依据 2026-09-08 期已上线记录，编辑部选题表里与 IFA 相关的有两条，均标注为进行中：\n\n1. IFA 探展总览：IFA 现场观展心得，提报日期 8/31，形式为 Hardwire 文章，当前待补全资料/提纲。\n2. IFA 2026 逛展稿件：IFA 2026 现场稿，提报日期 8/31，进行中。\n\n以上",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E10",
+      "category": "team",
+      "out": {
+        "status": "grounded",
+        "n_hits": 40,
+        "evidence_refs": [
+          "ev:item:4407",
+          "ev:item:4406",
+          "ev:item:4408",
+          "ev:item:4409",
+          "ev:item:4410",
+          "ev:item:4412",
+          "ev:item:4426",
+          "ev:item:4428"
+        ],
+        "item_ids": [
+          "4407",
+          "4406",
+          "4408",
+          "4409",
+          "4410",
+          "4412",
+          "4426",
+          "4428",
+          "4432",
+          "4433",
+          "4435",
+          "4437",
+          "4434",
+          "4439",
+          "4436",
+          "4441",
+          "4442",
+          "4443",
+          "4444",
+          "4445",
+          "4446",
+          "4448",
+          "4450",
+          "4451",
+          "4447",
+          "4452"
+        ],
+        "answer_snip": "本轮检索到的记录里，没有归属团队为「商业化团队」的客户跟进条目。可用记录的归属团队分别是视频号团队、硅谷 BD 团队和编辑部，均不涉及商业化团队。\n\n因此，本次检索范围内没有商业化团队跟进客户的相关记录。若需要该问题的完整答案，缺少商业化团队相关来源（如商业化团队例会提及等），该类记录本轮没有接入或未命中。\n\n来源：\n",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E11",
+      "category": "abstention",
+      "out": {
+        "status": "unsupported",
+        "n_hits": 0,
+        "evidence_refs": [],
+        "item_ids": [],
+        "answer_snip": "未找到与问题直接相关的已上线记录，资料未提供可核对依据，不能下结论。",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "insufficient",
+        "claim_support_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E12",
+      "category": "temporal",
+      "out": {
+        "status": "grounded",
+        "n_hits": 5,
+        "evidence_refs": [
+          "ev:item:4260",
+          "ev:item:4251",
+          "ev:item:4259"
+        ],
+        "item_ids": [
+          "4260",
+          "4251",
+          "4259"
+        ],
+        "answer_snip": "依据的是 2026-8-17 期已上线记录（品牌创意团队周会复盘），并非今日新发生；这些条目未提供具体发生时间，以下按该期记录陈述。\n\n- 锦涛（品牌创意团队）在该期记录中，就是否开源自己做的工具，与团队内部各有判断，事宜留待次日再讨论。\n- 与 Snowball 相关的小工具计划开源，该期记录写明锦涛准备代码仓库；开",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E13",
+      "category": "adversarial_unsupported",
+      "out": {
+        "status": "unsupported",
+        "n_hits": 0,
+        "evidence_refs": [],
+        "item_ids": [],
+        "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "insufficient",
+        "claim_support_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E14",
+      "category": "adversarial_unsupported",
+      "out": {
+        "status": "unsupported",
+        "n_hits": 6,
+        "evidence_refs": [],
+        "item_ids": [],
+        "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "insufficient",
+        "claim_support_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E15",
+      "category": "adversarial_unsupported",
+      "out": {
+        "status": "unsupported",
+        "n_hits": 0,
+        "evidence_refs": [],
+        "item_ids": [],
+        "answer_snip": "未找到与问题直接相关的已上线记录，资料未提供可核对依据，不能下结论。",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "insufficient",
+        "claim_support_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E16",
+      "category": "adversarial_unsupported",
+      "out": {
+        "status": "unsupported",
+        "n_hits": 18,
+        "evidence_refs": [],
+        "item_ids": [],
+        "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "insufficient",
+        "claim_support_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E17",
+      "category": "adversarial_unsupported",
+      "out": {
+        "status": "unsupported",
+        "n_hits": 1,
+        "evidence_refs": [],
+        "item_ids": [],
+        "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "insufficient",
+        "claim_support_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E18",
+      "category": "adversarial_contradicted",
+      "out": {
+        "status": "unsupported",
+        "n_hits": 1,
+        "evidence_refs": [],
+        "item_ids": [],
+        "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "contradicted",
+        "claim_support_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E19",
+      "category": "adversarial_unsupported",
+      "out": {
+        "status": "unsupported",
+        "n_hits": 0,
+        "evidence_refs": [],
+        "item_ids": [],
+        "answer_snip": "资料未提供可核对依据，不能确认该结论，不能下结论。已上线记录若仅涉及相关主体，也不等于支持该主张。",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "insufficient",
+        "claim_support_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E20",
+      "category": "entity_should_answer",
+      "out": {
+        "status": "grounded",
+        "n_hits": 3,
+        "evidence_refs": [
+          "ev:item:4260",
+          "ev:item:4251",
+          "ev:item:4259"
+        ],
+        "item_ids": [
+          "4260",
+          "4251",
+          "4259"
+        ],
+        "answer_snip": "依据 2026-8-17 那期已上线记录，锦涛（品牌创意团队）相关的事项如下：\n\n- 锦涛做了一个工具，团队内部就是否开源该工具各有判断：一方认为开源能沉淀 GitHub 记录、体现在 build 产品、立 builder 人设；另一方认为当前性价比与时机不足、人设需持续投入才能立、工具尚未用好即开出去，该期记录写明次",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "claim_support_leak": 0.0,
+        "claim_support": "supported",
+        "claim_support_ok": 1.0,
+        "pass": true
+      }
+    }
+  ]
+}

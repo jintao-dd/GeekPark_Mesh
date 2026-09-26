@@ -1,0 +1,128 @@
+[mesh] pg pool min=2 max=20
+{
+  "slug": "2026-8-17",
+  "lane": "draft_json",
+  "mode": "shadow",
+  "n_relations": 10,
+  "n_valid": 9,
+  "n_invalid": 1,
+  "n_uncertain": 0,
+  "invalid_ratio": 0.1,
+  "by_reason": {
+    "ok": 9,
+    "status_upgrade": 1
+  },
+  "invalid_rows": [
+    {
+      "candidate_id": "c25",
+      "title": "擎羽科技：编辑部接触获早期赛道信号",
+      "claim_verdict": "invalid",
+      "claim_reason_code": "status_upgrade",
+      "claim_reason": "title 论断强度 3 > 证据有效强度 2",
+      "claim_strength": 3,
+      "evidence_strength": 2
+    }
+  ],
+  "invalid_details": [
+    {
+      "title": "擎羽科技：编辑部接触获早期赛道信号",
+      "body": "编辑部：受访者陈述，柔性具身属尚未形成共识的早期赛道，投资人从追捧模型概念转向回归硬件本体价值，硅谷头部企业对 ego 数据采购需求远超国内，无触觉传感器的机器人普遍停留在简单取放阶段（非核实事实）。",
+      "details": [
+        "编辑部：受访者陈述，柔性具身属尚未形成共识的早期赛道，投资人从追捧模型概念转向回归硬件本体价值，硅谷头部企业对 ego 数据采购需求远超国内，无触觉传感器的机器人普遍停留在简单取放阶段（非核实事实）。"
+      ],
+      "tier": "watch",
+      "type": "one_sided",
+      "weak": true,
+      "evidence": [
+        {
+          "team": "编辑部",
+          "snippet": "受访者陈述（非核实事实）：柔性具身属尚未形成共识的早期赛道；投资人从追捧模型概念转向回归硬件本体价值；硅谷头部企业对 ego 数据的采购需求远超国内；无触觉传感器的机器人普遍停留在简单取放阶段。国内投资团队用得上（早期赛道信号）。"
+        }
+      ],
+      "reason_code": "status_upgrade",
+      "reason": "title 论断强度 3 > 证据有效强度 2",
+      "claim_strength": 3,
+      "evidence_strength": 2,
+      "lexical_body_pass": true
+    }
+  ],
+  "uncertain_rows": [],
+  "valid_watch_parallel_sample": [
+    {
+      "title": "Founder Park 传播与下半年规划：两队各知一半",
+      "tier": "strong",
+      "type": "info_complement",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    },
+    {
+      "title": "豆包（字节跳动）：三个团队各自触点",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    },
+    {
+      "title": "Agent 治理与 AI 伦理：编辑部与视频号各自覆盖",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 0,
+      "evidence_strength": 2
+    },
+    {
+      "title": "WAIC：社群办活动、编辑部记录受访判断",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    },
+    {
+      "title": "刘靖康（影石 Insta360）：编辑部接触、视频号出镜",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 3,
+      "evidence_strength": 3
+    },
+    {
+      "title": "xAI：编辑部建联技术成员、视频号做相关视频",
+      "tier": "watch",
+      "type": "one_sided",
+      "claim_strength": 1,
+      "evidence_strength": 2
+    },
+    {
+      "title": "视频号栏目封面：由品牌创意团队设计资源承接",
+      "tier": "watch",
+      "type": "one_sided",
+      "claim_strength": 0,
+      "evidence_strength": 0
+    },
+    {
+      "title": "编辑部海外内容进视频号选题会",
+      "tier": "watch",
+      "type": "one_sided",
+      "claim_strength": 5,
+      "evidence_strength": 5
+    },
+    {
+      "title": "戴博（李天羽）：编辑部访谈获具身赛道判断",
+      "tier": "watch",
+      "type": "one_sided",
+      "claim_strength": 2,
+      "evidence_strength": 3
+    }
+  ],
+  "lexical_pass_but_claim_invalid": [
+    {
+      "title": "擎羽科技：编辑部接触获早期赛道信号",
+      "reason_code": "status_upgrade",
+      "reason": "title 论断强度 3 > 证据有效强度 2",
+      "claim_strength": 3,
+      "evidence_strength": 2
+    }
+  ],
+  "go_nogo_hints": {
+    "invalid_ratio_warn_if_gt": 0.25,
+    "note": "A1 shadow only; do not enforce until human review of invalid_details"
+  }
+}

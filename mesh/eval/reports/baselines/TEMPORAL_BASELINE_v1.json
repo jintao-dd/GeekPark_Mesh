@@ -1,0 +1,1067 @@
+{
+  "phase": "Temporal Phase 0 Baseline",
+  "gold": "temporal_gold_v1.jsonl",
+  "n": 24,
+  "n_pass": 24,
+  "n_fail": 0,
+  "pass_rate": 1.0,
+  "elapsed_s": 105.3,
+  "by_category_count": {
+    "A": 4,
+    "B": 4,
+    "C": 4,
+    "D": 4,
+    "E": 4,
+    "F": 4
+  },
+  "failure_reason_hist": {},
+  "completion_criteria": {
+    "gold_built": true,
+    "baseline_ran": true,
+    "all_pass_required": false,
+    "next": "minimal Temporal implement only after reviewing failure distribution"
+  },
+  "results": [
+    {
+      "id": "T01",
+      "category": "A",
+      "query": "锦涛最近做了什么",
+      "gold_time_semantics": {
+        "basis": "event_time",
+        "window": "recent"
+      },
+      "gold_issue_scope": "latest_published",
+      "gold_explicit_issue": null,
+      "expected_behavior": "不得把 latest_published 或旧期材料直接说成「最近发生」；无 event_time 须标明依据期次/资料时间，或说明未提供发生时间",
+      "predicted_time_basis": "unknown",
+      "predicted_window": "recent",
+      "system_temporal": {
+        "window": "recent",
+        "basis": "unknown",
+        "filter_mode": "issue_anchor",
+        "hard_rules": [
+          "latest_published_neq_recent_event",
+          "unknown_event_time_neq_recent",
+          "no_basis_no_deterministic_recent"
+        ],
+        "reject_latest_equals_recent": false,
+        "require_no_event_time_caveat": true,
+        "issue_mode": "latest_published",
+        "issue_slug": "2026-09-08"
+      },
+      "issue_scope": "latest_published",
+      "issue_slug": "2026-09-08",
+      "retrieved_evidence": [],
+      "final_answer": "未在已上线周报中找到与问题直接相关的记录。请尝试换关键词、缩小或扩大时间范围，或确认相关内容是否已上线。\n（本次检索时间范围：2026-09-08 至 2026-09-08）",
+      "intent": "ask_published",
+      "data_tools": [
+        "ask.published"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 66,
+      "note": "system_temporal from Agent Phase 1"
+    },
+    {
+      "id": "T02",
+      "category": "A",
+      "query": "破壳创智最近有什么进展",
+      "gold_time_semantics": {
+        "basis": "event_time",
+        "window": "recent"
+      },
+      "gold_issue_scope": "latest_published",
+      "gold_explicit_issue": null,
+      "expected_behavior": "进展须挂事件/材料时间；不可因最新上线期而说成刚发生",
+      "predicted_time_basis": "unknown",
+      "predicted_window": "recent",
+      "system_temporal": {
+        "window": "recent",
+        "basis": "unknown",
+        "filter_mode": "issue_anchor",
+        "hard_rules": [
+          "latest_published_neq_recent_event",
+          "unknown_event_time_neq_recent",
+          "no_basis_no_deterministic_recent"
+        ],
+        "reject_latest_equals_recent": false,
+        "require_no_event_time_caveat": true,
+        "issue_mode": "latest_published",
+        "issue_slug": "2026-09-08"
+      },
+      "issue_scope": "latest_published",
+      "issue_slug": "2026-09-08",
+      "retrieved_evidence": [],
+      "final_answer": "未在已上线周报中找到与问题直接相关的记录。请尝试换关键词、缩小或扩大时间范围，或确认相关内容是否已上线。\n（本次检索时间范围：2026-09-08 至 2026-09-08）",
+      "intent": "ask_published",
+      "data_tools": [
+        "ask.published"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 11,
+      "note": "system_temporal from Agent Phase 1"
+    },
+    {
+      "id": "T03",
+      "category": "A",
+      "query": "近期哪些公司第一次进入记录",
+      "gold_time_semantics": {
+        "basis": "material_time",
+        "window": "recent"
+      },
+      "gold_issue_scope": "latest_published",
+      "gold_explicit_issue": null,
+      "expected_behavior": "「近期」应按材料进入/期次窗口表述，并点明依据哪一期；禁止假装为今日新发生",
+      "predicted_time_basis": "unknown",
+      "predicted_window": "recent",
+      "system_temporal": {
+        "window": "recent",
+        "basis": "unknown",
+        "filter_mode": "issue_anchor",
+        "hard_rules": [
+          "latest_published_neq_recent_event",
+          "unknown_event_time_neq_recent",
+          "no_basis_no_deterministic_recent"
+        ],
+        "reject_latest_equals_recent": false,
+        "require_no_event_time_caveat": true,
+        "issue_mode": "latest_published",
+        "issue_slug": "2026-09-08"
+      },
+      "issue_scope": "latest_published",
+      "issue_slug": "2026-09-08",
+      "retrieved_evidence": [
+        "ev:ctx:2026-09-08:1",
+        "ev:ctx:2026-09-08:2",
+        "ev:ctx:2026-09-08:3",
+        "ev:ctx:2026-09-08:4",
+        "ev:ctx:2026-09-08:5",
+        "ev:ctx:2026-09-08:6",
+        "ev:ctx:2026-09-08:7",
+        "ev:ctx:2026-09-08:8",
+        "ev:ctx:2026-09-08:9",
+        "ev:ctx:2026-09-08:10",
+        "ev:ctx:2026-09-08:11",
+        "ev:ctx:2026-09-08:12"
+      ],
+      "final_answer": "依据的是 2026-09-08 期已上线记录（检索时间范围自 2026-06-10 起），资料未提供这些公司各自的首次接触发生时间，以下按该期「接触过的人和公司」章节的记录列出，不代表\"最近（资料记载·非事件时刻断言）\"。\n\n在检索范围内，该期记录中出现的公司/项目主体有：\n\n- FREELANDER 神行者（文飞，汽车与出行 · 硬派新能源方向）\n- 滴滴战投（牛一鸣，智能硬件与投资方向）\n- 程天科技（颜海，外骨骼方向）\n- 越疆科技（Fay，具身线索）\n- 未来脑律 ZenoWell（薛耀，可穿戴睡眠硬件，欧美已开售）\n- OdyssLife（JACK，潘宇扬项目，走 KS 众筹与 CES 节奏）\n- xTool（珩仪，欧洲 Maker 工具）\n- floatboat（少卿，已接触）\n- 腾讯（wb 生态应用与软件场，已接触）\n- Reverie AI（Brad Yuan，实时交互模型）\n- Eigent AI（Guohao Li，企业多智能体自动化）\n\n需要说明：本轮上下文来自混合检索，可能不完整；且这些记录未标注各主体是否为\"第一次进入记录\"或首次接触时间，无法判断哪些是首次出现、哪些是既有跟进。要准确回答\"第一次进入\"，需要能对照更早期号的历史记录或带首次接触时间标记的来源，这类时间依据本期资料未提供。\n\n来源：\n- 2026-09-08 · 接触过的人和公司 · FREELANDER 神行者\n- 2026-09-08 · 接触过的人和公司 · 滴滴战投\n- 2026-09-08 · 接触过的人和公司 · 程天科技\n- 2026-09-08 · 接触过的人和公司 · 越疆科技\n- 2026-09-08 · 接触过的人和公司 · 未来脑律 ZenoWell\n- 2026-09-08 · 接触过的人和公司 · OdyssLife\n- 2026-09-08 · 接触过的人和公司 · xTool\n- 2026-09-08 · 接触过的人和公司 · floatboat\n- 2026-09-08 · 接触过的人和公司 · 腾讯\n- 2026-09-08 · 接触过的人和公司 · Reverie AI\n- 2026-09-08 · 接触过的人和公司 · Eigent AI",
+      "intent": "ask_published",
+      "data_tools": [
+        "ask.published"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 11126,
+      "note": "system_temporal from Agent Phase 1"
+    },
+    {
+      "id": "T04",
+      "category": "A",
+      "query": "视频号最近在跟什么选题",
+      "gold_time_semantics": {
+        "basis": "event_time",
+        "window": "recent"
+      },
+      "gold_issue_scope": "latest_published",
+      "gold_explicit_issue": null,
+      "expected_behavior": "回答须区分期次记录时间与事件发生时间；无事件时间不得说「最近正在」",
+      "predicted_time_basis": "unknown",
+      "predicted_window": "recent",
+      "system_temporal": {
+        "window": "recent",
+        "basis": "unknown",
+        "filter_mode": "issue_anchor",
+        "hard_rules": [
+          "latest_published_neq_recent_event",
+          "unknown_event_time_neq_recent",
+          "no_basis_no_deterministic_recent"
+        ],
+        "reject_latest_equals_recent": false,
+        "require_no_event_time_caveat": true,
+        "issue_mode": "latest_published",
+        "issue_slug": "2026-09-08"
+      },
+      "issue_scope": "latest_published",
+      "issue_slug": "2026-09-08",
+      "retrieved_evidence": [
+        "ev:item:4413",
+        "ev:item:4415",
+        "ev:item:4416",
+        "ev:item:4417",
+        "ev:item:4418",
+        "ev:item:4419",
+        "ev:ctx:2026-09-08:7",
+        "ev:item:4414",
+        "ev:ctx:2026-09-08:9",
+        "ev:ctx:2026-09-08:10",
+        "ev:ctx:2026-09-08:11",
+        "ev:ctx:2026-09-08:12"
+      ],
+      "final_answer": "本次检索命中的记录都归属编辑部（编辑部选题表），没有视频号团队的选题记录。视频号团队负责的是视频号账号运营与周数据，其选题类内容不在本轮命中的记录里。\n\n因此，关于「视频号最近在跟什么选题」，本期（依据 2026-09-08 期已上线记录）没有视频号团队的相关记录，无法回答。缺的是视频号团队的选题/内容规划类来源，本轮未接入或未命中。\n\n如果你想了解的是编辑部当前在做的选题，本期记录里有若干条（如 Agent 应用创业选题、IFA 探展稿件、高德扫街榜回顾等），但这些均归属编辑部，不是视频号团队，且资料未提供各条的具体推进时间，不宜说成「（资料记载·非事件时刻断言）跟」。\n\n来源：\n- 2026-09-08 · 抽取条目 · Agent应用创业正在消亡\n- 2026-09-08 · 抽取条目 · IFA / IFA 2026\n- 2026-09-08 · 抽取条目 · 高德\n- 2026-09-08 · 关注了什么 · Agent 与多智能体",
+      "intent": "ask_published",
+      "data_tools": [
+        "ask.published"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 12664,
+      "note": "system_temporal from Agent Phase 1"
+    },
+    {
+      "id": "T05",
+      "category": "B",
+      "query": "本周编辑部关注了什么",
+      "gold_time_semantics": {
+        "basis": "issue_time",
+        "window": "this_week"
+      },
+      "gold_issue_scope": "latest_published",
+      "gold_explicit_issue": null,
+      "expected_behavior": "「本周」须锚定 Issue Time / 期次窗口，不得锚定墙上时钟「今天所在周」而串错期",
+      "predicted_time_basis": "issue_time",
+      "predicted_window": "this_week",
+      "system_temporal": {
+        "window": "this_week",
+        "basis": "issue_time",
+        "filter_mode": "issue_anchor",
+        "hard_rules": [
+          "latest_published_neq_recent_event",
+          "unknown_event_time_neq_recent",
+          "no_basis_no_deterministic_recent"
+        ],
+        "reject_latest_equals_recent": false,
+        "require_no_event_time_caveat": false,
+        "issue_mode": "latest_published",
+        "issue_slug": "2026-09-08"
+      },
+      "issue_scope": "latest_published",
+      "issue_slug": "2026-09-08",
+      "retrieved_evidence": [
+        "ev:ctx:2026-09-08:1",
+        "ev:ctx:2026-09-08:2",
+        "ev:ctx:2026-09-08:3",
+        "ev:ctx:2026-09-08:4",
+        "ev:ctx:2026-09-08:5",
+        "ev:ctx:2026-09-08:6",
+        "ev:ctx:2026-09-08:7",
+        "ev:ctx:2026-09-08:8",
+        "ev:ctx:2026-09-08:9",
+        "ev:ctx:2026-09-08:10",
+        "ev:ctx:2026-09-08:11",
+        "ev:ctx:2026-09-08:12"
+      ],
+      "final_answer": "依据 2026-09-08 期已上线记录（并非今日新发生），编辑部在该期接触了以下人和公司：\n\n**汽车与出行**\n- 神行者 FREELANDER 文飞，硬派新能源方向：受访者陈述座舱竞争力在品牌审美与交互格调，护城河为传统调校×智能感知×底盘控制的集成；产品面向城市通勤为主、自驾为辅的家庭用户，配后轮转向、空悬、三把锁等安全冗余；采用少商多店类直营零库存模式覆盖全国核心 60~80 城（受访者陈述，非核实事实）。\n- 滴滴战投 牛一鸣，智能硬件与投资方向（受访者陈述，非核实事实）。\n\n**外骨骼与具身**\n- 程天科技 颜海，外骨骼方向：受访者陈述行业约 100 家外骨骼公司、原创约 3 家，单款研发投入在几千万到 1 亿区间，核心是人才（受访者陈述，非核实事实）。\n- 越疆科技 Fay，具身线索。\n\n**可穿戴与硬件**\n- 未来脑律 ZenoWell 薛耀，可穿戴睡眠硬件，欧美已开售。\n- OdyssLife JACK（潘宇扬项目），走 KS 众筹与 CES 节奏。\n- xTool 珩仪，欧洲 Maker 工具。\n\n**内容与生态**\n- floatboat 少卿，已接触。\n- 腾讯 wb 生态应用与软件场，已接触。\n\n**AI 应用与 SaaS 方向线索**（来自硅谷 BD 团队创业者数据库）\n- Pure Global / XOPS / AutoSeek / HeyGen / AgentLive / Infron / Cresta / Rezona 等新进数据库线索；其中 HeyGen（徐卓）编辑部与视频号团队可用作话题参照，多数尚未接触。\n\n来源：\n- 2026-09-08 · 接触过的人和公司 · FREELANDER 神行者\n- 2026-09-08 · 接触过的人和公司 · 滴滴战投\n- 2026-09-08 · 接触过的人和公司 · 程天科技\n- 2026-09-08 · 接触过的人和公司 · 越疆科技\n- 2026-09-08 · 接触过的人和公司 · 未来脑律 ZenoWell\n- 2026-09-08 · 接触过的人和公司 · OdyssLife\n- 2026-09-08 · 接触过的人和公司 · xTool\n- 2026-09-08 · 接触过的人和公司 · floatboat\n- 2026-09-08 · 接触过的人和公司 · 腾讯\n- 2026-09-08 · 接触过的人和公司 · AI 应用与 SaaS",
+      "intent": "ask_published",
+      "data_tools": [
+        "ask.published"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 9512,
+      "note": "system_temporal from Agent Phase 1"
+    },
+    {
+      "id": "T06",
+      "category": "B",
+      "query": "上周商业化团队跟进了哪些客户",
+      "gold_time_semantics": {
+        "basis": "issue_time",
+        "window": "last_week"
+      },
+      "gold_issue_scope": "latest_published",
+      "gold_explicit_issue": null,
+      "expected_behavior": "「上周」相对期次或明确无资料；不得用今天往回推一周覆盖无关期",
+      "predicted_time_basis": "issue_time",
+      "predicted_window": "last_week",
+      "system_temporal": {
+        "window": "last_week",
+        "basis": "issue_time",
+        "filter_mode": "issue_anchor",
+        "hard_rules": [
+          "latest_published_neq_recent_event",
+          "unknown_event_time_neq_recent",
+          "no_basis_no_deterministic_recent"
+        ],
+        "reject_latest_equals_recent": false,
+        "require_no_event_time_caveat": false,
+        "issue_mode": "latest_published",
+        "issue_slug": "2026-09-08"
+      },
+      "issue_scope": "latest_published",
+      "issue_slug": "2026-09-08",
+      "retrieved_evidence": [
+        "ev:ctx:2026-09-08:1"
+      ],
+      "final_answer": "依据检索范围（from=2026-08-31 to=2026-09-06），本轮命中的记录里没有商业化团队在该时间窗内跟进客户的记录。\n\n命中的唯一相关条目来自硅谷 BD 团队创业者数据库，提到 AdsGency AI（广告场景）标注为「商业化团队可留意」，但这属于新进数据库线索的路由提示，并非商业化团队已跟进的记录，且资料未提供该线索的发生时间。\n\n因此，「上周商业化团队跟进了哪些客户」这个问题所需的商业化团队跟进记录（如商业化团队例会提及、对应客户与阶段）在本轮上下文中尚未接入或本期没有相关记录，无法回答。\n\n来源：\n- 2026-09-08 · 接触过的人和公司 · 其他方向",
+      "intent": "ask_published",
+      "data_tools": [
+        "ask.published"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 6485,
+      "note": "system_temporal from Agent Phase 1"
+    },
+    {
+      "id": "T07",
+      "category": "B",
+      "query": "本周有没有可同步的关系",
+      "gold_time_semantics": {
+        "basis": "issue_time",
+        "window": "this_week"
+      },
+      "gold_issue_scope": "latest_published",
+      "gold_explicit_issue": null,
+      "expected_behavior": "关系摘要须落在所指期次；无关系则如实说，禁止用「本周刚联动」无依据措辞",
+      "predicted_time_basis": "unobserved",
+      "predicted_window": "issue_scoped",
+      "system_temporal": null,
+      "issue_scope": "latest_published",
+      "issue_slug": "2026-09-08",
+      "retrieved_evidence": [],
+      "final_answer": "期次 2026-09-08 的已上线周报中暂无读者可见关系卡。",
+      "intent": "ask_relations",
+      "data_tools": [
+        "ask.relations_summary"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 3,
+      "note": "predicted_* inferred from answer; no system temporal"
+    },
+    {
+      "id": "T08",
+      "category": "B",
+      "query": "上周视频号数据怎么样",
+      "gold_time_semantics": {
+        "basis": "material_time",
+        "window": "last_week"
+      },
+      "gold_issue_scope": "latest_published",
+      "gold_explicit_issue": null,
+      "expected_behavior": "数据窗口以材料/期次为准；说明资料所属周次，禁止默认「日历上周」",
+      "predicted_time_basis": "issue_time",
+      "predicted_window": "last_week",
+      "system_temporal": {
+        "window": "last_week",
+        "basis": "issue_time",
+        "filter_mode": "issue_anchor",
+        "hard_rules": [
+          "latest_published_neq_recent_event",
+          "unknown_event_time_neq_recent",
+          "no_basis_no_deterministic_recent"
+        ],
+        "reject_latest_equals_recent": false,
+        "require_no_event_time_caveat": false,
+        "issue_mode": "latest_published",
+        "issue_slug": "2026-09-08"
+      },
+      "issue_scope": "latest_published",
+      "issue_slug": "2026-09-08",
+      "retrieved_evidence": [
+        "ev:ctx:2026-09-08:1",
+        "ev:ctx:2026-09-08:2",
+        "ev:ctx:2026-09-08:3",
+        "ev:ctx:2026-09-08:4",
+        "ev:ctx:2026-09-08:5",
+        "ev:ctx:2026-09-08:6",
+        "ev:item:4423"
+      ],
+      "final_answer": "依据的是 2026-09-08 期已上线记录，不是今日新发生。\n\n关于上周（对应该期视频号周数据）视频号数据：\n\n- AGI 相关内容处于播放前列。\n- 观众更关注硅谷 AI 编程工具方向（数据判断，非核实事实）。\n- 观众更关注 OpenAI/GPT6/AGI 大模型话题（数据判断，非核实事实）。\n\n需要说明：本期记录只提供了上述内容方向层面的表现，未接入具体的播放量、涨粉、互动等数值型周数据，这部分来源本期没有相关记录。\n\n来源：\n- 2026-09-08 · 关注了什么 · OpenAI 与 GPT-6 Astra\n- 2026-09-08 · 关注了什么 · AI 编程与 vibecoding\n- 2026-09-08 · 沟通中提到的看法 · AGI 与编程",
+      "intent": "ask_published",
+      "data_tools": [
+        "ask.published"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 6063,
+      "note": "system_temporal from Agent Phase 1"
+    },
+    {
+      "id": "T09",
+      "category": "C",
+      "query": "2026年8月17日到8月27日期间编辑部接触了谁",
+      "gold_time_semantics": {
+        "basis": "issue_time",
+        "window": "explicit"
+      },
+      "gold_issue_scope": "explicit_issue",
+      "gold_explicit_issue": "2026-8-17",
+      "expected_behavior": "IssueRef 钉在 2026-8-17；回答时间范围与问句一致，不漂移到 2026-09-08",
+      "predicted_time_basis": "issue_time",
+      "predicted_window": "explicit",
+      "system_temporal": {
+        "window": "explicit",
+        "basis": "issue_time",
+        "filter_mode": "issue_anchor",
+        "hard_rules": [
+          "latest_published_neq_recent_event",
+          "unknown_event_time_neq_recent",
+          "no_basis_no_deterministic_recent"
+        ],
+        "reject_latest_equals_recent": false,
+        "require_no_event_time_caveat": false,
+        "issue_mode": "explicit",
+        "issue_slug": "2026-8-17"
+      },
+      "issue_scope": "explicit_issue",
+      "issue_slug": "2026-8-17",
+      "retrieved_evidence": [
+        "ev:item:4105",
+        "ev:item:4114",
+        "ev:item:4131",
+        "ev:item:4132",
+        "ev:item:4141",
+        "ev:item:4142",
+        "ev:item:4184",
+        "ev:item:4241",
+        "ev:item:4242",
+        "ev:item:4243",
+        "ev:item:4245",
+        "ev:ctx:2026-8-17:15"
+      ],
+      "final_answer": "依据 2026-8-17 期已上线记录（该期条目未逐条标注具体接触发生日期，部分条目自带日期），编辑部在这批记录中涉及的接触对象如下：\n\n**带明确日期、落在或接近该窗口前的接触**（原文自带日期，均早于 8-17，可核对）：\n- 詹杨帆（汽车行业），围绕 Agent 上车、智能座舱交流，日期 2026/07/24。\n- 威诚资本（智能硬件等赛道），沟通对象为其技术专家/投资经理 Wang，日期 2026/07/22。\n\n**该期收录、未标注具体接触日期的对话/建联对象**（资料未提供 event_time，不能判定为 8-17 至 8-27 之间发生）：\n- 安谋科技（CPU 产品总监徐瑞迪），端侧 AI 话题。\n- PPIO（CEO 姚欣），Token 消耗与智能体话题，来源为硅谷 BD 团队建联记录。\n- llama.cpp 相关端侧芯片模型框架能力沟通（受访者不具名）。\n\n**外部媒体报道中提及、由英文站发布的对谈嘉宾**（发布日期为 8/10、8/4，属报道而非该窗口内新接触）：\n- Insta360 创始人 JK Liu（AGI Playground 2026 与张鹏对谈）。\n- MiniMax 开发者关系负责人 Vincent Wu。\n- Genspark 创始人 Eric Jing。\n\n需要说明：\n1. 你问的时间窗为 2026-8-17 至 2026-8-27，但本期为 2026-8-17 那期，多数条目未提供接触的确切发生日期，无法确认它们发生在该窗口之内；仅詹杨帆、威诚资本自带日期，且这两个日期（7/22、7/24）均早于窗口起点。\n2. 网信办、HumanX2026 两条属政策动态与日历订阅信息，不属于编辑部的接触对象。\n3. 本轮上下文来自混合检索，可能不完整；若需 8-17 之后各期的编辑部接触记录，该时间段的期号来源在本轮未接入。\n\n来源：\n- 2026-8-17 · 抽取条目 · 詹杨帆\n- 2026-8-17 · 抽取条目 · 威诚资本\n- 2026-8-17 · 抽取条目 · 安谋科技\n- 2026-8-17 · 抽取条目 · PPIO\n- 2026-8-17 · 抽取条目 · llama.cpp\n- 2026-8-17 · 抽取条目 · Insta360\n- 2026-8-17 · 抽取条目 · MiniMax\n- 2026-8-17 · 抽取条目 · Genspark\n- 2026-8-17 · 抽取条目 · 网信办\n- 2026-8-17 · 抽取条目 · HumanX2026",
+      "intent": "ask_published",
+      "data_tools": [
+        "ask.published"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 16000,
+      "note": "system_temporal from Agent Phase 1"
+    },
+    {
+      "id": "T10",
+      "category": "C",
+      "query": "9月8日这一期外部媒体关注了什么",
+      "gold_time_semantics": {
+        "basis": "issue_time",
+        "window": "explicit"
+      },
+      "gold_issue_scope": "explicit_issue",
+      "gold_explicit_issue": "2026-09-08",
+      "expected_behavior": "钉 2026-09-08；不混入 2026-8-17 内部例会内容冒充该期媒体关注",
+      "predicted_time_basis": "issue_time",
+      "predicted_window": "explicit",
+      "system_temporal": {
+        "window": "explicit",
+        "basis": "issue_time",
+        "filter_mode": "issue_anchor",
+        "hard_rules": [
+          "latest_published_neq_recent_event",
+          "unknown_event_time_neq_recent",
+          "no_basis_no_deterministic_recent"
+        ],
+        "reject_latest_equals_recent": false,
+        "require_no_event_time_caveat": false,
+        "issue_mode": "explicit",
+        "issue_slug": "2026-09-08"
+      },
+      "issue_scope": "explicit_issue",
+      "issue_slug": "2026-09-08",
+      "retrieved_evidence": [],
+      "final_answer": "未在已上线周报中找到与问题直接相关的记录。请尝试换关键词、缩小或扩大时间范围，或确认相关内容是否已上线。\n（本次检索时间范围：2026-09-08 至 2026-09-08）",
+      "intent": "ask_published",
+      "data_tools": [
+        "ask.published"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 18,
+      "note": "system_temporal from Agent Phase 1"
+    },
+    {
+      "id": "T11",
+      "category": "C",
+      "query": "八月下旬社群例会里提了什么",
+      "gold_time_semantics": {
+        "basis": "material_time",
+        "window": "explicit"
+      },
+      "gold_issue_scope": "explicit_issue",
+      "gold_explicit_issue": "2026-8-17",
+      "expected_behavior": "材料时间约 2026-08；回答应体现八月下旬/该期材料，而非「本周」",
+      "predicted_time_basis": "issue_time",
+      "predicted_window": "explicit",
+      "system_temporal": {
+        "window": "explicit",
+        "basis": "issue_time",
+        "filter_mode": "issue_anchor",
+        "hard_rules": [
+          "latest_published_neq_recent_event",
+          "unknown_event_time_neq_recent",
+          "no_basis_no_deterministic_recent"
+        ],
+        "reject_latest_equals_recent": false,
+        "require_no_event_time_caveat": false,
+        "issue_mode": "explicit",
+        "issue_slug": "2026-8-17"
+      },
+      "issue_scope": "explicit_issue",
+      "issue_slug": "2026-8-17",
+      "retrieved_evidence": [
+        "ev:ctx:2026-8-17:1",
+        "ev:ctx:2026-8-17:2",
+        "ev:ctx:2026-8-17:3",
+        "ev:ctx:2026-8-17:4",
+        "ev:ctx:2026-8-17:5",
+        "ev:ctx:2026-8-17:6",
+        "ev:ctx:2026-8-17:7",
+        "ev:ctx:2026-8-17:8",
+        "ev:ctx:2026-8-17:9",
+        "ev:ctx:2026-8-17:10",
+        "ev:ctx:2026-8-17:11",
+        "ev:item:4137"
+      ],
+      "final_answer": "依据的是 2026-8-17 那期已上线记录（并非今日新发生，也无法确认原会议具体日期是否落在八月下旬）。该期「社群例会提及」的来源中，涉及以下几条：\n\n- Evolvent（胡梦康）：做了专访与分享，要点是帮助 Agent 做数据采集、评估、回流训练，小红书已发专访。\n- 谢扬 / Nirva / 徐豪 Unicus / sigmaZ：处于沟通中专访阶段的专访与分享。\n- Loopit（陈炜鹏，创始人）：专访待发布，该期记录写明为当周三。\n\n需要说明的是：这些记录来自 2026-8-17 期，标注为「社群例会提及」，但资料未提供该例会的具体日期，无法确认是否即为「八月下旬」的例会；若你要的是八月下旬某次特定例会的完整纪要，该类精确日期的社群例会来源在本期检索结果中没有对应记录。\n\n来源：\n- 2026-8-17 · 接触过的人和公司 · Evolvent\n- 2026-8-17 · 接触过的人和公司 · 谢扬 / Nirva / 徐豪 Unicus / sigmaZ\n- 2026-8-17 · 接触过的人和公司 · Loopit",
+      "intent": "ask_published",
+      "data_tools": [
+        "ask.published"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 7836,
+      "note": "system_temporal from Agent Phase 1"
+    },
+    {
+      "id": "T12",
+      "category": "C",
+      "query": "查一下 2026-09-08 期里 OdyssLife 相关记录",
+      "gold_time_semantics": {
+        "basis": "issue_time",
+        "window": "explicit"
+      },
+      "gold_issue_scope": "explicit_issue",
+      "gold_explicit_issue": "2026-09-08",
+      "expected_behavior": "限定 2026-09-08；有则引用该期证据，无则拒答/未找到，不串旧期众筹叙事冒充",
+      "predicted_time_basis": "issue_time",
+      "predicted_window": "explicit",
+      "system_temporal": {
+        "window": "explicit",
+        "basis": "issue_time",
+        "filter_mode": "issue_anchor",
+        "hard_rules": [
+          "latest_published_neq_recent_event",
+          "unknown_event_time_neq_recent",
+          "no_basis_no_deterministic_recent"
+        ],
+        "reject_latest_equals_recent": false,
+        "require_no_event_time_caveat": false,
+        "issue_mode": "explicit",
+        "issue_slug": "2026-09-08"
+      },
+      "issue_scope": "explicit_issue",
+      "issue_slug": "2026-09-08",
+      "retrieved_evidence": [
+        "ev:item:4429",
+        "ev:item:4420",
+        "ev:item:4423",
+        "ev:item:4424",
+        "ev:item:4425",
+        "ev:item:4426",
+        "ev:item:4427",
+        "ev:item:4421",
+        "ev:item:4428",
+        "ev:item:4430",
+        "ev:item:4431",
+        "ev:item:4432"
+      ],
+      "final_answer": "在 2026-09-08 期里，OdyssLife 的相关记录如下（依据该期已上线记录，非今日新发生）：\n\nOdyssLife 由潘宇扬创业，负责人 JACK（CMO）。该项目在官方 ShowStoppers 环节受到关注；新版硬件对摄像头角度与发热问题做了优化；市场策略首波瞄准男性用户走 KS 众筹，下一节奏是 CES。以上为受访者陈述，非核实事实。\n\n来源：\n- 2026-09-08 · 抽取条目 · OdyssLife（条目ID 4429）",
+      "intent": "ask_published",
+      "data_tools": [
+        "ask.published"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 5842,
+      "note": "system_temporal from Agent Phase 1"
+    },
+    {
+      "id": "T13",
+      "category": "D",
+      "query": "锦涛最近做了什么",
+      "gold_time_semantics": {
+        "basis": "event_time",
+        "window": "recent"
+      },
+      "gold_issue_scope": "explicit_issue",
+      "gold_explicit_issue": "2026-8-17",
+      "expected_behavior": "HARD：即便指定 2026-8-17，该期 date_end 可能被改成很新，材料实为 8 月例会——不得因期次日期新而说「最近发生」；须披露材料/事件时间或说明无 event_time",
+      "predicted_time_basis": "unknown",
+      "predicted_window": "recent",
+      "system_temporal": {
+        "window": "recent",
+        "basis": "unknown",
+        "filter_mode": "issue_anchor",
+        "hard_rules": [
+          "latest_published_neq_recent_event",
+          "unknown_event_time_neq_recent",
+          "no_basis_no_deterministic_recent"
+        ],
+        "reject_latest_equals_recent": false,
+        "require_no_event_time_caveat": true,
+        "issue_mode": "explicit",
+        "issue_slug": "2026-8-17"
+      },
+      "issue_scope": "explicit_issue",
+      "issue_slug": "2026-8-17",
+      "retrieved_evidence": [],
+      "final_answer": "未在已上线周报中找到与问题直接相关的记录。请尝试换关键词、缩小或扩大时间范围，或确认相关内容是否已上线。\n（本次检索时间范围：2026-09-07 至 2026-09-07）",
+      "intent": "ask_published",
+      "data_tools": [
+        "ask.published"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 9,
+      "note": "system_temporal from Agent Phase 1"
+    },
+    {
+      "id": "T14",
+      "category": "D",
+      "query": "这一期是不是刚发生的事？品牌创意例会里锦涛提了什么",
+      "gold_time_semantics": {
+        "basis": "event_time",
+        "window": "recent"
+      },
+      "gold_issue_scope": "explicit_issue",
+      "gold_explicit_issue": "2026-8-17",
+      "expected_behavior": "须纠正「刚发生」幻觉：材料时间≠Publish/脏 Issue Time；可复述内容但须时间依据正确",
+      "predicted_time_basis": "unknown",
+      "predicted_window": "recent",
+      "system_temporal": {
+        "window": "recent",
+        "basis": "unknown",
+        "filter_mode": "issue_anchor",
+        "hard_rules": [
+          "latest_published_neq_recent_event",
+          "unknown_event_time_neq_recent",
+          "no_basis_no_deterministic_recent"
+        ],
+        "reject_latest_equals_recent": true,
+        "require_no_event_time_caveat": true,
+        "issue_mode": "explicit",
+        "issue_slug": "2026-8-17"
+      },
+      "issue_scope": "explicit_issue",
+      "issue_slug": "2026-8-17",
+      "retrieved_evidence": [
+        "ev:ctx:2026-8-17:1",
+        "ev:ctx:2026-8-17:2",
+        "ev:ctx:2026-8-17:3",
+        "ev:ctx:2026-8-17:4",
+        "ev:ctx:2026-8-17:5",
+        "ev:ctx:2026-8-17:6",
+        "ev:ctx:2026-8-17:7",
+        "ev:ctx:2026-8-17:8",
+        "ev:ctx:2026-8-17:9",
+        "ev:ctx:2026-8-17:10",
+        "ev:ctx:2026-8-17:11"
+      ],
+      "final_answer": "先说时间：这些内容依据的是 **2026-8-17 那期已上线记录**，不能等同于\"（资料记载·非事件时刻断言）\"。资料未提供这些事项的具体发生时间，因此无法判断是不是近期发生。\n\n再说\"锦涛提了什么\"：可用记录里没有任何以\"锦涛\"这一人名标注的条目。按 Mesh 规则，内部同事只到团队级、不写个人姓名，所以无法回答某位具名同事在例会里说了什么。\n\n我只能按团队复述该期\"品牌创意团队周会复盘/相关记录\"里的内容：\n- Founder Park 传播复盘：账号涨了一些、自然关注约二三十个、扫码转关注 20 多个，LinkedIn 涨约 100 多粉主要来自嘉宾线上主动分享，周圆资源包增约 200 粉但多为营销号。\n- 视频号栏目封面制作由品牌创意团队设计资源承接，两位设计师可分配任务，需求需说清避免沿用旧主视觉。\n- 内容与传播判断（会议判断，非核实事实）：硬件类内容单纯夸赞难获传播，猎奇点或创始人破旧立新观点更易带来流量；小红书上好看且选题有趣的内容即便看出是 AI 做的，读者也不太在意。\n- 日程与计划：本周五公司分享会集中介绍 design/Founder Park AI 工具、目标 80% 设计工作用其完成；日报/周报工具部署自有服务器、本周产出最终版；小红书本周开始试点、目标每周 3-4 篇；3D 打印项目单独立项、第二系列与前沿社中秋/国庆礼品联动；思琪站点由 Blog 升级为 Newsletter 类栏目化；李源具身/硬件方向海外 X 账号已建立、计划开 tag。\n\n其中\"本周五\"\"本周\"等相对说法，指的是 2026-8-17 那期当时，不是今天（2026-09-08）。\n\n无法回答的部分：具名同事（如\"锦涛\"）在例会中的发言，Mesh 不按个人姓名记录，缺该类可指名来源。\n\n来源：\n- 2026-8-17 · 可同步的关系 · Founder Park 传播与下半年规划：两队各知一半\n- 2026-8-17 · 可同步的关系 · 视频号栏目封面：由品牌创意团队设计资源承接\n- 2026-8-17 · 沟通中提到的看法 · 内容与传播\n- 2026-8-17 · 日程与计划 · design founder park.AI 工具 / 内容打通产品 / 小红书试点 / 3D 打印项目 / 思琪站点 Newsletter 化 / 李源具身 · 硬件方向 X 账号",
+      "intent": "ask_published",
+      "data_tools": [
+        "ask.published"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 19015,
+      "note": "system_temporal from Agent Phase 1"
+    },
+    {
+      "id": "T15",
+      "category": "D",
+      "query": "最新一期里，八月那周的社群动作算最近发生的吗",
+      "gold_time_semantics": {
+        "basis": "event_time",
+        "window": "recent"
+      },
+      "gold_issue_scope": "latest_published",
+      "gold_explicit_issue": null,
+      "expected_behavior": "明确：latest_published ≠ recent event；八月材料不是「最近发生」",
+      "predicted_time_basis": "unknown",
+      "predicted_window": "recent",
+      "system_temporal": {
+        "window": "recent",
+        "basis": "unknown",
+        "filter_mode": "issue_anchor",
+        "hard_rules": [
+          "latest_published_neq_recent_event",
+          "unknown_event_time_neq_recent",
+          "no_basis_no_deterministic_recent"
+        ],
+        "reject_latest_equals_recent": true,
+        "require_no_event_time_caveat": true,
+        "issue_mode": "latest_published",
+        "issue_slug": "2026-09-08"
+      },
+      "issue_scope": "latest_published",
+      "issue_slug": "2026-09-08",
+      "retrieved_evidence": [],
+      "final_answer": "上线最新期次（latest published）不等于事件发生时刻。若没有可核对的事件时间，只能说明资料所属期次或材料时间，不能把旧材料说成当下新发生。\n\n未在已上线周报中找到与问题直接相关的记录。请尝试换关键词、缩小或扩大时间范围，或确认相关内容是否已上线。\n（本次检索时间范围：2026-09-08 至 2026-09-08）",
+      "intent": "ask_published",
+      "data_tools": [
+        "ask.published"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 24,
+      "note": "system_temporal from Agent Phase 1"
+    },
+    {
+      "id": "T16",
+      "category": "D",
+      "query": "把最新上线的期次内容都当成这周刚发生的事总结一下",
+      "gold_time_semantics": {
+        "basis": "unknown",
+        "window": "recent"
+      },
+      "gold_issue_scope": "latest_published",
+      "gold_explicit_issue": null,
+      "expected_behavior": "应拒绝该等同或强烈降级措辞；说明上线≠事件发生",
+      "predicted_time_basis": "unknown",
+      "predicted_window": "recent",
+      "system_temporal": {
+        "window": "recent",
+        "basis": "unknown",
+        "filter_mode": "issue_anchor",
+        "hard_rules": [
+          "latest_published_neq_recent_event",
+          "unknown_event_time_neq_recent",
+          "no_basis_no_deterministic_recent"
+        ],
+        "reject_latest_equals_recent": true,
+        "require_no_event_time_caveat": true,
+        "issue_mode": "latest_published",
+        "issue_slug": "2026-09-08"
+      },
+      "issue_scope": "latest_published",
+      "issue_slug": "2026-09-08",
+      "retrieved_evidence": [],
+      "final_answer": "上线最新期次（latest published）不等于事件发生时刻。若没有可核对的事件时间，只能说明资料所属期次或材料时间，不能把旧材料说成当下新发生。",
+      "intent": "ask_published",
+      "data_tools": [
+        "ask.published"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 2,
+      "note": "system_temporal from Agent Phase 1"
+    },
+    {
+      "id": "T17",
+      "category": "E",
+      "query": "破壳创智具体哪天成立的，最近有没有新动作",
+      "gold_time_semantics": {
+        "basis": "unknown",
+        "window": "recent"
+      },
+      "gold_issue_scope": "explicit_issue",
+      "gold_explicit_issue": "2026-8-17",
+      "expected_behavior": "成立日若材料有（约 2026-03）可引；「最近新动作」无 event_time 则不得断言最近发生，应说资料未提供发生时间或仅有沟通记录时间",
+      "predicted_time_basis": "unknown",
+      "predicted_window": "recent",
+      "system_temporal": {
+        "window": "recent",
+        "basis": "unknown",
+        "filter_mode": "issue_anchor",
+        "hard_rules": [
+          "latest_published_neq_recent_event",
+          "unknown_event_time_neq_recent",
+          "no_basis_no_deterministic_recent"
+        ],
+        "reject_latest_equals_recent": false,
+        "require_no_event_time_caveat": true,
+        "issue_mode": "explicit",
+        "issue_slug": "2026-8-17"
+      },
+      "issue_scope": "explicit_issue",
+      "issue_slug": "2026-8-17",
+      "retrieved_evidence": [],
+      "final_answer": "未在已上线周报中找到与问题直接相关的记录。请尝试换关键词、缩小或扩大时间范围，或确认相关内容是否已上线。\n（本次检索时间范围：2026-09-07 至 2026-09-07）",
+      "intent": "ask_published",
+      "data_tools": [
+        "ask.published"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 22,
+      "note": "system_temporal from Agent Phase 1"
+    },
+    {
+      "id": "T18",
+      "category": "E",
+      "query": "张鹏去深圳拜访吴伟是哪天的事",
+      "gold_time_semantics": {
+        "basis": "unknown",
+        "window": "none"
+      },
+      "gold_issue_scope": "explicit_issue",
+      "gold_explicit_issue": "2026-8-17",
+      "expected_behavior": "材料写「拟…尚未确认」——无确定 event_time 时应说明未提供/未确认，禁止编造日期或说最近已拜访",
+      "predicted_time_basis": "issue_time",
+      "predicted_window": "none",
+      "system_temporal": {
+        "window": "none",
+        "basis": "issue_time",
+        "filter_mode": "issue_anchor",
+        "hard_rules": [
+          "latest_published_neq_recent_event",
+          "unknown_event_time_neq_recent",
+          "no_basis_no_deterministic_recent"
+        ],
+        "reject_latest_equals_recent": false,
+        "require_no_event_time_caveat": false,
+        "issue_mode": "explicit",
+        "issue_slug": "2026-8-17"
+      },
+      "issue_scope": "explicit_issue",
+      "issue_slug": "2026-8-17",
+      "retrieved_evidence": [],
+      "final_answer": "未在已上线周报中找到与问题直接相关的记录。请尝试换关键词、缩小或扩大时间范围，或确认相关内容是否已上线。\n（本次检索时间范围：2026-09-07 至 2026-09-07）",
+      "intent": "ask_published",
+      "data_tools": [
+        "ask.published"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 19,
+      "note": "system_temporal from Agent Phase 1"
+    },
+    {
+      "id": "T19",
+      "category": "E",
+      "query": "有没有记录显示某件事「昨天」发生了",
+      "gold_time_semantics": {
+        "basis": "unknown",
+        "window": "none"
+      },
+      "gold_issue_scope": "latest_published",
+      "gold_explicit_issue": null,
+      "expected_behavior": "无墙上时钟「昨天」依据时应 abstain/说明资料未按昨天标注，禁止套用今日",
+      "predicted_time_basis": "issue_time",
+      "predicted_window": "none",
+      "system_temporal": {
+        "window": "none",
+        "basis": "issue_time",
+        "filter_mode": "issue_anchor",
+        "hard_rules": [
+          "latest_published_neq_recent_event",
+          "unknown_event_time_neq_recent",
+          "no_basis_no_deterministic_recent"
+        ],
+        "reject_latest_equals_recent": false,
+        "require_no_event_time_caveat": false,
+        "issue_mode": "latest_published",
+        "issue_slug": "2026-09-08"
+      },
+      "issue_scope": "latest_published",
+      "issue_slug": "2026-09-08",
+      "retrieved_evidence": [],
+      "final_answer": "未在已上线周报中找到与问题直接相关的记录。请尝试换关键词、缩小或扩大时间范围，或确认相关内容是否已上线。\n（本次检索时间范围：2026-09-08 至 2026-09-08）",
+      "intent": "ask_published",
+      "data_tools": [
+        "ask.published"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 22,
+      "note": "system_temporal from Agent Phase 1"
+    },
+    {
+      "id": "T20",
+      "category": "E",
+      "query": "众筹与出海节奏是什么时候发生的",
+      "gold_time_semantics": {
+        "basis": "unknown",
+        "window": "none"
+      },
+      "gold_issue_scope": "explicit_issue",
+      "gold_explicit_issue": "2026-09-08",
+      "expected_behavior": "若仅有沟通摘录无 event_time，须说明资料未提供发生时间；可复述内容但禁止「本周发生」",
+      "predicted_time_basis": "issue_time",
+      "predicted_window": "none",
+      "system_temporal": {
+        "window": "none",
+        "basis": "issue_time",
+        "filter_mode": "issue_anchor",
+        "hard_rules": [
+          "latest_published_neq_recent_event",
+          "unknown_event_time_neq_recent",
+          "no_basis_no_deterministic_recent"
+        ],
+        "reject_latest_equals_recent": false,
+        "require_no_event_time_caveat": false,
+        "issue_mode": "explicit",
+        "issue_slug": "2026-09-08"
+      },
+      "issue_scope": "explicit_issue",
+      "issue_slug": "2026-09-08",
+      "retrieved_evidence": [
+        "ev:item:4429",
+        "ev:ctx:2026-09-08:2",
+        "ev:ctx:2026-09-08:3"
+      ],
+      "final_answer": "记录里提到的「众筹与出海节奏」出现在 2026-09-08 那期已上线记录中，指的是 OdyssLife（潘宇扬项目，受访者 JACK/CMO）的市场策略：首波瞄准男性用户走 KS 众筹，下一节奏是 CES（受访者陈述，非核实事实）。\n\n需要说明的是，这几条记录只写了节奏本身，并未提供这一众筹与出海计划的具体发生时间或执行日期，因此无法给出确切的时间点；依据的是 2026-09-08 期已上线记录，并非今日新发生的事件。\n\n来源：\n- 2026-09-08 · 抽取条目 · OdyssLife\n- 2026-09-08 · 接触过的人和公司 · OdyssLife\n- 2026-09-08 · 关注了什么 · 众筹与出海节奏",
+      "intent": "ask_published",
+      "data_tools": [
+        "ask.published"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 5671,
+      "note": "system_temporal from Agent Phase 1"
+    },
+    {
+      "id": "T21",
+      "category": "F",
+      "query": "只看 2026-8-17 这一期：商业化团队提了什么",
+      "gold_time_semantics": {
+        "basis": "issue_time",
+        "window": "explicit"
+      },
+      "gold_issue_scope": "explicit_issue",
+      "gold_explicit_issue": "2026-8-17",
+      "expected_behavior": "IssueRef=2026-8-17；不扩展到其他期",
+      "predicted_time_basis": "issue_time",
+      "predicted_window": "explicit",
+      "system_temporal": {
+        "window": "explicit",
+        "basis": "issue_time",
+        "filter_mode": "issue_anchor",
+        "hard_rules": [
+          "latest_published_neq_recent_event",
+          "unknown_event_time_neq_recent",
+          "no_basis_no_deterministic_recent"
+        ],
+        "reject_latest_equals_recent": false,
+        "require_no_event_time_caveat": false,
+        "issue_mode": "explicit",
+        "issue_slug": "2026-8-17"
+      },
+      "issue_scope": "explicit_issue",
+      "issue_slug": "2026-8-17",
+      "retrieved_evidence": [],
+      "final_answer": "未在已上线周报中找到与问题直接相关的记录。请尝试换关键词、缩小或扩大时间范围，或确认相关内容是否已上线。\n（本次检索时间范围：2026-09-07 至 2026-09-07）",
+      "intent": "ask_published",
+      "data_tools": [
+        "ask.published"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 21,
+      "note": "system_temporal from Agent Phase 1"
+    },
+    {
+      "id": "T22",
+      "category": "F",
+      "query": "按 2026-09-08 期回答：编辑部沟通记录里有什么关键线索",
+      "gold_time_semantics": {
+        "basis": "issue_time",
+        "window": "explicit"
+      },
+      "gold_issue_scope": "explicit_issue",
+      "gold_explicit_issue": "2026-09-08",
+      "expected_behavior": "钉 2026-09-08；不拿 2026-8-17 例会顶替",
+      "predicted_time_basis": "issue_time",
+      "predicted_window": "explicit",
+      "system_temporal": {
+        "window": "explicit",
+        "basis": "issue_time",
+        "filter_mode": "issue_anchor",
+        "hard_rules": [
+          "latest_published_neq_recent_event",
+          "unknown_event_time_neq_recent",
+          "no_basis_no_deterministic_recent"
+        ],
+        "reject_latest_equals_recent": false,
+        "require_no_event_time_caveat": false,
+        "issue_mode": "explicit",
+        "issue_slug": "2026-09-08"
+      },
+      "issue_scope": "explicit_issue",
+      "issue_slug": "2026-09-08",
+      "retrieved_evidence": [
+        "ev:ctx:2026-09-08:1",
+        "ev:ctx:2026-09-08:2"
+      ],
+      "final_answer": "依据 2026-09-08 期已上线记录，编辑部沟通记录里的关键线索有两条：\n\n1. 与越疆科技 Fay 的对话（有原始记录），属于外骨骼与具身方向的具身线索。\n2. 编辑部记录了 KS 众筹与 CES 节奏、欧洲 Maker 工具等出海线索。\n\n以上为该期已上线内容，资料未提供这些接触的具体发生时间。\n\n来源：\n- 2026-09-08 · 接触过的人和公司 · 越疆科技\n- 2026-09-08 · 关注了什么 · 众筹与出海节奏",
+      "intent": "ask_published",
+      "data_tools": [
+        "ask.published"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 4867,
+      "note": "system_temporal from Agent Phase 1"
+    },
+    {
+      "id": "T23",
+      "category": "F",
+      "query": "不要跨期，只根据最新已上线期次列出关系卡标题",
+      "gold_time_semantics": {
+        "basis": "issue_time",
+        "window": "none"
+      },
+      "gold_issue_scope": "latest_published",
+      "gold_explicit_issue": null,
+      "expected_behavior": "IssueRef=latest_published；关系来自该期 published；时间措辞用期次而非「最近发生」",
+      "predicted_time_basis": "unobserved",
+      "predicted_window": "issue_scoped",
+      "system_temporal": null,
+      "issue_scope": "latest_published",
+      "issue_slug": "2026-09-08",
+      "retrieved_evidence": [],
+      "final_answer": "期次 2026-09-08 的已上线周报中暂无读者可见关系卡。",
+      "intent": "ask_relations",
+      "data_tools": [
+        "ask.relations_summary"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 3,
+      "note": "predicted_* inferred from answer; no system temporal"
+    },
+    {
+      "id": "T24",
+      "category": "F",
+      "query": "明确按期次 2026-8-17 查：Founder Park 相关联动",
+      "gold_time_semantics": {
+        "basis": "issue_time",
+        "window": "explicit"
+      },
+      "gold_issue_scope": "explicit_issue",
+      "gold_explicit_issue": "2026-8-17",
+      "expected_behavior": "钉 2026-8-17；可引用该期关系/条目；不得改口到别的期",
+      "predicted_time_basis": "unobserved",
+      "predicted_window": "issue_scoped",
+      "system_temporal": null,
+      "issue_scope": "explicit_issue",
+      "issue_slug": "2026-8-17",
+      "retrieved_evidence": [
+        "ev:item:4348",
+        "ev:item:4232",
+        "ev:item:4305",
+        "ev:item:4307",
+        "ev:item:4372",
+        "ev:item:4133",
+        "ev:item:4161",
+        "ev:item:4302",
+        "ev:item:4213",
+        "ev:item:4306",
+        "ev:item:4298",
+        "ev:item:4169"
+      ],
+      "final_answer": "期次 2026-8-17 已上线关系（8）：\n- [同一公司，不同触点] 豆包（字节跳动）：三个团队各自触点\n- [同一赛道，各自在做] Agent 治理与 AI 伦理：编辑部与视频号各自覆盖\n- [同一赛道，各自在做] WAIC：社群办活动、编辑部记录受访判断\n- [采访对象也是客户] 刘靖康（影石 Insta360）：编辑部接触、视频号出镜\n- [同一公司，不同触点] xAI：编辑部建联技术成员、视频号做相关视频\n- [一方接触，另一方用得上] 编辑部海外内容进视频号选题会\n- [一方接触，另一方用得上] 擎羽科技：编辑部接触获早期赛道信号\n- [一方接触，另一方用得上] 戴博（李天羽）：编辑部访谈获具身赛道判断",
+      "intent": "ask_relations",
+      "data_tools": [
+        "ask.relations_summary"
+      ],
+      "pass": true,
+      "failure_reason": "",
+      "elapsed_ms": 2,
+      "note": "predicted_* inferred from answer; no system temporal"
+    }
+  ]
+}

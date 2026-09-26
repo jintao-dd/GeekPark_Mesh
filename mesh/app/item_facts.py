@@ -12,6 +12,31 @@ SECTION = "抽取条目"
 _SNIP = 480
 _NAME_RE = re.compile(r"[\u4e00-\u9fff]{2,24}|[A-Za-z][A-Za-z0-9 .&\-]{2,40}")
 
+# LIKE 兜底分（P1 止血 → 粗排质量）：不再用全局硬编码常量，而是按「查询词加权覆盖率」打分。
+# 约定与 MATCH 一致：分数越小越靠前。权重用词长 —— 专名/长词比泛词更能定题
+# （避免泛词「培训」把专名「英伟达」的行挤下去）。
+# 依据：兜底池是「有命中但未过 FTS AND」的平池，原先全并列 → 通道内无相关性序，
+# RRF 只吃位次时整池退化（R21 的 The Verge 条目从 Top5 掉到 10+）。
+_FALLBACK_BASE = 1.2
+# 完全无词法命中时的兜底基准（略弱于有任何覆盖率命中者）
+_FALLBACK_BASE_NO_HIT = 1.2
+
+
+def _coverage_score(row: dict, terms: list[str]) -> float:
+    """查询词加权覆盖率 ∈ [0,1]：命中词长和 / 全部查询词长和。"""
+    if not terms:
+        return 0.0
+    blob = " ".join(
+        str(row.get(k) or "") for k in ("primary_name", "text_snippet", "toks", "source_label")
+    ).lower()
+    tot = sum(len(t) for t in terms) or 1
+    got = sum(len(t) for t in terms if t.lower() in blob)
+    return got / tot
+
+
+def _fallback_score(row: dict, terms: list[str], *, base: float = _FALLBACK_BASE) -> float:
+    return -(base + _coverage_score(row, terms))
+
 
 def _parse_json_list(raw: str | None) -> list[str]:
     if not raw:
@@ -61,15 +86,16 @@ def row_from_item(
     roles = _parse_json_list(item.get("roles"))
     signals = _parse_json_list(item.get("signals"))
     text = (item.get("text") or "").strip()
+    raw_snippet = (item.get("raw_snippet") or text or "").strip()
     name = primary_name(entities, text)
     owner = (item.get("owner_team") or item.get("team") or "").strip()
     stype = (item.get("stype") or "").strip()
-    snippet = text[:_SNIP]
+    snippet = raw_snippet[:_SNIP]
     title = " · ".join(x for x in (name, owner, stype) if x)[:200]
     body = " ".join(
         x
         for x in (
-            text,
+            raw_snippet,  # 优先用完整摘要做检索/问答 body
             owner,
             stype,
             " ".join(entities),
@@ -109,13 +135,14 @@ def row_from_item(
 
 def reindex_item_facts(con, issue_id: int) -> int:
     """仅从已发布期写入 item_facts；草稿/下线清空。返回写入条数。"""
+    from .issue_period import normalize_issue_slug
     row = con.execute(
         "SELECT id, slug, status, date_start, date_end FROM issues WHERE id=?",
         (issue_id,),
     ).fetchone()
     if not row:
         return 0
-    slug = row["slug"]
+    slug = normalize_issue_slug(row["slug"])
     con.execute("DELETE FROM item_facts WHERE issue_slug=?", (slug,))
     con.execute("DELETE FROM item_entity_facts WHERE issue_slug=?", (slug,))
     if row["status"] != "published":
@@ -298,11 +325,13 @@ def search(
     match_q = tok.build_match_query(q)
     params: list[Any] = []
     hits: list[dict] = []
+    # 兜底池打分用（覆盖两个兜底分支）
+    fb_terms = [t for t in tok.query_terms(q, limit=8) if len(t) >= 2]
 
     if match_q:
         if getattr(con, "dialect", "sqlite") == "postgresql":
             from . import fts_pg
-            filt, fp, score_expr = fts_pg.build_toks_filter(
+            filt, fp, sp, score_expr = fts_pg.build_toks_filter(
                 match_q, ["toks", "primary_name", "text_snippet"]
             )
             if filt:
@@ -312,7 +341,8 @@ def search(
                            -({score_expr}) AS score
                     FROM item_facts_fts WHERE {filt}
                 """
-                params = list(fp)
+                # 占位符按 SQL 文本顺序：SELECT 的 score_expr 在前，WHERE 的 filt 在后
+                params = list(sp) + list(fp)
                 if slug:
                     sql += " AND issue_slug = %s"
                     params.append(slug)
@@ -323,7 +353,8 @@ def search(
                     sql += " AND stype = %s"
                     params.append(stype)
                 sql += _date_clause(date_from, date_to, params)
-                sql += f" ORDER BY score DESC LIMIT %s"
+                # score = -(命中词计数)：越小越相关，须 ASC（DESC 会在截断时丢掉最相关行）
+                sql += f" ORDER BY score ASC LIMIT %s"
                 params.append(max(limit * 2, limit))
                 try:
                     for r in con.execute(sql, params):
@@ -384,7 +415,64 @@ def search(
                 key = (d["issue_slug"], d.get("item_id"))
                 if key in seen:
                     continue
-                hits.append(_row_to_hit(d, q, score=-0.5))
+                hits.append(
+                    _row_to_hit(d, q, score=_fallback_score(d, fb_terms, base=_FALLBACK_BASE_NO_HIT))
+                )
+
+    # MATCH 已饱和时仍用 query_terms 补召回（并列主题/专名常被宽 OR 噪声挤出）
+    terms_extra = tok.query_terms(q, limit=4)
+    if terms_extra and len(hits) >= min(3, limit):
+        wh_params = []
+        wh = []
+        for t in terms_extra:
+            if len(t) < 2:
+                continue
+            wh.append("(primary_name LIKE ? OR text_snippet LIKE ? OR toks LIKE ?)")
+            pat = f"%{t}%"
+            wh_params.extend([pat, pat, pat])
+        if wh:
+            sql2 = (
+                "SELECT issue_slug, date_end, item_id, source_id, owner_team, stype, "
+                "primary_name, text_snippet, source_label, level, kind, zone "
+                f"FROM item_facts WHERE ({' OR '.join(wh)})"
+            )
+            if slug:
+                sql2 += " AND issue_slug = ?"
+                wh_params.append(slug)
+            if team:
+                sql2 += " AND owner_team = ?"
+                wh_params.append(ingest.canonical_team(team) or team)
+            if stype:
+                sql2 += " AND stype = ?"
+                wh_params.append(stype)
+            sql2 += _date_clause(date_from, date_to, wh_params)
+            sql2 += " LIMIT ?"
+            wh_params.append(max(limit, 24))
+            seen = {(h["issue_slug"], h.get("item_id")) for h in hits}
+            extras: list[dict] = []
+            for r in con.execute(sql2, wh_params):
+                d = dict(r)
+                key = (d["issue_slug"], d.get("item_id"))
+                if key in seen:
+                    continue
+                # P1 止血 → 粗排质量：原为全局硬编码 -50.0（符号写反，钉榜首）；
+                # 现按查询词加权覆盖率打分，让兜底平池恢复通道内相关性序。
+                extras.append(_row_to_hit(d, q, score=_fallback_score(d, fb_terms)))
+                seen.add(key)
+            # 兜底池内部：先按查询词覆盖率（分数越小越好），同分再让短词命中优先
+            def _extra_key(h: dict) -> tuple:
+                body = (h.get("body") or "") + (h.get("title") or "")
+                short_hit = any(
+                    len(t) <= 2 and t in body for t in terms_extra
+                )
+                return (
+                    float(h.get("score") or 0.0),
+                    0 if short_hit else 1,
+                    str(h.get("item_id") or ""),
+                )
+
+            extras.sort(key=_extra_key)
+            hits = extras + hits
 
     ent_hits = search_entities(con, q, slug=slug, team=team, date_from=date_from, date_to=date_to, limit=limit)
     seen = {(h["issue_slug"], h.get("item_id"), h.get("title")) for h in hits}

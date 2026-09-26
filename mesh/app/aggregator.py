@@ -11,9 +11,18 @@ from .ingest import AGG_STYPE
 AGG_TEAM = "内容中心·数据聚合"
 _MIN_SEGMENT = 80
 
-# 主章节（emoji 标题行）
-_MAJOR = re.compile(
-    r"^[\U0001F300-\U0001FAFF📆📊🏢🗂📓🌐📰📱🎙️🔬🚀🎓💻📡]"
+# 无 ### 的旧式聚合壳：仅认「emoji + 已知章节名」，避免正文里 🎯 话题行被二次切开
+_MAJOR_KNOWN = re.compile(
+    r"^[\U0001F300-\U0001FAFF📆📊🏢🗂📓🌐📰📱🎙🔬🚀🎓💻📡🏟⚡]\s*"
+    r"(?:"
+    r"内容统计|内部飞书(?:内容|文件夹)?|外部信息源?|"
+    r"飞书多维表格|会议日程(?:\s*\(ICS\))?|Notion CRM|"
+    r"视频号数据|编辑部\s*·\s*(?:选题|沟通记录)|"
+    r"TechCrunch|Wired|The Verge|Stratechery|Platformer|"
+    r"Lex Fridman|How I Built This|Ars Technica|VentureBeat|"
+    r"MIT Technology Review|ZDNet|TechRadar|Digital Trends|极客公园|GeekPark English"
+    r")\b",
+    re.I,
 )
 # 飞书多维表格内：视频号数据： / 编辑部数据：
 _DATA_SUB = re.compile(r"^[\u4e00-\u9fffA-Za-z0-9 /·&]{2,40}数据：\s*$")
@@ -22,13 +31,12 @@ _FEED_SUB = re.compile(
     r"^(TechCrunch|Wired|The Verge|Ars Technica|Engadget|VentureBeat|CNET|ZDNet|"
     r"TechRadar|Digital Trends|MIT Technology Review|Platformer|Stratechery|Acquired)-"
 )
-# 飞书文件夹内各团队文档标题行
+# 飞书文件夹内各团队文档标题行（勿单独匹配「沟通记录」二字，否则会切开多维表沟通段正文）
 _INTERNAL = re.compile(
     r"^(?:"
     r"GP[\s·]?工作(?:进展|周报)?"
     r"|Global Partnership"
     r"|前沿社"
-    r"|沟通记录"
     r"|攻坚讨论"
     r"|飞书妙记"
     r"|(?:[\u4e00-\u9fffA-Za-z0-9 /·&]{2,20})(?:例会|周报|会议纪要|工作进展|妙记转写)"
@@ -52,7 +60,7 @@ _EXTERNAL_FEED_NAMES = (
     "TechCrunch", "Wired", "The Verge", "Stratechery", "Platformer",
     "Lex Fridman", "How I Built This", "Ars Technica", "VentureBeat",
     "MIT Technology Review", "ZDNet", "TechRadar", "Digital Trends",
-    "极客公园",
+    "极客公园", "GeekPark English",
 )
 
 _TOC_BULLET = re.compile(
@@ -66,13 +74,15 @@ _TOC_SUB = re.compile(
 
 
 def parse_content_stats_toc(text: str) -> list[dict]:
-    """解析 ## 📊 内容统计 下的目录项（用于校验 / 元数据）。"""
-    m = re.search(r"^##\s*📊\s*内容统计\s*$", text, re.M)
+    """解析 📊 内容统计 下的目录项（用于校验 / 元数据 / 补边界）。"""
+    m = re.search(r"^##?\s*📊\s*内容统计\s*$", text, re.M)
+    if not m:
+        m = re.search(r"^📊\s*内容统计\s*$", text, re.M)
     if not m:
         return []
     rest = text[m.end():]
     end = re.search(r"^##\s+", rest, re.M)
-    block = rest[: end.start()] if end else rest[:2000]
+    block = rest[: end.start()] if end else rest[:2500]
     out: list[dict] = []
     for line in block.splitlines():
         sub = _TOC_SUB.match(line)
@@ -83,6 +93,13 @@ def parse_content_stats_toc(text: str) -> list[dict]:
         if bul:
             out.append({"name": bul.group("name").strip(), "count": int(bul.group("count"))})
     return out
+
+
+def _strip_heading_noise(line: str) -> str:
+    s = line.strip()
+    s = re.sub(r"^#+\s*", "", s)
+    s = re.sub(r"^[\U0001F300-\U0001FAFF📆📊🏢🗂📓🌐📰📱🎙🔬🚀🎓💻📡]+\s*", "", s)
+    return s.strip()
 
 
 def _raw_data_start_line(lines: list[str]) -> int:
@@ -100,17 +117,24 @@ def _raw_data_start_line(lines: list[str]) -> int:
 
 
 def _is_md_section_boundary(line: str) -> bool:
+    """正文切段边界：### / #### 级；##### 单条记录不算。
+
+    「飞书多维表格」只是壳，真正切点是其下 #### 选题 / 视频号 / 沟通记录。
+    """
     s = line.strip()
-    if not s.startswith("### "):
+    if s.startswith("#####"):
         return False
-    body = s[4:].strip()
-    if re.match(r"📆\s*会议日程", body):
-        return True
-    if body.startswith("📊 飞书多维表格") or body == "飞书多维表格":
+    if not (s.startswith("### ") or s.startswith("#### ")):
+        return False
+    body = _strip_heading_noise(s)
+    # 壳：不单独成段，留给子 #### 切开
+    if body.startswith("飞书多维表格") or body == "飞书多维表格":
+        return False
+    if re.match(r"会议日程", body) or "会议日程" in body and "ICS" in body:
         return True
     if re.match(r"编辑部\s*·\s*(选题|沟通记录)", body):
         return True
-    if body == "视频号数据":
+    if body == "视频号数据" or ("视频号" in body and "数据" in body and len(body) <= 16):
         return True
     if "Notion CRM" in body:
         return True
@@ -121,7 +145,7 @@ def _is_md_section_boundary(line: str) -> bool:
     if body.startswith("记录 "):
         return False
     for name in _EXTERNAL_FEED_NAMES:
-        if name in body and len(body) <= len(name) + 8:
+        if body == name or (name in body and len(body) <= len(name) + 12):
             return True
     return False
 
@@ -142,16 +166,70 @@ class SplitResult:
     warnings: list[str] = field(default_factory=list)
     boundaries: int = 0
     skipped: int = 0
+    toc_count: int = 0
 
     def to_meta(self) -> dict:
+        conf = split_confidence(self)
         return {
             "segments": len(self.segments),
             "mode": self.mode,
             "boundaries": self.boundaries,
             "skipped": self.skipped,
+            "toc_count": self.toc_count,
+            "confidence": conf,
             "warnings": self.warnings,
             "types": _stype_counts(self.segments),
         }
+
+
+def split_confidence(split: "SplitResult | dict") -> str:
+    """拆段置信度：high / medium / low。
+
+    high → 可上传预拆、一般不需人审
+    medium → 不预拆炸子源，抽取时再拆；通常不拦人
+    low → 需人工确认（仅聚合源）
+    """
+    if isinstance(split, dict):
+        mode = (split.get("mode") or "").strip()
+        n = int(split.get("segments") or 0)
+        toc = int(split.get("toc_count") or 0)
+        boundaries = int(split.get("boundaries") or 0)
+        warnings = split.get("warnings") or []
+    else:
+        mode = (split.mode or "").strip()
+        n = len(split.segments or [])
+        toc = int(split.toc_count or 0)
+        boundaries = int(split.boundaries or 0)
+        warnings = split.warnings or []
+
+    if mode in ("fallback", "empty"):
+        return "low"
+    if mode == "single":
+        if boundaries > 1 and n <= 1:
+            return "low"
+        if warnings and n <= 1:
+            return "low"
+        return "low"
+    # multi
+    if n >= 4 and (toc <= 0 or n * 2 >= toc):
+        return "high"
+    if n >= 3 and (toc <= 0 or n * 3 >= toc):
+        return "medium"
+    if toc >= 6 and n > 0 and n * 3 < toc:
+        return "low"
+    if n >= 2:
+        return "medium"
+    return "low"
+
+
+def should_pre_explode(split: "SplitResult") -> bool:
+    """仅高置信 multi 才在上传时炸成子来源（减少错切绕过确认）。"""
+    return (
+        split.mode == "multi"
+        and len(split.segments) > 1
+        and split_confidence(split) == "high"
+    )
+
 
 
 def should_split(*, stype: str = "", team: str = "", channel: str = "", title: str = "", text: str = "") -> bool:
@@ -213,9 +291,9 @@ def split_hint(meta: str | dict | None) -> str:
     mode = sp.get("mode", "")
     if mode == "pre_split":
         idx = sp.get("segment_index")
-        parent = sp.get("parent_filename") or sp.get("parent_title") or ""
+        n = sp.get("segments", 0)
         if idx is not None and n:
-            return f"上传已预拆 {idx + 1}/{n}" + (f"（来自 {parent}）" if parent else "")
+            return f"上传已预拆 {idx + 1}/{n}"
         return "上传已预拆"
     if mode == "multi" and n > 1:
         types = sp.get("types") or {}
@@ -259,18 +337,22 @@ def sources_from_split(
             "segment_index": i,
             "segments": len(split.segments),
             "boundaries": split.boundaries,
+            "toc_count": split.toc_count,
+            "confidence": split_confidence(split),
             "warnings": split.warnings,
         }
         if manual_upload:
             split_meta["segment_inferred_team"] = seg_inferred
             split_meta["upload_team_override"] = upload_pick
         meta = {**base, "split": split_meta}
-        title = f"{parent_title} · {seg.title}" if parent_title else seg.title
+        # 展示名只用段标题（去掉 #/emoji），不拼父文件名，避免「内容聚合报告·…」盖住裁剪名
+        display = _strip_heading_noise(seg.title) or (seg.title or "").strip() or f"段落{i + 1}"
+        title = display[:200]
         team_for_source = upload_pick if manual_upload else seg_inferred
         out.append({
             "stype": seg.stype,
             "team": team_for_source,
-            "title": title[:200],
+            "title": title,
             "filename": parent_filename,
             "raw_path": raw_path,
             "text": seg.text,
@@ -297,7 +379,8 @@ def _is_boundary(line: str) -> bool:
         return False
     if _is_md_section_boundary(s):
         return True
-    if _MAJOR.match(s):
+    # 旧式无 # 标题的聚合包：仅已知章节名；正文 emoji 话题行（如 🎯 产品定义…）不算切点
+    if _MAJOR_KNOWN.match(s):
         return True
     if _DATA_SUB.match(s):
         return True
@@ -334,20 +417,35 @@ def _classify(title: str, body: str) -> tuple[str, str]:
         return "T3", "硅谷 BD 团队"
     if "Notion CRM" in title or "Interactions / Takes" in h or "People / Companies" in h:
         return "T3", "硅谷 BD 团队"
-    if "极客公园" in title and "外部" not in title:
-        return "T5", "编辑部"
+    # 自家站：
+    # - GeekPark English → 英文站（有独立团队）
+    # - 极客公园中文站 RSS → 外部媒体（公开发布文章，勿进「编辑部·沟通记录」；标题可区分自家 vs 外媒）
+    if re.search(r"GeekPark\s*English|极客公园英文|about\.geekpark", title + "\n" + h[:800], re.I):
+        return "T5", "英文站"
+    if "极客公园" in title:
+        return "T7", "外部媒体"
     if "外部信息" in title or _FEED_SUB.match(title.strip()):
         return "T7", "外部媒体"
+    # 与拆段白名单一致：外媒 feed → 外部媒体（英文站已在上方处理）
+    _OWN_EN = {"GeekPark English"}
+    for name in _EXTERNAL_FEED_NAMES:
+        if name in _OWN_EN:
+            continue
+        body_title = _strip_heading_noise(t) or t
+        if body_title == name or name in title:
+            return "T7", "外部媒体"
     if any(
         k in title
         for k in (
             "TechCrunch", "Wired", "The Verge", "Engadget", "VentureBeat",
             "Ars Technica", "CNET", "ZDNet", "TechRadar", "Digital Trends",
             "MIT Technology", "Platformer", "Stratechery", "Acquired",
+            "Lex Fridman", "How I Built This",
         )
     ):
         return "T7", "外部媒体"
-    if "作者:" in h and "链接:" in h and "发布时间:" in h:
+    # RSS 条目常见字段（聚合导出可能缺「链接」）
+    if ("作者:" in h or "作者：" in h) and ("发布时间:" in h or "发布时间：" in h):
         return "T7", "外部媒体"
     if any(k in title for k in ("GP 工作", "GP工作", "Global Partnership", "前沿社")):
         return "T10", "Global Partnership 团队"
@@ -451,6 +549,82 @@ def _fallback_segment(source_title: str, text: str) -> Segment:
     return Segment(title=title[:120], text=text.strip(), stype=st, team=tm, owner_hint=tm)
 
 
+def _toc_name_boundary_indexes(lines: list[str], start: int, toc: list[dict]) -> list[int]:
+    """用内容统计目录名在正文中补边界（欠拆时自动加刀）。"""
+    names = []
+    for item in toc or []:
+        name = re.sub(r"\s+", " ", (item.get("name") or "").strip())
+        # 去掉「(ICS)」等后缀便于匹配
+        name = re.sub(r"\s*\([^)]*\)\s*$", "", name).strip()
+        if name and name not in ("飞书多维表格",) and len(name) >= 2:
+            names.append(name)
+    if not names:
+        return []
+    hits: list[int] = []
+    for i in range(start, len(lines)):
+        plain = _strip_heading_noise(lines[i])
+        if not plain or len(plain) > 80:
+            continue
+        for name in names:
+            if plain == name or plain.startswith(name) or name in plain:
+                # 避免正文长句误命中：标题行要短且名字占比高
+                if len(plain) <= len(name) + 20:
+                    hits.append(i)
+                    break
+    return hits
+
+
+def _collect_segments(
+    lines: list[str], start: int, extra_bounds: list[int] | None = None,
+) -> tuple[list[Segment], int, int]:
+    """返回 (segments, boundary_count, skipped_n)。"""
+    pairs, boundary_count = _split_lines(lines, start)
+    if extra_bounds:
+        bounds = sorted(set([pairs[0][0]] + [a for a, _ in pairs] + list(extra_bounds) + [len(lines)]))
+        # rebuild pairs from merged bounds that fall in range
+        bounds = [b for b in bounds if start <= b <= len(lines)]
+        if bounds and bounds[0] > start:
+            bounds.insert(0, start)
+        if not bounds or bounds[-1] != len(lines):
+            bounds.append(len(lines))
+        bounds = sorted(set(bounds))
+        pairs = list(zip(bounds, bounds[1:]))
+        boundary_count = max(boundary_count, len(bounds) - 1)
+
+    section_at = _build_section_map(lines)
+    skipped: list[int] = []
+    segments: list[Segment] = []
+    for a, b in pairs:
+        segments.extend(_segments_from_range(lines, a, b, skipped=skipped, section_at=section_at))
+    return segments, boundary_count, sum(skipped)
+
+
+def _merge_adjacent_same_owner(segments: list[Segment]) -> list[Segment]:
+    """合并相邻且同 stype+team 的短碎片，减少噪声段。"""
+    if len(segments) < 2:
+        return segments
+    out: list[Segment] = []
+    for seg in segments:
+        if (
+            out
+            and out[-1].stype == seg.stype
+            and (out[-1].owner_hint or out[-1].team) == (seg.owner_hint or seg.team)
+            and len(seg.text) < 400
+            and len(out[-1].text) < 1200
+        ):
+            prev = out[-1]
+            out[-1] = Segment(
+                title=prev.title,
+                text=(prev.text + "\n\n" + seg.text).strip(),
+                stype=prev.stype,
+                team=prev.team,
+                owner_hint=prev.owner_hint or prev.team,
+            )
+        else:
+            out.append(seg)
+    return out
+
+
 def split_bundle_ex(text: str, *, source_title: str = "") -> SplitResult:
     """把聚合包正文切成多段；保证有正文时至少返回 1 段，并附带可追溯的拆段信息。"""
     raw = (text or "").replace("\r\n", "\n").strip()
@@ -458,25 +632,33 @@ def split_bundle_ex(text: str, *, source_title: str = "") -> SplitResult:
         return SplitResult(segments=[], mode="empty", warnings=["正文为空"])
 
     lines = raw.split("\n")
-    section_at = _build_section_map(lines)
     start = _raw_data_start_line(lines)
     for i in range(start, len(lines)):
         if _is_boundary(lines[i]):
             start = i
             break
 
-    pairs, boundary_count = _split_lines(lines, start)
-    skipped_n = 0
-    segments: list[Segment] = []
-    skipped: list[int] = []
-    for a, b in pairs:
-        segments.extend(_segments_from_range(lines, a, b, skipped=skipped, section_at=section_at))
-    skipped_n = sum(skipped)
-
     toc = parse_content_stats_toc(raw)
+    toc_n = len(toc) if toc else 0
+    segments, boundary_count, skipped_n = _collect_segments(lines, start)
+
+    # 欠拆：用目录名补边界再拆一次
+    if toc_n >= 3 and (not segments or len(segments) * 2 < toc_n):
+        extra = _toc_name_boundary_indexes(lines, start, toc)
+        if extra:
+            seg2, bc2, sk2 = _collect_segments(lines, start, extra_bounds=extra)
+            if len(seg2) > len(segments):
+                segments, boundary_count, skipped_n = seg2, bc2, sk2
+
+    segments = _merge_adjacent_same_owner(segments)
     warnings: list[str] = []
     if toc and segments:
         warnings.append(f"内容统计目录 {len(toc)} 项；正文拆出 {len(segments)} 段")
+        if toc_n >= 6 and len(segments) * 3 < toc_n:
+            warnings.append(
+                f"目录项远多于正文段落（{toc_n} vs {len(segments)}），可能拆段不足"
+            )
+
     if not segments and len(raw) >= _MIN_SEGMENT:
         seg = _fallback_segment(source_title, raw)
         warnings.append(
@@ -489,6 +671,7 @@ def split_bundle_ex(text: str, *, source_title: str = "") -> SplitResult:
             warnings=warnings,
             boundaries=boundary_count,
             skipped=skipped_n,
+            toc_count=toc_n,
         )
 
     if not segments:
@@ -498,6 +681,7 @@ def split_bundle_ex(text: str, *, source_title: str = "") -> SplitResult:
             warnings=["正文过短或无可抽取段落"],
             boundaries=boundary_count,
             skipped=skipped_n,
+            toc_count=toc_n,
         )
 
     mode = "multi" if len(segments) > 1 else "single"
@@ -515,6 +699,7 @@ def split_bundle_ex(text: str, *, source_title: str = "") -> SplitResult:
         warnings=warnings,
         boundaries=boundary_count,
         skipped=skipped_n,
+        toc_count=toc_n,
     )
 
 

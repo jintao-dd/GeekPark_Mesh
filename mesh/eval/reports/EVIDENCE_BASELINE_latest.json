@@ -1,0 +1,506 @@
+{
+  "phase": "evidence",
+  "tag": "baseline",
+  "n": 12,
+  "pass_rate": 1.0,
+  "macro_evidence_coverage": 1.0,
+  "macro_evidence_correctness": 1.0,
+  "macro_unsupported_claim_rate": 0.0,
+  "macro_citation_correctness": 1.0,
+  "elapsed_s": 0.3,
+  "results": [
+    {
+      "id": "E01",
+      "category": "entity",
+      "out": {
+        "status": "grounded",
+        "n_hits": 3,
+        "evidence_refs": [
+          "ev:item:4251",
+          "ev:item:4259",
+          "ev:item:4260"
+        ],
+        "item_ids": [
+          "4251",
+          "4259",
+          "4260"
+        ],
+        "answer_snip": "时间过滤；李源；Snowball；锦涛",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E02",
+      "category": "company",
+      "out": {
+        "status": "grounded",
+        "n_hits": 40,
+        "evidence_refs": [
+          "ev:item:4120",
+          "ev:item:4123",
+          "ev:ctx:2026-8-17:3",
+          "ev:item:4112",
+          "ev:item:4124",
+          "ev:item:4115",
+          "ev:item:4116",
+          "ev:item:4117"
+        ],
+        "item_ids": [
+          "4120",
+          "4123",
+          "4112",
+          "4124",
+          "4115",
+          "4116",
+          "4117",
+          "4118",
+          "4122",
+          "4121",
+          "4167",
+          "4128",
+          "4129",
+          "4130",
+          "4237",
+          "4105",
+          "4106",
+          "4110",
+          "4111",
+          "4182",
+          "4189",
+          "4190"
+        ],
+        "answer_snip": "时间过滤；面壁智能；面壁智能；面壁智能；面壁智能",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E03",
+      "category": "topic",
+      "out": {
+        "status": "grounded",
+        "n_hits": 40,
+        "evidence_refs": [
+          "ev:item:4112",
+          "ev:item:4114",
+          "ev:item:4116",
+          "ev:item:4118",
+          "ev:item:4120",
+          "ev:item:4123",
+          "ev:item:4125",
+          "ev:item:4127"
+        ],
+        "item_ids": [
+          "4112",
+          "4114",
+          "4116",
+          "4118",
+          "4120",
+          "4123",
+          "4125",
+          "4127",
+          "4149",
+          "4162",
+          "4345",
+          "4348",
+          "4383",
+          "4128",
+          "4129",
+          "4130",
+          "4242",
+          "4105",
+          "4106",
+          "4110"
+        ],
+        "answer_snip": "时间过滤；面壁智能；安谋科技；面壁智能；面壁智能",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E04",
+      "category": "topic",
+      "out": {
+        "status": "grounded",
+        "n_hits": 11,
+        "evidence_refs": [
+          "ev:item:4445",
+          "ev:ctx:2026-09-08:2",
+          "ev:item:4409",
+          "ev:item:4408",
+          "ev:item:4410",
+          "ev:item:4411",
+          "ev:ctx:2026-09-08:8",
+          "ev:ctx:2026-09-08:9"
+        ],
+        "item_ids": [
+          "4445",
+          "4409",
+          "4408",
+          "4410",
+          "4411"
+        ],
+        "answer_snip": "时间过滤；Joshua X.；OpenAI 与 GPT-6 Astra；AI；OpenAI",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E05",
+      "category": "community",
+      "out": {
+        "status": "grounded",
+        "n_hits": 32,
+        "evidence_refs": [
+          "ev:item:4368",
+          "ev:item:4221",
+          "ev:item:4274",
+          "ev:item:4286",
+          "ev:item:4183",
+          "ev:item:4319",
+          "ev:item:4358",
+          "ev:ctx:2026-8-17:8"
+        ],
+        "item_ids": [
+          "4368",
+          "4221",
+          "4274",
+          "4286",
+          "4183",
+          "4319",
+          "4358",
+          "4378",
+          "4385",
+          "4386",
+          "4246",
+          "4247",
+          "4387",
+          "4376",
+          "4377",
+          "4369",
+          "4271",
+          "4241",
+          "4370",
+          "4371",
+          "4372",
+          "4364",
+          "4303",
+          "4230",
+          "4231",
+          "4232",
+          "4233",
+          "4235"
+        ],
+        "answer_snip": "时间过滤；Founder Show；Anita Wang；AGI 2026；视频号",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E06",
+      "category": "relation",
+      "out": {
+        "status": "grounded",
+        "n_hits": 2,
+        "evidence_refs": [
+          "ev:item:4277",
+          "ev:item:4242"
+        ],
+        "item_ids": [
+          "4277",
+          "4242"
+        ],
+        "answer_snip": "时间过滤；AGI 2026；MiniMax",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E07",
+      "category": "empty",
+      "out": {
+        "status": "grounded",
+        "n_hits": 18,
+        "evidence_refs": [
+          "ev:ctx:2026-09-08:1",
+          "ev:ctx:2026-09-08:2",
+          "ev:ctx:2026-09-08:3",
+          "ev:ctx:2026-09-08:4",
+          "ev:ctx:2026-09-08:5",
+          "ev:item:4517",
+          "ev:item:4499",
+          "ev:ctx:2026-09-08:8"
+        ],
+        "item_ids": [
+          "4517",
+          "4499",
+          "4423",
+          "4426",
+          "4437",
+          "4439",
+          "4453",
+          "4454",
+          "4462",
+          "4463"
+        ],
+        "answer_snip": "时间过滤；Agent 与多智能体；FREELANDER 神行者；滴滴战投；Eigent AI",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E08",
+      "category": "topic",
+      "out": {
+        "status": "grounded",
+        "n_hits": 20,
+        "evidence_refs": [
+          "ev:item:4153",
+          "ev:item:4156",
+          "ev:item:4158",
+          "ev:item:4160",
+          "ev:item:4168",
+          "ev:item:4169",
+          "ev:item:4174",
+          "ev:item:4175"
+        ],
+        "item_ids": [
+          "4153",
+          "4156",
+          "4158",
+          "4160",
+          "4168",
+          "4169",
+          "4174",
+          "4175",
+          "4182",
+          "4190",
+          "4237",
+          "4250",
+          "4379",
+          "4380",
+          "4154",
+          "4155",
+          "4334"
+        ],
+        "answer_snip": "时间过滤；源策；艾欧智能；乐享科技；灵初",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E09",
+      "category": "team",
+      "out": {
+        "status": "grounded",
+        "n_hits": 40,
+        "evidence_refs": [
+          "ev:item:4502",
+          "ev:item:4416",
+          "ev:item:4417",
+          "ev:ctx:2026-09-08:4",
+          "ev:ctx:2026-09-08:5",
+          "ev:ctx:2026-09-08:6",
+          "ev:ctx:2026-09-08:7",
+          "ev:ctx:2026-09-08:8"
+        ],
+        "item_ids": [
+          "4502",
+          "4416",
+          "4417",
+          "4514",
+          "4414",
+          "4415",
+          "4511",
+          "4413",
+          "4418",
+          "4419",
+          "4420",
+          "4423",
+          "4424",
+          "4425",
+          "4426",
+          "4427",
+          "4421",
+          "4428",
+          "4429",
+          "4430",
+          "4431",
+          "4432",
+          "4438"
+        ],
+        "answer_snip": "时间过滤；IFA 2026；IFA；IFA 2026；IFA 探展总览与 IFA 2026 现场稿",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E10",
+      "category": "team",
+      "out": {
+        "status": "grounded",
+        "n_hits": 40,
+        "evidence_refs": [
+          "ev:item:4406",
+          "ev:item:4407",
+          "ev:item:4408",
+          "ev:item:4409",
+          "ev:item:4410",
+          "ev:item:4412",
+          "ev:item:4426",
+          "ev:item:4428"
+        ],
+        "item_ids": [
+          "4406",
+          "4407",
+          "4408",
+          "4409",
+          "4410",
+          "4412",
+          "4426",
+          "4428",
+          "4432",
+          "4433",
+          "4434",
+          "4435",
+          "4436",
+          "4437",
+          "4439",
+          "4441",
+          "4442",
+          "4443",
+          "4444",
+          "4445",
+          "4446",
+          "4448",
+          "4450",
+          "4451",
+          "4447",
+          "4452"
+        ],
+        "answer_snip": "时间过滤；运营性条目；悦普集团；OpenAI；AI",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E11",
+      "category": "abstention",
+      "out": {
+        "status": "unsupported",
+        "n_hits": 0,
+        "evidence_refs": [],
+        "item_ids": [],
+        "answer_snip": "未在已上线周报中找到与问题直接相关的记录。请尝试换关键词、缩小或扩大时间范围，或确认相关内容是否已上线。\n（本次检索时间范围：2026-09-08 至 2026-09-08）",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "pass": true
+      }
+    },
+    {
+      "id": "E12",
+      "category": "temporal",
+      "out": {
+        "status": "grounded",
+        "n_hits": 5,
+        "evidence_refs": [
+          "ev:item:4251",
+          "ev:item:4259",
+          "ev:item:4260"
+        ],
+        "item_ids": [
+          "4251",
+          "4259",
+          "4260"
+        ],
+        "answer_snip": "时间过滤；李源；Snowball；锦涛；锦涛",
+        "error": null
+      },
+      "metrics": {
+        "evidence_coverage": 1.0,
+        "evidence_correctness": 1.0,
+        "unsupported_claim": 0.0,
+        "citation_correctness": 1.0,
+        "abstention_ok": 1.0,
+        "pass": true
+      }
+    }
+  ]
+}

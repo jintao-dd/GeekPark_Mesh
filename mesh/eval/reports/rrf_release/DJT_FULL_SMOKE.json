@@ -1,0 +1,353 @@
+{
+  "identity": {
+    "display": "杜锦涛54564545",
+    "user_id": 5,
+    "team": "品牌创意团队",
+    "feishu_open_id_prefix": "ou_fd65363b8ed1e"
+  },
+  "n": 20,
+  "n_ok": 20,
+  "n_soft_empty": 0,
+  "n_fail": 0,
+  "elapsed_s": 353.4,
+  "by_cat": {
+    "self": {
+      "n": 2,
+      "ok": 2,
+      "soft": 0
+    },
+    "team_tech": {
+      "n": 1,
+      "ok": 1,
+      "soft": 0
+    },
+    "dept_edit": {
+      "n": 1,
+      "ok": 1,
+      "soft": 0
+    },
+    "person_edit": {
+      "n": 2,
+      "ok": 2,
+      "soft": 0
+    },
+    "dept_biz": {
+      "n": 1,
+      "ok": 1,
+      "soft": 0
+    },
+    "person_biz": {
+      "n": 2,
+      "ok": 2,
+      "soft": 0
+    },
+    "dept_community": {
+      "n": 1,
+      "ok": 1,
+      "soft": 0
+    },
+    "person_community": {
+      "n": 1,
+      "ok": 1,
+      "soft": 0
+    },
+    "dept_video": {
+      "n": 1,
+      "ok": 1,
+      "soft": 0
+    },
+    "person_video": {
+      "n": 1,
+      "ok": 1,
+      "soft": 0
+    },
+    "entity": {
+      "n": 3,
+      "ok": 3,
+      "soft": 0
+    },
+    "cross": {
+      "n": 1,
+      "ok": 1,
+      "soft": 0
+    },
+    "time": {
+      "n": 1,
+      "ok": 1,
+      "soft": 0
+    },
+    "followup": {
+      "n": 1,
+      "ok": 1,
+      "soft": 0
+    },
+    "person_alias": {
+      "n": 1,
+      "ok": 1,
+      "soft": 0
+    }
+  },
+  "results": [
+    {
+      "id": "S01",
+      "cat": "self",
+      "query": "我是谁，我在哪个团队？",
+      "ok": true,
+      "soft_empty": false,
+      "reason": "ok",
+      "elapsed_ms": 18116,
+      "answer_preview": "你是 杜锦涛（品牌创意团队）。想查周报直接说人名或公司就行。",
+      "answer_len": 30,
+      "tools": [],
+      "mode": null
+    },
+    {
+      "id": "S02",
+      "cat": "self",
+      "query": "锦涛最近在忙什么？",
+      "ok": true,
+      "soft_empty": false,
+      "reason": "ok",
+      "elapsed_ms": 15205,
+      "answer_preview": "你就是杜锦涛（创新技术 / 品牌创意团队）——问自己在忙什么，这个得你告诉我。\n\n已上线周报里没有挂你名下的进展条目；飞书通讯录只有你的基本信息（创新技术，G-356）。\n\n要看具体活儿，缺一块：你参与的周报 Issue 或近期任务材料，现在没有。",
+      "answer_len": 124,
+      "tools": [],
+      "mode": null
+    },
+    {
+      "id": "T01",
+      "cat": "team_tech",
+      "query": "创新技术团队这期周报重点是什么？",
+      "ok": true,
+      "soft_empty": false,
+      "reason": "ok",
+      "elapsed_ms": 14852,
+      "answer_preview": "已上线周报里没有「创新技术团队」这个分组的重点汇总——周报按内容主题挂条目，不按你团队名归类。\n\n和你（创新技术 / G-356）能对上的周报条目有这些：\n- 迈思创新\n- memopin · 叶志伟\n- 科锐国际\n- 具身智能\n\n但这些是内容标签检索出来的，材料里没写「哪条是本期重点」。要定「重点」，缺一块：本期周报的重点标记或 Owner 排序，现在没有。",
+      "answer_len": 181,
+      "tools": [],
+      "mode": null
+    },
+    {
+      "id": "E01",
+      "cat": "dept_edit",
+      "query": "编辑部这周接触了哪些公司和人？",
+      "ok": true,
+      "soft_empty": false,
+      "reason": "ok",
+      "elapsed_ms": 14247,
+      "answer_preview": "编辑部本周（已上线周报）接触的公司/人：\n- floatboat\n- Ran Chen\n- Brandon Kwong\n- Byungkook Kim\n\n以上是周报里挂在编辑部相关标签下的条目，材料没写具体交流内容。\n\n补充：Takes/时间线里那批（Kolento Hou、Ion Stoica、Gavin Ni、Wei Lyu 等）是硅谷 CRM 思琪侧跟进，不算编辑部，也不是本期周报，别混进来。",
+      "answer_len": 201,
+      "tools": [],
+      "mode": null
+    },
+    {
+      "id": "E02",
+      "cat": "person_edit",
+      "query": "赵思琪最近在跟进什么？",
+      "ok": true,
+      "soft_empty": false,
+      "reason": "ok",
+      "elapsed_ms": 15705,
+      "answer_preview": "赵思琪（硅谷 CRM，思琪/Lilyann 侧）近期跟进：\n\n**已完成/成稿**\n- Ion Stoica（9-15 专访已成稿，中英稿待发布）\n- Wei Lyu（中文专访已发布，英文待发；带思琪去 South Park Commons 探合作）\n\n**进行中 / 待跟进**\n- David Lee：待发正式邮件走专访流程（已给下周可约时间）\n- Kolento Hou（emergences.ai）：9-16 线下见过，下一步引荐 Jack\n- Gavin Ni（fal）：关系比预期深，已抛 10 月 Tech Week cohost，待跟进\n- R",
+      "answer_len": 584,
+      "tools": [],
+      "mode": null
+    },
+    {
+      "id": "E03",
+      "cat": "person_edit",
+      "query": "张山山这期写了什么？",
+      "ok": true,
+      "soft_empty": false,
+      "reason": "ok",
+      "elapsed_ms": 7410,
+      "answer_preview": "张山山这期周报里写的条目：\n- 小度 AI Day（9-08）\n- 海信（9-08）\n- 阿里（8-17）\n- Reverie AI（8-17）\n\n材料里只有条目名，没写具体内容/进展。\n\n——\n来源：2026-09-08 已上线周报",
+      "answer_len": 117,
+      "tools": [],
+      "mode": null
+    },
+    {
+      "id": "B01",
+      "cat": "dept_biz",
+      "query": "商业化团队最近有哪些客户进展？",
+      "ok": true,
+      "soft_empty": false,
+      "reason": "ok",
+      "elapsed_ms": 13196,
+      "answer_preview": "商业化团队本期已上线周报里的客户/项目条目：\n- 原力灵机（9-08）\n- 名仕（9-01）\n- 小度 AI Day（9-08）\n- 商业化团队（8-21，条目名，无细节）\n\n周报只给了条目名，没写具体客户进展/交流内容。\n\n补充：Takes/时间线里那批（Kolento Hou、Ion Stoica、Gavin Ni、Wei Lyu 等）是硅谷 CRM 思琪侧跟进，不属于商业化团队周报，别混进来。",
+      "answer_len": 201,
+      "tools": [],
+      "mode": null
+    },
+    {
+      "id": "B02",
+      "cat": "person_biz",
+      "query": "郭冀超最近在忙什么？",
+      "ok": true,
+      "soft_empty": false,
+      "reason": "ok",
+      "elapsed_ms": 8414,
+      "answer_preview": "郭冀超本期周报里没有条目。\n\n材料里只有「郭冀昂」（8-17）：Mentiforce、阿里、Reverie AI、Eigent AI，都只有条目名、没写具体内容。\n\n如果你要找的就是这个人，请确认是不是名字写岔了（郭冀超 / 郭冀昂）。\n\n——\n来源：2026-09-08 已上线周报",
+      "answer_len": 142,
+      "tools": [],
+      "mode": null
+    },
+    {
+      "id": "B03",
+      "cat": "person_biz",
+      "query": "姜丽最近跟进了哪些项目？",
+      "ok": true,
+      "soft_empty": false,
+      "reason": "ok",
+      "elapsed_ms": 19581,
+      "answer_preview": "姜丽这期周报里的条目：\n- 小度 AI Day（9-08）\n- Loopit（8-17）\n- 阿里（8-17）\n- Reverie AI（8-17）\n\n材料里只有条目名，没写具体跟进内容/进展。\n\n另外：这批挂在「姜丽萍」名下，如果你找的是别人请确认名字。\n\n——\n来源：2026-09-08 已上线周报",
+      "answer_len": 152,
+      "tools": [],
+      "mode": null
+    },
+    {
+      "id": "C01",
+      "cat": "dept_community",
+      "query": "社区运营最近在做什么活动？",
+      "ok": true,
+      "soft_empty": false,
+      "reason": "ok",
+      "elapsed_ms": 24421,
+      "answer_preview": "社区运营相关的已上线周报条目（只有条目名，没写具体活动内容）：\n- Founder Park（8-17）\n- 源策（8-17）\n- 短测未来（8-17）\n- 小红书（8-17）\n- design studio（8-17）\n- 小度 AI Day（9-08）\n\n周报里没写这些是什么活动、做到哪一步，缺「活动内容/进展」这一块。\n\n社区运营在飞书通讯录里的人：孙晨薇、王子艺（活动运营）、王馨梓、胡晓普、董慧、马旸——但材料里没有他们各自的活动进展记录。",
+      "answer_len": 226,
+      "tools": [],
+      "mode": null
+    },
+    {
+      "id": "C02",
+      "cat": "person_community",
+      "query": "胡晓最近在跟进什么？",
+      "ok": true,
+      "soft_empty": false,
+      "reason": "ok",
+      "elapsed_ms": 8834,
+      "answer_preview": "材料里只有「胡晓普」（不确定是不是你要找的「胡晓」，名字可能写岔）。\n\n胡晓普名下的已上线周报条目（只有条目名，没写具体跟进内容）：\n- 阿里（8-17）\n- 阿里千问（8-17）\n- Reverie AI（8-17）\n- XC / 飞书演讲项目（9-08）\n\n缺「跟进内容/进展」这一块。\n\n——\n来源：2026-09-08 已上线周报",
+      "answer_len": 169,
+      "tools": [],
+      "mode": null
+    },
+    {
+      "id": "V01",
+      "cat": "dept_video",
+      "query": "创意视频团队本期重点是什么？",
+      "ok": true,
+      "soft_empty": false,
+      "reason": "ok",
+      "elapsed_ms": 14860,
+      "answer_preview": "创意视频相关的已上线周报条目（只有条目名，没写「本期重点」是什么）：\n- 追觅（8-17）\n- Hardware（8-17）\n- 视频号选题文案（8-17）\n- HeyGen（8-17）\n- 内容矩阵与账号（8-17）\n- AI 硬件测评与形态（8-17）\n- 宇树 · 王兴兴（8-17）\n\n周报里没标哪个是「本期重点」，也没写各条进展，缺「重点/优先级」这一块。\n\n创意视频在飞书通讯录里的人：李文哲、郭宇祺（社媒数据运营实习生）、闫晓龙（创意内容视频编辑）——但没有各自在跟什么。",
+      "answer_len": 243,
+      "tools": [],
+      "mode": null
+    },
+    {
+      "id": "V02",
+      "cat": "person_video",
+      "query": "闫晓龙最近拍了什么？",
+      "ok": true,
+      "soft_empty": false,
+      "reason": "ok",
+      "elapsed_ms": 12305,
+      "answer_preview": "闫晓龙名下的已上线周报条目（只有条目名，没写他具体拍了什么）：\n- AGI 2026（8-17）\n- Reverie AI（8-17）\n- 阿里（8-17）\n- 小度 AI Day（9-08）\n\n周报里没写拍摄内容/成片，缺「拍了什么」这一块。\n\n闫晓龙：创意视频 · 创意内容视频编辑。",
+      "answer_len": 144,
+      "tools": [],
+      "mode": null
+    },
+    {
+      "id": "X01",
+      "cat": "entity",
+      "query": "面壁智能最近有什么进展？",
+      "ok": true,
+      "soft_empty": false,
+      "reason": "ok",
+      "elapsed_ms": 9332,
+      "answer_preview": "面壁智能相关的已上线周报条目（只有条目名，没写具体进展）：\n- 面壁智能（8-17）\n- 端侧 AI 与芯片（8-17）\n- cumora（8-17）\n- Eigent AI（8-17）\n\n缺「进展/跟进内容」这一块。\n\n——\n来源：2026-09-08 已上线周报",
+      "answer_len": 133,
+      "tools": [],
+      "mode": null
+    },
+    {
+      "id": "X02",
+      "cat": "entity",
+      "query": "英伟达 EDC 培训讲了什么？",
+      "ok": true,
+      "soft_empty": false,
+      "reason": "ok",
+      "elapsed_ms": 16684,
+      "answer_preview": "英伟达相关的已上线周报条目（只有条目名，没写培训内容）：\n- 英伟达（8-17）\n- 英伟达视频播客（9-08）\n- 端侧 AI 与芯片（8-17）\n\n周报里没有「EDC 培训」这个条目，也没写培训讲了什么，缺这一块。\n\n——\n来源：2026-09-08 已上线周报",
+      "answer_len": 133,
+      "tools": [],
+      "mode": null
+    },
+    {
+      "id": "X03",
+      "cat": "entity",
+      "query": "The Verge 写了哪些手机或隐私相关？",
+      "ok": true,
+      "soft_empty": false,
+      "reason": "ok",
+      "elapsed_ms": 18753,
+      "answer_preview": "周报里没有「The Verge」这个来源标签，也没有按「手机/隐私」归类的条目，缺这一块。\n\n勉强沾边的条目（只有条目名，没写内容，也没标是不是 The Verge 写的）：\n- 手机背面硬件选题（暂名 The Far Side of the Phone）（9-08）\n- Huawei（9-08）\n- Apple（9-08）\n\n无法确认这些是不是 The Verge 的报道，也没有隐私相关条目。\n\n——\n来源：2026-09-08 已上线周报",
+      "answer_len": 223,
+      "tools": [],
+      "mode": null
+    },
+    {
+      "id": "X04",
+      "cat": "cross",
+      "query": "编辑部和商业化最近有交叉的人和公司吗？",
+      "ok": true,
+      "soft_empty": false,
+      "reason": "ok",
+      "elapsed_ms": 20840,
+      "answer_preview": "编辑部（内容/专访）和商业化（BD/客户）出现交叉的，材料里能看到这些：\n\n**周报侧（内容里带商业化标签的公司）**\n- AdsGency AI（8-17）\n- 追觅（8-17）\n\n这两条同时落在「编辑部×商业化交叉」和「商业化/BD」两个检索里，是重合点。但周报只有条目名，没写具体怎么交叉的。\n\n**硅谷 CRM（思琪侧，非周报）——同一个人既做专访又牵商业化的**\n- Gavin Ni：客户线索，同时抛了 10 月 Tech Week cohost，属内容接触+商务\n- Wei Lyu（吕唯）：中文专访已发，同时带赵思琪去 South Park C",
+      "answer_len": 438,
+      "tools": [],
+      "mode": null
+    },
+    {
+      "id": "W01",
+      "cat": "time",
+      "query": "最近一期周报里有什么值得关注的？",
+      "ok": true,
+      "soft_empty": false,
+      "reason": "ok",
+      "elapsed_ms": 11875,
+      "answer_preview": "最近一期周报（9-08）里只有一条：\n- 小度 AI Day\n\n再往前一期（9-01）有三条：\n- Paula Wang\n- Stripe\n- Melody\n\n周报里这些都只有条目名，没写具体内容，看不出哪条更值得关注，缺这一块。\n\n——\n来源：2026-09-08 已上线周报",
+      "answer_len": 139,
+      "tools": [],
+      "mode": null
+    },
+    {
+      "id": "W02",
+      "cat": "followup",
+      "query": "他具体说了什么？",
+      "ok": true,
+      "soft_empty": false,
+      "reason": "ok",
+      "elapsed_ms": 71345,
+      "answer_preview": "你问「他具体说了什么」——指代不清（上一轮列了小度 AI Day、Paula Wang、Stripe、Melody 四个条目，没有单独某个「他」）。\n\n而且这些周报条目都只有条目名，没有正文内容，看不出任何人具体说了什么，缺这一块。\n\n——\n来源：2026-09-08 已上线周报",
+      "answer_len": 140,
+      "tools": [],
+      "mode": null
+    },
+    {
+      "id": "W03",
+      "cat": "person_alias",
+      "query": "思琪最近怎么样？",
+      "ok": true,
+      "soft_empty": false,
+      "reason": "ok",
+      "elapsed_ms": 17422,
+      "answer_preview": "思琪（赵思琪 / Lilyann）这边分两块：\n\n**周报侧（已上线）**\n- [8-17] 有一条挂着「思琪」的条目，但只有条目名，没正文，看不出具体进展。\n\n**硅谷 CRM（思琪侧跟进，非周报）——最近在推的几条**\n- Ion Stoica：专访已成稿（9-15），中英文稿待发布\n- David Lee：LinkedIn 已回，邮件草稿好了，待发正式邮件走流程（专访）\n- Kolento Hou：线下已见（emergences.ai 创始人），下一步引荐 Jack（商务）\n- Gavin Ni：关系比预期深，已抛 10 月 Tech Week c",
+      "answer_len": 559,
+      "tools": [],
+      "mode": null
+    }
+  ],
+  "pass": true
+}

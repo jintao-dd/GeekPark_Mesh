@@ -1,0 +1,160 @@
+[mesh] pg pool min=2 max=20
+{
+  "slug": "2026-8-17",
+  "lane": "published_json",
+  "mode": "shadow",
+  "n_relations": 17,
+  "n_valid": 16,
+  "n_invalid": 1,
+  "n_uncertain": 0,
+  "invalid_ratio": 0.059,
+  "by_reason": {
+    "ok": 16,
+    "status_upgrade": 1
+  },
+  "invalid_rows": [
+    {
+      "candidate_id": "c16",
+      "title": "xAI：编辑部技术成员建联与视频号财报选题",
+      "claim_verdict": "invalid",
+      "claim_reason_code": "status_upgrade",
+      "claim_reason": "body 论断强度 3 > 证据有效强度 2",
+      "claim_strength": 3,
+      "evidence_strength": 2
+    }
+  ],
+  "invalid_details": [
+    {
+      "title": "xAI：编辑部技术成员建联与视频号财报选题",
+      "body": "编辑部有 xAI 技术成员建联，视频号做 xAI 财报选题，同一公司不同触点。",
+      "details": [
+        "视频号团队：周数据多条视频聚焦 AI 大厂与地缘，含马斯克身家与 SpaceX/xAI 合并财报。"
+      ],
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "weak": false,
+      "evidence": [
+        {
+          "team": "编辑部",
+          "snippet": "Shuyang Gao（xAI 技术成员，Coding & Reasoning 方向，加州 Sunnyvale）：xAI 为 Elon Musk 创立的 AI 公司，研发 Grok 大模型（Series C+）"
+        },
+        {
+          "team": "视频号团队",
+          "snippet": "多条视频聚焦AI大厂与地缘：马斯克身家与SpaceX/xAI合并财报、长鑫上市（开盘涨472%、市值3.31万亿元）冲击美光/SK海力士、美国对中国扫地机器人FCC限制、Kimi K3引发美国AI圈争论、黄仁勋首条X帖谈开放权重。"
+        }
+      ],
+      "reason_code": "status_upgrade",
+      "reason": "body 论断强度 3 > 证据有效强度 2",
+      "claim_strength": 3,
+      "evidence_strength": 2,
+      "lexical_body_pass": true
+    }
+  ],
+  "uncertain_rows": [],
+  "valid_watch_parallel_sample": [
+    {
+      "title": "Founder Park 账号运营：传播涨粉与下半年规划两侧各知一半",
+      "tier": "strong",
+      "type": "info_complement",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    },
+    {
+      "title": "AGI 2026 现场内容分栏：品牌创意与视频号各知一半",
+      "tier": "strong",
+      "type": "info_complement",
+      "claim_strength": 5,
+      "evidence_strength": 5
+    },
+    {
+      "title": "豆包：商业化、编辑部、视频号各自碰到的三个触点",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    },
+    {
+      "title": "Agent 治理与 AI 安全伦理：编辑部与视频号同赛道各自记录",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 0,
+      "evidence_strength": 2
+    },
+    {
+      "title": "百度：社群智能硬件 Workshop 与视频号内容分账选题",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    },
+    {
+      "title": "Google：社群 I/O 专场与视频号打法对比选题",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    },
+    {
+      "title": "字节跳动：编辑部豆包战役报道与视频号火山引擎/工具触点",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 3,
+      "evidence_strength": 3
+    },
+    {
+      "title": "Anthropic 与 OpenAI：编辑部早报与视频号御三家选题各自记录",
+      "tier": "parallel",
+      "type": "parallel_tracks",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    },
+    {
+      "title": "Helloboss CEO 王沁：编辑部接触",
+      "tier": "watch",
+      "type": "one_sided",
+      "claim_strength": 3,
+      "evidence_strength": 0
+    },
+    {
+      "title": "视频号栏目封面：由品牌创意团队设计资源承接",
+      "tier": "watch",
+      "type": "one_sided",
+      "claim_strength": 0,
+      "evidence_strength": 0
+    },
+    {
+      "title": "视频号选题会：拟对接编辑部海外内容信源",
+      "tier": "watch",
+      "type": "one_sided",
+      "claim_strength": 5,
+      "evidence_strength": 5
+    },
+    {
+      "title": "柔性具身早期赛道信号：编辑部记录",
+      "tier": "watch",
+      "type": "one_sided",
+      "claim_strength": 2,
+      "evidence_strength": 2
+    },
+    {
+      "title": "韩国아산나눔재단 Byungkook Kim：编辑部海外接触",
+      "tier": "watch",
+      "type": "overseas_link",
+      "claim_strength": 3,
+      "evidence_strength": 0
+    }
+  ],
+  "lexical_pass_but_claim_invalid": [
+    {
+      "title": "xAI：编辑部技术成员建联与视频号财报选题",
+      "reason_code": "status_upgrade",
+      "reason": "body 论断强度 3 > 证据有效强度 2",
+      "claim_strength": 3,
+      "evidence_strength": 2
+    }
+  ],
+  "go_nogo_hints": {
+    "invalid_ratio_warn_if_gt": 0.25,
+    "note": "A1 shadow only; do not enforce until human review of invalid_details"
+  }
+}

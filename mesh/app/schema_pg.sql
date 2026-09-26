@@ -26,7 +26,13 @@ CREATE TABLE IF NOT EXISTS issues(
   published_items_snapshot TEXT,
   updated_at TEXT,
   published_at TEXT,
-  created_at TEXT DEFAULT to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')
+  created_at TEXT DEFAULT to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'),
+  embedding_status TEXT DEFAULT '',
+  embedding_total INTEGER DEFAULT 0,
+  embedding_done INTEGER DEFAULT 0,
+  embedding_model TEXT DEFAULT '',
+  embedding_at TEXT,
+  embedding_error TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sources(
@@ -66,6 +72,7 @@ CREATE TABLE IF NOT EXISTS items(
   channel TEXT DEFAULT 'manual',
   merged_into INTEGER,
   source_labels TEXT,
+  raw_snippet TEXT,                              -- 原文较长去敏摘要，供问答深度成文
   created_at TEXT DEFAULT to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')
 );
 
@@ -373,4 +380,75 @@ CREATE TABLE IF NOT EXISTS mesh_llm_slots(
   slot_id INTEGER PRIMARY KEY,
   holder TEXT,
   taken_at DOUBLE PRECISION
+);
+
+-- Notion CRM 底库（全量/增量同步；周报仍按窗口投影）
+CREATE TABLE IF NOT EXISTS crm_sync_state(
+  kind TEXT PRIMARY KEY,
+  database_id TEXT,
+  database_title TEXT,
+  cursor_last_edited TEXT,
+  last_full_at TEXT,
+  last_incr_at TEXT,
+  row_count INTEGER DEFAULT 0,
+  status TEXT DEFAULT '',
+  error TEXT,
+  updated_at TEXT
+);
+CREATE TABLE IF NOT EXISTS crm_companies(
+  id SERIAL PRIMARY KEY,
+  notion_id TEXT UNIQUE NOT NULL,
+  name TEXT, aliases TEXT, one_liner TEXT, sector TEXT, stage TEXT, website TEXT,
+  people_ids_json TEXT, people_names TEXT, props_json TEXT, last_edited_time TEXT, synced_at TEXT
+);
+CREATE TABLE IF NOT EXISTS crm_people(
+  id SERIAL PRIMARY KEY,
+  notion_id TEXT UNIQUE NOT NULL,
+  display_name TEXT, aliases TEXT, headline TEXT,
+  company_ids_json TEXT, company_names TEXT, sector TEXT, location TEXT,
+  email TEXT, wechat TEXT, linkedin TEXT,
+  interaction_ids_json TEXT, take_ids_json TEXT,
+  interaction_count TEXT, last_touched TEXT,
+  props_json TEXT, last_edited_time TEXT, synced_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_crm_people_name ON crm_people(display_name);
+CREATE INDEX IF NOT EXISTS idx_crm_people_touched ON crm_people(last_touched);
+CREATE INDEX IF NOT EXISTS idx_crm_companies_name ON crm_companies(name);
+CREATE TABLE IF NOT EXISTS crm_interactions(
+  id SERIAL PRIMARY KEY,
+  notion_id TEXT UNIQUE NOT NULL,
+  title TEXT, date_start TEXT, interact_type TEXT,
+  people_ids_json TEXT, people_names TEXT, our_side TEXT, output_link TEXT,
+  processed INTEGER DEFAULT 0, props_json TEXT, last_edited_time TEXT, synced_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_crm_ix_date ON crm_interactions(date_start);
+CREATE TABLE IF NOT EXISTS crm_takes(
+  id SERIAL PRIMARY KEY,
+  notion_id TEXT UNIQUE NOT NULL,
+  name TEXT, person_ids_json TEXT, person_names TEXT, verdict TEXT,
+  scenario TEXT, owner TEXT, last_reviewed TEXT, is_prospect TEXT,
+  props_json TEXT, last_edited_time TEXT, synced_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_crm_takes_reviewed ON crm_takes(last_reviewed);
+CREATE TABLE IF NOT EXISTS crm_page_blocks(
+  id SERIAL PRIMARY KEY,
+  notion_id TEXT NOT NULL,
+  owner_kind TEXT DEFAULT 'takes',
+  block_id TEXT UNIQUE NOT NULL,
+  parent_block_id TEXT,
+  ord INTEGER,
+  block_type TEXT,
+  text TEXT,
+  page_last_edited TEXT,
+  synced_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_crm_blocks_page ON crm_page_blocks(notion_id, ord);
+CREATE INDEX IF NOT EXISTS idx_crm_blocks_kind ON crm_page_blocks(owner_kind);
+CREATE TABLE IF NOT EXISTS crm_cross_anchor(
+  id SERIAL PRIMARY KEY,
+  issue_id INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  anchor_edited TEXT,
+  updated_at TEXT,
+  UNIQUE(issue_id, kind)
 );

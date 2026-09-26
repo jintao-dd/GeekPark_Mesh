@@ -1,0 +1,210 @@
+{
+  "phase": "Agent Quality v2.2",
+  "generated_at": "2026-09-08 22:54:59",
+  "elapsed_s": 3.2,
+  "steps": [
+    {
+      "step": "ranking_baseline",
+      "rc": 0
+    },
+    {
+      "step": "ranking_v1_2",
+      "rc": 0
+    },
+    {
+      "step": "evidence_v2",
+      "rc": 0
+    },
+    {
+      "step": "answer_v2",
+      "rc": 0
+    }
+  ],
+  "Temporal": {
+    "n_pass": 24,
+    "n": 24,
+    "pass_rate": 1.0
+  },
+  "Retrieval_Recall_frozen": {
+    "R@5": 0.8261,
+    "R@10": 0.8961,
+    "R@20": 0.9433,
+    "current": {
+      "R@5": 0.8261,
+      "R@10": 0.8961,
+      "R@20": 0.9433
+    }
+  },
+  "Ranking": {
+    "baseline": {
+      "mrr": 0.8071,
+      "ndcg@10": 0.825,
+      "precision@5": 0.5106,
+      "post_rank_R@5": 0.8261,
+      "post_rank_R@10": 0.8961,
+      "post_rank_R@20": 0.9433
+    },
+    "experiment_v1_2": {
+      "mrr": 0.8282,
+      "ndcg@10": 0.8379,
+      "precision@5": 0.5039,
+      "post_rank_R@5": 0.8178,
+      "post_rank_R@10": 0.8961,
+      "post_rank_R@20": 0.9433
+    },
+    "delta": {
+      "mrr": 0.0211,
+      "ndcg@10": 0.0129,
+      "precision@5": -0.0067
+    },
+    "focus": {
+      "R06": {
+        "baseline_pat": "ok",
+        "v1_2_pat": "ok",
+        "baseline_ranks": {
+          "4149": 3,
+          "4148": 2,
+          "4147": 1,
+          "4150": 4,
+          "4151": 5
+        },
+        "v1_2_ranks": {
+          "4148": 2,
+          "4151": 5,
+          "4150": 4,
+          "4149": 3,
+          "4147": 1
+        },
+        "ndcg_delta": 0.0,
+        "top5_b": [
+          "4147",
+          "4148",
+          "4149",
+          "4150",
+          "4151"
+        ],
+        "top5_v": [
+          "4147",
+          "4148",
+          "4149",
+          "4150",
+          "4151"
+        ]
+      },
+      "R12": {
+        "baseline_pat": "top5_miss:4125,4128",
+        "v1_2_pat": "top5_miss:4125,4128",
+        "baseline_ranks": {
+          "4116": 3,
+          "4120": 5,
+          "4128": 14,
+          "4125": 7
+        },
+        "v1_2_ranks": {
+          "4116": 2,
+          "4120": 5,
+          "4128": 14,
+          "4125": 7
+        },
+        "ndcg_delta": 0.0511,
+        "top5_b": [
+          "4112",
+          "4114",
+          "4116",
+          "4118",
+          "4120"
+        ],
+        "top5_v": [
+          "4112",
+          "4116",
+          "4114",
+          "4118",
+          "4120"
+        ]
+      },
+      "R13": {
+        "baseline_pat": "top5_miss:4154,4155",
+        "v1_2_pat": "top5_miss:4154,4155",
+        "baseline_ranks": {
+          "4155": 16,
+          "4154": 15,
+          "4156": 2
+        },
+        "v1_2_ranks": {
+          "4154": 15,
+          "4156": 2,
+          "4155": 16
+        },
+        "ndcg_delta": 0.0,
+        "top5_b": [
+          "4153",
+          "4156",
+          "4158",
+          "4160",
+          "4168"
+        ],
+        "top5_v": [
+          "4153",
+          "4156",
+          "4158",
+          "4160",
+          "4168"
+        ]
+      },
+      "R18": {
+        "baseline_pat": "top5_miss:4271,4358",
+        "v1_2_pat": "top5_miss:4271,4358",
+        "baseline_ranks": {
+          "4358": 7,
+          "4271": 17
+        },
+        "v1_2_ranks": {
+          "4358": 7,
+          "4271": 18
+        },
+        "ndcg_delta": 0.0,
+        "top5_b": [
+          "4368",
+          "4221",
+          "4274",
+          "4286",
+          "4183"
+        ],
+        "top5_v": [
+          "4368",
+          "4274",
+          "4221",
+          "4286",
+          "4183"
+        ]
+      }
+    },
+    "regressions": [
+      "R16"
+    ],
+    "gates": {
+      "r06_ok": true,
+      "r18_ok": true,
+      "r20_ok": true,
+      "r12_improve": true,
+      "merge_blocked_by": "R16 ndcg -0.012; P@5 -0.007; R12 4125 still @7"
+    },
+    "decision": "KEEP current production ranking; ranking_v1_2 experiment-only (gold regressions: R16)",
+    "production": "KEEP current production ranking until merge_ok"
+  },
+  "Evidence_v2": {
+    "pass_rate": 0.8667,
+    "unsupported_rate": 0.1333,
+    "correctness": 0.8667
+  },
+  "Answer_v2_2": {
+    "pass_rate": 0.8824,
+    "accuracy": 0.8824,
+    "abstention": 0.9412,
+    "nonempty": 1.0,
+    "prev_v2_pass": 0.7059,
+    "delta_pass": 0.1765
+  },
+  "Vector": "OFF",
+  "report": "eval/reports/AGENT_QUALITY_V2_2.md"
+}

@@ -37,6 +37,15 @@
     </div>
     <div class="kpis">{% for k in d.kpis %}<div class="kpi"><b data-path="kpis.{{ loop.index0 }}.n">{{ k.n }}</b><span data-path="kpis.{{ loop.index0 }}.label">{{ k.label }}</span></div>{% endfor %}</div>
     {% if preview %}<p class="note preview-note" id="previewNote" style="color:#B45309" hidden>预览模式：显示的是草稿，读者仍看到上一版上线内容。{% if perms.publish %} 改完后点下方「{% if issue.status == 'published' %}重新上线{% else %}确认上线{% endif %}」。{% else %} 上线需管理员确认。{% endif %}</p>{% endif %}
+    {% if preview and preview_building %}
+    <p class="note" id="buildingNote" style="color:#B45309;margin-top:8px">后台仍在生成要点卡 / 草稿 / 关系。可先浏览；完成后将自动刷新。生成完成前请暂缓大改（可能被覆盖）。确认上线需等生成完成。</p>
+    {% endif %}
+    {% if preview and preview_gate_stale %}
+    <p class="note" id="gateStaleNote" style="color:#B45309;margin-top:8px">稿面已改动，进预览检查已失效。请回素材页重新点「生成预览」后再上线。</p>
+    {% endif %}
+    {% if preview and dup_rel_warnings %}
+    <p class="note" id="dupRelNote" style="color:#B45309;margin-top:8px">有 {{ dup_rel_warnings }} 张疑似重复的关系卡（已标 Warning），请发布前确认保留哪些。</p>
+    {% endif %}
   </div>
 </main></div>
 <main class="wrap">
@@ -44,15 +53,23 @@
   <section id="rel">
     <div class="sec-h"><div class="hrow"><img class="num" src="/static/assets/num_1.png" alt="1"><h2>可同步的关系</h2><span class="k">权重最高</span></div><p>被不止一个团队碰到，或一个团队碰到、另一个明显用得上。只列各团队各自的事实，不给建议。<strong>实线团队标签</strong>表示该团队本期有具体记录；<strong>虚线「→ 团队」</strong>表示建议该团队关注、内容可能与其相关。</p></div>
     <div class="cards" data-addable="relations">
-    {% for r in d.relations %}
-      <div class="card" data-path="relations.{{ loop.index0 }}">
-        <span class="flag" {{ flagstyle(r.label) }} data-path="relations.{{ loop.index0 }}.label" title="单击换标签，双击改文字">{{ r.label }}</span>
-        <p class="t" data-path="relations.{{ loop.index0 }}.title">{{ r.title }}</p>
-        <p class="b" data-path="relations.{{ loop.index0 }}.body">{{ r.body }}</p>
-        {% if r.details %}<div class="detail"><ul>{% set ri=loop.index0 %}{% for li in r.details %}<li data-path="relations.{{ ri }}.details.{{ loop.index0 }}">{{ li }}</li>{% endfor %}</ul></div>{% endif %}
-        <div class="srcs">{% set ri=loop.index0 %}{% for s in r.sources %}<p><span class="lab">来源</span><span data-path="relations.{{ ri }}.sources.{{ loop.index0 }}">{{ s }}</span></p>{% endfor %}</div>
-        <div class="deps">{% set ri=loop.index0 %}{% for t in r.teams %}<span class="dep{% if t.startswith('→') or t.startswith('->') %} dep-sug{% endif %}" data-path="relations.{{ ri }}.teams.{{ loop.index0 }}">{{ t }}</span>{% endfor %}</div>
+    {% for item in relations_view %}
+      {% set r = item.rel %}{% set ri = item.index %}{% set tier = (r.decision_tier or '')|lower %}
+      {# 进草稿即读者可见；skip 不展示。按强度排序，ri 为原数组下标。 #}
+      {% if tier != 'skip' %}
+      <div class="card" data-path="relations.{{ ri }}">
+        <span class="flag" {{ flagstyle(r.label) }} data-path="relations.{{ ri }}.label" title="单击换标签，双击改文字">{{ r.label }}</span>
+        {% if preview and r.decision_tier %}<span class="tier" style="font-size:11px;opacity:.65;margin-left:6px">{{ r.decision_tier }}</span>{% endif %}
+        {% if preview and r._draft_warning == 'suspected_duplicate' %}
+        <span class="tier" style="font-size:11px;color:#B45309;margin-left:6px" title="与「{{ (r._dup_peer_titles or [])|join('、') }}」可能讲同一件事">Warning · 疑似重复</span>
+        {% endif %}
+        <p class="t" data-path="relations.{{ ri }}.title">{{ r.title }}</p>
+        {% if r.body %}<p class="b" data-path="relations.{{ ri }}.body">{{ r.body }}</p>{% endif %}
+        {% if r.details %}<div class="detail"><ul>{% for li in r.details %}<li data-path="relations.{{ ri }}.details.{{ loop.index0 }}">{{ li }}</li>{% endfor %}</ul></div>{% endif %}
+        <div class="srcs">{% for s in r.sources %}<p><span class="lab">来源</span><span data-path="relations.{{ ri }}.sources.{{ loop.index0 }}">{{ s }}</span></p>{% endfor %}</div>
+        <div class="deps">{% for t in r.teams %}<span class="dep{% if t.startswith('→') or t.startswith('->') %} dep-sug{% endif %}" data-path="relations.{{ ri }}.teams.{{ loop.index0 }}">{{ t }}</span>{% endfor %}</div>
       </div>
+      {% endif %}
     {% endfor %}
     </div>
   </section>

@@ -10,14 +10,16 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app import db, qa_structured
+from app import db, db_conn, qa_structured
 
 
 @pytest.fixture
 def facts_db(monkeypatch):
     fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
-    monkeypatch.setenv("MESH_DB", path)
+    # DB_PATH 是 import 期常量；必须 patch 模块属性，否则测试数据写进真实 data/mesh.db。
+    monkeypatch.setattr(db_conn, "DB_PATH", path)
+    monkeypatch.setattr(db, "DB_PATH", path)
     db.init_db(seed=False)
     con = db.connect()
     con.execute(

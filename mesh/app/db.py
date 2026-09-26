@@ -7,7 +7,7 @@ from . import db_conn
 
 _log = logging.getLogger("mesh.db")
 DB_PATH = db_conn.DB_PATH
-SCHEMA_VERSION = "1.8.2"
+SCHEMA_VERSION = "1.9.0"
 _DB_WRITE_LOCK = threading.RLock()
 
 IntegrityError = db_conn.IntegrityError
@@ -31,7 +31,10 @@ CREATE TABLE IF NOT EXISTS issues(
   id INTEGER PRIMARY KEY, slug TEXT UNIQUE, date_start TEXT, date_end TEXT, period_label TEXT,
   version TEXT DEFAULT 'v1.4', status TEXT DEFAULT 'draft',   -- draft | published
   draft_json TEXT, published_json TEXT, published_items_snapshot TEXT,
-  updated_at TEXT, published_at TEXT, created_at TEXT DEFAULT (datetime('now'))
+  updated_at TEXT, published_at TEXT, created_at TEXT DEFAULT (datetime('now')),
+  embedding_status TEXT DEFAULT '', embedding_total INTEGER DEFAULT 0,
+  embedding_done INTEGER DEFAULT 0, embedding_model TEXT DEFAULT '',
+  embedding_at TEXT, embedding_error TEXT
 );
 CREATE TABLE IF NOT EXISTS sources(
   id INTEGER PRIMARY KEY, issue_id INTEGER, stype TEXT, team TEXT, title TEXT, filename TEXT, raw_path TEXT,
@@ -274,6 +277,75 @@ CREATE TABLE IF NOT EXISTS preset_push_log(
   error TEXT,
   pushed_at TEXT DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS crm_sync_state(
+  kind TEXT PRIMARY KEY,
+  database_id TEXT,
+  database_title TEXT,
+  cursor_last_edited TEXT,
+  last_full_at TEXT,
+  last_incr_at TEXT,
+  row_count INTEGER DEFAULT 0,
+  status TEXT DEFAULT '',
+  error TEXT,
+  updated_at TEXT
+);
+CREATE TABLE IF NOT EXISTS crm_companies(
+  id INTEGER PRIMARY KEY,
+  notion_id TEXT UNIQUE NOT NULL,
+  name TEXT, aliases TEXT, one_liner TEXT, sector TEXT, stage TEXT, website TEXT,
+  people_ids_json TEXT, people_names TEXT, props_json TEXT, last_edited_time TEXT, synced_at TEXT
+);
+CREATE TABLE IF NOT EXISTS crm_people(
+  id INTEGER PRIMARY KEY,
+  notion_id TEXT UNIQUE NOT NULL,
+  display_name TEXT, aliases TEXT, headline TEXT,
+  company_ids_json TEXT, company_names TEXT, sector TEXT, location TEXT,
+  email TEXT, wechat TEXT, linkedin TEXT,
+  interaction_ids_json TEXT, take_ids_json TEXT,
+  interaction_count TEXT, last_touched TEXT,
+  props_json TEXT, last_edited_time TEXT, synced_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_crm_people_name ON crm_people(display_name);
+CREATE INDEX IF NOT EXISTS idx_crm_people_touched ON crm_people(last_touched);
+CREATE INDEX IF NOT EXISTS idx_crm_companies_name ON crm_companies(name);
+CREATE TABLE IF NOT EXISTS crm_interactions(
+  id INTEGER PRIMARY KEY,
+  notion_id TEXT UNIQUE NOT NULL,
+  title TEXT, date_start TEXT, interact_type TEXT,
+  people_ids_json TEXT, people_names TEXT, our_side TEXT, output_link TEXT,
+  processed INTEGER DEFAULT 0, props_json TEXT, last_edited_time TEXT, synced_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_crm_ix_date ON crm_interactions(date_start);
+CREATE TABLE IF NOT EXISTS crm_takes(
+  id INTEGER PRIMARY KEY,
+  notion_id TEXT UNIQUE NOT NULL,
+  name TEXT, person_ids_json TEXT, person_names TEXT, verdict TEXT,
+  scenario TEXT, owner TEXT, last_reviewed TEXT, is_prospect TEXT,
+  props_json TEXT, last_edited_time TEXT, synced_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_crm_takes_reviewed ON crm_takes(last_reviewed);
+CREATE TABLE IF NOT EXISTS crm_page_blocks(
+  id INTEGER PRIMARY KEY,
+  notion_id TEXT NOT NULL,
+  owner_kind TEXT DEFAULT 'takes',
+  block_id TEXT UNIQUE NOT NULL,
+  parent_block_id TEXT,
+  ord INTEGER,
+  block_type TEXT,
+  text TEXT,
+  page_last_edited TEXT,
+  synced_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_crm_blocks_page ON crm_page_blocks(notion_id, ord);
+CREATE INDEX IF NOT EXISTS idx_crm_blocks_kind ON crm_page_blocks(owner_kind);
+CREATE TABLE IF NOT EXISTS crm_cross_anchor(
+  id INTEGER PRIMARY KEY,
+  issue_id INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  anchor_edited TEXT,
+  updated_at TEXT,
+  UNIQUE(issue_id, kind)
+);
 """
 
 @contextmanager
@@ -352,11 +424,19 @@ def _cols(con, table):
 
 def migrate(con):
     """就地升级旧库：老部署直接覆盖代码后启动即可，不丢数据。"""
+    _embedding_cols = [
+        ("issues", "embedding_status", "TEXT DEFAULT ''"),
+        ("issues", "embedding_total", "INTEGER DEFAULT 0"),
+        ("issues", "embedding_done", "INTEGER DEFAULT 0"),
+        ("issues", "embedding_model", "TEXT DEFAULT ''"),
+        ("issues", "embedding_at", "TEXT"),
+        ("issues", "embedding_error", "TEXT"),
+    ]
     if is_postgres():
         pg_add = [
             ("items", "owner_provenance", "TEXT"),
             ("items", "llm_owner_team_hint", "TEXT"),
-        ]
+        ] + _embedding_cols
         for table, col, decl in pg_add:
             try:
                 if col not in _cols(con, table):
@@ -364,10 +444,23 @@ def migrate(con):
             except Exception:
                 pass
         try:
+            from . import notion_crm
+
+            notion_crm.ensure_crm_schema(con)
+        except Exception:
+            pass
+        try:
+            from . import qa_log
+
+            qa_log.ensure_schema(con)
+        except Exception:
+            pass
+        try:
             set_setting(con, "schema_version", SCHEMA_VERSION)
         except Exception:
             pass
         ensure_search_fts_schema(con)
+        _maybe_normalize_issue_slugs(con)
         return
     add = [
         ("sources", "channel", "TEXT DEFAULT 'manual'"),
@@ -379,13 +472,19 @@ def migrate(con):
         ("items", "llm_owner_team_hint", "TEXT"),
         ("users", "avatar_url", "TEXT"),
         ("issues", "published_items_snapshot", "TEXT"),
-    ]
+    ] + _embedding_cols
     for table, col, decl in add:
         try:
             if col not in _cols(con, table):
                 con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
         except Exception:
             pass
+    # raw_snippet 字段：新 SCHEMA 已包含；旧库补加
+    try:
+        if "raw_snippet" not in _cols(con, "items"):
+            con.execute("ALTER TABLE items ADD COLUMN raw_snippet TEXT")
+    except Exception:
+        pass
     # 旧数据回填：owner_team 缺失时先沿用 team，管理员可在审校台改
     try:
         con.execute("UPDATE items SET owner_team=team WHERE owner_team IS NULL OR owner_team=''")
@@ -459,6 +558,12 @@ def migrate(con):
     con.execute("""CREATE TABLE IF NOT EXISTS feishu_chat_bindings(
       chat_id TEXT PRIMARY KEY, chat_type TEXT DEFAULT 'group', team TEXT, label TEXT,
       created_at TEXT DEFAULT (datetime('now')), updated_at TEXT)""")
+    try:
+        from . import qa_log
+
+        qa_log.ensure_schema(con)
+    except Exception:
+        pass
     for ddl in (
         """CREATE TABLE IF NOT EXISTS chunk_index(
           chunk_id TEXT PRIMARY KEY, issue_slug TEXT NOT NULL, issue_id INTEGER, date_end TEXT,
@@ -535,10 +640,50 @@ def migrate(con):
         except Exception:
             pass
     try:
+        from . import notion_crm
+
+        notion_crm.ensure_crm_schema(con)
+    except Exception:
+        pass
+    try:
         set_setting(con, "schema_version", SCHEMA_VERSION)
     except Exception:
         pass
     ensure_search_fts_schema(con)
+    _maybe_normalize_issue_slugs(con)
+
+
+def _maybe_normalize_issue_slugs(con) -> None:
+    """把 issues.slug 及所有依赖表的 issue_slug 规范为 YYYY-MM-DD。
+    幂等、轻量，每次启动跑一遍无妨。"""
+    from .issue_period import normalize_issue_slug
+
+    try:
+        rows = con.execute("SELECT id, slug FROM issues").fetchall()
+    except Exception:
+        return
+    for r in rows:
+        old = (r["slug"] or "").strip()
+        new = normalize_issue_slug(old) or old
+        if not new or new == old:
+            continue
+        # 级联更新依赖表（不删 issue 本身，保留 id）
+        for table, col in [
+            ("sources", "issue_slug"),
+            ("items", "issue_slug"),
+            ("search_fts", "issue_slug"),
+            ("entity_team_facts", "issue_slug"),
+            ("item_facts", "issue_slug"),
+            ("item_entity_facts", "issue_slug"),
+            ("chunk_index", "issue_slug"),
+            ("crm_cross_anchor", "issue_slug"),
+            ("preview_job_state", "issue_slug"),
+        ]:
+            try:
+                con.execute(f"UPDATE {table} SET {col}=? WHERE {col}=?", (new, old))
+            except Exception:
+                pass
+        con.execute("UPDATE issues SET slug=? WHERE id=?", (new, r["id"]))
 
 
 def _fts_columns(con) -> set[str]:
@@ -555,6 +700,41 @@ def _init_pg_schema(con) -> None:
     con.executescript(schema_path.read_text(encoding="utf-8"))
 
 
+def ensure_pg_trgm_indexes(con) -> bool:
+    """为 PG 全文检索建 pg_trgm GIN 索引。
+
+    fts_pg 的召回是 `%term%` LIKE，普通 B-tree 用不上；trigram GIN 能让
+    子串匹配走索引，避免语料变大后的全表扫描。失败（无权限/扩展不可用）
+    只记日志，不影响主流程。
+    """
+    if getattr(con, "dialect", "sqlite") == "postgresql":
+        pass
+    else:
+        return False
+    try:
+        con.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_search_fts_toks_trgm ON search_fts USING gin (toks gin_trgm_ops)"
+        )
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_search_fts_title_trgm ON search_fts USING gin (title gin_trgm_ops)"
+        )
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_search_fts_body_trgm ON search_fts USING gin (body gin_trgm_ops)"
+        )
+        with write_lock():
+            commit_retry(con)
+        print("[mesh] pg_trgm indexes ensured", flush=True)
+        return True
+    except Exception as e:
+        print(f"[mesh] pg_trgm index skipped: {e}", flush=True)
+        try:
+            con.rollback()
+        except Exception:
+            pass
+        return False
+
+
 def ensure_search_fts_schema(con) -> bool:
     """
     确保 search_fts 含 toks/date_end（中文 MATCH 用）。
@@ -565,6 +745,8 @@ def ensure_search_fts_schema(con) -> bool:
     if cols >= need:
         return False
     if getattr(con, "dialect", "sqlite") == "postgresql":
+        # PG：不重建表，只确保 trigram 索引存在（让 %term% LIKE 能走索引）
+        ensure_pg_trgm_indexes(con)
         return False
     con.execute("DROP TABLE IF EXISTS search_fts")
     con.execute("""CREATE VIRTUAL TABLE search_fts USING fts5(
@@ -669,6 +851,10 @@ _TEAM_ALIAS_DEFAULT = {
     "GP": "Global Partnership 团队",
     "硅谷 BD": "硅谷 BD 团队",
     "硅谷BD": "硅谷 BD 团队",
+    "硅谷": "硅谷 BD 团队",
+    "硅谷团队": "硅谷 BD 团队",
+    "硅谷的团队": "硅谷 BD 团队",
+    "湾区": "硅谷 BD 团队",
     "Founder Park": "社群",
     "FounderPark": "社群",
     "Founder Park 团队": "社群",
@@ -678,6 +864,7 @@ _TEAM_ALIAS_DEFAULT = {
     "编辑": "编辑部",
     "商业化": "商业化团队",
     "品牌": "品牌创意团队",
+    "海外拓展": "海外拓展",
     "投资": "投资团队",
     "总裁办": "CEO / 总裁办",
     "播客": "音频播客团队",
@@ -691,6 +878,13 @@ _TEAM_ALIAS_DEFAULT = {
 
 def _team_alias_map() -> dict:
     m = dict(_TEAM_ALIAS_DEFAULT)
+    # 飞书部门名 → Mesh 业务队（与 dept_team_map 同源）
+    try:
+        from .agent.dept_team_map import feishu_name_aliases
+
+        m.update(feishu_name_aliases())
+    except Exception:
+        pass
     raw = (os.environ.get("MESH_TEAM_ALIASES") or "").strip()
     if raw:
         try:
@@ -747,8 +941,12 @@ def teams_from_blob(*parts: str) -> list[str]:
                 found.append(n)
     return found
 
-def _item_snippet(it: dict, limit: int = 240) -> str:
+def _item_snippet(it: dict, limit: int = 500) -> str:
     bits = []
+    # 优先用 LLM 生成的完整摘要（若有）
+    summary = str(it.get("summary") or it.get("raw_summary") or "").strip()
+    if summary:
+        bits.append(summary)
     if it.get("sub"):
         bits.append(str(it["sub"]))
     for row in it.get("rows") or []:
@@ -795,13 +993,14 @@ def _collect_item_teams(it: dict, parent_label: str = "", group_title: str = "")
 
 def reindex_entity_facts(con, issue_id: int):
     """从已发布 JSON 物化 主体×团队×期号；仅 published 写入，草稿不进交叉语料。"""
+    from .issue_period import normalize_issue_slug
     row = con.execute(
         "SELECT slug, status, date_start, date_end, published_json FROM issues WHERE id=?",
         (issue_id,),
     ).fetchone()
     if not row:
         return
-    slug = row["slug"]
+    slug = normalize_issue_slug(row["slug"])
     con.execute("DELETE FROM entity_team_facts WHERE issue_slug=?", (slug,))
     if row["status"] != "published" or not (row["published_json"] or "").strip():
         return
@@ -889,23 +1088,53 @@ def reindex_all_entity_facts(con) -> int:
     return len(ids)
 
 
-def reindex_issue(con, issue_id: int, *, items: bool = True):
+def _add_issue_digest(add, data: dict) -> None:
+    """把「导语 + KPI + 期次引导问句」写成一条「本期概览」事实。
+
+    这样「最新一期讲了什么 / 本期概览 / 这期周报主要内容」能直接命中一条完整摘要，
+    而不是只捞到零散条目标题。空导语且无 KPI 时不写，避免制造空壳。
+    """
+    lead = str(data.get("lead") or "").strip()
+    kpis = data.get("kpis") or []
+    kpi_txt = "；".join(
+        f"{k.get('n')} {k.get('label')}" for k in kpis
+        if isinstance(k, dict) and (k.get("label") or k.get("n"))
+    )
+    if not lead and not kpi_txt:
+        return
+    slug = str(data.get("slug") or "").strip()
+    label = str(data.get("period_label") or slug).strip()
+    guide = f"本期周报讲了什么？{label} 一期的主要内容与概览。"
+    body = " ".join(filter(None, [
+        f"【{label}】" if label else "",
+        guide,
+        lead,
+        f"本期规模：{kpi_txt}。" if kpi_txt else "",
+    ]))
+    add("本期概览", f"{label} 本期概览" if label else "本期概览", body[:2000])
+
+
+def reindex_issue(con, issue_id: int, *, items: bool = True, rebuild_chunks: bool = True):
     """仅已上线期进入搜索语料；草稿/未上线先清索引，避免问答/搜索泄露。
-    items=False 时只重建 published_json 层（FTS/entity），不写 live items 到 item_facts。"""
+    items=False 时只重建 published_json 层（FTS/entity），不写 live items 到 item_facts。
+    rebuild_chunks=False 时跳过 chunk_index（Publish 可异步补建）。
+    """
     from . import tokenize as tok
+    from .issue_period import normalize_issue_slug
     row = con.execute(
         "SELECT slug, status, date_end, published_json FROM issues WHERE id=?",
         (issue_id,),
     ).fetchone()
     if not row:
         return
-    slug = row["slug"]
+    slug = normalize_issue_slug(row["slug"])
     con.execute("DELETE FROM search_fts WHERE issue_slug=?", (slug,))
     if row["status"] != "published" or not (row["published_json"] or "").strip():
         from . import item_facts, chunk_index
         item_facts.reindex_item_facts(con, issue_id)
         reindex_entity_facts(con, issue_id)
-        chunk_index.rebuild_issue(con, issue_id, items=False)
+        if rebuild_chunks:
+            chunk_index.rebuild_issue(con, issue_id, items=False)
         return
     date_end = row["date_end"] or ""
     try:
@@ -934,18 +1163,113 @@ def reindex_issue(con, issue_id: int, *, items: bool = True):
                 add(sec_name, it.get("name"), " ".join([it.get("sub",""), it.get("cert",""), g.get("title","")] + [f"{x.get('k')} {x.get('v')}" for x in it.get("rows", [])]))
     for v in data.get("views", []): add("沟通中提到的看法", v.get("topic"), (v.get("text","") + " " + v.get("source","")))
     for g in data.get("gaps", []): add("本期未汇入", g.get("topic"), g.get("text"))
+    # 本期概览：导语 + KPI + 期次引导问句。此前只存在于 published_json，
+    # 从不入索引 → 「最新一期讲了什么」类问法只能取到零散条目标题，答不出内容。
+    _add_issue_digest(add, data)
     for ds in data.get("data_sources") or []:
         add("Data Source", ds.get("team"), ds.get("text") or "")
     from . import item_facts, chunk_index
     if items:
         item_facts.reindex_item_facts(con, issue_id)
     else:
-        slug = row["slug"]
         con.execute("DELETE FROM item_facts WHERE issue_slug=?", (slug,))
         con.execute("DELETE FROM item_entity_facts WHERE issue_slug=?", (slug,))
         item_facts.sync_fts(con)
     reindex_entity_facts(con, issue_id)
-    chunk_index.rebuild_issue(con, issue_id, items=items)
+    if rebuild_chunks:
+        chunk_index.rebuild_issue(con, issue_id, items=items)
+        refresh_issue_embedding_status(con, issue_id)
+
+
+def refresh_issue_embedding_status(
+    con,
+    issue_id: int,
+    *,
+    status: str | None = None,
+    error: str | None = None,
+    running: bool = False,
+) -> dict:
+    """按 chunk_index / chunk_embeddings（当前 model）刷新该期 embedding 进度。"""
+    from . import chunk_index, embeddings
+
+    row = con.execute(
+        "SELECT slug, status, embedding_model FROM issues WHERE id=?", (issue_id,),
+    ).fetchone()
+    if not row:
+        return {}
+    from .issue_period import normalize_issue_slug
+    slug = normalize_issue_slug(row["slug"])
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    model = embeddings.model_name() if embeddings.is_configured() else ""
+    if row["status"] != "published":
+        con.execute(
+            "UPDATE issues SET embedding_status='', embedding_total=0, embedding_done=0, "
+            "embedding_model='', embedding_at=NULL, embedding_error=NULL WHERE id=?",
+            (issue_id,),
+        )
+        return {"slug": slug, "embedding_status": "", "embedding_model": ""}
+    if not embeddings.is_configured():
+        con.execute(
+            "UPDATE issues SET embedding_status='skipped', embedding_total=0, embedding_done=0, "
+            "embedding_model='', embedding_at=?, embedding_error=NULL WHERE id=?",
+            (now, issue_id),
+        )
+        return {"slug": slug, "embedding_status": "skipped", "embedding_model": ""}
+    total, done = chunk_index.embedding_counts_for_slug(con, slug, model=model)
+    stored_model = (row["embedding_model"] or "").strip()
+    err = (error or "").strip() or None
+    if status:
+        st = status
+    elif running:
+        st = "running"
+    elif total <= 0:
+        st = "completed"
+    elif done >= total:
+        st = "completed"
+    elif stored_model and stored_model != model:
+        # 换模型后：旧 completed 不能沿用，按当前 model 缺口重算
+        st = "partial" if done > 0 else "pending"
+    elif err and done <= 0:
+        st = "failed"
+    elif done > 0:
+        st = "partial"
+    else:
+        st = "pending"
+    record_model = model if st in ("completed", "running", "partial", "pending", "failed") else stored_model
+    if st == "completed":
+        record_model = model
+    con.execute(
+        "UPDATE issues SET embedding_status=?, embedding_total=?, embedding_done=?, "
+        "embedding_model=?, embedding_at=?, embedding_error=? WHERE id=?",
+        (st, total, done, record_model, now, err, issue_id),
+    )
+    return {
+        "slug": slug,
+        "embedding_status": st,
+        "embedding_total": total,
+        "embedding_done": done,
+        "embedding_model": record_model,
+        "embedding_error": err,
+    }
+
+
+def issues_needing_embedding(con) -> list[str]:
+    """已发布且向量未齐的期号（供启动回填 / 运维）。"""
+    from . import embeddings
+
+    if not embeddings.is_configured():
+        return []
+    out: list[str] = []
+    for r in con.execute(
+        "SELECT id, slug FROM issues WHERE status='published' ORDER BY date_end DESC"
+    ):
+        slug = r["slug"]
+        if not slug:
+            continue
+        info = refresh_issue_embedding_status(con, r["id"])
+        if info.get("embedding_status") in ("pending", "partial", "failed"):
+            out.append(slug)
+    return out
 
 
 def reindex_all_search(con) -> int:
@@ -988,6 +1312,7 @@ def delete_issue(con, slug: str) -> bool:
     con.execute("DELETE FROM edits WHERE issue_id=?", (iid,))
     con.execute("DELETE FROM mail_log WHERE issue_id=?", (iid,))
     con.execute("DELETE FROM versions WHERE issue_id=?", (iid,))
+    con.execute("DELETE FROM crm_cross_anchor WHERE issue_id=?", (iid,))
     con.execute("DELETE FROM issues WHERE id=?", (iid,))
     return True
 
@@ -1049,7 +1374,7 @@ def snapshot_published_items(con, issue_id: int) -> int:
     rows = [
         dict(x)
         for x in con.execute(
-            """SELECT id, source_id, team, stype, zone, level, kind, text, entities, roles, signals,
+            """SELECT id, source_id, team, stype, zone, level, kind, text, raw_snippet, entities, roles, signals,
                source_label, pointer, blocked, owner_team, channel, merged_into, source_labels
                FROM items WHERE issue_id=? AND blocked=0 AND merged_into IS NULL""",
             (issue_id,),
@@ -1075,7 +1400,7 @@ def iter_index_items(con, issue_id: int):
         except Exception:
             _log.warning("published_items_snapshot corrupt for issue_id=%s", issue_id)
     for it in con.execute(
-        """SELECT id, source_id, team, stype, zone, level, kind, text, entities, roles, signals,
+        """SELECT id, source_id, team, stype, zone, level, kind, text, raw_snippet, entities, roles, signals,
            source_label, pointer, blocked, owner_team, channel, merged_into, source_labels
            FROM items WHERE issue_id=? AND blocked=0 AND merged_into IS NULL""",
         (issue_id,),
@@ -1116,6 +1441,8 @@ def prune_old_logs(con, *, ask_days: int = 180, push_days: int = 90) -> dict:
     return out
 
 
+# 挖掘或重生成卡片后，强制要求重新「生成周报草稿」。
+# 渐进预览骨架期间：若仍在 building，不打 _stale，避免进页瞬间被 draft_is_ready 判死。
 def mark_draft_stale(con, issue_id: int) -> None:
     """挖掘或重生成卡片后，强制要求重新「生成周报草稿」。"""
     row = con.execute("SELECT draft_json FROM issues WHERE id=?", (issue_id,)).fetchone()
@@ -1124,6 +1451,8 @@ def mark_draft_stale(con, issue_id: int) -> None:
     try:
         data = json.loads(row["draft_json"])
     except Exception:
+        return
+    if data.get("_preview_building") or data.get("_preview_partial_ready"):
         return
     if data.get("_stale"):
         return

@@ -1,5 +1,12 @@
-# tmesh 测试环境 — 与生产隔离的独立 compose
-# 用法：cd /opt/geekpark-tmesh && docker compose -f docker-compose.staging.yml up -d --build
+# tmesh 测试环境 — image digest 可复现发布
+# 正确路径：Git commit → docker build → MESH_IMAGE_TAG → up --force-recreate
+# 禁止：对运行中容器 docker cp 热补 app/（recreate 会丢，且与 commit 不对齐）
+#
+# 用法：
+#   export MESH_IMAGE_TAG=2026-09-09-abc1234
+#   export MESH_GIT_SHA=abc1234
+#   docker compose -f docker-compose.staging.yml build
+#   docker compose -f docker-compose.staging.yml up -d
 
 services:
   postgres:
@@ -20,7 +27,14 @@ services:
       retries: 10
 
   mesh:
-    build: .
+    image: geekpark-mesh:${MESH_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GIT_SHA: ${MESH_GIT_SHA:-unknown}
+        BUILD_DATE: ${MESH_BUILD_DATE:-unknown}
+        IMAGE_TAG: ${MESH_IMAGE_TAG:-local}
     container_name: geekpark-tmesh
     restart: unless-stopped
     env_file: .env
@@ -32,18 +46,30 @@ services:
       MESH_ASK_LLM_GLOBAL: ${MESH_ASK_LLM_GLOBAL:-4}
       MESH_JOB_LLM_CONCURRENCY: ${MESH_JOB_LLM_CONCURRENCY:-2}
       MESH_JOB_LLM_GLOBAL: ${MESH_JOB_LLM_GLOBAL:-2}
-      # 测试环境允许 KG/regen 抽检脚本 publish（生产 PG 默认禁止）
+      MESH_PREVIEW_CARD_CONCURRENCY: ${MESH_PREVIEW_CARD_CONCURRENCY:-2}
       MESH_ALLOW_PROD_PUBLISH: "1"
+      MESH_BUILD_GIT_SHA: ${MESH_GIT_SHA:-unknown}
+      MESH_EXPECTED_GIT_SHA: ${MESH_EXPECTED_GIT_SHA:-unknown}
+      MESH_IMAGE_TAG: ${MESH_IMAGE_TAG:-local}
+      MESH_IMAGE_DIGEST: ${MESH_IMAGE_DIGEST:-}
+      MESH_IMAGE_ID: ${MESH_IMAGE_ID:-}
     ports: ["8091:8080"]
     volumes:
+      # 仅持久化数据；app/prompts 以镜像为准（可复现）
       - ./data:/srv/mesh/data
-      - ./app/prompts:/srv/mesh/app/prompts
     depends_on:
       postgres:
         condition: service_healthy
 
   mesh-worker:
-    build: .
+    image: geekpark-mesh:${MESH_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GIT_SHA: ${MESH_GIT_SHA:-unknown}
+        BUILD_DATE: ${MESH_BUILD_DATE:-unknown}
+        IMAGE_TAG: ${MESH_IMAGE_TAG:-local}
     container_name: geekpark-tmesh-worker
     restart: unless-stopped
     env_file: .env
@@ -53,13 +79,18 @@ services:
       MESH_JOB_POLL_SEC: ${MESH_JOB_POLL_SEC:-1.5}
       MESH_JOB_LLM_CONCURRENCY: ${MESH_JOB_LLM_CONCURRENCY:-2}
       MESH_JOB_LLM_GLOBAL: ${MESH_JOB_LLM_GLOBAL:-2}
+      MESH_PREVIEW_CARD_CONCURRENCY: ${MESH_PREVIEW_CARD_CONCURRENCY:-2}
       MESH_ASK_LLM_CONCURRENCY: "1"
       MESH_ASK_LLM_GLOBAL: "1"
       MESH_ALLOW_PROD_PUBLISH: "1"
+      MESH_BUILD_GIT_SHA: ${MESH_GIT_SHA:-unknown}
+      MESH_EXPECTED_GIT_SHA: ${MESH_EXPECTED_GIT_SHA:-unknown}
+      MESH_IMAGE_TAG: ${MESH_IMAGE_TAG:-local}
+      MESH_IMAGE_DIGEST: ${MESH_IMAGE_DIGEST:-}
+      MESH_IMAGE_ID: ${MESH_IMAGE_ID:-}
     command: ["python", "-m", "app.job_worker"]
     volumes:
       - ./data:/srv/mesh/data
-      - ./app/prompts:/srv/mesh/app/prompts
     depends_on:
       postgres:
         condition: service_healthy

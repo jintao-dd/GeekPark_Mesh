@@ -1,11 +1,17 @@
-"""向量 embedding：OpenAI 兼容接口 + 本地 cosine 检索（零额外依赖）。"""
+"""向量 embedding：OpenAI 兼容接口 + 本地 cosine 检索（零额外依赖）。
+
+Runtime 纪律（与质量冻结对齐）：
+  - 默认 Vector / Embedding = OFF（须显式 MESH_EMBED_ENABLED=1 或 MESH_VECTOR_ENABLED=1）
+  - OFF 时 Ask/Agent 热路径不得调用 embed API；不靠「调用失败再 fallback」
+"""
 from __future__ import annotations
 
 import heapq
 import json
 import math
 import re
-from typing import Any
+import threading
+from typing import Any, Literal
 
 import requests
 
@@ -13,10 +19,112 @@ from .providers.base import env
 
 _HTTP = requests.Session()
 
+# 向量矩阵进程内缓存：941 条 × 4096 维 JSON 约 86MB，每次查询重新解析会白花数秒。
+# 按 (model, 语料指纹) 缓存「全量」矩阵；slug/team/date 过滤在检索时做，禁止按过滤后结果缓存
+# （否则第一次无 slug 查询会污染后续限定某期的召回 → 串期）。
+_VEC_CACHE: dict[str, Any] = {"key": "", "rows": [], "norms": []}
+_VEC_CACHE_LOCK = threading.Lock()
+
+_FULL_MATRIX_SQL = """
+    SELECT c.chunk_id, c.issue_slug, c.date_end, c.layer, c.section, c.title, c.body,
+           c.owner_team, c.stype, c.item_id, c.source_label, c.meta_json, e.vector_json
+    FROM chunk_index c
+    JOIN chunk_embeddings e ON e.chunk_id = c.chunk_id AND e.model = ?
+"""
+
+
+def _corpus_key(con: Any, model: str) -> str:
+    try:
+        row = con.execute(
+            "SELECT COUNT(*) AS c, COALESCE(SUM(LENGTH(vector_json)),0) AS n "
+            "FROM chunk_embeddings WHERE model=?",
+            (model,),
+        ).fetchone()
+        return f"{model}:{int(row['c'])}:{int(row['n'])}"
+    except Exception:
+        return ""
+
+
+def clear_vector_cache() -> None:
+    with _VEC_CACHE_LOCK:
+        _VEC_CACHE["key"] = ""
+        _VEC_CACHE["rows"] = []
+        _VEC_CACHE["norms"] = []
+
+
+def _load_full_matrix(con: Any, model: str) -> tuple[list, list]:
+    """返回全量 (rows, norms)；rows 为 (chunk_row, vector)。"""
+    key = _corpus_key(con, model)
+    with _VEC_CACHE_LOCK:
+        if key and _VEC_CACHE["key"] == key:
+            return _VEC_CACHE["rows"], _VEC_CACHE["norms"]
+    rows: list[Any] = []
+    norms: list[float] = []
+    for r in con.execute(_FULL_MATRIX_SQL, (model,)):
+        try:
+            vec = json.loads(r["vector_json"])
+        except Exception:
+            continue
+        if not isinstance(vec, list) or not vec:
+            continue
+        rows.append((r, vec))
+        norms.append(math.sqrt(sum(x * x for x in vec)))
+    with _VEC_CACHE_LOCK:
+        if key:
+            _VEC_CACHE["key"] = key
+            _VEC_CACHE["rows"] = rows
+            _VEC_CACHE["norms"] = norms
+    return rows, norms
+
+
+def _row_passes_filters(
+    r: Any,
+    *,
+    slug: str,
+    team: str,
+    date_from: str | None,
+    date_to: str | None,
+) -> bool:
+    if slug and (r["issue_slug"] or "") != slug:
+        return False
+    if team and (r["owner_team"] or "") != team:
+        return False
+    de = (r["date_end"] or "")[:10]
+    if date_from or date_to:
+        if not de:
+            return False
+        if date_from and de < date_from:
+            return False
+        if date_to and de > date_to:
+            return False
+    return True
+
+RetrievalMode = Literal["structured", "lexical", "hybrid"]
+
 
 def enabled() -> bool:
-    v = (env("MESH_EMBED_ENABLED") or env("MESH_VECTOR_ENABLED") or "1").lower()
-    return v not in ("0", "false", "no", "off")
+    """向量检索 / query embedding 开关。默认 OFF（与 Vector frozen OFF 一致）。"""
+    v = (env("MESH_EMBED_ENABLED") or env("MESH_VECTOR_ENABLED") or "0").lower()
+    return v not in ("0", "false", "no", "off", "")
+
+
+def vector_retrieval_enabled() -> bool:
+    """热路径是否允许 vector / embed_one。等同 enabled ∧ configured keys。"""
+    return is_configured()
+
+
+def retrieval_execution_mode(*, structured_candidate: bool) -> RetrievalMode:
+    """本次请求实际执行模式（非 Planner，仅 Runtime 决策）。
+
+    - structured：结构化候选
+    - hybrid：显式打开 Vector 且已配置
+    - lexical：默认 / Vector OFF
+    """
+    if structured_candidate:
+        return "structured"
+    if vector_retrieval_enabled():
+        return "hybrid"
+    return "lexical"
 
 
 def model_name() -> str:
@@ -59,10 +167,21 @@ def batch_size() -> int:
 
 
 _last_error: str = ""
+_call_count: int = 0
 
 
 def last_error() -> str:
     return _last_error
+
+
+def call_count() -> int:
+    """进程内 embed_texts / embed_one 入口调用次数（含 OFF 时误入热路径）。"""
+    return _call_count
+
+
+def reset_call_count() -> None:
+    global _call_count
+    _call_count = 0
 
 
 def _post_embeddings(url: str, payload: dict) -> requests.Response:
@@ -76,8 +195,11 @@ def _post_embeddings(url: str, payload: dict) -> requests.Response:
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
     """批量 embedding；失败返回空列表并记录 last_error。"""
-    global _last_error
+    global _last_error, _call_count
     _last_error = ""
+    if texts:
+        # 任何非空入口都计数：Vector OFF 下热路径误入可被自检 / 性能报告抓住
+        _call_count += 1
     if not texts or not is_configured():
         if not is_configured():
             _last_error = "embedding not configured (MESH_EMBED_API_KEY / MESH_EMBED_BASE_URL / MESH_EMBED_MODEL)"
@@ -141,38 +263,30 @@ def vector_search(
     if not query_vec:
         return []
     model = model_name()
-    params: list[Any] = [model]
-    sql = """
-        SELECT c.chunk_id, c.issue_slug, c.date_end, c.layer, c.section, c.title, c.body,
-               c.owner_team, c.stype, c.item_id, c.source_label, e.vector_json
-        FROM chunk_index c
-        JOIN chunk_embeddings e ON e.chunk_id = c.chunk_id AND e.model = ?
-        WHERE 1=1
-    """
-    if slug:
-        sql += " AND c.issue_slug = ?"
-        params.append(slug)
-    if team:
-        sql += " AND c.owner_team = ?"
-        params.append(team)
-    if date_from:
-        sql += " AND c.date_end >= ?"
-        params.append(date_from)
-    if date_to:
-        sql += " AND c.date_end <= ?"
-        params.append(date_to)
+    rows, norms = _load_full_matrix(con, model)
     top_k = max(limit * 4, limit)
+    qn = math.sqrt(sum(x * x for x in query_vec))
+    if qn <= 0:
+        return []
     heap: list[tuple[float, dict]] = []
-    for r in con.execute(sql, params):
-        try:
-            vec = json.loads(r["vector_json"])
-        except Exception:
+    for (r, vec), rn in zip(rows, norms):
+        if not _row_passes_filters(
+            r, slug=slug, team=team, date_from=date_from, date_to=date_to,
+        ):
             continue
-        if not isinstance(vec, list):
+        if rn <= 0 or len(vec) != len(query_vec):
             continue
-        sc = cosine(query_vec, vec)
+        dot = sum(x * y for x, y in zip(query_vec, vec))
+        sc = dot / (qn * rn)
         if sc <= 0.05:
             continue
+        meta = {}
+        try:
+            raw_meta = r["meta_json"]
+            if raw_meta:
+                meta = json.loads(raw_meta)
+        except Exception:
+            meta = {}
         hit = {
             "issue_slug": r["issue_slug"],
             "section": r["section"] or "抽取条目",
@@ -185,6 +299,8 @@ def vector_search(
             "stype": r["stype"] or "",
             "source": "vector",
             "chunk_id": r["chunk_id"],
+            "layer": r["layer"] or "",
+            "meta": meta,
         }
         if len(heap) < top_k:
             heapq.heappush(heap, (-sc, hit))

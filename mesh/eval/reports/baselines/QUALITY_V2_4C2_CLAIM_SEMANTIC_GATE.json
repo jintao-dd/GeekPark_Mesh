@@ -1,0 +1,50 @@
+{
+  "phase": "quality_v2_4c2_claim_semantic_gate",
+  "elapsed_s": 115.89,
+  "baseline": {
+    "mesh_claim_semantic": "1",
+    "mesh_agent_use_llm": "0",
+    "claim_support": "v2.4c2_semantic_extension",
+    "ranking": "v1.4",
+    "vector": "OFF"
+  },
+  "steps": [
+    {
+      "step": "answer_canonical",
+      "rc": 0
+    },
+    {
+      "step": "evidence_canonical",
+      "rc": 0
+    },
+    {
+      "step": "answer_unseen",
+      "rc": 0
+    },
+    {
+      "step": "evidence_unseen",
+      "rc": 0
+    }
+  ],
+  "metrics": {
+    "answer_canonical_pass_rate": 1.0,
+    "evidence_canonical_pass_rate": 1.0,
+    "answer_unseen_pass_rate": 1.0,
+    "evidence_unseen_pass_rate": 1.0,
+    "answer_unseen_fail_ids": [],
+    "evidence_unseen_fail_ids": [],
+    "temporal": 0.9167
+  },
+  "hard_gates": {
+    "canonical_answer_full": true,
+    "canonical_evidence_full": true,
+    "unseen_answer_cleared": true,
+    "unseen_evidence_cleared": true,
+    "E28_ok": true,
+    "steps_ok": true,
+    "worse_empty": true
+  },
+  "worse_ids": [],
+  "gate_ok": true,
+  "freeze_claim_support": true
+}

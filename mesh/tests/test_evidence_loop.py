@@ -47,19 +47,22 @@ def test_citation_keeps_grounded():
     assert "编辑部" in out["answer"]
 
 
-def test_relation_gate_allows_weak_blocks_needs_review():
+def test_relation_gate_allows_watch_and_needs_review_with_evidence():
     draft = {
         "relations": [{
             "label": "一方接触，另一方用得上",
             "weak": True,
+            "decision_tier": "watch",
             "title": "某公司 · 某人",
-            "teams": ["编辑部"],
+            "teams": ["编辑部", "→ 投资团队"],
             "details": ["编辑部记录：x"],
             "sources": ["编辑部"],
+            "evidence": [{"item_id": 1, "team": "编辑部", "snippet": "x"}],
         }]
     }
     errs = relation_gate.relation_publish_blockers(draft, [])
     assert not any("弱关系" in e for e in errs)
+    assert not any("缺少 evidence" in e for e in errs)
 
     draft2 = {
         "relations": [{
@@ -72,7 +75,8 @@ def test_relation_gate_allows_weak_blocks_needs_review():
         }]
     }
     errs2 = relation_gate.relation_publish_blockers(draft2, [])
-    assert any("叙事待核对" in e for e in errs2)
+    # 有 evidence 的 needs_review 不再硬拦（稿面已人工过）
+    assert not any("叙事待核对" in e for e in errs2)
 
 
 def test_relation_gate_blocks_fake_cross_team():

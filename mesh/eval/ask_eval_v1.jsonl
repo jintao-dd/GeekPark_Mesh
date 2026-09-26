@@ -1,10 +1,10 @@
-{"id":"e01","q":"商业化团队在跟进的客户里，哪些同时也是编辑部的采访对象？","tags":["structured","intersect"],"expect_route":"independent","expect_mode":"structured","min_total":0,"note":"交集可能为0（接触段）"}
+{"id":"e01","q":"商业化团队在跟进的客户里，哪些同时也是编辑部的采访对象？","tags":["structured","intersect"],"expect_route":"independent","expect_mode":"structured","min_total":0,"note":"接触段交集（复合主体名拆分后可得 小鹏 等）"}
 {"id":"e02","q":"编辑部接触了面壁智能吗","tags":["entity","hybrid"],"expect_route":"independent","expect_mode":"hybrid","must_context":["面壁"],"e2e":true,"must_answer":["面壁","编辑部"],"forbid_answer":["已校验断言"]}
 {"id":"e03","q":"具身智能有哪些公司","tags":["topic","hybrid"],"expect_route":"independent","expect_mode":"hybrid","min_context":1,"must_context":["具身"],"e2e":true}
 {"id":"e04","q":"还有哪些","tags":["followup"],"expect_route":"followup","needs_prior":true,"prior_q":"具身智能有哪些公司","prior_answer_leak":"SECRET_LEAK_具身答案不应出现","prior_entities":["优必选"],"min_context":1}
 {"id":"e05","q":"面壁智能","tags":["short","independent"],"expect_route":"independent","needs_prior":true,"prior_q":"具身智能有哪些公司","must_context":["面壁"],"e2e":true,"forbid_answer":["#","##"]}
 {"id":"e06","q":"面壁智能","tags":["team_scope"],"scope":{"team":"编辑部"},"expect_route":"independent","min_context":1,"must_context":["面壁"]}
-{"id":"e07","q":"面壁智能","tags":["slug_scope"],"scope":{"slug":"2026-8-17"},"expect_route":"independent","scope_issues":["2026-8-17"],"min_context":1}
+{"id":"e07","q":"面壁智能","tags":["slug_scope"],"scope":{"slug":"2026-08-17"},"expect_route":"independent","scope_issues":["2026-08-17"],"min_context":1}
 {"id":"e08","q":"商业化团队跟进了但编辑部还没接触的主体有哪些？","tags":["structured","diff"],"expect_route":"independent","expect_mode":"structured","expect_set_op":"diff"}
 {"id":"e09","q":"海外团队有接触、国内团队还没跟进的公司有哪些？","tags":["structured","overseas"],"expect_route":"independent","expect_mode":"structured","expect_set_op":"overseas_gap"}
 {"id":"e10","q":"各团队最近关注了哪些硬件相关话题？","tags":["structured","by_team"],"expect_route":"independent","expect_mode":"structured","expect_set_op":"by_team"}
@@ -12,7 +12,7 @@
 {"id":"e12","q":"吉利银河 智能座舱","tags":["entity","topic"],"expect_route":"independent","min_context":1}
 {"id":"e13","q":"近30天编辑部接触了谁","tags":["time_window","team"],"expect_route":"independent","min_context":0}
 {"id":"e14","q":"全部历史以来具身智能有哪些公司","tags":["time_all"],"expect_route":"independent","min_context":1}
-{"id":"e15","q":"编辑部和商业化团队两边同时跟进了哪些客户？","tags":["cross_cue","hybrid"],"expect_route":"independent","min_context":0}
+{"id":"e15","q":"编辑部和商业化团队两边同时跟进了哪些客户？","tags":["structured","intersect"],"expect_route":"independent","expect_mode":"structured","expect_set_op":"intersect","note":"LLM 意图层识别改述交集；复合主体名拆分后不再恒为 0"}
 {"id":"e16","q":"那家最近怎么样","tags":["followup","anaphora"],"expect_route":"followup","needs_prior":true,"prior_q":"编辑部接触了面壁智能吗","prior_answer_leak":"端云协同SECRET不应泄漏","prior_entities":["面壁智能"],"min_context":1}
 {"id":"e17","q":"他们对比一下","tags":["followup","weak"],"expect_route":"followup","needs_prior":true,"prior_q":"编辑部和商业化团队两边同时跟进了哪些客户？","min_context":0}
 {"id":"e18","q":"硅谷 BD 团队有没有接触面壁智能","tags":["team_in_q","entity"],"expect_route":"independent","min_context":0}

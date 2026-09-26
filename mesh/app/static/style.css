@@ -285,8 +285,9 @@ body.editor .flag[data-path][contenteditable="true"]{outline:2px solid #fff;box-
 .pubmodal .row .k[disabled]{background:#D0D5DD;color:#98A2B3;cursor:not-allowed}
 
 /* 统一确认/输入对话框（替代浏览器 UI） */
-.mesh-dlg-mask{position:fixed;inset:0;background:rgba(20,56,47,.48);display:none;align-items:center;justify-content:center;z-index:240;padding:24px;touch-action:manipulation}
-.mesh-dlg-mask.on{display:flex}
+.mesh-dlg-mask{position:fixed;inset:0;background:rgba(20,56,47,.48);display:none;align-items:center;justify-content:center;z-index:10050;padding:24px;touch-action:manipulation}
+.mesh-dlg-mask.on{display:flex !important}
+.mesh-dlg-mask[hidden]{display:none !important}
 .mesh-dlg{background:#fff;border-radius:22px;padding:32px;width:min(440px,92vw);box-shadow:0 30px 80px -20px rgba(0,0,0,.4);margin:0;transform:translateZ(0)}
 .mesh-dlg h3{margin:0 0 10px;font-size:20px;color:var(--ink)}
 .mesh-dlg .mesh-dlg-body{margin:0 0 18px;color:var(--ink3);font-size:14px;line-height:1.55;white-space:pre-wrap}
@@ -445,6 +446,16 @@ body[data-num="a"] .hrow .ds{height:52px}
 .card.weak{border-style:dashed;box-shadow:none;background:rgba(255,255,255,.85)}
 .card.weak .t{font-size:21.5px}
 .card.weak .b{font-size:15px}
+
+/* 预览/编辑：草稿积压（parallel / watch，不上读者页） */
+.rel-backlog{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
+.rel-backlog .sec-h h2{color:var(--ink2)}
+.rel-backlog .card-backlog{border-style:dashed;background:rgba(255,255,255,.78);box-shadow:none}
+.rel-backlog .card-backlog .t{font-size:21px;color:var(--ink2)}
+.rel-backlog .tier{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-family:var(--mono);opacity:.75;margin-left:6px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--ink3)}
+.rel-backlog .tier-parallel{border-color:#CFE0B8;color:#3F6E14;background:#F4FAEC}
+.rel-backlog .tier-watch{border-color:#E8D9A8;color:#854D0E;background:#FBF6E8}
+
 /* ===== 列表 ===== */
 .list{border:1px solid #E6EDE0;border-radius:var(--r-box);overflow:hidden;background:#fff}
 @media (min-width:1500px){.list{max-width:1120px}}

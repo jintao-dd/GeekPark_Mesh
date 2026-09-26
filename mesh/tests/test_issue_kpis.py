@@ -5,40 +5,50 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.issue_verify import sync_kpis_from_data
-from app.relation_candidates import build_relation_candidates, merge_relations_from_candidates
+
+
+def _card(title: str, tier: str = "strong") -> dict:
+    return {
+        "title": title,
+        "body": "x",
+        "decision_tier": tier,
+        "evidence": [{"item_id": 1}],
+        "label": "已联动",
+        "teams": ["编辑部"],
+        "details": [],
+        "sources": [],
+    }
 
 
 def test_kpi_relations_count_matches_cards():
-    items = [
-        {"id": 1, "source_id": 10, "owner_team": "编辑部", "pointer": "p1", "entities": '["破壳创智"]', "text": "a", "source_label": "编辑部", "blocked": 0},
-        {"id": 2, "source_id": 11, "owner_team": "Global Partnership 团队", "pointer": "p2", "entities": '["破壳创智"]', "text": "b", "source_label": "GP", "blocked": 0},
-    ]
-    cands = build_relation_candidates(items)
-    draft = {
-        "kpis": [{"n": "99", "label": "可同步的关系"}],
-        "relations": [
-            {
-                "title": "破壳创智",
-                "teams": ["编辑部", "Global Partnership 团队"],
-                "body": "x",
-                "details": [],
-                "sources": [],
-                "label": "合作机会",
-                "weak": False,
-            }
-        ],
+    out = sync_kpis_from_data({
+        "relations": [_card("破壳创智")],
         "contacts": [],
         "keywords": {"groups": []},
-    }
-    out = merge_relations_from_candidates(draft, cands, items)
+    })
     kpi_rel = next(k for k in out["kpis"] if k["label"] == "可同步的关系")
     assert kpi_rel["n"] == "1"
     assert len(out["relations"]) == 1
 
 
+def test_kpi_relations_counts_all_keep_tiers():
+    """KPI 统计进草稿的全部完整卡（含 parallel/watch）。"""
+    out = sync_kpis_from_data({
+        "relations": [
+            _card("S1", "strong"),
+            _card("S2", "strong"),
+            _card("P", "parallel"),
+            _card("W", "watch"),
+        ],
+        "contacts": [],
+        "keywords": {"groups": []},
+    })
+    assert next(k for k in out["kpis"] if k["label"] == "可同步的关系")["n"] == "4"
+
+
 def test_sync_kpis_founder_dialogue_from_contacts():
     data = sync_kpis_from_data({
-        "relations": [{"title": "a"}, {"title": "b"}],
+        "relations": [_card("a"), _card("b")],
         "contacts": [
             {
                 "label": "编辑部一手对话 · 3 场",

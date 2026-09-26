@@ -1,0 +1,130 @@
+{% extends "base.html" %}{% block title %}AI 问答质量 · GeekPark Mesh{% endblock %}
+{% block body %}
+<div class="adm">
+{% with nav='qa' %}{% include "adm_top.html" %}{% endwith %}
+<h1>AI 问答质量</h1>
+<p class="muted" style="max-width:760px;line-height:1.6">
+飞书与 HTTP 每轮问答都会落到这里，含<strong>答案原文、证据、answer_status</strong>。
+这是排查「答错 / 无证据乱答」的可复现样本库；只读记录，不改答案。
+</p>
+
+<h2>近 {{ stats.days }} 天概览{% if stats.source %}（来源：{{ stats.source }}）{% endif %}</h2>
+{% if stats.error %}
+<div class="box" style="border-color:#B42318">
+  <b style="color:#B42318">概览查询失败</b>
+  <div class="muted" style="margin-top:6px;font-size:12.5px"><code>{{ stats.error }}</code></div>
+  <div class="muted" style="margin-top:6px;font-size:12.5px">页面仍可用；若持续报错请查容器日志 <code>qa_log</code>。</div>
+</div>
+{% endif %}
+<div class="box">
+  <div style="font-size:15px;margin-bottom:8px">共 <b>{{ stats.total }}</b> 轮</div>
+  {% if stats.by_source %}
+  <div class="muted" style="margin-bottom:8px;font-size:12.5px">
+    全表来源分布（不受筛选影响）：
+    {% for k, v in stats.by_source.items() %}<code>{{ k }}</code> {{ v }}{% if not loop.last %} · {% endif %}{% endfor %}
+  </div>
+  {% endif %}
+  <table style="max-width:720px">
+    <tr><th>answer_status</th><th>轮数</th><th>渠道</th><th>轮数</th></tr>
+    {% set statuses = stats.by_status.items()|list %}
+    {% set channels = stats.by_channel.items()|list %}
+    {% for i in range([statuses|length, channels|length]|max) %}
+    <tr>
+      <td>{% if i < statuses|length %}<code>{{ statuses[i][0] }}</code>{% endif %}</td>
+      <td>{% if i < statuses|length %}{{ statuses[i][1] }}{% endif %}</td>
+      <td>{% if i < channels|length %}<code>{{ channels[i][0] }}</code>{% endif %}</td>
+      <td>{% if i < channels|length %}{{ channels[i][1] }}{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<h2>问答记录</h2>
+<form method="get" action="/admin/qa" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0 16px">
+  <input type="text" name="q" value="{{ filters.q }}" placeholder="搜问题或答案" style="max-width:260px">
+  <select name="source" style="max-width:150px">
+    <option value="feishu"{% if filters.source == 'feishu' %} selected{% endif %}>真实飞书</option>
+    <option value=""{% if filters.source == '' %} selected{% endif %}>全部来源</option>
+    <option value="eval"{% if filters.source == 'eval' %} selected{% endif %}>评测</option>
+    <option value="http"{% if filters.source == 'http' %} selected{% endif %}>HTTP</option>
+  </select>
+  <select name="channel" style="max-width:150px">
+    <option value="">全部渠道</option>
+    {% for c in ['feishu_dm','feishu_group','harness','web'] %}
+    <option value="{{ c }}"{% if filters.channel == c %} selected{% endif %}>{{ c }}</option>
+    {% endfor %}
+  </select>
+  <select name="status" style="max-width:170px">
+    <option value="">全部状态</option>
+    {% for s in ['grounded','weak','unsupported','refused','has_evidence','unknown'] %}
+    <option value="{{ s }}"{% if filters.status == s %} selected{% endif %}>{{ s }}</option>
+    {% endfor %}
+  </select>
+  <label class="muted" style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="only_bad" value="1"{% if filters.only_bad %} checked{% endif %} style="width:auto">只看我标了「差」</label>
+  <button class="btn pri" type="submit">筛选</button>
+  <a class="btn" href="/admin/qa">重置</a>
+</form>
+
+<p class="muted">共 {{ total }} 条{% if total > limit %} · 显示第 {{ offset + 1 }}–{{ offset + turns|length }} 条{% endif %}</p>
+
+{% for t in turns %}
+<div class="box" id="turn-{{ t.id }}">
+  <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline">
+    <div style="font-size:13px" class="muted">
+      #{{ t.id }} · {{ t.created_at }} · <code>{{ t.source or '—' }}</code> / <code>{{ t.channel or '—' }}</code>
+      {% if t.feishu_open_id %} · {{ t.feishu_open_id[:18] }}{% endif %}
+      {% if t.latency_ms %} · {{ t.latency_ms }}ms{% endif %}
+    </div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <span class="tag{% if t.flag in ('error','unsupported','no_evidence') %} bad{% elif t.flag in ('weak','refused','unknown') %} pend{% elif t.answer_status == 'grounded' %} ok{% endif %}">{{ t.answer_status or 'unknown' }}</span>
+      {% if t.flag %}<span class="tag">{{ t.flag }}</span>{% endif %}
+      {% if t.feedback == 'good' %}<span class="tag ok">人工·好</span>{% elif t.feedback == 'bad' %}<span class="tag bad">人工·差</span>{% endif %}
+    </div>
+  </div>
+
+  <div style="margin-top:10px"><b>问：</b>{{ t.question }}</div>
+  <div style="margin-top:8px;white-space:pre-wrap"><b>答：</b>{{ t.answer_text or '（空）' }}</div>
+
+  <div class="muted" style="margin-top:10px;font-size:12.5px">
+    intent=<code>{{ t.intent or '—' }}</code>
+    route=<code>{{ t.route or '—' }}</code>
+    证据 {{ t.evidence_count }} 条
+    {% if t.tools_called %} · tools={{ t.tools_called|join(', ') }}{% endif %}
+    {% if t.error %} · <span style="color:#B42318">error={{ t.error }}</span>{% endif %}
+  </div>
+
+  {% if t.evidence_refs %}
+  <details style="margin-top:8px"><summary class="muted" style="cursor:pointer">证据引用（{{ t.evidence_refs|length }}）</summary>
+    <pre>{{ t.evidence_refs|tojson(indent=2) }}</pre>
+  </details>
+  {% endif %}
+  {% if t.claim_bindings %}
+  <details style="margin-top:6px"><summary class="muted" style="cursor:pointer">Claim 绑定（{{ t.claim_bindings|length }}）</summary>
+    <pre>{{ t.claim_bindings|tojson(indent=2) }}</pre>
+  </details>
+  {% endif %}
+  {% if t.trace_json %}
+  <details style="margin-top:6px"><summary class="muted" style="cursor:pointer">trace</summary>
+    <pre>{{ t.trace_json|tojson(indent=2) }}</pre>
+  </details>
+  {% endif %}
+
+  <form method="post" action="/admin/qa/{{ t.id }}/feedback" style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap">
+    <input type="text" name="note" value="{{ t.feedback_note or '' }}" placeholder="备注（可选）" style="max-width:320px">
+    <button class="btn" type="submit" name="feedback" value="good">标为好</button>
+    <button class="btn danger" type="submit" name="feedback" value="bad">标为差</button>
+    {% if t.feedback %}<button class="btn" type="submit" name="feedback" value="">清除</button>{% endif %}
+  </form>
+</div>
+{% else %}
+<p class="muted">还没有记录。去飞书问一句，或走 HTTP harness，再回来看。</p>
+{% endfor %}
+
+{% if total > limit %}
+<div style="display:flex;gap:8px;margin-top:16px">
+  {% if offset > 0 %}<a class="btn" href="/admin/qa?offset={{ [offset - limit, 0]|max }}&limit={{ limit }}&q={{ filters.q }}&source={{ filters.source }}&channel={{ filters.channel }}&status={{ filters.status }}{% if filters.only_bad %}&only_bad=1{% endif %}">上一页</a>{% endif %}
+  {% if offset + turns|length < total %}<a class="btn" href="/admin/qa?offset={{ offset + limit }}&limit={{ limit }}&q={{ filters.q }}&source={{ filters.source }}&channel={{ filters.channel }}&status={{ filters.status }}{% if filters.only_bad %}&only_bad=1{% endif %}">下一页</a>{% endif %}
+</div>
+{% endif %}
+</div>
+{% endblock %}
