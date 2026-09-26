@@ -98,11 +98,11 @@ def _mouth_max_tokens(*, cross: bool = False) -> int:
     import os
 
     try:
-        base = max(400, min(2000, int(os.environ.get("MESH_MOUTH_MAX_TOKENS") or "1200")))
+        base = max(400, min(2400, int(os.environ.get("MESH_MOUTH_MAX_TOKENS") or "1600")))
     except Exception:
-        base = 1200
+        base = 1600
     if cross:
-        return max(base, min(2400, int(os.environ.get("MESH_MOUTH_CROSS_MAX_TOKENS") or "1800")))
+        return max(base, min(3200, int(os.environ.get("MESH_MOUTH_CROSS_MAX_TOKENS") or "2400")))
     return base
 
 
